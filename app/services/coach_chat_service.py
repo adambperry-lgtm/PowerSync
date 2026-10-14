@@ -278,12 +278,15 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
         }
 
     # 1. Check for daily workout / interval session intent (today OR scheduled for tomorrow/future date)
-    wants_workout = any(k in msg for k in [
-        "workout", "intervals", "spin", "ride today", "sweet spot", "sst", "tempo",
+    is_pure_review = any(k in msg for k in ["review", "history", "why did", "what happened", "explain my"]) and not any(k in msg for k in [
+        "give me a", "schedule", "create", "make a", "prescribe", "swap", "change", "what workout", "suggest a workout"
+    ])
+    wants_workout = (not is_pure_review) and any(k in msg for k in [
+        "intervals", "spin", "ride today", "sweet spot", "sst", "tempo",
         "vo2", "recovery", "flush", "threshold", "over-under", "over under", "overunder",
         "trainer", "zwift", "shorter", "20 min", "25 min", "30 min", "45 min", "60 min",
         "75 min", "90 min", "give me a", "make a", "create a", "suggest a", "change to",
-        "swap to", "switch to", "can i do", "put together", "schedule"
+        "swap to", "switch to", "can i do", "put together", "schedule", "new workout", "prescribe"
     ])
     
     # Check if this is an explicit major target event or large outdoor ride (NOT a daily workout)
@@ -478,11 +481,13 @@ def call_gemini_api(api_key: str, system_instruction: str, history: List[Dict[st
 
     models_to_try = [
         ("v1beta", "gemini-3-flash-preview"),
+        ("v1beta", "gemini-2.5-flash"),
         ("v1beta", "gemini-3.8-flash"),
         ("v1beta", "gemini-3.1-flash-lite"),
         ("v1beta", "gemini-3.5-flash"),
         ("v1beta", "gemini-3.7-flash"),
         ("v1beta", "gemini-flash-latest"),
+        ("v1beta", "gemini-2.5-pro"),
         ("v1beta", "gemini-pro-latest"),
     ]
 
@@ -522,7 +527,7 @@ def call_gemini_api(api_key: str, system_instruction: str, history: List[Dict[st
         "contents": contents,
         "generationConfig": {
             "temperature": 0.7,
-            "maxOutputTokens": 1000
+            "maxOutputTokens": 8192
         }
     }
 
@@ -531,18 +536,21 @@ def call_gemini_api(api_key: str, system_instruction: str, history: List[Dict[st
     for api_ver, model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent?key={api_key}"
         try:
-            res = requests.post(url, headers=headers, json=payload, timeout=10)
+            res = requests.post(url, headers=headers, json=payload, timeout=25)
             if res.status_code == 200:
                 data = res.json()
                 candidates = data.get("candidates", [])
                 if candidates:
+                    finish_reason = candidates[0].get("finishReason")
+                    if finish_reason == "MAX_TOKENS":
+                        print(f"WARNING: Gemini {api_ver}/{model} hit MAX_TOKENS limit!")
                     parts = candidates[0].get("content", {}).get("parts", [])
-                    text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text")]
+                    text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text") and not p.get("thought")]
                     full_text = "\n".join(text_parts).strip()
                     clean_text = clean_model_output(full_text)
                     if clean_text:
                         _CACHED_WORKING_MODEL = (api_ver, model)
-                        print(f"Gemini API success using {api_ver}/{model}")
+                        print(f"Gemini API success using {api_ver}/{model} (finish_reason: {finish_reason}, len: {len(clean_text)})")
                         return clean_text
             else:
                 print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {res.text[:100]}")
@@ -552,7 +560,7 @@ def call_gemini_api(api_key: str, system_instruction: str, history: List[Dict[st
     # If predefined models failed, query ListModels for active Gemini-specific models
     try:
         list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-        l_res = requests.get(list_url, timeout=8)
+        l_res = requests.get(list_url, timeout=10)
         if l_res.status_code == 200:
             models_data = l_res.json().get("models", [])
             valid_models = []
@@ -569,18 +577,21 @@ def call_gemini_api(api_key: str, system_instruction: str, history: List[Dict[st
             for vm in valid_models:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{vm}:generateContent?key={api_key}"
                 try:
-                    res = requests.post(url, headers=headers, json=payload, timeout=12)
+                    res = requests.post(url, headers=headers, json=payload, timeout=25)
                     if res.status_code == 200:
                         data = res.json()
                         candidates = data.get("candidates", [])
                         if candidates:
+                            finish_reason = candidates[0].get("finishReason")
+                            if finish_reason == "MAX_TOKENS":
+                                print(f"WARNING: Discovered Gemini model {vm} hit MAX_TOKENS limit!")
                             parts = candidates[0].get("content", {}).get("parts", [])
-                            text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text")]
+                            text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text") and not p.get("thought")]
                             full_text = "\n".join(text_parts).strip()
                             clean_text = clean_model_output(full_text)
                             if clean_text:
                                 _CACHED_WORKING_MODEL = ("v1beta", vm)
-                                print(f"Successfully generated response with discovered Gemini model: {vm}")
+                                print(f"Successfully generated response with discovered Gemini model: {vm} (finish_reason: {finish_reason})")
                                 return clean_text
                 except Exception as ex:
                     print(f"Error querying discovered model {vm}: {ex}")
@@ -819,7 +830,13 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             model_used = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini"
             clean_reply, proposed_action = extract_action_from_response(gemini_reply)
             if not proposed_action:
-                proposed_action = build_sports_science_action(user_message, snapshot)
+                has_action_request = any(k in user_message.lower() for k in [
+                    "give me a", "schedule", "create a", "make a", "prescribe", "suggest a workout",
+                    "change to", "swap to", "switch to", "put together", "plan a ride", "upcoming ride",
+                    "cancel plan", "clear plan", "what workout should i do", "what should i do today"
+                ])
+                if has_action_request:
+                    proposed_action = build_sports_science_action(user_message, snapshot)
 
             if proposed_action and "intervals" in proposed_action and "duration_minutes" in proposed_action:
                 from app.services.zwift_service import reconcile_workout_intervals

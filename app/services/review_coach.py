@@ -827,7 +827,7 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.4,
-            "maxOutputTokens": 1000,
+            "maxOutputTokens": 4096,
             "responseMimeType": "application/json"
         }
     }
@@ -836,10 +836,12 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
     for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
         try:
-            res = requests.post(url, json=payload, timeout=8)
+            res = requests.post(url, json=payload, timeout=20)
             if res.status_code == 200:
                 data = res.json()
-                raw_text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
+                text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text") and not p.get("thought")]
+                raw_text = "\n".join(text_parts).strip()
                 clean = raw_text.strip().replace("```json", "").replace("```", "").strip()
                 # 1. Try standard JSON parse
                 try:
