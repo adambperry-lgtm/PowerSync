@@ -594,7 +594,7 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     }
 
     if (narrative) {
-      narrative.textContent = w.ai_rationale || `Whoop recovery sits at ${whoopRec}%. Keep power strictly within aerobic boundaries to preserve autonomic reserves and promote metabolic adaptation.`;
+      narrative.textContent = w.ai_rationale || `Whoop recovery sits at ${whoopRec}%. Keep power strictly within aerobic boundaries to protect recovery and build aerobic fitness.`;
     }
 
     if (subtext) {
@@ -3270,9 +3270,7 @@ function renderDebrief(data) {
         zoneBg = "rgba(244, 63, 94, 0.1)";
       }
 
-      const durTag = (item.duration_min === 0)
-        ? `<span class="tag tag-dur" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-weight:600;">🛌 REST DAY</span>`
-        : `<span class="tag tag-dur">${item.duration_min} MIN</span>`;
+      const durTag = `<span class="tag tag-dur">${item.duration_min || 0} MIN</span>`;
       const xssTag = (item.estimated_xss !== undefined && item.estimated_xss > 0)
         ? `<span class="tag" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);font-weight:600;">⚡ ~${item.estimated_xss} XSS</span>`
         : '';
@@ -3284,9 +3282,9 @@ function renderDebrief(data) {
         : '';
 
       const scheduledBadge = item.is_athlete_adjusted
-        ? `<span class="badge-status" style="color:#a78bfa;border-color:rgba(167,139,250,0.4);background:rgba(167,139,250,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">✍️ Athlete Note Adjusted</span>`
+        ? `<span class="badge-status" style="color:#a78bfa;border-color:rgba(167,139,250,0.4);background:rgba(167,139,250,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">✍️ Athlete Note</span>`
         : (item.is_directive_rest
-          ? `<span class="badge-status" style="color:#10b981;border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">🛌 Directive Rest Day</span>`
+          ? `<span class="badge-status" style="color:#10b981;border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">📋 Schedule Directive</span>`
           : (item.is_coach_scheduled
             ? `<span class="badge-status" style="color:var(--accent-cyan);border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">💬 Coach Scheduled</span>`
             : ''));

@@ -119,58 +119,58 @@ def parse_athlete_feedback_for_outlook(note: str, today: datetime.date, ftp: int
         if has_rest and has_z2:
             overrides[off] = {
                 "type": "zone_2_or_rest",
-                "title": "🌱 Zone 2 Aerobic Flush (or Rest Day)",
+                "title": "Zone 2 Spin or Rest Day",
                 "duration_min": 35,
                 "estimated_tss": 20,
                 "estimated_xss": 20,
                 "low_xss": 20,
                 "high_xss": 0,
                 "peak_xss": 0,
-                "focus": "Low-Strain Aerobic Flush (or Rest Day)",
+                "focus": "Active Recovery or Rest",
                 "focus_duration": "Active Recovery / Base (>1h Focus)",
-                "description": f"Adapted to your feedback (\"{note}\"): High-intensity intervals removed. Prescribed a gentle Zone 2 spin (<65% FTP, <{int(ftp * 0.65)}W, ~20 Low XSS) or optional rest day to let muscular fatigue clear."
+                "description": f"Adapted to your note (\"{note}\"): High-intensity intervals removed. Gentle Zone 2 spin (<65% FTP, <{int(ftp * 0.65)}W, ~20 Low XSS) or optional rest day."
             }
         elif has_rest:
             overrides[off] = {
                 "type": "rest",
-                "title": "🛌 Athlete-Requested Rest Day",
+                "title": "Rest Day",
                 "duration_min": 0,
                 "estimated_tss": 0,
                 "estimated_xss": 0,
                 "low_xss": 0,
                 "high_xss": 0,
                 "peak_xss": 0,
-                "focus": "Autonomic Restoration & Muscle Repair",
+                "focus": "Rest & Recovery",
                 "focus_duration": "Rest & Recovery",
-                "description": f"Adapted to your feedback (\"{note}\"): Scheduled as a dedicated rest day. Focus on hydration, mobility, and restorative sleep."
+                "description": f"Adapted to your note (\"{note}\"): Scheduled rest day. Focus on hydration, mobility, and restorative sleep."
             }
         elif has_z2:
             overrides[off] = {
                 "type": "zone_2",
-                "title": "Zone 2 Progressive Aerobic Foundation",
+                "title": "Zone 2 Aerobic Base",
                 "duration_min": 35,
                 "estimated_tss": 24,
                 "estimated_xss": 24,
                 "low_xss": 24,
                 "high_xss": 0,
                 "peak_xss": 0,
-                "focus": "Aerobic Base & Cadence Clearance",
+                "focus": "Aerobic Base",
                 "focus_duration": "Endurance / Century (>1h Focus)",
-                "description": f"Adapted to your feedback (\"{note}\"): High-intensity intervals replaced with a steady Zone 2 endurance spin (<68% FTP, <{int(ftp * 0.68)}W) with progressive ramp warmup and cooldown."
+                "description": f"Adapted to your note (\"{note}\"): Steady Zone 2 endurance spin (<68% FTP, <{int(ftp * 0.68)}W) with progressive ramp warmup and cooldown."
             }
         elif has_fatigue:
             overrides[off] = {
                 "type": "fatigue_downgrade",
-                "title": "🌱 Active Recovery Flush (35m)",
+                "title": "Active Recovery (35m)",
                 "duration_min": 35,
                 "estimated_tss": 18,
                 "estimated_xss": 18,
                 "low_xss": 18,
                 "high_xss": 0,
                 "peak_xss": 0,
-                "focus": "Lactate Clearance & Autonomic Recovery",
+                "focus": "Active Recovery",
                 "focus_duration": "Active Recovery (>1h Focus)",
-                "description": f"Adjusted for reported fatigue/soreness (\"{note}\"): Downgraded to an easy 35-minute active recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or rest day to facilitate cellular supercompensation."
+                "description": f"Adjusted for reported fatigue (\"{note}\"): Easy 35-minute recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or rest day to recover."
             }
 
     return overrides
@@ -256,7 +256,7 @@ def build_preference_aligned_outlook_days(
                 "date_formatted": date_formatted,
                 "projected_recovery": max(78, rec_est),
                 "projected_zone": "green",
-                "title": "🛌 Scheduled Directive Rest Day (or 🌱 Easy Day)",
+                "title": "Rest Day or Easy Spin",
                 "duration_min": 0,
                 "estimated_tss": 0,
                 "estimated_xss": 0,
@@ -264,14 +264,12 @@ def build_preference_aligned_outlook_days(
                 "high_xss": 0,
                 "peak_xss": 0,
                 "focus_duration": "Rest & Recovery",
-                "focus": "Autonomic Supercompensation & Schedule Directive",
+                "focus": "Rest & Recovery",
                 "is_directive_rest": True,
                 "description": (
-                    f"Expected Recovery: ~{max(78, rec_est)}% (Supercompensation). Schedule Directive Rest Day: "
-                    f"Per your forward directive ('{rest_quota_status.get('matched_directive', 'one of Mon/Tue/Wed/Thu should be a rest day')}') "
-                    f"and having completed workouts on {rest_quota_status.get('completed_streak_text', 'Monday, Tuesday, and Wednesday (and Sunday)')}, "
-                    f"{day_name} is recommended as a full rest day or gentle active recovery spin (<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) "
-                    f"to allow cellular supercompensation before Friday's ride."
+                    f"Expected Recovery: ~{max(78, rec_est)}% (Supercompensation). "
+                    f"Per your forward directive, {day_name} is recommended as a full rest day or gentle active recovery spin "
+                    f"(<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) to allow cellular supercompensation before Friday's ride."
                 )
             }
 
@@ -283,7 +281,7 @@ def build_preference_aligned_outlook_days(
                 "date_formatted": date_formatted,
                 "projected_recovery": rec_est,
                 "projected_zone": zone,
-                "title": "🛌 Dedicated Weekly Rest & Recovery",
+                "title": "Rest & Recovery",
                 "duration_min": 0,
                 "estimated_tss": 0,
                 "estimated_xss": 0,
@@ -291,10 +289,10 @@ def build_preference_aligned_outlook_days(
                 "high_xss": 0,
                 "peak_xss": 0,
                 "focus_duration": "Rest & Recovery",
-                "focus": "Autonomic Restoration & Muscle Repair",
+                "focus": "Rest & Recovery",
                 "description": (
                     f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Dedicated weekly rest day consistent with your scheduling preferences. "
-                    f"Focus on hydration, mobility, and restorative sleep to allow cellular supercompensation before Sunday's longer endurance session."
+                    f"Focus on hydration, mobility, and restorative sleep before Sunday's longer endurance ride."
                 )
             }
 
@@ -312,7 +310,7 @@ def build_preference_aligned_outlook_days(
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "🚴 Outdoor Endurance or Long Indoor Tempo",
+                    "title": "Outdoor Endurance or Long Indoor Ride",
                     "duration_min": dur,
                     "estimated_tss": est_tss,
                     "estimated_xss": est_xss,
@@ -320,10 +318,10 @@ def build_preference_aligned_outlook_days(
                     "high_xss": high_x,
                     "peak_xss": 0,
                     "focus_duration": "Rouleur (20:00 Focus)",
-                    "focus": "Aerobic Engine & Durability",
+                    "focus": "Aerobic Endurance",
                     "description": (
-                        f"Expected Recovery: ~{rec_est}% (Prime). Sunday volume ride ({dur} min, outdoor priority if weather permits, or structured indoor endurance). "
-                        f"Designed with progressive wattage ramps to build mitochondrial durability and contribute toward your weekly {program.get('weekly_tss_target', 360)} TSS macrocycle target."
+                        f"Expected Recovery: ~{rec_est}% (Prime). Sunday volume ride ({dur} min, outdoors if weather permits, or indoor endurance). "
+                        f"Features progressive wattage ramps to build endurance and contribute toward your weekly {program.get('weekly_tss_target', 360)} TSS target."
                     )
                 }
             else:
@@ -334,7 +332,7 @@ def build_preference_aligned_outlook_days(
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "Zone 2 Extended Aerobic Base",
+                    "title": "Zone 2 Endurance",
                     "duration_min": 60,
                     "estimated_tss": 42,
                     "estimated_xss": 42,
@@ -342,10 +340,10 @@ def build_preference_aligned_outlook_days(
                     "high_xss": 0,
                     "peak_xss": 0,
                     "focus_duration": "Endurance / Century (>1h Focus)",
-                    "focus": "Aerobic Base & Fat Oxidation",
+                    "focus": "Aerobic Base",
                     "description": (
-                        f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Sunday aerobic volume tailored for moderate recovery: steady 60-minute Zone 2 spin "
-                        f"(<{int(ftp * 0.68)}W, ~42 Low XSS) with progressive ramp warmup to stimulate aerobic blood flow without CNS strain."
+                        f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Steady 60-minute Zone 2 spin "
+                        f"(<{int(ftp * 0.68)}W, ~42 Low XSS) with progressive ramp warmup and cooldown."
                     )
                 }
 
@@ -363,7 +361,7 @@ def build_preference_aligned_outlook_days(
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "⚡ Sweet Spot Over-Unders (Outdoor / Indoor)",
+                    "title": "Sweet Spot Over-Unders",
                     "duration_min": dur,
                     "estimated_tss": est_tss,
                     "estimated_xss": est_xss,
@@ -371,10 +369,10 @@ def build_preference_aligned_outlook_days(
                     "high_xss": high_x,
                     "peak_xss": 0,
                     "focus_duration": "Climber / Sweet Spot (45:00 Focus)",
-                    "focus": "Sweet Spot Over-Unders & Threshold Expansion",
+                    "focus": "Sweet Spot & Threshold",
                     "description": (
-                        f"Expected Recovery: ~{rec_est}% (Green Rebound). Prescribed {dur}+ min session consistent with your {day_name} preference (outdoors if weather permits, or indoor). "
-                        f"Features progressive wattage ramp warmup (45% -> 75% FTP) and structured Over/Under intervals ({int(ftp * 0.90)}W / {int(ftp * 1.05)}W) to maximize threshold density without flat continuous grinding."
+                        f"Expected Recovery: ~{rec_est}% (Green). Prescribed {dur}+ min session consistent with your {day_name} preference (outdoors if weather permits, or indoor). "
+                        f"Features progressive wattage ramp warmup and structured Over/Under intervals ({int(ftp * 0.90)}W / {int(ftp * 1.05)}W) to build threshold power."
                     )
                 }
             elif rec_est >= 45:
@@ -384,7 +382,7 @@ def build_preference_aligned_outlook_days(
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "Zone 2 Progressive Aerobic Foundation",
+                    "title": "Zone 2 Aerobic Foundation",
                     "duration_min": 60,
                     "estimated_tss": 46,
                     "estimated_xss": 46,
@@ -392,10 +390,9 @@ def build_preference_aligned_outlook_days(
                     "high_xss": 2,
                     "peak_xss": 0,
                     "focus_duration": "Endurance / Century (>1h Focus)",
-                    "focus": "Aerobic Base & Cadence Clearance",
+                    "focus": "Aerobic Base",
                     "description": (
-                        f"Expected Recovery: ~{rec_est}% (Yellow). 60-min steady Zone 2 ride (outdoors if weather permits) with progressive ramp warmup and cooldown. "
-                        f"Promotes blood flow and mitochondrial aerobic capacity without compounding acute fatigue."
+                        f"Expected Recovery: ~{rec_est}% (Yellow). 60-min steady Zone 2 ride (outdoors if weather permits) with progressive ramp warmup and cooldown."
                     )
                 }
             else:
@@ -405,7 +402,7 @@ def build_preference_aligned_outlook_days(
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "🌱 Active Recovery Spin or Rest",
+                    "title": "Active Recovery or Rest",
                     "duration_min": 45,
                     "estimated_tss": 22,
                     "estimated_xss": 22,
@@ -413,9 +410,9 @@ def build_preference_aligned_outlook_days(
                     "high_xss": 0,
                     "peak_xss": 0,
                     "focus_duration": "Active Recovery (>1h Focus)",
-                    "focus": "Lactate Clearance & Autonomic Recovery",
+                    "focus": "Active Recovery",
                     "description": (
-                        f"Expected Recovery: ~{rec_est}% (Red). Deep fatigue calls for an easy active recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or complete rest to allow autonomic rebound."
+                        f"Expected Recovery: ~{rec_est}% (Red). Easy active recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or complete rest to allow full recovery."
                     )
                 }
 
@@ -429,7 +426,7 @@ def build_preference_aligned_outlook_days(
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "🌱 Active Recovery Flush or Rest (35m)",
+                    "title": "Active Recovery or Rest (35m)",
                     "duration_min": 35,
                     "estimated_tss": 18,
                     "estimated_xss": 18,
@@ -437,10 +434,10 @@ def build_preference_aligned_outlook_days(
                     "high_xss": 0,
                     "peak_xss": 0,
                     "focus_duration": "Active Recovery (>1h Focus)",
-                    "focus": "Cellular Flush & Rest Day Candidate",
+                    "focus": "Active Recovery",
                     "description": (
                         f"Expected Recovery: ~{rec_est}% ({'Red' if rec_est < 34 else 'Yellow'}). Consistent with your preference that one of Mon/Tue/Thu serves as an extra rest day: "
-                        f"35-min gentle spin (<55% FTP, <{int(ftp * 0.55)}W) or passive rest to absorb recent training stress."
+                        f"35-min gentle spin (<55% FTP, <{int(ftp * 0.55)}W) or rest day to absorb recent training stress."
                     )
                 }
             else:
@@ -460,7 +457,7 @@ def build_preference_aligned_outlook_days(
                     "high_xss": 12,
                     "peak_xss": 0,
                     "focus_duration": "Climber / Sweet Spot (45:00 Focus)",
-                    "focus": "High-Efficiency Over-Unders",
+                    "focus": "Sweet Spot & Threshold",
                     "description": (
                         f"Expected Recovery: ~{rec_est}% (Ready). High-efficiency {dur}-minute indoor session respecting your 35–45 min weekday limit. "
                         f"Includes a progressive wattage ramp warmup (45% -> 75% FTP), structured Over/Under threshold blocks ({int(ftp * 0.90)}W / {int(ftp * 1.05)}W), and progressive ramp cooldown."
@@ -599,16 +596,16 @@ def build_daily_review_and_outlook_local(
             if is_today:
                 assessment_text = (
                     f"Outstanding discipline during today's '{act_name}' ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP). "
-                    f"You perfectly matched your {workout_recovery}% Whoop recovery by holding power within your target "
-                    f"{target_zone_name} ceiling ({workout_strain:.1f} Whoop day strain). Your cardiac cost ({act_hr} bpm avg) "
-                    f"indicates clean aerobic turnover without non-functional sympathetic strain."
+                    f"You matched your {workout_recovery}% Whoop recovery by holding power within your target "
+                    f"{target_zone_name} ceiling ({workout_strain:.1f} Whoop day strain). Your average heart rate ({act_hr} bpm) "
+                    f"indicates clean aerobic effort without excessive strain."
                 )
             elif is_yesterday:
                 assessment_text = (
                     f"Outstanding pacing discipline during yesterday's '{act_name}' ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP). "
-                    f"You executed precisely to your {workout_recovery}% Whoop recovery baseline, logging {act_suffer} TSS and "
+                    f"You executed to your {workout_recovery}% Whoop recovery baseline, logging {act_suffer} TSS and "
                     f"{workout_strain:.1f} day strain within your target {target_zone_name}. This balanced aerobic stimulus "
-                    f"protected autonomic function, helping support today's recovery status ({today_recovery}%, {today_strain:.1f} strain today)."
+                    f"protected recovery, keeping today's readiness at {today_recovery}% ({today_strain:.1f} strain today)."
                 )
             else:
                 assessment_text = (
@@ -648,15 +645,15 @@ def build_daily_review_and_outlook_local(
             verdict_color = "cyan"
             if is_today:
                 assessment_text = (
-                    f"Controlled, conservative session in today's '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP). "
-                    f"You kept cardiac stress very low ({act_hr} bpm), absorbing an easy active recovery stimulus "
-                    f"({workout_strain:.1f} Whoop day strain). Your autonomic reserves remain well-protected for the upcoming key workout block."
+                    f"Controlled session in today's '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP). "
+                    f"You kept cardiac stress low ({act_hr} bpm), absorbing an easy active recovery stimulus "
+                    f"({workout_strain:.1f} Whoop day strain). Your energy reserves remain well-protected for upcoming training."
                 )
             elif is_yesterday:
                 assessment_text = (
-                    f"Controlled, conservative session during yesterday's '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP, "
-                    f"{workout_strain:.1f} day strain). You kept cardiac stress low ({act_hr} bpm), preserving autonomic reserves "
-                    f"and supporting today's recovery status ({today_recovery}%)."
+                    f"Controlled session during yesterday's '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP, "
+                    f"{workout_strain:.1f} day strain). You kept cardiac stress low ({act_hr} bpm), preserving energy "
+                    f"and supporting today's recovery ({today_recovery}%)."
                 )
             else:
                 assessment_text = (
@@ -720,7 +717,7 @@ def build_daily_review_and_outlook_local(
             "verdict_color": "emerald",
             "assessment_text": (
                 f"Zero moving time logged today. With today's Whoop recovery of {today_recovery}% and current day strain of {today_strain:.1f}, "
-                f"taking a rest day allows acute muscular and autonomic fatigue to clear before your next structured session."
+                f"taking a rest day allows fatigue to clear before your next structured session."
             ),
             "workout_strain": 0.0,
             "workout_recovery": today_recovery,
@@ -821,8 +818,8 @@ def build_daily_review_and_outlook_local(
                 )
             elif offset == days_until_event - 2:
                 # T-2 Day
-                item["title"] = "🌱 Pre-Event Active Recovery Flush"
-                item["focus"] = "Active Flush & Supercompensation"
+                item["title"] = "Pre-Event Recovery Spin"
+                item["focus"] = "Active Recovery"
                 item["duration_min"] = 35
                 item["estimated_tss"] = 20
                 item["estimated_xss"] = 20
@@ -833,8 +830,7 @@ def build_daily_review_and_outlook_local(
                 item["projected_recovery"] = 70
                 item["projected_zone"] = "green"
                 item["description"] = (
-                    f"T-2 Flush: Gentle Zone 1 spin (<55% FTP, ~20 Low XSS) to clear metabolic waste "
-                    f"and stimulate cellular supercompensation before {p_title}."
+                    f"T-2 Primer: Gentle Zone 1 spin (<55% FTP, ~20 Low XSS) to promote recovery before {p_title}."
                 )
 
     # 2b. Dynamically inject Coach-Scheduled Workouts into 3-Day Forecast
@@ -902,18 +898,18 @@ def build_daily_review_and_outlook_local(
         sleep_target_hrs = max(8.5, sleep_target_hrs)
         recovery_protocol = {
             "sleep_target_hours": sleep_target_hrs,
-            "sleep_target_text": f"Aim for {sleep_target_hrs} hours of restorative sleep. Maximizes growth hormone release and pre-event muscular supercompensation.",
-            "nutrition_headline": "Target Event Glycogen Loading & Pre-Hydration",
-            "nutrition_advice": f"Pre-Event Fueling: High complex-carbohydrate intake (7–9g/kg carbs) to saturate liver and muscle glycogen stores before {active_plan.get('title')}.",
-            "hydration_target": "Drink 750–1000 ml water with electrolytes throughout the evening to optimize intracellular pre-hydration."
+            "sleep_target_text": f"Aim for {sleep_target_hrs} hours of restorative sleep to ensure you are well-rested before the event.",
+            "nutrition_headline": "Pre-Event Fueling & Hydration",
+            "nutrition_advice": f"High complex-carbohydrate intake (7–9g/kg carbs) to replenish glycogen stores before {active_plan.get('title')}.",
+            "hydration_target": "Drink 750–1000 ml water with electrolytes throughout the evening to stay well-hydrated."
         }
     else:
         recovery_protocol = {
             "sleep_target_hours": sleep_target_hrs,
-            "sleep_target_text": f"Aim for {sleep_target_hrs} hours of restorative sleep tonight to clear sleep debt and trigger growth hormone release.",
-            "nutrition_headline": "Glycogen Replenishment & Protein Synthesis",
-            "nutrition_advice": f"Consume ~{max(40, carb_target_g)}g complex carbohydrates with 25–30g lean protein to restore liver/muscle glycogen reserves.",
-            "hydration_target": "500–750 ml water with electrolytes before bed to optimize nocturnal HRV recovery."
+            "sleep_target_text": f"Aim for {sleep_target_hrs} hours of restorative sleep tonight to support recovery.",
+            "nutrition_headline": "Nutrition & Recovery",
+            "nutrition_advice": f"Consume ~{max(40, carb_target_g)}g complex carbohydrates with 25–30g lean protein to refuel.",
+            "hydration_target": "500–750 ml water with electrolytes before bed to support overnight recovery."
         }
 
     from app.services.strain_model_service import calculate_trailing_strain_systems
