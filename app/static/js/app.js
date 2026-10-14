@@ -140,10 +140,13 @@ async function loadDashboard() {
     const res = await fetch("/api/dashboard");
     const data = await res.json();
     state.dashboard = data;
+    state.whoop = data.whoop;
+    state.strava = data.strava;
     state.ftp = data.athlete.ftp || 250;
     state.maxHr = data.athlete.max_hr || 185;
     state.athleteWPrime = data.athlete.w_prime_kj !== undefined ? data.athlete.w_prime_kj : 20.0;
     state.athletePeakPower = data.athlete.peak_power_watts !== undefined ? data.athlete.peak_power_watts : 1050;
+    state.trailingStrain = data.whoop ? (data.whoop.trailing_7d_strain_avg || data.whoop.day_strain) : null;
 
     if (data.program) {
       renderProgram(data.program);
@@ -154,6 +157,7 @@ async function loadDashboard() {
     renderIntegrations(data.integrations);
     renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
     loadDebrief();
+    updateCoachChatTelemetryChips();
   } catch (err) {
     console.error("Failed to load dashboard:", err);
   }
@@ -162,6 +166,8 @@ async function loadDashboard() {
 // Render Whoop 3-Rings Biometrics (Tri-Ring & Concentric)
 function renderWhoop(whoop) {
   if (!whoop) return;
+  state.whoop = whoop;
+  updateCoachChatTelemetryChips();
   const score = Math.round(Number(whoop.recovery_score) || 0);
   const strain = Number(whoop.day_strain) || 0;
   const sleep = Math.round(Number(whoop.sleep_performance) || 0);
@@ -4471,6 +4477,11 @@ async function checkCoachGeminiStatus() {
       const data = await res.json();
       updateGeminiConnectedIndicators(data.gemini_configured, data.gemini_model);
 
+      if (data.recovery_score != null) {
+        state.chatRecovery = Number(data.recovery_score);
+        updateCoachChatTelemetryChips();
+      }
+
       const subtitle = document.getElementById("coachChatSubtitle");
       if (subtitle) {
         if (data.gemini_configured) {
@@ -4542,14 +4553,44 @@ function updateCoachChatTelemetryChips() {
     const chipStrain = document.getElementById("chatChipStrain");
     const chipWorkout = document.getElementById("chatChipWorkout");
 
-    const rec = (state.whoop && state.whoop.recovery_score) || (state.whoopMetrics && state.whoopMetrics.recovery_score) || 45;
-    const ftp = state.ftp || 250;
-    const wPrime = state.athleteWPrime !== undefined ? state.athleteWPrime : 20.0;
-    const rawStrain = (state.trailingStrain != null) ? Number(state.trailingStrain) : 11.0;
-    const strain = isNaN(rawStrain) ? "11.0" : rawStrain.toFixed(1);
-    const workoutTitle = (state.currentWorkout && state.currentWorkout.title) || "Sweet Spot Aerobic";
+    const whoopData = state.whoop || (state.dashboard && state.dashboard.whoop) || state.whoopMetrics;
+    const rec = (whoopData && whoopData.recovery_score != null)
+      ? Math.round(Number(whoopData.recovery_score))
+      : (state.chatRecovery != null ? Math.round(Number(state.chatRecovery)) : 72);
 
-    if (chipRec) chipRec.textContent = `🧬 Whoop: ${rec}%`;
+    const ftp = state.ftp || (state.dashboard && state.dashboard.athlete && state.dashboard.athlete.ftp) || 250;
+    const wPrime = state.athleteWPrime !== undefined
+      ? state.athleteWPrime
+      : ((state.dashboard && state.dashboard.athlete && state.dashboard.athlete.w_prime_kj) ?? 20.0);
+
+    const rawStrain = (whoopData && whoopData.trailing_7d_strain_avg != null)
+      ? Number(whoopData.trailing_7d_strain_avg)
+      : ((whoopData && whoopData.day_strain != null)
+          ? Number(whoopData.day_strain)
+          : (state.trailingStrain != null ? Number(state.trailingStrain) : 10.6));
+    const strain = isNaN(rawStrain) ? "10.6" : rawStrain.toFixed(1);
+
+    const workoutTitle = (state.currentWorkout && state.currentWorkout.title)
+      || (state.todayPrescribed && state.todayPrescribed.title)
+      || (state.dashboard && state.dashboard.today_prescribed && state.dashboard.today_prescribed.title)
+      || "Sweet Spot Aerobic";
+
+    if (chipRec) {
+      chipRec.textContent = `🧬 Whoop: ${rec}%`;
+      if (rec > 66) {
+        chipRec.style.background = "rgba(16, 185, 129, 0.15)";
+        chipRec.style.borderColor = "rgba(16, 185, 129, 0.4)";
+        chipRec.style.color = "#10b981";
+      } else if (rec >= 34) {
+        chipRec.style.background = "rgba(245, 158, 11, 0.15)";
+        chipRec.style.borderColor = "rgba(245, 158, 11, 0.4)";
+        chipRec.style.color = "#f59e0b";
+      } else {
+        chipRec.style.background = "rgba(244, 63, 94, 0.15)";
+        chipRec.style.borderColor = "rgba(244, 63, 94, 0.4)";
+        chipRec.style.color = "#f43f5e";
+      }
+    }
     if (chipFtp) chipFtp.textContent = `⚡ FTP: ${ftp}W`;
     if (chipWPrime) chipWPrime.textContent = `🔋 W': ${wPrime}kJ`;
     if (chipStrain) chipStrain.textContent = `🔥 7D Strain: ${strain}`;
