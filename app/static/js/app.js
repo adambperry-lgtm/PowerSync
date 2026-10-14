@@ -2783,6 +2783,62 @@ btnSaveSettings.addEventListener("click", async () => {
   }
 });
 
+// Program Goal & Target FTP Dynamic Auto-Update (Xert Alternative)
+const settingProgramGoalEl = document.getElementById("settingProgramGoal");
+const settingProgramTargetFtpEl = document.getElementById("settingProgramTargetFtp");
+const settingProgramWeeklyTssEl = document.getElementById("settingProgramWeeklyTss");
+const settingProgramWeeklyXssEl = document.getElementById("settingProgramWeeklyXss");
+const settingFtpEl = document.getElementById("settingFtp");
+
+const PROGRAM_GOAL_ARCHETYPES = {
+  "FTP_BUILD": { gain: 15, tss: 360, xss: 360 },
+  "GRAN_FONDO": { gain: 10, tss: 420, xss: 420 },
+  "VO2_CRIT": { gain: 12, tss: 340, xss: 340 },
+  "HEALTH_LONGEVITY": { gain: 5, tss: 260, xss: 260 }
+};
+
+function updateTargetFtpFromProgramGoal(flash = true) {
+  if (!settingProgramGoalEl || !settingProgramTargetFtpEl) return;
+  const goalKey = settingProgramGoalEl.value || "FTP_BUILD";
+  const archetype = PROGRAM_GOAL_ARCHETYPES[goalKey] || { gain: 15, tss: 360, xss: 360 };
+  const currentFtp = parseInt(settingFtpEl?.value, 10) || state.athlete?.ftp || 250;
+  const newTargetFtp = currentFtp + archetype.gain;
+
+  settingProgramTargetFtpEl.value = newTargetFtp;
+  settingProgramTargetFtpEl.placeholder = newTargetFtp;
+
+  if (settingProgramWeeklyTssEl) {
+    settingProgramWeeklyTssEl.value = archetype.tss;
+    settingProgramWeeklyTssEl.placeholder = archetype.tss;
+  }
+  if (settingProgramWeeklyXssEl) {
+    settingProgramWeeklyXssEl.value = archetype.xss;
+    settingProgramWeeklyXssEl.placeholder = archetype.xss;
+  }
+
+  if (flash) {
+    settingProgramTargetFtpEl.style.transition = "border-color 0.25s ease, box-shadow 0.25s ease";
+    settingProgramTargetFtpEl.style.borderColor = "var(--accent-cyan)";
+    settingProgramTargetFtpEl.style.boxShadow = "0 0 10px rgba(6, 182, 212, 0.4)";
+    setTimeout(() => {
+      settingProgramTargetFtpEl.style.borderColor = "";
+      settingProgramTargetFtpEl.style.boxShadow = "";
+    }, 600);
+  }
+}
+
+if (settingProgramGoalEl) {
+  settingProgramGoalEl.addEventListener("change", () => {
+    updateTargetFtpFromProgramGoal(true);
+  });
+}
+
+if (settingFtpEl) {
+  settingFtpEl.addEventListener("input", () => {
+    updateTargetFtpFromProgramGoal(false);
+  });
+}
+
 // Test Gemini API Key Button in Settings
 const btnTestGemini = document.getElementById("btnTestGeminiKey");
 if (btnTestGemini) {
