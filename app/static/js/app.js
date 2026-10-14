@@ -3283,15 +3283,21 @@ function renderDebrief(data) {
         ? `<span class="tag" style="background:rgba(6,182,212,0.12);color:#06b6d4;border:1px solid rgba(6,182,212,0.25);">🎯 ${item.focus_duration}</span>`
         : '';
 
-      const scheduledBadge = item.is_coach_scheduled
-        ? `<span class="badge-status" style="color:var(--accent-cyan);border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">💬 Coach Scheduled</span>`
-        : '';
-      const cardStyle = item.is_coach_scheduled
-        ? 'style="border-color:rgba(6,182,212,0.45);background:rgba(6,182,212,0.03);box-shadow:0 0 15px rgba(6,182,212,0.06);"'
-        : '';
-      const titleStyle = item.is_coach_scheduled
-        ? 'style="color:var(--accent-cyan);font-weight:700;"'
-        : '';
+      const scheduledBadge = item.is_athlete_adjusted
+        ? `<span class="badge-status" style="color:#a78bfa;border-color:rgba(167,139,250,0.4);background:rgba(167,139,250,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">✍️ Athlete Note Adjusted</span>`
+        : (item.is_coach_scheduled
+          ? `<span class="badge-status" style="color:var(--accent-cyan);border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">💬 Coach Scheduled</span>`
+          : '');
+      const cardStyle = item.is_athlete_adjusted
+        ? 'style="border-color:rgba(167,139,250,0.45);background:rgba(167,139,250,0.03);box-shadow:0 0 15px rgba(167,139,250,0.06);"'
+        : (item.is_coach_scheduled
+          ? 'style="border-color:rgba(6,182,212,0.45);background:rgba(6,182,212,0.03);box-shadow:0 0 15px rgba(6,182,212,0.06);"'
+          : '');
+      const titleStyle = item.is_athlete_adjusted
+        ? 'style="color:#a78bfa;font-weight:700;"'
+        : (item.is_coach_scheduled
+          ? 'style="color:var(--accent-cyan);font-weight:700;"'
+          : '');
       const zwiftTag = item.is_coach_scheduled
         ? `<span class="tag" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-weight:600;">🚀 Zwift Synced</span>`
         : '';
@@ -3344,6 +3350,10 @@ function renderDebrief(data) {
   if (protocolHydrationDesc && protocol.hydration_target) {
     protocolHydrationDesc.textContent = protocol.hydration_target;
   }
+  const inputDebriefUserNote = document.getElementById("inputDebriefUserNote");
+  if (inputDebriefUserNote && data.athlete_note && !inputDebriefUserNote.value) {
+    inputDebriefUserNote.value = data.athlete_note;
+  }
   renderAiCoachTodayCard(data, state.currentWorkout);
 }
 
@@ -3380,6 +3390,12 @@ async function triggerDebriefAnalysis(note = "") {
     if (!res.ok) throw new Error("Debrief regenerate failed");
     const data = await res.json();
     renderDebrief(data);
+    if (note) {
+      const tabDebriefOutlook = document.getElementById("tabDebriefOutlook");
+      if (tabDebriefOutlook) {
+        tabDebriefOutlook.click();
+      }
+    }
     showToast("🧠 AI coach debrief & 3-day forecast updated!");
   } catch (err) {
     console.error("Failed to analyze debrief:", err);

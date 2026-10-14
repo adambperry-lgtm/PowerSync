@@ -80,6 +80,101 @@ def get_whoop_for_date(target_date_str: str) -> Optional[Dict[str, Any]]:
         return dict(row)
     return None
 
+def parse_athlete_feedback_for_outlook(note: str, today: datetime.date, ftp: int = 250) -> Dict[int, Dict[str, Any]]:
+    """
+    Parses subjective athlete debrief notes (e.g. 'tomorrow will be zone 2 or a rest day',
+    'tired from poor sleep', 'Friday rest day') to dynamically adapt the 3-day forecast.
+    """
+    if not note or not note.strip():
+        return {}
+
+    n = note.lower().strip()
+    overrides = {}
+
+    # 1. Determine target day offset(s)
+    target_offsets = []
+    weekday_names = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    for off in [1, 2, 3]:
+        d = today + datetime.timedelta(days=off)
+        w_name = weekday_names[d.weekday()]
+        if w_name in n:
+            target_offsets.append(off)
+
+    if not target_offsets:
+        if any(w in n for w in ["tomorrow", "tmrw", "next day"]):
+            target_offsets = [1]
+        elif any(w in n for w in ["day after tomorrow", "in two days", "+2"]):
+            target_offsets = [2]
+        elif any(w in n for w in ["in three days", "+3"]):
+            target_offsets = [3]
+        else:
+            # Default to tomorrow (offset 1) if subjective note targets upcoming training
+            target_offsets = [1]
+
+    has_rest = any(w in n for w in ["rest day", "rest", "day off", "off day", "take off", "passive rest", "skip"])
+    has_z2 = any(w in n for w in ["zone 2", "zone 1", "z2", "z1", "easy spin", "easy ride", "flush", "recovery spin", "endurance"])
+    has_fatigue = any(w in n for w in ["tired", "fatigued", "exhausted", "fried", "sore", "poor sleep", "bad sleep", "drained", "heavy legs", "sluggish", "cooked"])
+
+    for off in target_offsets:
+        if has_rest and has_z2:
+            overrides[off] = {
+                "type": "zone_2_or_rest",
+                "title": "🌱 Zone 2 Aerobic Flush (or Rest Day)",
+                "duration_min": 35,
+                "estimated_tss": 20,
+                "estimated_xss": 20,
+                "low_xss": 20,
+                "high_xss": 0,
+                "peak_xss": 0,
+                "focus": "Low-Strain Aerobic Flush (or Rest Day)",
+                "focus_duration": "Active Recovery / Base (>1h Focus)",
+                "description": f"Adapted to your feedback (\"{note}\"): High-intensity intervals removed. Prescribed a gentle Zone 2 spin (<65% FTP, <{int(ftp * 0.65)}W, ~20 Low XSS) or optional rest day to let muscular fatigue clear."
+            }
+        elif has_rest:
+            overrides[off] = {
+                "type": "rest",
+                "title": "🛌 Athlete-Requested Rest Day",
+                "duration_min": 0,
+                "estimated_tss": 0,
+                "estimated_xss": 0,
+                "low_xss": 0,
+                "high_xss": 0,
+                "peak_xss": 0,
+                "focus": "Autonomic Restoration & Muscle Repair",
+                "focus_duration": "Rest & Recovery",
+                "description": f"Adapted to your feedback (\"{note}\"): Scheduled as a dedicated rest day. Focus on hydration, mobility, and restorative sleep."
+            }
+        elif has_z2:
+            overrides[off] = {
+                "type": "zone_2",
+                "title": "Zone 2 Progressive Aerobic Foundation",
+                "duration_min": 35,
+                "estimated_tss": 24,
+                "estimated_xss": 24,
+                "low_xss": 24,
+                "high_xss": 0,
+                "peak_xss": 0,
+                "focus": "Aerobic Base & Cadence Clearance",
+                "focus_duration": "Endurance / Century (>1h Focus)",
+                "description": f"Adapted to your feedback (\"{note}\"): High-intensity intervals replaced with a steady Zone 2 endurance spin (<68% FTP, <{int(ftp * 0.68)}W) with progressive ramp warmup and cooldown."
+            }
+        elif has_fatigue:
+            overrides[off] = {
+                "type": "fatigue_downgrade",
+                "title": "🌱 Active Recovery Flush (35m)",
+                "duration_min": 35,
+                "estimated_tss": 18,
+                "estimated_xss": 18,
+                "low_xss": 18,
+                "high_xss": 0,
+                "peak_xss": 0,
+                "focus": "Lactate Clearance & Autonomic Recovery",
+                "focus_duration": "Active Recovery (>1h Focus)",
+                "description": f"Adjusted for reported fatigue/soreness (\"{note}\"): Downgraded to an easy 35-minute active recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or rest day to facilitate cellular supercompensation."
+            }
+
+    return overrides
+
 def build_preference_aligned_outlook_days(
     today: datetime.date,
     today_recovery: int,
@@ -90,7 +185,8 @@ def build_preference_aligned_outlook_days(
     has_trained_today: bool,
     session_summary: Dict[str, Any],
     ftp: int,
-    program: Dict[str, Any]
+    program: Dict[str, Any],
+    custom_prompt: str = ""
 ) -> List[Dict[str, Any]]:
     """
     Constructs a 3-day forward forecast that models acute fatigue decay (tau ~ 3.0 days)
@@ -101,12 +197,16 @@ def build_preference_aligned_outlook_days(
       - Sunday: 60–90+ minutes (longer outdoor endurance or long indoor session)
       - Warmup/Cooldown: Progressive wattage ramps (never flat Zone 2 blocks)
       - Threshold / Sweet Spot: Strongly favors Over/Under intervals
+      - Dynamically adapts to subjective athlete notes (e.g. 'tomorrow will be zone 2 or a rest day')
     """
     from app.services.preferences_service import get_day_target_config
 
     trained_today_heavy = is_today and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 60))
     trained_yesterday_heavy = is_yesterday and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 40) or (session_summary.get("verdict") == "Intensity Overreach"))
     today_passive_or_light = (not has_trained_today) and (today_strain < 13.5)
+
+    # Parse athlete subjective notes for dynamic forecast adaptation
+    feedback_overrides = parse_athlete_feedback_for_outlook(custom_prompt, today, ftp)
 
     # 1. Base recovery progression over next 3 days
     if trained_today_heavy:
@@ -336,6 +436,21 @@ def build_preference_aligned_outlook_days(
                     )
                 }
 
+        # Check for athlete subjective debrief note overrides (e.g. "tomorrow will be zone 2 or a rest day")
+        if offset in feedback_overrides:
+            ovr = feedback_overrides[offset]
+            item["title"] = ovr["title"]
+            item["duration_min"] = ovr["duration_min"]
+            item["estimated_tss"] = ovr["estimated_tss"]
+            item["estimated_xss"] = ovr["estimated_xss"]
+            item["low_xss"] = ovr["low_xss"]
+            item["high_xss"] = ovr["high_xss"]
+            item["peak_xss"] = ovr["peak_xss"]
+            item["focus"] = ovr["focus"]
+            item["focus_duration"] = ovr["focus_duration"]
+            item["description"] = ovr["description"]
+            item["is_athlete_adjusted"] = True
+
         outlook_days.append(item)
 
     return outlook_days
@@ -347,7 +462,8 @@ def build_daily_review_and_outlook_local(
     latest_act: Optional[Dict[str, Any]],
     program: Dict[str, Any],
     ftp: int = 250,
-    max_hr: int = 185
+    max_hr: int = 185,
+    custom_prompt: str = ""
 ) -> Dict[str, Any]:
     """
     Generates a deep physiological Debrief of completed workouts
@@ -612,7 +728,8 @@ def build_daily_review_and_outlook_local(
         has_trained_today=has_trained_today,
         session_summary=session_summary,
         ftp=ftp,
-        program=program
+        program=program,
+        custom_prompt=custom_prompt
     )
 
     # Check if athlete has an active upcoming target plan
@@ -629,6 +746,8 @@ def build_daily_review_and_outlook_local(
 
         for item in outlook_days:
             offset = item["day_offset"]
+            if item.get("is_athlete_adjusted"):
+                continue
             if offset == days_until_event:
                 # Target Event Day
                 est_xss = int(p_tss * 1.05) if p_type in ["Punchy / Rolling", "Climber / Hilly"] else p_tss
@@ -691,6 +810,10 @@ def build_daily_review_and_outlook_local(
     from app.database import get_scheduled_workout_for_date
     for item in outlook_days:
         offset = item["day_offset"]
+        # If athlete explicitly requested rest or zone 2 for this day, honor athlete adjustment
+        if item.get("is_athlete_adjusted"):
+            continue
+
         target_iso = (today + datetime.timedelta(days=offset)).isoformat()
         scheduled_w = get_scheduled_workout_for_date(target_iso)
         if scheduled_w:
@@ -803,6 +926,17 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
     today_acts = act_info.get("today_activities", [])
     latest_act = act_info.get("latest_activity")
     
+    today_iso = datetime.date.today().isoformat()
+    if custom_prompt and custom_prompt.strip():
+        set_setting("latest_debrief_athlete_note", custom_prompt.strip())
+        set_setting("latest_debrief_athlete_note_date", today_iso)
+    else:
+        saved_date = get_setting("latest_debrief_athlete_note_date", "")
+        if saved_date == today_iso:
+            custom_prompt = get_setting("latest_debrief_athlete_note", "")
+        else:
+            custom_prompt = ""
+
     # 1. Generate local sports-science baseline
     base_review = build_daily_review_and_outlook_local(
         whoop_data=whoop_data,
@@ -811,8 +945,10 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
         latest_act=latest_act,
         program=program,
         ftp=ftp,
-        max_hr=max_hr
+        max_hr=max_hr,
+        custom_prompt=custom_prompt
     )
+    base_review["athlete_note"] = custom_prompt
     
     # 2. Check if Gemini API key is configured
     gemini_key = get_setting("gemini_api_key", "").strip()
@@ -837,19 +973,21 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
                 if len(clean_insights) > 25:
                     base_review["today_assessment"]["assessment_text"] = clean_insights
                     base_review["today_assessment"]["ai_coach_insights"] = clean_insights
-                if enhanced_assessment.get("tomorrow_guidance"):
-                    clean_guidance = str(enhanced_assessment["tomorrow_guidance"]).strip()
-                    if len(clean_guidance) > 10 and not clean_guidance.startswith("{"):
-                        orig_desc = base_review["outlook_days"][0]["description"]
-                        if clean_guidance not in orig_desc:
-                            base_review["outlook_days"][0]["description"] = f"{orig_desc} AI Guidance: {clean_guidance}"
+                if custom_prompt and "Athlete Note:" not in base_review["today_assessment"]["assessment_text"]:
+                    base_review["today_assessment"]["assessment_text"] += f"\n\nAthlete Note: '{custom_prompt}' — accounted for in fatigue decay and forward outlook modeling."
+            if enhanced_assessment.get("tomorrow_guidance"):
+                clean_guidance = str(enhanced_assessment["tomorrow_guidance"]).strip()
+                if len(clean_guidance) > 10 and not clean_guidance.startswith("{"):
+                    orig_desc = base_review["outlook_days"][0]["description"]
+                    if clean_guidance not in orig_desc:
+                        base_review["outlook_days"][0]["description"] = f"{orig_desc} AI Guidance: {clean_guidance}"
         except Exception as e:
             print(f"Gemini API review call error: {e}")
-            if custom_prompt:
-                base_review["today_assessment"]["assessment_text"] += f" Athlete Note: '{custom_prompt}' — accounted for in fatigue decay modeling."
+            if custom_prompt and "Athlete Note:" not in base_review["today_assessment"]["assessment_text"]:
+                base_review["today_assessment"]["assessment_text"] += f"\n\nAthlete Note: '{custom_prompt}' — accounted for in fatigue decay and forward outlook modeling."
     else:
-        if custom_prompt:
-            base_review["today_assessment"]["assessment_text"] += f" Athlete Note: '{custom_prompt}' — accounted for in fatigue decay modeling."
+        if custom_prompt and "Athlete Note:" not in base_review["today_assessment"]["assessment_text"]:
+            base_review["today_assessment"]["assessment_text"] += f"\n\nAthlete Note: '{custom_prompt}' — accounted for in fatigue decay and forward outlook modeling."
 
     return base_review
 
