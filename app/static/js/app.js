@@ -3214,10 +3214,16 @@ function renderDebrief(data) {
         zoneBg = "rgba(244, 63, 94, 0.1)";
       }
 
-      const xssTag = (item.estimated_xss !== undefined)
+      const durTag = (item.duration_min === 0)
+        ? `<span class="tag tag-dur" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-weight:600;">🛌 REST DAY</span>`
+        : `<span class="tag tag-dur">${item.duration_min} MIN</span>`;
+      const xssTag = (item.estimated_xss !== undefined && item.estimated_xss > 0)
         ? `<span class="tag" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);font-weight:600;">⚡ ~${item.estimated_xss} XSS</span>`
         : '';
-      const focusDurationTag = (item.focus_duration)
+      const tssTag = (item.estimated_tss > 0)
+        ? `<span class="tag tag-tss">~${item.estimated_tss} TSS</span>`
+        : `<span class="tag tag-tss" style="color:var(--text-muted);">0 TSS</span>`;
+      const focusDurationTag = (item.focus_duration && item.duration_min > 0)
         ? `<span class="tag" style="background:rgba(6,182,212,0.12);color:#06b6d4;border:1px solid rgba(6,182,212,0.25);">🎯 ${item.focus_duration}</span>`
         : '';
 
@@ -3247,9 +3253,9 @@ function renderDebrief(data) {
           </div>
           <div class="outlook-card-title" ${titleStyle}>${item.title}</div>
           <div class="outlook-tags">
-            <span class="tag tag-dur">${item.duration_min} MIN</span>
+            ${durTag}
             ${xssTag}
-            <span class="tag tag-tss">~${item.estimated_tss} TSS</span>
+            ${tssTag}
             ${focusDurationTag}
             <span class="tag tag-focus">${item.focus}</span>
             ${zwiftTag}

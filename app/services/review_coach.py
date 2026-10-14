@@ -80,6 +80,266 @@ def get_whoop_for_date(target_date_str: str) -> Optional[Dict[str, Any]]:
         return dict(row)
     return None
 
+def build_preference_aligned_outlook_days(
+    today: datetime.date,
+    today_recovery: int,
+    today_strain: float,
+    workout_strain: float,
+    is_today: bool,
+    is_yesterday: bool,
+    has_trained_today: bool,
+    session_summary: Dict[str, Any],
+    ftp: int,
+    program: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    """
+    Constructs a 3-day forward forecast that models acute fatigue decay (tau ~ 3.0 days)
+    while strictly aligning with the athlete's persistent weekly schedule preferences:
+      - Monday, Tuesday, Thursday: 35–45 minutes ONLY (indoor efficiency, secondary rest candidates)
+      - Wednesday & Friday: 60+ minutes (an hour or more, outdoor priority if weather allows)
+      - Saturday: Dedicated weekly rest day (0 min)
+      - Sunday: 60–90+ minutes (longer outdoor endurance or long indoor session)
+      - Warmup/Cooldown: Progressive wattage ramps (never flat Zone 2 blocks)
+      - Threshold / Sweet Spot: Strongly favors Over/Under intervals
+    """
+    from app.services.preferences_service import get_day_target_config
+
+    trained_today_heavy = is_today and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 60))
+    trained_yesterday_heavy = is_yesterday and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 40) or (session_summary.get("verdict") == "Intensity Overreach"))
+    today_passive_or_light = (not has_trained_today) and (today_strain < 13.5)
+
+    # 1. Base recovery progression over next 3 days
+    if trained_today_heavy:
+        # Acute fatigue spike peaks tomorrow morning (Day +1)
+        day1_recovery = max(38, min(62, today_recovery - 10))
+        day2_recovery = min(84, day1_recovery + 24)
+        day3_recovery = min(88, day2_recovery + 6)
+    elif trained_yesterday_heavy and today_passive_or_light:
+        # 48 hours post-workout: fatigue clears, recovery rebounds
+        day1_recovery = min(74, today_recovery + 22)
+        day2_recovery = min(86, day1_recovery + 14)
+        day3_recovery = 76
+    else:
+        # Standard balanced progression
+        day1_recovery = min(88, today_recovery + 12)
+        day2_recovery = max(45, day1_recovery - 14)
+        day3_recovery = 74
+
+    recoveries = [day1_recovery, day2_recovery, day3_recovery]
+    outlook_days = []
+
+    for offset in [1, 2, 3]:
+        target_date = today + datetime.timedelta(days=offset)
+        rec_est = recoveries[offset - 1]
+        zone = "green" if rec_est > 66 else ("yellow" if rec_est >= 34 else "red")
+        date_relative = "Tomorrow" if offset == 1 else f"Day +{offset}"
+        date_formatted = target_date.strftime("%a, %b %-d")
+
+        cfg = get_day_target_config(target_date)
+        w_key = cfg.get("weekday_key", "")
+        day_name = cfg.get("day_name", w_key.capitalize())
+        min_dur = cfg.get("min_duration_min", 35)
+        max_dur = cfg.get("max_duration_min", 45)
+        preferred_dur = cfg.get("preferred_duration_min", 45)
+        is_default_rest = cfg.get("is_default_rest", False) or (w_key == "saturday")
+        mode = cfg.get("mode", "indoor_priority")
+
+        # CASE A: Dedicated Rest Day (e.g. Saturday)
+        if is_default_rest or mode == "rest_day":
+            item = {
+                "day_offset": offset,
+                "date_relative": date_relative,
+                "date_formatted": date_formatted,
+                "projected_recovery": rec_est,
+                "projected_zone": zone,
+                "title": "🛌 Dedicated Weekly Rest & Recovery",
+                "duration_min": 0,
+                "estimated_tss": 0,
+                "estimated_xss": 0,
+                "low_xss": 0,
+                "high_xss": 0,
+                "peak_xss": 0,
+                "focus_duration": "Rest & Recovery",
+                "focus": "Autonomic Restoration & Muscle Repair",
+                "description": (
+                    f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Dedicated weekly rest day consistent with your scheduling preferences. "
+                    f"Focus on hydration, mobility, and restorative sleep to allow cellular supercompensation before Sunday's longer endurance session."
+                )
+            }
+
+        # CASE B: Sunday (Outdoor or Long Indoor Ride)
+        elif w_key == "sunday" or mode == "outdoor_or_long_indoor":
+            dur = max(60, min(90, preferred_dur or 75))
+            if rec_est >= 60:
+                est_tss = int(dur * 0.95)
+                est_xss = est_tss
+                low_x = int(est_xss * 0.85)
+                high_x = int(est_xss * 0.15)
+                item = {
+                    "day_offset": offset,
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": "🚴 Outdoor Endurance or Long Indoor Tempo",
+                    "duration_min": dur,
+                    "estimated_tss": est_tss,
+                    "estimated_xss": est_xss,
+                    "low_xss": low_x,
+                    "high_xss": high_x,
+                    "peak_xss": 0,
+                    "focus_duration": "Rouleur (20:00 Focus)",
+                    "focus": "Aerobic Engine & Durability",
+                    "description": (
+                        f"Expected Recovery: ~{rec_est}% (Prime). Sunday volume ride ({dur} min, outdoor priority if weather permits, or structured indoor endurance). "
+                        f"Designed with progressive wattage ramps to build mitochondrial durability and contribute toward your weekly {program.get('weekly_tss_target', 360)} TSS macrocycle target."
+                    )
+                }
+            else:
+                dur = 60
+                item = {
+                    "day_offset": offset,
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": "Zone 2 Extended Aerobic Base",
+                    "duration_min": 60,
+                    "estimated_tss": 42,
+                    "estimated_xss": 42,
+                    "low_xss": 42,
+                    "high_xss": 0,
+                    "peak_xss": 0,
+                    "focus_duration": "Endurance / Century (>1h Focus)",
+                    "focus": "Aerobic Base & Fat Oxidation",
+                    "description": (
+                        f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Sunday aerobic volume tailored for moderate recovery: steady 60-minute Zone 2 spin "
+                        f"(<{int(ftp * 0.68)}W, ~42 Low XSS) with progressive ramp warmup to stimulate aerobic blood flow without CNS strain."
+                    )
+                }
+
+        # CASE C: Wednesday & Friday (60+ Minutes, Outdoor Priority if Weather Allows)
+        elif w_key in ["wednesday", "friday"] or mode == "outdoor_priority":
+            dur = max(60, min(90, preferred_dur or 60))
+            if rec_est >= 66:
+                est_tss = 65 if dur == 60 else 75
+                est_xss = 68 if dur == 60 else 78
+                low_x = 50 if dur == 60 else 58
+                high_x = 18 if dur == 60 else 20
+                item = {
+                    "day_offset": offset,
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": "⚡ Sweet Spot Over-Unders (Outdoor / Indoor)",
+                    "duration_min": dur,
+                    "estimated_tss": est_tss,
+                    "estimated_xss": est_xss,
+                    "low_xss": low_x,
+                    "high_xss": high_x,
+                    "peak_xss": 0,
+                    "focus_duration": "Climber / Sweet Spot (45:00 Focus)",
+                    "focus": "Sweet Spot Over-Unders & Threshold Expansion",
+                    "description": (
+                        f"Expected Recovery: ~{rec_est}% (Green Rebound). Prescribed {dur}+ min session consistent with your {day_name} preference (outdoors if weather permits, or indoor). "
+                        f"Features progressive wattage ramp warmup (45% -> 75% FTP) and structured Over/Under intervals ({int(ftp * 0.90)}W / {int(ftp * 1.05)}W) to maximize threshold density without flat continuous grinding."
+                    )
+                }
+            elif rec_est >= 45:
+                item = {
+                    "day_offset": offset,
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": "Zone 2 Progressive Aerobic Foundation",
+                    "duration_min": 60,
+                    "estimated_tss": 46,
+                    "estimated_xss": 46,
+                    "low_xss": 44,
+                    "high_xss": 2,
+                    "peak_xss": 0,
+                    "focus_duration": "Endurance / Century (>1h Focus)",
+                    "focus": "Aerobic Base & Cadence Clearance",
+                    "description": (
+                        f"Expected Recovery: ~{rec_est}% (Yellow). 60-min steady Zone 2 ride (outdoors if weather permits) with progressive ramp warmup and cooldown. "
+                        f"Promotes blood flow and mitochondrial aerobic capacity without compounding acute fatigue."
+                    )
+                }
+            else:
+                item = {
+                    "day_offset": offset,
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": "🌱 Active Recovery Spin or Rest",
+                    "duration_min": 45,
+                    "estimated_tss": 22,
+                    "estimated_xss": 22,
+                    "low_xss": 22,
+                    "high_xss": 0,
+                    "peak_xss": 0,
+                    "focus_duration": "Active Recovery (>1h Focus)",
+                    "focus": "Lactate Clearance & Autonomic Recovery",
+                    "description": (
+                        f"Expected Recovery: ~{rec_est}% (Red). Deep fatigue calls for an easy active recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or complete rest to allow autonomic rebound."
+                    )
+                }
+
+        # CASE D: Monday, Tuesday, Thursday (35–45 Minutes ONLY, Secondary Rest Candidates)
+        else:
+            if rec_est < 50:
+                # Active flush or rest day candidate
+                item = {
+                    "day_offset": offset,
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": "🌱 Active Recovery Flush or Rest (35m)",
+                    "duration_min": 35,
+                    "estimated_tss": 18,
+                    "estimated_xss": 18,
+                    "low_xss": 18,
+                    "high_xss": 0,
+                    "peak_xss": 0,
+                    "focus_duration": "Active Recovery (>1h Focus)",
+                    "focus": "Cellular Flush & Rest Day Candidate",
+                    "description": (
+                        f"Expected Recovery: ~{rec_est}% ({'Red' if rec_est < 34 else 'Yellow'}). Consistent with your preference that one of Mon/Tue/Thu serves as an extra rest day: "
+                        f"35-min gentle spin (<55% FTP, <{int(ftp * 0.55)}W) or passive rest to absorb recent training stress."
+                    )
+                }
+            else:
+                # High-efficiency 40-minute Over/Unders session
+                dur = min(45, max(35, preferred_dur or 40))
+                item = {
+                    "day_offset": offset,
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": f"⚡ {dur}-Min Sweet Spot Over-Unders",
+                    "duration_min": dur,
+                    "estimated_tss": 45,
+                    "estimated_xss": 46,
+                    "low_xss": 34,
+                    "high_xss": 12,
+                    "peak_xss": 0,
+                    "focus_duration": "Climber / Sweet Spot (45:00 Focus)",
+                    "focus": "High-Efficiency Over-Unders",
+                    "description": (
+                        f"Expected Recovery: ~{rec_est}% (Ready). High-efficiency {dur}-minute indoor session respecting your 35–45 min weekday limit. "
+                        f"Includes a progressive wattage ramp warmup (45% -> 75% FTP), structured Over/Under threshold blocks ({int(ftp * 0.90)}W / {int(ftp * 1.05)}W), and progressive ramp cooldown."
+                    )
+                }
+
+        outlook_days.append(item)
+
+    return outlook_days
+
 def build_daily_review_and_outlook_local(
     whoop_data: Dict[str, Any],
     trailing_strava: Dict[str, Any],
@@ -341,226 +601,23 @@ def build_daily_review_and_outlook_local(
         }
 
     # 2. MULTI-DAY OUTLOOK (Next 3 Days)
-    # Model forward fatigue decay (tau = 3.0 days)
-    trained_today_heavy = is_today and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 60))
-    trained_yesterday_heavy = is_yesterday and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 40) or (session_summary.get("verdict") == "Intensity Overreach"))
-    today_passive_or_light = (not has_trained_today) and (today_strain < 13.5)
-
-    if trained_today_heavy:
-        # Acute fatigue spike peaks tomorrow morning (Day +1)
-        day1_recovery_est = max(38, min(60, today_recovery - 10))
-        day1_zone = "yellow" if day1_recovery_est >= 34 else "red"
-        day1_title = "Zone 2 Steady Aerobic Flush"
-        day1_dur = 45
-        day1_tss = 28
-        day1_xss = 28
-        day1_low_xss = 28
-        day1_high_xss = 0
-        day1_peak_xss = 0
-        day1_focus_duration = "Endurance / Century (>1h Focus)"
-        day1_focus = "Mitochondrial Clearance & Aerobic Base"
-        day1_desc = (
-            f"Expected Recovery: ~{day1_recovery_est}% ({day1_zone.capitalize()}). Following today's {today_strain:.1f} strain effort, "
-            f"acute muscular glycogen debt will peak tomorrow morning. Recommend a steady 45-minute Zone 2 spin (60–65% FTP, <{int(ftp * 0.65)}W, ~28 Low XSS) "
-            f"to flush lactate metabolites without triggering autonomic strain."
-        )
-
-        # Day +2: Supercompensation begins (48h post-effort)
-        day2_recovery_est = min(84, day1_recovery_est + 24)
-        day2_zone = "green" if day2_recovery_est > 66 else "yellow"
-        day2_title = "Sweet Spot / VO2 Max Progression"
-        day2_dur = 60
-        day2_tss = 70
-        day2_xss = 68
-        day2_low_xss = 52
-        day2_high_xss = 16
-        day2_peak_xss = 0
-        day2_focus_duration = "Climber / Sweet Spot (45:00 Focus)"
-        day2_focus = "Muscular Endurance & Power Supercompensation"
-        day2_desc = (
-            f"Expected Recovery: ~{day2_recovery_est}% ({day2_zone.capitalize()} Supercompensation). 48 hours of recovery will clear peripheral fatigue, "
-            f"unlocking the ideal supercompensation window for 3x10min Sweet Spot blocks (88–92% FTP, ~{int(ftp * 0.90)}W, est. 68 XSS)."
-        )
-
-        # Day +3
-        day3_recovery_est = 72
-        day3_zone = "green"
-        day3_title = "Long Weekend Endurance or Outdoor Tempo"
-        day3_dur = 90
-        day3_tss = 85
-        day3_xss = 85
-        day3_low_xss = 75
-        day3_high_xss = 10
-        day3_peak_xss = 0
-        day3_focus_duration = "Rouleur (20:00 Focus)"
-        day3_focus = "Aerobic Engine & Durability"
-        day3_desc = (
-            f"Expected Recovery: ~{day3_recovery_est}% (Prime). Projected load balance supports an extended 90-minute endurance "
-            f"or tempo loop (est. 85 XSS), contributing toward your weekly {program.get('weekly_tss_target', 360)} TSS macrocycle target."
-        )
-
-    elif trained_yesterday_heavy and today_passive_or_light:
-        # Heavy workout was yesterday; today is absorbing the recovery dip (45%).
-        # Tomorrow is 48 hours post-workout: fatigue clears, recovery rebounds!
-        day1_recovery_est = min(72, today_recovery + 22)
-        day1_zone = "green" if day1_recovery_est > 66 else "yellow"
-        day1_title = "Zone 2 Progressive Aerobic Foundation"
-        day1_dur = 55
-        day1_tss = 42
-        day1_xss = 42
-        day1_low_xss = 40
-        day1_high_xss = 2
-        day1_peak_xss = 0
-        day1_focus_duration = "Endurance / Century (>1h Focus)"
-        day1_focus = "Aerobic Base & Cadence Clearance"
-        day1_desc = (
-            f"Expected Recovery: ~{day1_recovery_est}% ({day1_zone.capitalize()} Rebound). 48 hours after yesterday's {workout_strain:.1f} strain overreach, "
-            f"acute muscular fatigue is dissipating. With today's controlled {today_strain:.1f} daytime strain absorbing the initial load, "
-            f"restorative sleep tonight will lift autonomic readiness back into the adaptation zone. Prescribed: steady 55-minute Zone 2 spin "
-            f"(<{int(ftp * 0.68)}W, ~42 Low XSS) to stimulate mitochondrial blood flow without taxing sympathetic reserves."
-        )
-
-        # Day +2 (Day After Tomorrow): 72h supercompensation window
-        day2_recovery_est = min(84, day1_recovery_est + 14)
-        day2_zone = "green"
-        day2_title = "Sweet Spot / VO2 Max Progression"
-        day2_dur = 60
-        day2_tss = 68
-        day2_xss = 68
-        day2_low_xss = 52
-        day2_high_xss = 16
-        day2_peak_xss = 0
-        day2_focus_duration = "Climber / Sweet Spot (45:00 Focus)"
-        day2_focus = "Threshold Expansion & Supercompensation"
-        day2_desc = (
-            f"Expected Recovery: ~{day2_recovery_est}% (Green Supercompensation). 72 hours of recovery fully restores neuromuscular freshness "
-            f"and cellular glycogen. Recommended focus is structured Sweet Spot blocks (88–92% FTP, ~{int(ftp * 0.90)}W, est. 68 XSS) to drive functional threshold power gains."
-        )
-
-        # Day +3 (In 3 Days)
-        day3_recovery_est = 72
-        day3_zone = "green"
-        day3_title = "Long Weekend Endurance or Outdoor Tempo"
-        day3_dur = 90
-        day3_tss = 85
-        day3_xss = 85
-        day3_low_xss = 75
-        day3_high_xss = 10
-        day3_peak_xss = 0
-        day3_focus_duration = "Rouleur (20:00 Focus)"
-        day3_focus = "Aerobic Engine & Durability"
-        day3_desc = (
-            f"Expected Recovery: ~{day3_recovery_est}% (Prime). Projected load balance supports sustained aerobic volume (~85 XSS), "
-            f"contributing toward your weekly {program.get('weekly_tss_target', 360)} TSS macrocycle target."
-        )
-
-    else:
-        # Standard balanced progression
-        day1_recovery_est = min(88, today_recovery + 12)
-        day1_zone = "green" if day1_recovery_est > 66 else "yellow"
-        day1_title = "Sweet Spot / VO2 Max Progression"
-        day1_dur = 60
-        day1_tss = 68
-        day1_xss = 68
-        day1_low_xss = 52
-        day1_high_xss = 16
-        day1_peak_xss = 0
-        day1_focus_duration = "Climber / Sweet Spot (45:00 Focus)"
-        day1_focus = "Threshold Expansion & Aerobic Density"
-        day1_desc = (
-            f"Expected Recovery: ~{day1_recovery_est}% ({day1_zone.capitalize()}). Low residual fatigue positions you in a prime adaptation window. "
-            f"Recommended focus is structured Sweet Spot blocks (88–92% FTP, ~{int(ftp * 0.90)}W, est. 68 XSS) to drive functional threshold power gains."
-        )
-
-        day2_recovery_est = max(45, day1_recovery_est - 15)
-        day2_zone = "yellow"
-        day2_title = "Zone 2 Aerobic Foundation"
-        day2_dur = 75
-        day2_tss = 48
-        day2_xss = 48
-        day2_low_xss = 46
-        day2_high_xss = 2
-        day2_peak_xss = 0
-        day2_focus_duration = "Endurance / Century (>1h Focus)"
-        day2_focus = "Capillary Density & Fat Oxidation"
-        day2_desc = (
-            f"Expected Recovery: ~{day2_recovery_est}% (Yellow). Step into steady endurance pacing (65% FTP, ~48 Low XSS) "
-            f"to accumulate aerobic volume without pushing into cardiovascular overreach."
-        )
-
-        day3_recovery_est = 72
-        day3_zone = "green"
-        day3_title = "Long Weekend Endurance or Outdoor Tempo"
-        day3_dur = 90
-        day3_tss = 85
-        day3_xss = 85
-        day3_low_xss = 75
-        day3_high_xss = 10
-        day3_peak_xss = 0
-        day3_focus_duration = "Rouleur (20:00 Focus)"
-        day3_focus = "Aerobic Engine & Durability"
-        day3_desc = (
-            f"Expected Recovery: ~{day3_recovery_est}% (Prime). Projected load balance supports an extended 90-minute outdoor endurance "
-            f"or tempo loop (~85 XSS), contributing toward your weekly {program.get('weekly_tss_target', 360)} TSS macrocycle target."
-        )
+    # Model forward fatigue decay (tau = 3.0 days) strictly compliant with athlete weekly schedule preferences
+    outlook_days = build_preference_aligned_outlook_days(
+        today=today,
+        today_recovery=today_recovery,
+        today_strain=today_strain,
+        workout_strain=workout_strain,
+        is_today=is_today,
+        is_yesterday=is_yesterday,
+        has_trained_today=has_trained_today,
+        session_summary=session_summary,
+        ftp=ftp,
+        program=program
+    )
 
     # Check if athlete has an active upcoming target plan
     active_plan = get_active_target_plan()
     days_until_event = active_plan.get("days_until") if active_plan else None
-
-    outlook_days = [
-        {
-            "day_offset": 1,
-            "date_relative": "Tomorrow",
-            "date_formatted": (today + datetime.timedelta(days=1)).strftime("%a, %b %-d"),
-            "projected_recovery": day1_recovery_est,
-            "projected_zone": day1_zone,
-            "title": day1_title,
-            "duration_min": day1_dur,
-            "estimated_tss": day1_tss,
-            "estimated_xss": day1_xss,
-            "low_xss": day1_low_xss,
-            "high_xss": day1_high_xss,
-            "peak_xss": day1_peak_xss,
-            "focus_duration": day1_focus_duration,
-            "focus": day1_focus,
-            "description": day1_desc
-        },
-        {
-            "day_offset": 2,
-            "date_relative": "Day +2",
-            "date_formatted": (today + datetime.timedelta(days=2)).strftime("%a, %b %-d"),
-            "projected_recovery": day2_recovery_est,
-            "projected_zone": day2_zone,
-            "title": day2_title,
-            "duration_min": day2_dur,
-            "estimated_tss": day2_tss,
-            "estimated_xss": day2_xss,
-            "low_xss": day2_low_xss,
-            "high_xss": day2_high_xss,
-            "peak_xss": day2_peak_xss,
-            "focus_duration": day2_focus_duration,
-            "focus": day2_focus,
-            "description": day2_desc
-        },
-        {
-            "day_offset": 3,
-            "date_relative": "Day +3",
-            "date_formatted": (today + datetime.timedelta(days=3)).strftime("%a, %b %-d"),
-            "projected_recovery": day3_recovery_est,
-            "projected_zone": day3_zone,
-            "title": day3_title,
-            "duration_min": day3_dur,
-            "estimated_tss": day3_tss,
-            "estimated_xss": day3_xss,
-            "low_xss": day3_low_xss,
-            "high_xss": day3_high_xss,
-            "peak_xss": day3_peak_xss,
-            "focus_duration": day3_focus_duration,
-            "focus": day3_focus,
-            "description": day3_desc
-        }
-    ]
 
     # Dynamically inject target event into outlook if within horizon
     if active_plan and days_until_event is not None and days_until_event >= 1:
@@ -783,11 +840,9 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
                 if enhanced_assessment.get("tomorrow_guidance"):
                     clean_guidance = str(enhanced_assessment["tomorrow_guidance"]).strip()
                     if len(clean_guidance) > 10 and not clean_guidance.startswith("{"):
-                        if base_review["outlook_days"][0].get("is_coach_scheduled"):
-                            orig_desc = base_review["outlook_days"][0]["description"]
-                            base_review["outlook_days"][0]["description"] = f"{orig_desc} Guidance: {clean_guidance}"
-                        else:
-                            base_review["outlook_days"][0]["description"] = clean_guidance
+                        orig_desc = base_review["outlook_days"][0]["description"]
+                        if clean_guidance not in orig_desc:
+                            base_review["outlook_days"][0]["description"] = f"{orig_desc} AI Guidance: {clean_guidance}"
         except Exception as e:
             print(f"Gemini API review call error: {e}")
             if custom_prompt:
@@ -809,15 +864,26 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
         f"Session was completed YESTERDAY ({sess.get('date')}): '{sess.get('title')}' on yesterday's {sess.get('workout_recovery')}% recovery baseline ({sess.get('workout_strain')} Whoop day strain). "
         f"Note: TODAY's recovery is {sess.get('today_recovery')}% with {sess.get('today_strain')} daytime strain accumulated so far, as a direct consequence of yesterday's effort. Do NOT attribute today's {sess.get('today_strain')} strain to yesterday's ride."
     )
+
+    from app.services.preferences_service import get_coaching_preferences
+    prefs = get_coaching_preferences()
+    directives_summary = "; ".join(prefs.get("directives", [
+        "Mon/Tue/Thu: 35-45m only",
+        "Wed/Fri: 60+ min (outdoors if weather allows)",
+        "Sat: dedicated rest day",
+        "Sun: 60-90+ min endurance"
+    ]))
     
     prompt = (
         f"You are PowerSync's elite cycling sports-science coach. Provide a concise, qualitative debrief for the athlete.\n"
         f"Athlete FTP: {review_data['macrocycle_context']['current_ftp']}W.\n"
+        f"Athlete Permanent Schedule & Workout Preferences: {directives_summary}\n"
         f"Timeline & Data: {temporal_context}\n"
         f"Session Metrics: {sess.get('moving_time_formatted')}, {sess.get('weighted_watts')}W ({sess.get('pct_ftp')}% FTP), {sess.get('suffer_score')} TSS.\n"
         f"Physiological Strain Breakdown: {sess.get('total_xss', 0)} Total XSS ({sess.get('low_strain_xss', 0)} Low / {sess.get('high_strain_xss', 0)} High / {sess.get('peak_strain_xss', 0)} Peak), W' Anaerobic Battery Depleted: {sess.get('battery_depleted_pct', 0)}%, Focus Duration: {sess.get('focus_duration', 'Endurance')}.\n"
         f"Target Zone was: {sess.get('target_zone')}. Compliance verdict: {sess.get('verdict')}.\n"
         f"Tomorrow outlook: {review_data['outlook_days'][0]['title']} (est. {review_data['outlook_days'][0].get('estimated_xss', 50)} XSS, Focus: {review_data['outlook_days'][0].get('focus_duration', 'Sweet Spot')}, {review_data['outlook_days'][0]['focus']}).\n"
+        f"Mandatory: All advice and tomorrow guidance MUST strictly respect the athlete's workout and schedule preferences.\n"
         f"Format response as strict JSON: {{\"insights\": \"1-2 paragraphs assessing session against recovery and explaining fatigue state, under 150 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\"}}"
     )
     if custom_prompt:
