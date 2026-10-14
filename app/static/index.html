@@ -1,0 +1,1982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="PowerSync">
+  <meta name="theme-color" content="#0b0f19">
+  <title>PowerSync | Whoop + Strava AI Coach & Zwift Bridge</title>
+  <script>
+    (function() {
+      try {
+        var mode = localStorage.getItem("powersync_theme_mode") || localStorage.getItem("aerosync_theme_mode") || "system";
+        var isLight = mode === "light" || (mode === "system" && window.matchMedia("(prefers-color-scheme: light)").matches);
+        document.documentElement.setAttribute("data-theme", isLight ? "light" : "dark");
+        document.documentElement.setAttribute("data-theme-mode", mode);
+      } catch (_) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="/static/css/style.css?v=52">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
+  <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
+</head>
+<body>
+
+  <!-- Pull to Reload Indicator (PWA & Mobile) -->
+  <div id="pullToReloadIndicator" class="pull-to-reload" aria-live="polite">
+    <div class="pull-to-reload-content">
+      <div class="pull-to-reload-icon">
+        <svg class="pull-arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"></line>
+          <polyline points="19 12 12 19 5 12"></polyline>
+        </svg>
+        <svg class="pull-spinner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-opacity="0.25"></circle>
+          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-linecap="round"></path>
+        </svg>
+      </div>
+      <span class="pull-to-reload-label" id="pullToReloadLabel">Pull to reload</span>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <header class="navbar">
+    <div class="brand">
+      <img src="/static/img/logo.jpg?v=12" alt="PowerSync Logo" style="width:38px;height:38px;border-radius:10px;box-shadow:0 0 12px rgba(6,182,212,0.3);object-fit:cover;">
+      <div class="brand-text">
+        <h1>PowerSync</h1>
+        <span>Adaptive Coach & Zwift Sync</span>
+      </div>
+    </div>
+    
+    <div class="nav-actions">
+      <div class="badge-status" id="badgeWhoop" style="cursor:pointer;" title="Click to connect Whoop">
+        <span class="dot green"></span> Whoop: <span id="whoopStatusText">Ready</span>
+      </div>
+      <div class="badge-status" id="badgeStrava" style="cursor:pointer;" title="Click to connect Strava">
+        <span class="dot green"></span> Strava: <span id="stravaStatusText">Ready</span>
+      </div>
+      <div class="badge-status" id="badgeZwift" style="cursor:pointer;" title="Click to configure Zwift">
+        <span class="dot zwift"></span> Zwift: <span id="zwiftStatusText">Ready</span>
+      </div>
+      <div class="badge-status" id="badgeGemini" style="cursor:pointer;" title="Click to configure Google Gemini AI">
+        <span class="dot green" id="geminiNavDot"></span> Gemini: <span id="geminiNavStatusText">Ready</span>
+      </div>
+      <button class="btn btn-secondary" id="btnOpenSettings">⚙️ Settings</button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <main class="container">
+
+    <!-- Quick Connect Live Accounts Banner (Hidden by default; only shown if explicitly in demo mode) -->
+    <div id="demoModeBanner" style="background: linear-gradient(90deg, rgba(6,182,212,0.15), rgba(16,185,129,0.15)); border: 1px solid rgba(6,182,212,0.3); border-radius: var(--radius-md); padding: 1rem 1.5rem; display: none; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div style="display:flex;align-items:center;gap:0.75rem;">
+        <span style="font-size:1.4rem;">🔗</span>
+        <div>
+          <div style="font-weight:700;font-size:0.95rem;color:#f8fafc;">Currently in Demo / Preview Mode</div>
+          <div style="font-size:0.8rem;color:#94a3b8;">Connect your live Whoop & Strava accounts to replace sample metrics with your real data.</div>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="btnBannerOpenConnect">
+        🔑 Connect Whoop & Strava
+      </button>
+    </div>
+
+    <!-- Dashboard Master Controls Toolbar -->
+    <div class="dashboard-toolbar">
+      <div class="dashboard-toolbar-left">
+        <span class="dashboard-toolbar-title">⚡ Performance Dashboard</span>
+        <span class="dashboard-toolbar-hint">Tap any tile header or switch to expand / collapse</span>
+      </div>
+      <div class="dashboard-toolbar-right">
+        <button class="btn btn-secondary btn-toggle-all-tiles" id="btnToggleAllTiles" type="button" aria-label="Expand or collapse all tiles">
+          <span id="toggleAllTilesIcon">⊟</span>
+          <span id="toggleAllTilesText">Collapse All</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Top Telemetry Row: The Anti-Xert High-Signal Cards -->
+    <section class="telemetry-grid">
+      
+      <!-- Card 1: Whoop Daily Readiness (All 3 Whoop Rings) -->
+      <div class="card collapsible-tile" id="cardWhoop">
+        <div class="card-header collapsible-tile-header" id="whoopCardHeader" role="button" tabindex="0" title="Click to collapse or expand Whoop Biometrics" aria-expanded="true">
+          <div class="card-header-left">
+            <span class="card-header-icon">📊</span>
+            <div>
+              <span class="card-title">Whoop Biometrics</span>
+              <!-- Collapsed Summary Chips (Visible when collapsed) -->
+              <div class="collapsible-tile-summary" id="whoopCollapsedSummary" style="display:none;margin-top:0.25rem;">
+                <span class="tag tag-focus" id="collapsedWhoopRecovery">Recovery: 50%</span>
+                <span class="tag tag-dur" id="collapsedWhoopStrain">Strain: 15.0</span>
+                <span class="tag tag-tss" id="collapsedWhoopSleep">Sleep: 83%</span>
+                <span class="tag" id="collapsedWhoopHrv" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);">HRV: -- ms</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem;" id="btnSyncWhoop">🔄 Sync Whoop</button>
+            <span class="badge-status" id="whoopDateBadge">Today</span>
+            <button class="btn btn-secondary btn-stage-collapse" id="btnToggleWhoopCard" type="button" aria-label="Collapse or expand Whoop biometrics">
+              <span id="whoopToggleIcon">▲</span>
+              <span id="whoopToggleText">Collapse</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Collapsible Body Container -->
+        <div class="collapsible-tile-body" id="whoopCardBody">
+          <!-- 3 Whoop Rings (Recovery, Day Strain, Sleep) -->
+          <div class="whoop-tri-rings-wrap" id="whoopTriRingWrap">
+            <!-- Ring 1: Recovery -->
+            <div class="whoop-ring-box">
+              <div class="ring-circle-wrap">
+                <svg class="ring-svg" viewBox="0 0 96 96">
+                  <circle class="ring-bg" cx="48" cy="48" r="38" />
+                  <circle class="ring-val" id="gaugeValCircle" cx="48" cy="48" r="38" 
+                          stroke="#f59e0b" stroke-dasharray="238.76" stroke-dashoffset="119.38" />
+                </svg>
+                <div class="ring-center">
+                  <div class="ring-num" id="gaugeRecoveryNum">50%</div>
+                </div>
+              </div>
+              <div class="ring-title" id="ringTitleRecovery" style="color:#f59e0b;">RECOVERY</div>
+              <div class="ring-detail" id="ringDetailRecovery">Yellow Zone</div>
+            </div>
+
+            <!-- Ring 2: Day Strain -->
+            <div class="whoop-ring-box">
+              <div class="ring-circle-wrap">
+                <svg class="ring-svg" viewBox="0 0 96 96">
+                  <circle class="ring-bg" cx="48" cy="48" r="38" />
+                  <circle class="ring-val" id="gaugeStrainCircle" cx="48" cy="48" r="38" 
+                          stroke="#06b6d4" stroke-dasharray="238.76" stroke-dashoffset="68.2" />
+                </svg>
+                <div class="ring-center">
+                  <div class="ring-num" id="gaugeStrainNum" style="color:#06b6d4;">15.0</div>
+                </div>
+              </div>
+              <div class="ring-title" style="color:#06b6d4;">DAY STRAIN</div>
+              <div class="ring-detail" id="ringDetailStrain">/ 21.0 Max</div>
+            </div>
+
+            <!-- Ring 3: Sleep Performance -->
+            <div class="whoop-ring-box">
+              <div class="ring-circle-wrap">
+                <svg class="ring-svg" viewBox="0 0 96 96">
+                  <circle class="ring-bg" cx="48" cy="48" r="38" />
+                  <circle class="ring-val" id="gaugeSleepCircle" cx="48" cy="48" r="38" 
+                          stroke="#8b5cf6" stroke-dasharray="238.76" stroke-dashoffset="40.59" />
+                </svg>
+                <div class="ring-center">
+                  <div class="ring-num" id="gaugeSleepNum" style="color:#8b5cf6;">83%</div>
+                </div>
+              </div>
+              <div class="ring-title" style="color:#8b5cf6;">SLEEP</div>
+              <div class="ring-detail" id="ringDetailSleep">7.6 hrs</div>
+            </div>
+          </div>
+
+          <!-- Secondary Biometric Telemetry Strip -->
+          <div class="whoop-sub-strip">
+            <div class="sub-strip-item">
+              <span class="sub-strip-lbl">HRV (rMSSD)</span>
+              <span class="sub-strip-val" id="valHrv">-- ms</span>
+            </div>
+            <div class="sub-strip-item">
+              <span class="sub-strip-lbl">Resting HR</span>
+              <span class="sub-strip-val" id="valRhr">-- bpm</span>
+            </div>
+            <div class="sub-strip-item">
+              <span class="sub-strip-lbl">Yesterday Strain</span>
+              <span class="sub-strip-val" id="valYesterdayStrain" style="color:var(--accent-amber);">--</span>
+            </div>
+            <div class="sub-strip-item">
+              <span class="sub-strip-lbl">Weighted Strain</span>
+              <span class="sub-strip-val" id="valTrailingStrain" style="color:var(--accent-cyan);" title="Exponential recency weighted (decay tau=3d)">--</span>
+            </div>
+            <!-- Hidden spans to preserve backwards compatibility -->
+            <span id="valSleep" style="display:none;">--</span>
+            <span id="valStrain" style="display:none;">--</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Strava Workload & Fatigue -->
+      <div class="card collapsible-tile" id="cardStrava">
+        <div class="card-header collapsible-tile-header" id="stravaCardHeader" role="button" tabindex="0" title="Click to collapse or expand Strava Training Load" aria-expanded="true">
+          <div class="card-header-left">
+            <span class="card-header-icon">📈</span>
+            <div>
+              <span class="card-title">Strava Training Load (7 Days)</span>
+              <!-- Collapsed Summary Chips (Visible when collapsed) -->
+              <div class="collapsible-tile-summary" id="stravaCollapsedSummary" style="display:none;margin-top:0.25rem;">
+                <span class="tag tag-focus" id="collapsedStravaHours">6.8 hrs</span>
+                <span class="tag tag-dur" id="collapsedStravaDist">103.5 mi</span>
+                <span class="tag tag-tss" id="collapsedStravaTss">305 TSS</span>
+                <span class="tag" id="collapsedStravaForm" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);">Optimal</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span class="badge-status" id="formStatusBadge" style="color:#10b981;border-color:#10b981;">Optimal / Fresh</span>
+            <button class="btn btn-secondary btn-stage-collapse" id="btnToggleStravaCard" type="button" aria-label="Collapse or expand Strava training load">
+              <span id="stravaToggleIcon">▲</span>
+              <span id="stravaToggleText">Collapse</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Collapsible Body Container -->
+        <div class="collapsible-tile-body" id="stravaCardBody">
+          <div class="strava-stats">
+            <div class="stat-box">
+              <div class="stat-box-title">Weekly Time</div>
+              <div class="stat-box-num" id="valWeeklyHours">6.8 hrs</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-title">Acute Weighted TSS</div>
+              <div class="stat-box-num" id="valAcuteTss" style="color:var(--accent-cyan);" title="Recency-weighted acute fatigue load (tau=3.0d)">--</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-title">Total 7D TSS</div>
+              <div class="stat-box-num" id="valWeeklyTss">305</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-box-title">Yesterday TSS</div>
+              <div class="stat-box-num" id="valYesterdayTss" style="color:var(--accent-amber);">--</div>
+            </div>
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:0.2rem;font-size:0.75rem;color:var(--text-muted);">
+            <span>Distance: <b id="valWeeklyDist" style="color:var(--text-secondary);">103.5 mi</b> · Elev: <b id="valWeeklyElev" style="color:var(--text-secondary);">4,298 ft</b></span>
+            <span id="valLoadProfileBadge" style="font-weight:600;color:var(--accent-cyan);">Evenly Distributed</span>
+          </div>
+
+          <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:0.2rem;" id="formDesc">
+            Load is well-balanced with recovery. Cardiovascular freshness is high.
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 3: AI Coach Daily Directive & Status (Top Right Panel) -->
+      <div class="card collapsible-tile" id="cardAiCoachToday">
+        <div class="card-header collapsible-tile-header" id="coachCardHeader" role="button" tabindex="0" title="Click to collapse or expand AI Coach Directive" aria-expanded="true" style="margin-bottom:0.15rem;">
+          <div class="card-header-left">
+            <span class="card-header-icon">🧠</span>
+            <div>
+              <span class="card-title" id="coachCardTitle">AI Coach Directive</span>
+              <!-- Collapsed Summary Chips (Visible when collapsed) -->
+              <div class="collapsible-tile-summary" id="coachCardCollapsedSummary" style="display:none;margin-top:0.25rem;">
+                <span class="collapsed-summary-title" id="collapsedCoachSession">Today's Session</span>
+                <span class="tag tag-focus" id="collapsedCoachVerdict">Bullseye 🎯</span>
+                <span class="tag tag-dur" id="collapsedCoachDur">36m</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span class="badge-status badge-gemini connected" id="badgeCardGeminiStatus" title="Google Gemini Sports-Science Intelligence" style="font-size:0.68rem;padding:0.16rem 0.5rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:600;flex-shrink:0;">
+              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #10b981;background:#10b981;border-radius:50%;"></span>
+              <span id="txtCardGeminiStatus">Connected</span>
+            </span>
+            <button class="btn btn-secondary btn-stage-collapse" id="btnToggleCoachCard" type="button" aria-label="Collapse or expand AI coach directive">
+              <span id="coachCardToggleIcon">▲</span>
+              <span id="coachCardToggleText">Collapse</span>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Collapsible Body Container -->
+        <div class="collapsible-tile-body" id="coachCardBody">
+          <div style="display:flex;flex-direction:column;gap:0.2rem;">
+            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;" id="coachCardPreHeading">
+              TODAY'S COMPLETED WORKOUT
+            </div>
+            <div style="font-size:1.02rem;font-weight:700;color:#fff;line-height:1.3;" id="coachCardSessionTitle">
+              Zwift -PowerSync: 35-Min Microburst &amp; Cadence Flush
+            </div>
+          </div>
+
+          <div class="strava-stats" id="coachCardMetricsStrip" style="grid-template-columns: repeat(4, 1fr); gap: 0.35rem; margin-top:0.15rem;">
+            <div class="stat-box" style="padding:0.35rem 0.45rem;">
+              <div class="stat-box-title" id="coachCardLbl1">Duration</div>
+              <div class="stat-box-num" id="coachCardVal1" style="font-size:1rem;">36m</div>
+            </div>
+            <div class="stat-box" style="padding:0.35rem 0.45rem;">
+              <div class="stat-box-title" id="coachCardLbl2">Avg Power</div>
+              <div class="stat-box-num" id="coachCardVal2" style="font-size:1rem;color:var(--accent-cyan);">174 W</div>
+            </div>
+            <div class="stat-box" style="padding:0.35rem 0.45rem;">
+              <div class="stat-box-title" id="coachCardLbl3">Avg HR</div>
+              <div class="stat-box-num" id="coachCardVal3" style="font-size:1rem;color:#f59e0b;">129 bpm</div>
+            </div>
+            <div class="stat-box" style="padding:0.35rem 0.45rem;">
+              <div class="stat-box-title" id="coachCardLbl4">Verdict</div>
+              <div class="stat-box-num" id="coachCardVal4" style="font-size:0.92rem;color:#10b981;">Bullseye 🎯</div>
+            </div>
+          </div>
+
+          <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);padding:0.6rem 0.75rem;border-radius:6px;max-height:105px;overflow-y:auto;" id="coachCardNarrative">
+            Outstanding discipline holding power within your Zone 2 aerobic base ceiling on a 45% recovery day. Cardiac cost remained flat with 7.7 Whoop day strain.
+          </div>
+
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.75rem;padding-top:0.35rem;border-top:1px solid rgba(255,255,255,0.06);">
+            <span id="coachCardFooterSubtext" style="color:#10b981;font-weight:600;font-size:0.78rem;">Bullseye 🎯</span>
+            <a href="#cardCoachDebrief" id="coachCardJumpLink" style="color:var(--accent-cyan);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:0.25rem;">
+              Full Debrief ↓
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- Long-Term Fitness Goal & Periodization Card (Xert Alternative) -->
+    <section class="card program-card collapsible-tile" id="cardProgram">
+      <div class="program-top-bar collapsible-tile-header" id="programCardHeader" role="button" tabindex="0" title="Click to collapse or expand Fitness Goal & Periodization" aria-expanded="true">
+        <div class="card-header-left">
+          <span class="card-header-icon">🎯</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <span class="card-title" id="programGoalTitle">Threshold &amp; FTP Booster</span>
+              <span class="phase-badge" id="programPhaseBadge">Build Phase</span>
+            </div>
+            <div class="card-subtitle collapsible-tile-subtitle" id="programGoalDesc">
+              Targeting sustained 20-min power output with structured sweet spot &amp; threshold progressions.
+            </div>
+            <!-- Collapsed Summary Chips (Visible when collapsed) -->
+            <div class="collapsible-tile-summary" id="programCollapsedSummary" style="display:none;margin-top:0.25rem;">
+              <span class="tag tag-focus" id="collapsedProgramPhase">Build Phase</span>
+              <span class="tag tag-dur" id="collapsedProgramWeek">Week 4 of 8</span>
+              <span class="tag tag-tss" id="collapsedProgramCompliance">85% Compliance</span>
+              <span class="tag" id="collapsedProgramFtpDelta" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid var(--accent-cyan);">+15W FTP Target</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <button class="btn btn-secondary" style="padding:0.25rem 0.65rem;font-size:0.75rem;" id="btnAdjustGoal">
+            ⚙️ Adjust Goal
+          </button>
+          <button class="btn btn-secondary btn-stage-collapse" id="btnToggleProgramCard" type="button" aria-label="Collapse or expand fitness goal & periodization">
+            <span id="programToggleIcon">▲</span>
+            <span id="programToggleText">Collapse</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Body Container -->
+      <div class="collapsible-tile-body" id="programCardBody">
+        <!-- Macrocycle Periodization Timeline -->
+        <div class="macrocycle-bar-wrap">
+          <div class="macrocycle-labels">
+            <div class="phase-col" id="phaseColBase">1. Base (Vol)</div>
+            <div class="phase-col" id="phaseColBuild">2. Build (FTP)</div>
+            <div class="phase-col" id="phaseColPeak">3. Peak (VO2)</div>
+            <div class="phase-col" id="phaseColTaper">4. Taper & Fresh</div>
+          </div>
+          <div class="macrocycle-track">
+            <div class="macrocycle-fill" id="macrocycleFillBar" style="width: 50%;"></div>
+          </div>
+          <div class="macrocycle-info-row">
+            <span id="programWeekInfo">Week 4 of 8 • Build Phase</span>
+            <span id="programDaysInfo">35 Days Remaining</span>
+          </div>
+        </div>
+
+        <!-- High-Signal Program Metrics -->
+        <div class="program-stats-grid">
+          <div class="program-stat-box">
+            <div class="program-stat-label">
+              <span>Target FTP</span>
+              <span style="color:var(--accent-cyan);font-weight:700;" id="programFtpDelta">+15W</span>
+            </div>
+            <div class="program-stat-value">
+              <span id="programTargetFtpVal">265</span>
+              <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span>
+            </div>
+            <div class="program-stat-sub">
+              Current: <span id="programCurrentFtpVal">250W</span>
+            </div>
+          </div>
+
+          <div class="program-stat-box">
+            <div class="program-stat-label">
+              <span>Weekly Compliance</span>
+              <span id="programCompliancePct" style="color:var(--accent-emerald);font-weight:700;">85%</span>
+            </div>
+            <div class="program-stat-value">
+              <span id="programWeeklyTssActual">305</span>
+              <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">/ <span id="programWeeklyTssTarget">360</span> TSS</span>
+            </div>
+            <div class="mini-meter-track">
+              <div class="mini-meter-fill" id="programTssMeterFill" style="width: 85%;"></div>
+            </div>
+            <div class="program-stat-sub" style="margin-top:0.35rem;display:flex;justify-content:space-between;align-items:center;">
+              <span>⚡ Strain: <b id="programWeeklyXssActual" style="color:#a78bfa;">312</b> / <span id="programWeeklyXssTarget">360</span> XSS</span>
+              <span id="programXssCompliancePct" style="color:#a78bfa;font-weight:600;">87%</span>
+            </div>
+          </div>
+
+          <div class="program-stat-box" style="grid-column: span 2;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div class="program-stat-label">Current Macrocycle Objective</div>
+              <span class="badge-status" id="programFocusDurationBadge" style="font-size:0.7rem;padding:0.15rem 0.45rem;background:rgba(6,182,212,0.12);color:#06b6d4;border-color:rgba(6,182,212,0.25);">
+                Sweet Spot (45:00 Focus)
+              </span>
+            </div>
+            <div style="font-size:0.9rem;font-weight:700;color:var(--accent-cyan);margin-top:0.2rem;" id="programPhaseFocus">
+              Sweet Spot & Threshold Progression
+            </div>
+            <div class="program-stat-sub" id="programPhaseDetail">
+              Increasing muscular endurance and raising functional threshold power before peak VO2 sharpening.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Upcoming Target Plan Mission Control Banner (Shown dynamically when an event plan is active) -->
+    <section class="card upcoming-plan-card collapsible-tile" id="cardUpcomingPlan" style="display:none;">
+      <!-- State A: Active Plan Set -->
+      <div id="upcomingActiveView" style="display:none;">
+        <div class="upcoming-plan-top collapsible-tile-header" id="upcomingPlanHeader" role="button" tabindex="0" title="Click to collapse or expand Upcoming Target Plan" aria-expanded="true">
+          <div class="card-header-left">
+            <span class="card-header-icon">📅</span>
+            <div>
+              <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                <span class="card-title" id="upcomingPlanTitle">Sunday 50-Mile Group Ride</span>
+                <span class="upcoming-badge-countdown" id="upcomingCountdownBadge">🎯 T-6 Days Remaining</span>
+                <span class="phase-badge" id="upcomingPhaseBadge" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border-color:rgba(6,182,212,0.3);">Taper Protocol Active</span>
+              </div>
+              <div class="card-subtitle collapsible-tile-subtitle" id="upcomingPlanDesc">
+                Planned endurance ride with steady pacing.
+              </div>
+              <!-- Collapsed Summary Chips (Visible when collapsed) -->
+              <div class="collapsible-tile-summary" id="upcomingCollapsedSummary" style="display:none;margin-top:0.25rem;">
+                <span class="tag tag-focus" id="collapsedUpcomingDist">50.0 mi</span>
+                <span class="tag tag-dur" id="collapsedUpcomingDur">~2h 55m</span>
+                <span class="tag tag-tss" id="collapsedUpcomingTss">~165 TSS</span>
+                <span class="tag" id="collapsedUpcomingIntensity" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);">Endurance</span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
+            <button class="btn btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.75rem;border-color:#10b981;color:#10b981;" id="btnViewPlanFueling">
+              🥪 View Fueling Plan
+            </button>
+            <button class="btn btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.75rem;" id="btnEditUpcomingPlan">
+              ✏️ Edit Plan
+            </button>
+            <button class="btn btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.75rem;color:#f87171;border-color:rgba(248,113,113,0.3);" id="btnClearUpcomingPlan">
+              🗑️ Clear
+            </button>
+            <button class="btn btn-secondary btn-stage-collapse" id="btnToggleUpcomingPlan" type="button" aria-label="Collapse or expand upcoming target plan">
+              <span id="upcomingToggleIcon">▲</span>
+              <span id="upcomingToggleText">Collapse</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible Body Container -->
+        <div class="collapsible-tile-body" id="upcomingPlanBody">
+          <div class="upcoming-meta-grid">
+            <div class="upcoming-meta-item">
+              <div class="upcoming-meta-label">Distance</div>
+              <div class="upcoming-meta-val" id="upcomingMetaDist">50.0 mi</div>
+            </div>
+            <div class="upcoming-meta-item">
+              <div class="upcoming-meta-label">Elevation Gain</div>
+              <div class="upcoming-meta-val" id="upcomingMetaElev">3,200 ft</div>
+            </div>
+            <div class="upcoming-meta-item">
+              <div class="upcoming-meta-label">Est. Duration</div>
+              <div class="upcoming-meta-val" id="upcomingMetaDur">~2h 55m</div>
+            </div>
+            <div class="upcoming-meta-item">
+              <div class="upcoming-meta-label">Est. Load</div>
+              <div class="upcoming-meta-val" id="upcomingMetaTss">~165 TSS</div>
+            </div>
+            <div class="upcoming-meta-item">
+              <div class="upcoming-meta-label">Target Intensity</div>
+              <div class="upcoming-meta-val" id="upcomingMetaIntensity">Endurance</div>
+            </div>
+          </div>
+
+          <!-- Optional Mini-Map Preview if route attached -->
+          <div id="upcomingRouteMapWrap" style="display:none;margin:0.75rem 0;background:rgba(0,0,0,0.3);padding:0.75rem;border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,0.06);">
+            <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Route Preview</div>
+            <svg id="upcomingRouteSvg" viewBox="0 0 380 170" style="width:100%;max-height:140px;stroke:#06b6d4;stroke-width:2.5;fill:none;"></svg>
+          </div>
+
+          <!-- Lead-up Taper Roadmap Timeline -->
+          <div class="taper-roadmap-wrap">
+            <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">
+              📅 Taper & Preparation Progression leading up to event:
+            </div>
+            <div class="taper-roadmap-grid" id="upcomingTaperGrid">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Center Stage: Today's AI Prescribed Workout / Outdoor Ride -->
+    <section class="workout-stage" id="workoutStageSection">
+
+      <!-- Collapsible Stage Header -->
+      <div class="workout-stage-header" id="workoutStageHeader" role="button" tabindex="0" title="Click to collapse or expand Today's Training" aria-expanded="true">
+        <div class="card-header-left">
+          <span class="card-header-icon">⚡</span>
+          <div>
+            <span class="card-title">Today's Training</span>
+            <div class="card-subtitle collapsible-tile-subtitle" id="stageHeaderSubtitle">
+              Intervals scaled to Whoop recovery with 1-click Zwift export
+            </div>
+            <!-- Collapsed Summary Chips (Visible when collapsed) -->
+            <div class="collapsible-tile-summary" id="workoutStageCollapsedSummary" style="display:none;margin-top:0.25rem;">
+              <span class="collapsed-summary-title" id="collapsedWorkoutTitle">Sweet Spot Aerobic Density</span>
+              <span class="tag tag-focus" id="collapsedWorkoutFocus">Sweet Spot</span>
+              <span class="tag tag-dur" id="collapsedWorkoutDur">60 MIN</span>
+              <span class="tag tag-tss" id="collapsedWorkoutTss">~68 TSS</span>
+              <span class="tag tag-xss" id="collapsedWorkoutXss" style="display:none;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);">68 XSS</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="workout-stage-header-right">
+          <button class="btn btn-secondary btn-stage-collapse" id="btnToggleWorkoutStage" type="button" aria-label="Collapse or expand today's training">
+            <span id="workoutStageToggleIcon">▲</span>
+            <span id="workoutStageToggleText">Collapse</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Body Container -->
+      <div class="workout-stage-body" id="workoutStageBody">
+
+        <!-- Training Mode Switcher: Indoor Structured vs Outdoor Route Match -->
+        <div class="training-mode-bar">
+        <div class="mode-tabs">
+          <button class="mode-tab active" id="tabModeIndoor">
+            🏠 Indoor Structured Workout
+          </button>
+          <button class="mode-tab" id="tabModeOutdoor">
+            🌲 Outdoor Ride Recommendation
+          </button>
+        </div>
+        <div class="mode-subtext" id="modeSubtext">
+          Intervals scaled to Whoop recovery with 1-click Zwift export
+        </div>
+      </div>
+
+      <!-- 1. INDOOR STRUCTURED WORKOUT VIEW -->
+      <div id="indoorContainer">
+        <!-- Alternative Workout Selection (Triad Switcher) -->
+        <div class="workout-alternatives-container">
+          <div class="workout-alternatives-header">
+            <div class="workout-alternatives-title">
+              <span>🎛️ Select Daily Workout Option (Tailored to Readiness)</span>
+            </div>
+            <span style="font-size:0.75rem;color:var(--text-muted);">Switch updates intervals, chart &amp; Zwift export</span>
+          </div>
+          <div class="workout-options-grid" id="workoutOptionsGrid">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </div>
+        
+        <div class="workout-header">
+          <div class="workout-title-area">
+            <div style="font-size:0.8rem;color:var(--accent-cyan);font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">
+              TODAY'S TRAINING
+            </div>
+            <div style="display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;">
+              <h2 id="workoutTitle" style="margin:0;">Sweet Spot Aerobic Density</h2>
+              <div class="outdoor-header-thumb-card" id="workoutHeaderThumbCard" style="display:none;" title="Course Map Preview">
+                <svg id="workoutHeaderThumbSvg" viewBox="0 0 160 80" preserveAspectRatio="xMidYMid meet"></svg>
+                <span class="outdoor-header-thumb-lbl">🗺️ Route Map</span>
+              </div>
+            </div>
+            <div class="workout-tags">
+              <span class="tag tag-focus" id="workoutFocus">Sweet Spot</span>
+              <span class="tag tag-dur" id="workoutDurationBadge">60 MIN</span>
+              <span class="tag tag-tss" id="workoutTssBadge">~68 TSS</span>
+              <span class="tag tag-xss" id="workoutXssBadge" style="display:none;" title="3-Tier Physiological Strain (Xert XSS equivalent)">68 XSS</span>
+              <span class="tag" id="workoutStrainBreakdownBadge" style="display:none;background:rgba(6,182,212,0.12);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.3);font-size:0.72rem;">52 Low • 16 High • 0 Peak</span>
+            </div>
+          </div>
+
+          <!-- Action Station for Zwift, Apple TV, Custom Ride & Fueling -->
+          <div class="action-buttons">
+            <button class="btn btn-secondary" id="btnToggleFuelingPlan" style="border-color:#10b981;color:#10b981;">
+              🥪 Fueling Plan
+            </button>
+            <button class="btn btn-secondary" id="btnOpenReplaceRideModal" style="border-color:var(--accent-cyan);color:var(--accent-cyan);">
+              ⚡ Custom Ride
+            </button>
+            <button class="btn btn-zwift" id="btnPushZwift">
+              🚀 Send to Zwift
+            </button>
+            <a class="btn btn-secondary" id="btnDownloadZwo" href="/api/workouts/download-zwo">
+              💾 Download .zwo
+            </a>
+            <button class="btn btn-secondary btn-collapse-inline" type="button" title="Collapse Today's Training Tile" style="font-size:0.75rem;">
+              ▲ Collapse Tile
+            </button>
+          </div>
+        </div>
+
+        <!-- Interactive Fueling Plan Section -->
+        <div id="fuelingPlanPanel" class="fueling-panel" style="display:none;">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;">
+            <div>
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:1.3rem;">🥪</span>
+                <h3 style="font-size:1.15rem;font-weight:800;color:#10b981;margin:0;" id="fuelingRideTitle">
+                  Personalized Fueling & Hydration Strategy
+                </h3>
+              </div>
+              <p style="font-size:0.78rem;color:var(--text-secondary);margin:0.25rem 0 0 0;" id="fuelingSubtext">
+                Sports-science nutrition modeled on Jeukendrup/ACSM oxidation rates, Whoop recovery, and local weather.
+              </p>
+            </div>
+            <button class="btn btn-secondary" id="btnCloseFuelingPanel" style="padding:0.25rem 0.6rem;font-size:0.75rem;">
+              ✕ Close Plan
+            </button>
+          </div>
+
+          <!-- Environmental Weather Bar -->
+          <div class="weather-control-bar" style="margin-top:0.85rem;">
+            <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;">
+              <span>🌡️ Temp:</span>
+              <input type="range" id="fuelingTempSlider" min="40" max="100" value="74" style="width:90px;" />
+              <b id="fuelingTempLabel" style="color:var(--text-primary);width:38px;">74°F</b>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.4rem;font-size:0.8rem;">
+              <span>💧 Humidity:</span>
+              <input type="range" id="fuelingHumiditySlider" min="20" max="95" value="50" style="width:80px;" />
+              <b id="fuelingHumidityLabel" style="color:var(--text-primary);width:34px;">50%</b>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.8rem;">
+              <label style="cursor:pointer;display:flex;align-items:center;gap:0.3rem;margin:0;">
+                <input type="checkbox" id="fuelingOutdoorCheck" checked /> Outdoor Ride
+              </label>
+            </div>
+            <button class="btn btn-secondary" id="btnFetchLocalWeather" type="button" style="padding:0.2rem 0.55rem;font-size:0.74rem;" title="Fetch live weather via browser geolocation">
+              📍 Use Local Weather
+            </button>
+            <div id="fuelingWeatherBadge" style="font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:4px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.25);">
+              Optimal Conditions
+            </div>
+          </div>
+
+          <!-- Physiological Recovery & Trailing Stress Impact Bar -->
+          <div class="recovery-load-impact-bar" id="fuelingRecoveryImpactBar" style="margin-top:0.6rem;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.22);border-radius:6px;padding:0.6rem 0.85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.15rem;" id="fuelingRecoveryIcon">🧬</span>
+              <div>
+                <div style="font-size:0.78rem;font-weight:700;color:#c7d2fe;" id="fuelingRecoveryTitle">
+                  Physiological Recovery & Load Adaptation
+                </div>
+                <div style="font-size:0.74rem;color:var(--text-secondary);" id="fuelingRecoveryDesc">
+                  Calibrated to your Whoop recovery score and trailing training load.
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.4rem;" id="fuelingRecoveryPills">
+              <span class="badge-status" id="fuelingBadgeRecScore" style="font-size:0.7rem;">Whoop: --%</span>
+              <span class="badge-status" id="fuelingBadgeStrain" style="font-size:0.7rem;">7D Strain: --</span>
+              <span class="badge-status" id="fuelingBadgeYesterdayTss" style="font-size:0.7rem;">Yesterday: -- TSS</span>
+            </div>
+          </div>
+
+          <!-- Target Fueling Metrics Strip -->
+          <div class="fueling-stats-strip">
+            <div class="fueling-stat-box">
+              <div class="upcoming-meta-label">Carbs per Hour</div>
+              <div class="fueling-stat-val" id="fuelingCarbsPerHour">65 <span style="font-size:0.8rem;">g/h</span></div>
+              <span style="font-size:0.72rem;color:var(--text-muted);" id="fuelingCarbRatio">1:0.8 Dual Ratio</span>
+            </div>
+            <div class="fueling-stat-box">
+              <div class="upcoming-meta-label">Total Carbs Needed</div>
+              <div class="fueling-stat-val" id="fuelingTotalCarbs" style="color:var(--accent-cyan);">160 <span style="font-size:0.8rem;">g</span></div>
+              <span style="font-size:0.72rem;color:var(--text-muted);" id="fuelingTotalCals">~640 kcal</span>
+            </div>
+            <div class="fueling-stat-box">
+              <div class="upcoming-meta-label">Fluid Intake</div>
+              <div class="fueling-stat-val" id="fuelingFluidPerHour" style="color:#38bdf8;">650 <span style="font-size:0.8rem;">ml/h</span></div>
+              <span style="font-size:0.72rem;color:var(--text-muted);" id="fuelingTotalFluid">~2.0 L total</span>
+            </div>
+            <div class="fueling-stat-box">
+              <div class="upcoming-meta-label">Sodium Target</div>
+              <div class="fueling-stat-val" id="fuelingSodiumPerHour" style="color:#fbbf24;">650 <span style="font-size:0.8rem;">mg/h</span></div>
+              <span style="font-size:0.72rem;color:var(--text-muted);" id="fuelingTotalSodium">~1,950 mg total</span>
+            </div>
+          </div>
+
+          <!-- Pre-Ride & Recovery Tabs / Sections -->
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:0.75rem;margin:0.85rem 0;">
+            <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);padding:0.85rem;border-radius:var(--radius-sm);">
+              <div style="font-size:0.78rem;font-weight:700;color:#a78bfa;text-transform:uppercase;margin-bottom:0.35rem;">
+                🍳 Pre-Ride Fueling (2.5h Prior)
+              </div>
+              <div style="font-size:0.85rem;font-weight:800;color:var(--text-primary);margin-bottom:0.25rem;" id="fuelingPreCarbTarget">
+                Target: ~140g Carbohydrates
+              </div>
+              <ul style="margin:0;padding-left:1.1rem;font-size:0.76rem;color:var(--text-secondary);line-height:1.45;" id="fuelingPreGuidelines">
+                <!-- Dynamically populated -->
+              </ul>
+              <div style="font-size:0.74rem;color:#38bdf8;margin-top:0.4rem;" id="fuelingRolloutSnack"></div>
+            </div>
+
+            <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);padding:0.85rem;border-radius:var(--radius-sm);">
+              <div style="font-size:0.78rem;font-weight:700;color:#10b981;text-transform:uppercase;margin-bottom:0.35rem;">
+                🥛 Post-Ride Recovery Window (&lt;45m)
+              </div>
+              <div style="font-size:0.85rem;font-weight:800;color:var(--text-primary);margin-bottom:0.25rem;" id="fuelingRecoveryTarget">
+                Target: ~80g Carbs + 25g Protein
+              </div>
+              <ul style="margin:0;padding-left:1.1rem;font-size:0.76rem;color:var(--text-secondary);line-height:1.45;" id="fuelingRecoveryGuidelines">
+                <!-- Dynamically populated -->
+              </ul>
+            </div>
+          </div>
+
+          <!-- Hour-by-Hour Timeline -->
+          <div style="margin-top:0.85rem;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
+              ⏰ Hour-by-Hour On-The-Bike Feeding Protocol
+            </div>
+            <div class="fueling-timeline-grid" id="fuelingHourlyGrid">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+
+          <!-- Jersey Pocket Packing Checklist -->
+          <div style="margin-top:0.85rem;">
+            <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
+              🎒 Jersey Pocket & Bike Packing Checklist
+            </div>
+            <div class="fueling-checklist-grid" id="fuelingChecklistGrid">
+              <!-- Populated dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Coach Plain-English Rationale Box -->
+        <div class="coach-bubble">
+          <div class="coach-icon">🧠</div>
+          <div class="coach-text">
+            <h4>AI Coach Insight</h4>
+            <p id="workoutRationale">
+              Loading tailored workout based on your Whoop recovery and Strava history...
+            </p>
+          </div>
+        </div>
+
+        <!-- Visual Interval Profile Graph -->
+        <div class="interval-graph-wrap">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;width:100%;">
+            <span style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">
+              Workout Profile & Power Targets (% FTP)
+            </span>
+            <div class="graph-legend">
+              <div class="legend-item"><span class="legend-color" style="background:#38bdf8;"></span> Z2 Base</div>
+              <div class="legend-item"><span class="legend-color" style="background:#10b981;"></span> Z3 Tempo</div>
+              <div class="legend-item"><span class="legend-color" style="background:#f59e0b;"></span> Sweet Spot</div>
+              <div class="legend-item"><span class="legend-color" style="background:#f43f5e;"></span> VO2 Max</div>
+            </div>
+          </div>
+
+          <div class="canvas-container">
+            <canvas id="intervalCanvas"></canvas>
+            <div id="intervalTooltip" class="interval-tooltip" style="display:none;"></div>
+          </div>
+
+          <!-- Interactive Section Power Target Inspector -->
+          <div id="intervalInspector" class="interval-inspector">
+            <!-- Populated dynamically by app.js -->
+          </div>
+
+          <!-- Collapsible Breakdown Table Toggle & Container -->
+          <div class="interval-breakdown-toggle-wrap">
+            <button class="btn btn-secondary" id="btnToggleSectionTable" style="font-size:0.75rem;padding:0.25rem 0.65rem;">
+              📋 View Section Breakdown (<span id="inspTotalSectionsCount">0</span>)
+            </button>
+          </div>
+          <div id="sectionTableContainer" style="display:none;margin-top:0.4rem;overflow-x:auto;">
+            <table class="recent-workouts-table section-breakdown-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Section</th>
+                  <th>Timeline</th>
+                  <th>Duration</th>
+                  <th>Target Power</th>
+                  <th>% FTP</th>
+                  <th>Cadence</th>
+                  <th>Zone</th>
+                </tr>
+              </thead>
+              <tbody id="sectionTableBody">
+                <!-- Populated dynamically by app.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Workout Adjusters & AI Regeneration -->
+        <div class="workout-controls">
+          <div class="control-group">
+            <span class="control-label">Duration:</span>
+            <div class="btn-pill-group" id="durPillGroup">
+              <button class="btn-pill" data-dur="30">30m</button>
+              <button class="btn-pill" data-dur="35">35m</button>
+              <button class="btn-pill" data-dur="45">45m</button>
+              <button class="btn-pill active" data-dur="60">60m</button>
+              <button class="btn-pill" data-dur="75">75m</button>
+              <button class="btn-pill" data-dur="90">90m</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <span class="control-label">Intensity:</span>
+            <div class="btn-pill-group" id="intensityPillGroup">
+              <button class="btn-pill" data-intensity="-10">-10% Easy</button>
+              <button class="btn-pill active" data-intensity="0">Prescribed</button>
+              <button class="btn-pill" data-intensity="10">+10% Push</button>
+            </div>
+          </div>
+
+          <div class="control-group" style="flex:1;min-width:280px;display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
+            <input type="text" id="inputUserNote" placeholder="Notes for coach (e.g. 'planning a 40 mile ride', 'tired legs', 'zone 2 spin')..." 
+                   style="flex:1;min-width:200px;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;padding:0.4rem 0.75rem;color:#fff;font-size:0.85rem;" />
+            <label class="btn btn-secondary" id="lblInlineGpxUpload" title="Upload GPX Route File" style="margin:0;cursor:pointer;padding:0.4rem 0.65rem;font-size:0.78rem;white-space:nowrap;display:flex;align-items:center;gap:0.35rem;border-color:rgba(6,182,212,0.4);color:var(--accent-cyan);">
+              <input type="file" id="inputInlineGpxUpload" accept=".gpx" style="display:none;" />
+              📎 Route (.gpx)
+            </label>
+            <span id="chipAttachedRoute" style="display:none;background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.35);padding:0.25rem 0.6rem;border-radius:12px;font-size:0.75rem;align-items:center;gap:0.4rem;">
+              📍 <span id="lblAttachedRouteName">Route.gpx</span>
+              <button id="btnRemoveAttachedRoute" type="button" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;font-size:0.9rem;line-height:1;margin-left:0.2rem;">&times;</button>
+            </span>
+          </div>
+
+          <button class="btn btn-primary" id="btnRegenerateWorkout">
+            🔄 Adapt / Plan Ride
+          </button>
+        </div>
+      </div>
+
+      <!-- 2. OUTDOOR ROUTE RECOMMENDATION VIEW -->
+      <div id="outdoorContainer" style="display:none;">
+        <!-- Alternative Outdoor Ride Selection (Triad Switcher) -->
+        <div class="workout-alternatives-container">
+          <div class="workout-alternatives-header">
+            <div class="workout-alternatives-title">
+              <span>🎛️ Select Matching Outdoor Route from Strava History</span>
+            </div>
+            <span style="font-size:0.75rem;color:var(--text-muted);">Matches your Whoop recovery and target duration</span>
+          </div>
+          <div class="workout-options-grid" id="outdoorOptionsGrid">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </div>
+
+        <div class="workout-header">
+          <div class="workout-title-area">
+            <div style="font-size:0.8rem;color:#fc5200;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;" id="outdoorPrescriptionBadge">
+              RECOMMENDED STRAVA OUTDOOR ROUTE
+            </div>
+            <div class="outdoor-title-row">
+              <h2 id="outdoorTitle">Loading recommended route...</h2>
+              <!-- Small Hero Route Silhouette Map in Header -->
+              <div class="outdoor-header-thumb-card" id="outdoorHeaderThumbCard" title="Mini Route Course Map Preview">
+                <svg id="outdoorHeaderThumbSvg" viewBox="0 0 160 80" preserveAspectRatio="xMidYMid meet"></svg>
+                <span class="outdoor-header-thumb-lbl">🗺️ Route Map</span>
+              </div>
+            </div>
+            <div class="workout-tags">
+              <span class="tag tag-focus" id="outdoorZoneBadge" style="background:rgba(252,82,0,0.15);color:#fc5200;border:1px solid rgba(252,82,0,0.3);">Zone 2 Aerobic Base</span>
+              <span class="tag tag-dur" id="outdoorDurationBadge">-- MIN</span>
+              <span class="tag tag-tss" id="outdoorDistBadge">-- mi</span>
+              <span class="tag" id="outdoorElevBadge" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);">-- ft Elev</span>
+            </div>
+          </div>
+
+          <div class="action-buttons">
+            <button class="btn btn-secondary" id="btnToggleOutdoorFueling" style="border-color:#10b981;color:#10b981;">
+              🥪 Fueling Plan
+            </button>
+            <a class="btn btn-strava" id="btnOpenStrava" target="_blank" href="https://www.strava.com">
+              🗺️ Open on Strava
+            </a>
+            <button class="btn btn-secondary" id="btnRematchOutdoor">
+              🔄 Re-Match
+            </button>
+            <button class="btn btn-secondary btn-collapse-inline" type="button" title="Collapse Today's Training Tile" style="font-size:0.75rem;">
+              ▲ Collapse Tile
+            </button>
+          </div>
+        </div>
+
+        <!-- Coach Plain-English Rationale Box -->
+        <div class="coach-bubble" style="border-left-color:#fc5200;">
+          <div class="coach-icon">🧠</div>
+          <div class="coach-text">
+            <h4 style="color:#fc5200;">AI Coach Route Analysis</h4>
+            <p id="outdoorRationale">
+              Loading outdoor recommendation tailored to your Whoop recovery and Strava history...
+            </p>
+          </div>
+        </div>
+
+        <!-- Interactive Route Course Map Preview -->
+        <div class="outdoor-map-card" id="outdoorMapCard">
+          <div class="outdoor-map-header">
+            <div class="outdoor-map-title">
+              <span>🗺️ Route Course Map</span>
+              <span id="outdoorMapSubtext" class="outdoor-map-subtext">GPS Track</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <div class="btn-pill-group" style="margin:0;">
+                <button class="btn-pill active" id="btnMapModeLeaflet" style="font-size:0.75rem;padding:0.25rem 0.6rem;">🗺️ Google Map</button>
+                <button class="btn-pill" id="btnMapModeSilhouette" style="font-size:0.75rem;padding:0.25rem 0.6rem;">✨ Neon Silhouette</button>
+              </div>
+              <!-- Google Maps Layer Dropdown Switcher -->
+              <select id="selectMapBaseLayer" class="select-map-layer" title="Choose Google Maps Layer" style="background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0.25rem 0.5rem;color:#e2e8f0;font-size:0.74rem;cursor:pointer;">
+                <option value="google_roads" selected>🗺️ Google Roadmap</option>
+                <option value="google_hybrid">🛰️ Google Satellite Hybrid</option>
+                <option value="google_terrain">⛰️ Google Terrain</option>
+              </select>
+              <div class="outdoor-map-pills">
+                <span class="badge-status" id="badgeMapStart" style="font-size:0.7rem;padding:0.15rem 0.5rem;color:#10b981;border-color:rgba(16,185,129,0.3);">🟢 Start</span>
+                <span class="badge-status" id="badgeMapEnd" style="font-size:0.7rem;padding:0.15rem 0.5rem;color:#06b6d4;border-color:rgba(6,182,212,0.3);">🏁 Finish</span>
+                <span class="badge-status" id="badgeMapDist" style="font-size:0.7rem;padding:0.15rem 0.5rem;color:var(--text-secondary);">-- mi</span>
+                <button class="btn-pill" id="btnRecenterRoute" type="button" style="font-size:0.7rem;padding:0.15rem 0.55rem;color:var(--accent-cyan);border-color:rgba(6,182,212,0.35);cursor:pointer;background:rgba(6,182,212,0.08);" title="Center route in view">🎯 Center Route</button>
+              </div>
+            </div>
+          </div>
+          
+          <div class="outdoor-map-viewport" id="outdoorMapWrap">
+            <!-- Seamless High-Contrast SVG Route Silhouette (Toggleable) -->
+            <div id="outdoorMapSvgWrap" class="outdoor-map-svg-wrap" style="display:none;">
+              <svg id="outdoorMapSvg" viewBox="0 0 460 210" preserveAspectRatio="xMidYMid meet" style="width:100%;height:100%;max-height:260px;"></svg>
+            </div>
+            <!-- Leaflet Interactive Map (Default Active View Overlaid on Real Map Base) -->
+            <div id="outdoorLeafletMap" style="width:100%;height:340px;min-height:320px;border-radius:var(--radius-md);display:block;position:relative;z-index:1;"></div>
+          </div>
+
+          <!-- Route Course Summary Footer Strip -->
+          <div class="outdoor-map-footer" id="outdoorMapFooter" style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--text-muted);padding:0.45rem 0.6rem;border-top:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;gap:0.4rem;">
+            <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+              <span id="outdoorMapHeading">🧭 Course Orientation: Loop Course</span>
+              <span id="outdoorMapElevationProfile">⛰️ Gradient: Rolling</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <a id="btnExternalGoogleMaps" target="_blank" href="https://maps.google.com" class="btn-pill" style="font-size:0.72rem;padding:0.2rem 0.55rem;color:#60a5fa;border-color:rgba(96,165,250,0.35);text-decoration:none;display:inline-flex;align-items:center;gap:0.3rem;">
+                🌍 Open in Google Maps ↗
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- High-Signal Route Telemetry Cards -->
+        <div class="outdoor-stats-grid">
+          <div class="outdoor-stat-box">
+            <span class="outdoor-stat-lbl">Moving Time</span>
+            <span class="outdoor-stat-val" id="outdoorStatTime">--</span>
+            <span class="outdoor-stat-sub" id="outdoorStatDate">Previously ridden</span>
+          </div>
+          <div class="outdoor-stat-box">
+            <span class="outdoor-stat-lbl">Distance</span>
+            <span class="outdoor-stat-val" id="outdoorStatDist">--</span>
+            <span class="outdoor-stat-sub" id="outdoorStatMiles">-- miles</span>
+          </div>
+          <div class="outdoor-stat-box">
+            <span class="outdoor-stat-lbl">Elevation Gain</span>
+            <span class="outdoor-stat-val" id="outdoorStatElev">--</span>
+            <span class="outdoor-stat-sub" id="outdoorStatGradient">-- ft/mi gradient</span>
+          </div>
+          <div class="outdoor-stat-box">
+            <span class="outdoor-stat-lbl">Historical Power</span>
+            <span class="outdoor-stat-val" id="outdoorStatWatts">-- W</span>
+            <span class="outdoor-stat-sub" id="outdoorStatPctFtp">--% FTP</span>
+          </div>
+          <div class="outdoor-stat-box">
+            <span class="outdoor-stat-lbl">Relative Effort</span>
+            <span class="outdoor-stat-val" id="outdoorStatSuffer">--</span>
+            <span class="outdoor-stat-sub">Suffer Score</span>
+          </div>
+          <div class="outdoor-stat-box">
+            <span class="outdoor-stat-lbl">Readiness Match</span>
+            <span class="outdoor-stat-val" id="outdoorStatMatch" style="color:var(--accent-emerald);">--%</span>
+            <span class="outdoor-stat-sub">Optimal Fit</span>
+          </div>
+        </div>
+
+        <!-- On-the-Bike Execution Guidance -->
+        <div class="outdoor-tips-wrap">
+          <div class="outdoor-tips-title">
+            <span>🎯 On-the-Bike Pacing & Execution Guidance</span>
+          </div>
+          <div class="outdoor-tips-grid" id="outdoorTipsGrid">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </div>
+
+        <!-- Outdoor Duration Controls & Notes -->
+        <div class="workout-controls">
+          <div class="control-group">
+            <span class="control-label">Target Duration:</span>
+            <div class="btn-pill-group" id="outdoorDurPillGroup">
+              <button class="btn-pill" data-dur="45">45m</button>
+              <button class="btn-pill active" data-dur="60">60m</button>
+              <button class="btn-pill" data-dur="75">75m</button>
+              <button class="btn-pill" data-dur="90">90m</button>
+              <button class="btn-pill" data-dur="120">2h+</button>
+            </div>
+          </div>
+
+          <div class="control-group" style="flex:1;min-width:280px;">
+            <input type="text" id="inputOutdoorUserNote" placeholder="Outdoor notes (e.g. 'Looking for flat recovery', 'Rolling hills')..." 
+                   style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;padding:0.4rem 0.75rem;color:#fff;font-size:0.85rem;" />
+          </div>
+
+          <button class="btn btn-strava" id="btnRegenerateOutdoor">
+            🌲 Match Best Route
+          </button>
+        </div>
+      </div>
+      </div> <!-- End #workoutStageBody -->
+
+    </section>
+
+    <!-- AI COACH DAILY DEBRIEF & MULTI-DAY OUTLOOK -->
+    <section class="card collapsible-tile" id="cardCoachDebrief">
+      <div class="card-header collapsible-tile-header" id="coachDebriefHeader" role="button" tabindex="0" title="Click to collapse or expand AI Coach Daily Debrief" aria-expanded="true">
+        <div class="card-header-left">
+          <span class="card-header-icon">🧠</span>
+          <div>
+            <span class="card-title">AI Coach Daily Debrief &amp; Forward Outlook</span>
+            <div class="card-subtitle collapsible-tile-subtitle" id="debriefSubtitle">
+              Assessing completed sessions against prescriptions, goals, and recovery decay
+            </div>
+            <!-- Collapsed Summary Chips (Visible when collapsed) -->
+            <div class="collapsible-tile-summary" id="debriefCollapsedSummary" style="display:none;margin-top:0.25rem;">
+              <span class="tag tag-focus" id="collapsedDebriefVerdict">🎯 Compliant</span>
+              <span class="tag tag-dur" id="collapsedDebriefScore">Score: 92%</span>
+              <span class="tag tag-tss" id="collapsedDebriefTss">68 TSS</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
+          <div class="mode-tabs" id="debriefTabGroup" style="padding:0.2rem;">
+            <button class="mode-tab active" id="tabDebriefToday" data-tab="assessment">
+              🎯 Today's Debrief
+            </button>
+            <button class="mode-tab" id="tabDebriefOutlook" data-tab="outlook">
+              🔮 3-Day Forecast
+            </button>
+            <button class="mode-tab" id="tabDebriefRecovery" data-tab="protocol">
+              🛌 Recovery Directive
+            </button>
+          </div>
+          <button class="btn btn-secondary" style="padding:0.35rem 0.65rem;font-size:0.75rem;" id="btnRefreshDebrief">
+            🔄 Refresh
+          </button>
+          <button class="btn btn-secondary btn-stage-collapse" id="btnToggleCoachDebrief" type="button" aria-label="Collapse or expand AI coach debrief">
+            <span id="coachDebriefToggleIcon">▲</span>
+            <span id="coachDebriefToggleText">Collapse</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Body Container -->
+      <div class="collapsible-tile-body" id="coachDebriefBody">
+
+      <!-- Subjective Athlete Feedback Bar -->
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 1rem;background:rgba(0,0,0,0.25);border-bottom:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">
+        <input type="text" id="inputDebriefUserNote" placeholder="Subjective feedback for coach (e.g., 'RPE felt high on climbs', 'Legs felt fresh', 'Tired from poor sleep')..." style="flex:1;min-width:260px;background:rgba(0,0,0,0.35);border:1px solid var(--border-color);border-radius:6px;padding:0.4rem 0.75rem;color:#fff;font-size:0.8rem;" />
+        <button class="btn btn-primary" style="padding:0.4rem 0.85rem;font-size:0.8rem;" id="btnAnalyzeDebrief">
+          🧠 Assess & Update Forecast
+        </button>
+      </div>
+
+      <!-- Tab Content 1: Today's Session Assessment -->
+      <div id="debriefTabAssessment" class="debrief-tab-panel">
+        <div class="debrief-session-header">
+          <div>
+            <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;" id="debriefActivityMeta">
+              EVALUATION OF COMPLETED SESSION
+            </div>
+            <h3 id="debriefActivityTitle" style="font-size:1.15rem;font-weight:700;margin:0.15rem 0;color:var(--text-primary);">
+              Loading completed session analysis...
+            </h3>
+          </div>
+          <div id="debriefVerdictBadge" class="badge-status" style="font-size:0.8rem;padding:0.25rem 0.75rem;color:#10b981;border-color:rgba(16,185,129,0.3);">
+            🎯 Evaluating Compliance
+          </div>
+        </div>
+
+        <!-- Telemetry & Compliance Strip -->
+        <div class="debrief-metrics-grid">
+          <div class="debrief-metric-box">
+            <span class="debrief-metric-lbl">Execution Score</span>
+            <span class="debrief-metric-val" id="debriefMetricScore" style="color:var(--accent-cyan);">--%</span>
+            <span class="debrief-metric-sub" id="debriefMetricVerdict">Target Fidelity</span>
+          </div>
+          <div class="debrief-metric-box">
+            <span class="debrief-metric-lbl">Power vs Target</span>
+            <span class="debrief-metric-val" id="debriefMetricWatts">-- W</span>
+            <span class="debrief-metric-sub" id="debriefMetricTargetWatts">Target: -- W</span>
+          </div>
+          <div class="debrief-metric-box">
+            <span class="debrief-metric-lbl">Moving Time</span>
+            <span class="debrief-metric-val" id="debriefMetricTime">--</span>
+            <span class="debrief-metric-sub" id="debriefMetricDist">-- mi logged</span>
+          </div>
+          <div class="debrief-metric-box">
+            <span class="debrief-metric-lbl">Cardiovascular Load</span>
+            <span class="debrief-metric-val" id="debriefMetricTss" style="color:var(--accent-amber);">-- TSS</span>
+            <span class="debrief-metric-sub" id="debriefMetricHr">-- bpm avg</span>
+          </div>
+        </div>
+
+        <!-- 3-Tier Physiological Strain & W'bal Battery (Xert XSS Equivalent) -->
+        <div class="strain-system-debrief-card" id="debriefStrainSystemCard" style="margin:0.75rem 0;background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.25);border-radius:var(--radius-sm);padding:0.85rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.15rem;">⚡</span>
+              <span style="font-weight:700;font-size:0.85rem;color:#c084fc;">3-Tier Physiological Strain &amp; W' Battery</span>
+              <span class="badge-status" id="debriefFocusDurationBadge" style="font-size:0.7rem;background:rgba(168,85,247,0.15);color:#c084fc;border-color:rgba(168,85,247,0.35);">Rouleur (20:00 Focus)</span>
+            </div>
+            <div style="font-size:0.82rem;font-weight:700;color:#fff;">
+              Total Strain: <span id="debriefTotalXssVal" style="color:#c084fc;font-size:1.05rem;">--</span> <span style="font-size:0.75rem;color:var(--text-muted);">XSS</span>
+            </div>
+          </div>
+
+          <!-- Strain Tier Breakdown Badges -->
+          <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.6rem;margin-bottom:0.75rem;">
+            <div style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);border-radius:6px;padding:0.45rem 0.6rem;">
+              <div style="font-size:0.7rem;color:var(--accent-cyan);font-weight:600;text-transform:uppercase;">Low Strain (Aerobic)</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#fff;" id="debriefLowXssVal">-- <span style="font-size:0.75rem;color:var(--text-muted);">XSS</span></div>
+            </div>
+            <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:0.45rem 0.6rem;">
+              <div style="font-size:0.7rem;color:var(--accent-amber);font-weight:600;text-transform:uppercase;">High Strain (Glycolytic)</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#fff;" id="debriefHighXssVal">-- <span style="font-size:0.75rem;color:var(--text-muted);">XSS</span></div>
+            </div>
+            <div style="background:rgba(244,63,94,0.08);border:1px solid rgba(244,63,94,0.2);border-radius:6px;padding:0.45rem 0.6rem;">
+              <div style="font-size:0.7rem;color:var(--accent-rose);font-weight:600;text-transform:uppercase;">Peak Strain (Sprint)</div>
+              <div style="font-size:1.1rem;font-weight:800;color:#fff;" id="debriefPeakXssVal">-- <span style="font-size:0.75rem;color:var(--text-muted);">XSS</span></div>
+            </div>
+          </div>
+
+          <!-- W'bal Battery Depletion Meter -->
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;margin-bottom:0.25rem;">
+              <span style="color:var(--text-secondary);">W' Anaerobic Battery (Min Remaining / Depletion)</span>
+              <span style="font-weight:700;color:#fff;" id="debriefBatteryLabel">100% Remaining (0% Depleted)</span>
+            </div>
+            <div class="w-bal-battery-meter">
+              <div id="debriefBatteryFill" class="w-bal-battery-fill" style="width:100%;background:linear-gradient(90deg, #10b981, #06b6d4);"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Coach Plain-English Assessment -->
+        <div class="coach-bubble" style="border-left-color:var(--accent-cyan);margin:0.75rem 0;">
+          <div class="coach-icon">🔬</div>
+          <div class="coach-text">
+            <h4 style="color:var(--accent-cyan);">Sports-Science Assessment</h4>
+            <p id="debriefAssessmentText">
+              Analyzing training stress, heart rate response, and neuromuscular fidelity...
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab Content 2: 3-Day Forward Outlook -->
+      <div id="debriefTabOutlook" class="debrief-tab-panel" style="display:none;">
+        <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.75rem;">
+          Forecast modeled on acute fatigue decay (&tau; &approx; 3.0 days) and weekly target of <b id="outlookWeeklyTargetTss" style="color:var(--accent-cyan);">360 TSS</b>:
+        </div>
+        <div class="outlook-grid" id="outlookCardsGrid">
+          <!-- Populated dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- Tab Content 3: Tonight's Recovery Directive -->
+      <div id="debriefTabProtocol" class="debrief-tab-panel" style="display:none;">
+        <div class="recovery-protocol-grid">
+          <div class="protocol-card" style="border-color:rgba(139,92,246,0.25);background:rgba(139,92,246,0.04);">
+            <div style="font-size:1.3rem;">🛌</div>
+            <div class="protocol-title" style="color:#a78bfa;">Sleep Target Tonight</div>
+            <div class="protocol-val" id="protocolSleepVal" style="color:#a78bfa;">8.0 hrs</div>
+            <p class="protocol-desc" id="protocolSleepDesc">Aim for restorative sleep to clear sleep debt and release growth hormone.</p>
+          </div>
+          <div class="protocol-card" style="border-color:rgba(16,185,129,0.25);background:rgba(16,185,129,0.04);">
+            <div style="font-size:1.3rem;">🥗</div>
+            <div class="protocol-title" style="color:#10b981;" id="protocolNutritionTitle">Glycogen Replenishment</div>
+            <div class="protocol-val" id="protocolNutritionVal" style="color:#10b981;">Carbs + Protein</div>
+            <p class="protocol-desc" id="protocolNutritionDesc">Consume complex carbs with 25-30g lean protein to restock muscle glycogen.</p>
+          </div>
+          <div class="protocol-card" style="border-color:rgba(6,182,212,0.25);background:rgba(6,182,212,0.04);">
+            <div style="font-size:1.3rem;">💧</div>
+            <div class="protocol-title" style="color:#06b6d4;">Hydration & Autonomic Balance</div>
+            <div class="protocol-val" style="color:#06b6d4;">Electrolytes</div>
+            <p class="protocol-desc" id="protocolHydrationDesc">Drink water with sodium/magnesium before bed to optimize nocturnal HRV recovery.</p>
+          </div>
+        </div>
+      </div>
+      </div> <!-- End #coachDebriefBody -->
+    </section>
+
+    <!-- Bottom Section: Recent Activities Feed -->
+    <section class="card collapsible-tile" id="cardRecentWorkouts">
+      <div class="card-header collapsible-tile-header" id="recentWorkoutsHeader" role="button" tabindex="0" title="Click to collapse or expand Recent Workouts" aria-expanded="true">
+        <div class="card-header-left">
+          <span class="card-header-icon">🚴</span>
+          <div>
+            <span class="card-title">Recent Workouts (Strava)</span>
+            <!-- Collapsed Summary Chips (Visible when collapsed) -->
+            <div class="collapsible-tile-summary" id="recentWorkoutsCollapsedSummary" style="display:none;margin-top:0.25rem;">
+              <span class="collapsed-summary-title" id="collapsedRecentTitle">Latest Workout</span>
+              <span class="tag tag-focus" id="collapsedRecentSport">Ride</span>
+              <span class="tag tag-dur" id="collapsedRecentDur">--m</span>
+              <span class="tag tag-tss" id="collapsedRecentTss">-- TSS</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <button class="btn btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.75rem;" id="btnSyncStrava">
+            Sync Now
+          </button>
+          <button class="btn btn-secondary btn-stage-collapse" id="btnToggleRecentWorkouts" type="button" aria-label="Collapse or expand recent workouts">
+            <span id="recentWorkoutsToggleIcon">▲</span>
+            <span id="recentWorkoutsToggleText">Collapse</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Body Container -->
+      <div class="collapsible-tile-body" id="recentWorkoutsBody">
+        <div style="overflow-x:auto;">
+          <table class="recent-workouts-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Activity Name</th>
+                <th>Sport</th>
+                <th>Duration</th>
+                <th>Distance</th>
+                <th>Avg Power</th>
+                <th>Avg HR</th>
+                <th>Strain (XSS &amp; TSS)</th>
+                <th>Focus Duration</th>
+              </tr>
+            </thead>
+            <tbody id="recentActivitiesBody">
+              <tr><td colspan="9" style="text-align:center;color:var(--text-muted);">Loading activity logs...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+ 
+    <!-- Athlete Power Profile & Training Zones (Moved to bottom of dashboard) -->
+    <section class="card collapsible-tile" id="cardAthlete" style="margin-top:1.5rem;">
+      <div class="card-header collapsible-tile-header" id="athleteCardHeader" role="button" tabindex="0" title="Click to collapse or expand Athlete Power Profile &amp; Training Zones" aria-expanded="true">
+        <div class="card-header-left">
+          <span class="card-header-icon">⚡</span>
+          <div>
+            <span class="card-title">Athlete Power Profile &amp; Training Zones</span>
+            <!-- Collapsed Summary Chips (Visible when collapsed) -->
+            <div class="collapsible-tile-summary" id="athleteCollapsedSummary" style="display:none;margin-top:0.25rem;">
+              <span class="tag tag-focus" id="collapsedAthleteFtp">FTP: 250W</span>
+              <span class="tag" id="collapsedAthleteWPrime" style="background:rgba(192,132,252,0.15);color:#c084fc;border:1px solid rgba(192,132,252,0.3);">W': 20.0 kJ</span>
+              <span class="tag tag-dur" id="collapsedAthleteMaxHr">Max HR: 185 bpm</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;">
+          <button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem;" id="btnEditFtp">Edit FTP</button>
+          <button class="btn btn-secondary btn-stage-collapse" id="btnToggleAthleteCard" type="button" aria-label="Collapse or expand athlete power profile">
+            <span id="athleteToggleIcon">▲</span>
+            <span id="athleteToggleText">Collapse</span>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Collapsible Body Container -->
+      <div class="collapsible-tile-body" id="athleteCardBody">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:1rem;padding:0.5rem 0;">
+          <div>
+            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">THRESHOLD POWER (FTP)</div>
+            <div style="font-size:2rem;font-weight:800;color:var(--accent-cyan);" id="valFtpDisplay">250 <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">W</span></div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">W' WORK CAPACITY</div>
+            <div style="font-size:2rem;font-weight:800;color:#c084fc;" id="valWPrimeDisplay">20.0 <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">kJ</span></div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">PEAK SPRINT POWER</div>
+            <div style="font-size:2rem;font-weight:800;color:#f43f5e;" id="valPeakPowerDisplay">1050 <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">W</span></div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">MAX HEART RATE</div>
+            <div style="font-size:2rem;font-weight:700;" id="valMaxHrDisplay">185 <span style="font-size:1rem;color:var(--text-muted);">BPM</span></div>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.75rem;font-size:0.8rem;background:rgba(0,0,0,0.25);padding:0.85rem;border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,0.06);">
+          <div>
+            <div style="color:#38bdf8;font-weight:600;margin-bottom:0.2rem;">Z2 Endurance (56-75%)</div>
+            <div id="rangeZ2" style="font-weight:700;font-size:1rem;color:#fff;">140 - 188 W</div>
+          </div>
+          <div>
+            <div style="color:#f59e0b;font-weight:600;margin-bottom:0.2rem;">Sweet Spot (88-93%)</div>
+            <div id="rangeSweetSpot" style="font-weight:700;font-size:1rem;color:#fff;">220 - 233 W</div>
+          </div>
+          <div>
+            <div style="color:#f43f5e;font-weight:600;margin-bottom:0.2rem;">Z5 VO2 Max (106-120%)</div>
+            <div id="rangeVO2" style="font-weight:700;font-size:1rem;color:#fff;">265 - 300 W</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Version Tracker Footer -->
+  <footer class="version-footer">
+    <div class="version-footer-content">
+      <div class="version-left">
+        <img src="/static/img/logo.jpg?v=12" alt="PowerSync" class="version-logo" />
+        <div class="version-text-block">
+          <div class="version-title">
+            <strong>PowerSync</strong>
+            <span class="version-tag" id="footerVersionBadge">v1.2.4</span>
+            <span class="version-status-dot"></span>
+            <span class="version-status-text">Production Ready</span>
+          </div>
+          <div class="version-desc">
+            Whoop v2 Biometrics • Strava Workload • Zwift Apple TV Bridge
+          </div>
+        </div>
+      </div>
+
+      <div class="version-center">
+        <div class="version-pill" title="Whoop Developer API v2">
+          <span class="dot green"></span> Whoop API v2
+        </div>
+        <div class="version-pill" title="Strava v3 OAuth">
+          <span class="dot green"></span> Strava v3
+        </div>
+        <div class="version-pill" title="Zwift Cloud Bridge via Intervals.icu">
+          <span class="dot zwift"></span> Zwift Bridge
+        </div>
+        <div class="version-pill" id="footerPillGemini" title="Google Gemini Sports-Science Intelligence">
+          <span class="dot green" id="footerDotGemini" style="background:#10b981;box-shadow:0 0 6px #10b981;"></span>
+          <span id="footerTextGemini">Gemini Connected</span>
+        </div>
+      </div>
+
+      <div class="version-right">
+        <button class="btn btn-secondary" id="btnOpenChangelog" style="font-size:0.75rem;padding:0.35rem 0.75rem;">
+          📋 Release Notes & Changelog
+        </button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Settings & Apple TV Zwift Bridge Modal -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>Settings & Connections</h3>
+        <button class="modal-close" id="btnCloseSettings">&times;</button>
+      </div>
+      <div class="modal-body">
+        
+        <!-- Appearance / Theme Mode (Light / Dark / System) -->
+        <div class="form-group" style="background:rgba(255,255,255,0.03);border:1px solid var(--border-color);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
+            <div>
+              <div style="display:flex;align-items:center;gap:0.5rem;">
+                <span style="font-size:1.25rem;">🌓</span>
+                <label style="color:var(--text-primary);font-weight:700;margin:0;">Theme &amp; Appearance</label>
+              </div>
+              <p class="form-hint" style="margin:0.25rem 0 0 0;">
+                Choose your preferred interface theme or automatically match your operating system.
+              </p>
+            </div>
+            <div class="btn-pill-group" id="themePillGroup" style="margin:0;">
+              <button type="button" class="btn-pill" data-theme-mode="dark" id="btnThemeDark">
+                🌙 Dark
+              </button>
+              <button type="button" class="btn-pill" data-theme-mode="light" id="btnThemeLight">
+                ☀️ Light
+              </button>
+              <button type="button" class="btn-pill" data-theme-mode="system" id="btnThemeSystem">
+                💻 System
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Apple TV / Intervals.icu Zwift Bridge -->
+        <div class="form-group" style="background:rgba(252, 103, 25, 0.08);border:1px solid rgba(252, 103, 25, 0.3);padding:1rem;border-radius:8px;">
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span style="font-size:1.25rem;">📺</span>
+            <label style="color:#fc6719;font-weight:700;">Zwift Direct Sync for Apple TV (Intervals.icu Bridge)</label>
+          </div>
+          <p class="form-hint" style="color:#cbd5e1;margin-top:0.25rem;">
+            Because Apple TV doesn't have a filesystem to drop files into, Zwift connects to free accounts like <b>Intervals.icu</b>. 
+            When you click "Send to Zwift", PowerSync schedules today's workout on your Intervals.icu calendar, which Zwift on Apple TV instantly loads into your custom workouts menu!
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
+            <div>
+              <label>Athlete ID</label>
+              <input type="text" id="settingIntervalsAthleteId" placeholder="e.g. i12345" />
+            </div>
+            <div>
+              <label>API Key</label>
+              <input type="password" id="settingIntervalsApiKey" placeholder="API Key" />
+            </div>
+          </div>
+          <span class="form-hint">Find your ID & key in Intervals.icu -> Settings -> Developer Settings (Free).</span>
+        </div>
+
+        <!-- Long-Term Fitness Goal & Program (Xert Alternative) -->
+        <div class="form-group" style="background:rgba(6, 182, 212, 0.08);border:1px solid rgba(6, 182, 212, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;align-items:center;gap:0.5rem;">
+            <span style="font-size:1.25rem;">🎯</span>
+            <label style="color:#06b6d4;font-weight:700;">Long-Term Fitness Goal & Program (Xert Alternative)</label>
+          </div>
+          <p class="form-hint" style="color:#cbd5e1;margin-top:0.25rem;">
+            PowerSync structures your macrocycles (Base &rarr; Build &rarr; Peak &rarr; Taper) towards your target power output or event date.
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
+            <div>
+              <label>Program Focus / Goal Archetype</label>
+              <select id="settingProgramGoal" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border-color);border-radius:6px;padding:0.5rem;color:#fff;font-size:0.85rem;">
+                <option value="FTP_BUILD">Threshold & FTP Booster (+15W)</option>
+                <option value="GRAN_FONDO">Gran Fondo & Century Base (+10W)</option>
+                <option value="VO2_CRIT">Punchy Power & Criterium (+12W)</option>
+                <option value="HEALTH_LONGEVITY">Aerobic Health & Longevity (+5W)</option>
+              </select>
+            </div>
+            <div>
+              <label>Target FTP (Watts)</label>
+              <input type="number" id="settingProgramTargetFtp" placeholder="265" />
+            </div>
+            <div>
+              <label>Target Event / Completion Date</label>
+              <input type="date" id="settingProgramTargetDate" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border-color);border-radius:6px;padding:0.45rem;color:#fff;font-size:0.85rem;" />
+            </div>
+            <div>
+              <label>Weekly Target TSS</label>
+              <input type="number" id="settingProgramWeeklyTss" placeholder="360" />
+            </div>
+            <div>
+              <label>Weekly Target XSS (3-Tier Strain)</label>
+              <input type="number" id="settingProgramWeeklyXss" placeholder="360" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Athlete Fitness Signature (3-Tier Strain & Xert Equivalent) -->
+        <div class="form-group" style="background:rgba(168, 85, 247, 0.08);border:1px solid rgba(168, 85, 247, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
+            <span style="font-size:1.25rem;">⚡</span>
+            <label style="color:#c084fc;font-weight:700;margin:0;">Athlete Fitness Signature (Xert Equivalent)</label>
+          </div>
+          <p class="form-hint" style="color:#cbd5e1;margin:0.25rem 0 0.5rem 0;">
+            Calibrates your 3-tier physiological strain model (Low, High glycolytic W' depletion, and Peak neuromuscular power).
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.75rem;">
+            <div>
+              <label style="font-size:0.75rem;">Threshold Power (FTP)</label>
+              <input type="number" id="settingFtp" placeholder="250" />
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <label style="font-size:0.75rem;">W' Anaerobic Work (kJ)</label>
+                <button type="button" id="btnToggleWPrimeHelper" style="background:none;border:none;color:var(--accent-cyan);font-size:0.7rem;cursor:pointer;padding:0;text-decoration:underline;" title="Open W' Anaerobic Work Estimator">📐 Estimate</button>
+              </div>
+              <input type="number" step="0.5" id="settingAthleteWPrime" placeholder="20.0" />
+            </div>
+            <div>
+              <label style="font-size:0.75rem;">Peak Power P_max (W)</label>
+              <input type="number" id="settingAthletePeakPower" placeholder="1050" />
+            </div>
+            <div>
+              <label style="font-size:0.75rem;">Max Heart Rate (BPM)</label>
+              <input type="number" id="settingMaxHr" placeholder="185" />
+            </div>
+          </div>
+
+          <!-- W' Estimator Collapsible Helper -->
+          <div id="wPrimeEstimatorBox" style="display:none;margin-top:0.75rem;padding:0.85rem;background:rgba(15, 23, 42, 0.65);border:1px solid rgba(168, 85, 247, 0.35);border-radius:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.45rem;">
+              <span style="font-size:0.8rem;font-weight:700;color:#c084fc;">📐 W' (Anaerobic Capacity) Estimator</span>
+              <button type="button" id="btnCloseWPrimeHelper" style="background:none;border:none;color:var(--text-muted);font-size:0.85rem;cursor:pointer;">✕</button>
+            </div>
+            <p style="font-size:0.74rem;color:var(--text-secondary);margin:0 0 0.55rem 0;line-height:1.45;">
+              <strong>W' (W-Prime)</strong> is your anaerobic battery capacity above FTP. In <strong>Xert</strong>, this is your exact <strong>HIE (High Intensity Energy)</strong> in kJ.
+            </p>
+            
+            <!-- Method 1: Two All-Out Efforts -->
+            <div style="font-size:0.74rem;font-weight:600;color:var(--accent-cyan);margin-bottom:0.3rem;">Option A: Calculate from 2 Max Efforts</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.45rem;align-items:end;margin-bottom:0.55rem;">
+              <div>
+                <label style="font-size:0.68rem;color:var(--text-muted);display:block;margin-bottom:0.2rem;">Effort 1 (e.g. 3m / 180s)</label>
+                <div style="display:flex;gap:0.25rem;">
+                  <input type="number" id="calcWpDur1" placeholder="Sec (180)" value="180" style="width:45%;font-size:0.75rem;padding:0.3rem;" />
+                  <input type="number" id="calcWpWatts1" placeholder="Watts" style="width:55%;font-size:0.75rem;padding:0.3rem;" />
+                </div>
+              </div>
+              <div>
+                <label style="font-size:0.68rem;color:var(--text-muted);display:block;margin-bottom:0.2rem;">Effort 2 (e.g. 10m / 600s)</label>
+                <div style="display:flex;gap:0.25rem;">
+                  <input type="number" id="calcWpDur2" placeholder="Sec (600)" value="600" style="width:45%;font-size:0.75rem;padding:0.3rem;" />
+                  <input type="number" id="calcWpWatts2" placeholder="Watts" style="width:55%;font-size:0.75rem;padding:0.3rem;" />
+                </div>
+              </div>
+              <button type="button" id="btnCalculateWPrime" class="btn btn-secondary" style="font-size:0.72rem;padding:0.35rem 0.65rem;white-space:nowrap;border-color:var(--accent-cyan);color:var(--accent-cyan);">Compute</button>
+            </div>
+            <div id="calcWpResult" style="display:none;font-size:0.74rem;padding:0.4rem 0.6rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:6px;color:#10b981;margin-bottom:0.55rem;"></div>
+
+            <!-- Method 2: Rider Phenotype Quick-Select -->
+            <div style="font-size:0.74rem;font-weight:600;color:var(--accent-cyan);margin-bottom:0.3rem;">Option B: Quick-Select by Rider Phenotype</div>
+            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
+              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="14.0" style="font-size:0.7rem;padding:0.25rem 0.55rem;" title="Time trialist, diesel engine, steady climber">⏱️ TT / Diesel (14 kJ)</button>
+              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="20.0" style="font-size:0.7rem;padding:0.25rem 0.55rem;" title="Balanced rouleur / all-rounder">🚴 All-Rounder (20 kJ)</button>
+              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="25.0" style="font-size:0.7rem;padding:0.25rem 0.55rem;" title="Punchy climbs, short hills, criterium racer">⚡ Puncheur (25 kJ)</button>
+              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="30.0" style="font-size:0.7rem;padding:0.25rem 0.55rem;" title="Fast-twitch sprint specialist / track racer">🚀 Sprinter (30 kJ)</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Google Gemini AI Key -->
+        <div class="form-group" style="background:rgba(6, 182, 212, 0.05);border:1px solid rgba(6, 182, 212, 0.22);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;flex-wrap:wrap;gap:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.45rem;">
+              <span style="font-size:1.15rem;">✨</span>
+              <label style="color:var(--accent-cyan);font-weight:700;margin:0;">Google Gemini AI Integration</label>
+            </div>
+            <span id="geminiConnStatus" class="badge-status badge-gemini connected" style="font-size:0.75rem;padding:0.18rem 0.55rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:600;">
+              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #10b981;background:#10b981;border-radius:50%;"></span>
+              <span id="txtGeminiConnStatus">Connected</span>
+            </span>
+          </div>
+          <p class="form-hint" style="color:var(--text-secondary);margin:0 0 0.5rem 0;">
+            Powers deep conversational LLM reasoning, post-ride debriefs, and automatic schedule adaptation.
+          </p>
+          <div style="display:flex;gap:0.5rem;">
+            <input type="password" id="settingGeminiKey" placeholder="Paste Gemini API Key..." style="flex:1;" />
+            <button type="button" class="btn btn-secondary" id="btnTestGeminiKey" style="font-size:0.78rem;padding:0.4rem 0.8rem;border-color:var(--accent-cyan);color:var(--accent-cyan);white-space:nowrap;">
+              ⚡ Test Connection
+            </button>
+          </div>
+          <span class="form-hint" id="geminiTestFeedback" style="display:none;margin-top:0.4rem;font-weight:600;"></span>
+        </div>
+
+        <!-- Base Map Overlays & Google Maps API -->
+        <div class="form-group" style="background:rgba(59, 130, 246, 0.08);border:1px solid rgba(59, 130, 246, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.25rem;">🗺️</span>
+              <label style="color:#60a5fa;font-weight:700;margin:0;">Route Map Overlays & Google Maps</label>
+            </div>
+            <a href="https://console.cloud.google.com/google/maps-apis/overview" target="_blank" style="color:#60a5fa;font-size:0.75rem;text-decoration:underline;">Google Cloud Console ↗</a>
+          </div>
+          <p class="form-hint" style="margin-top:0.25rem;color:#cbd5e1;">
+            Course map views use official <b>Google Maps</b> (Roadmap, Satellite Hybrid, and Terrain). Select your default Google Maps layer below:
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
+            <div>
+              <label style="font-size:0.75rem;">Default Google Maps Layer</label>
+              <select id="settingPreferredMapLayer" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border-color);border-radius:6px;padding:0.45rem;color:#fff;font-size:0.85rem;">
+                <option value="google_roads" selected>🗺️ Google Roadmap (Default)</option>
+                <option value="google_hybrid">🛰️ Google Satellite Hybrid</option>
+                <option value="google_terrain">⛰️ Google Terrain</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:0.75rem;">Google Maps API Key (Optional)</label>
+              <input type="password" id="settingGoogleMapsApiKey" placeholder="AIzaSy..." />
+            </div>
+          </div>
+        </div>
+
+        <!-- Strava API Credentials -->
+        <div class="form-group" style="background:rgba(252, 82, 0, 0.08);border:1px solid rgba(252, 82, 0, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <label style="color:#fc5200;font-weight:700;margin:0;">Strava Integration</label>
+            <a href="https://www.strava.com/settings/api" target="_blank" style="color:#fc5200;font-size:0.75rem;text-decoration:underline;">Create Strava App ↗</a>
+          </div>
+          <p class="form-hint" style="margin-top:0.25rem;">
+            Go to <b>strava.com/settings/api</b>. Set <i>"Authorization Callback Domain"</i> to <b>localhost</b>. Then paste your Client ID & Secret below:
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
+            <div>
+              <label style="font-size:0.75rem;">Client ID</label>
+              <input type="text" id="settingStravaClientId" placeholder="e.g. 123456" />
+            </div>
+            <div>
+              <label style="font-size:0.75rem;">Client Secret</label>
+              <input type="password" id="settingStravaClientSecret" placeholder="Paste Client Secret" />
+            </div>
+          </div>
+          <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;">
+            <a href="/api/auth/strava/login" id="btnConnectStravaOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem;border-color:#fc5200;color:#fc5200;text-decoration:none;">
+              🔗 Authorize with Strava
+            </a>
+            <span id="stravaConnStatus" style="font-size:0.8rem;color:#94a3b8;">Not connected</span>
+          </div>
+        </div>
+
+        <!-- Whoop API Credentials -->
+        <div class="form-group" style="background:rgba(16, 185, 129, 0.08);border:1px solid rgba(16, 185, 129, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <label style="color:#10b981;font-weight:700;margin:0;">Whoop Developer Integration</label>
+            <a href="https://developer.whoop.com" target="_blank" style="color:#10b981;font-size:0.75rem;text-decoration:underline;">Whoop Developer Portal ↗</a>
+          </div>
+          <p class="form-hint" style="margin-top:0.25rem;">
+            Go to <b>developer.whoop.com</b>. Set <i>Redirect URI</i> to <b>http://localhost:8000/api/auth/whoop/callback</b>. Paste your Client ID & Secret below:
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
+            <div>
+              <label style="font-size:0.75rem;">Client ID</label>
+              <input type="text" id="settingWhoopClientId" placeholder="e.g. your-client-id" />
+            </div>
+            <div>
+              <label style="font-size:0.75rem;">Client Secret</label>
+              <input type="password" id="settingWhoopClientSecret" placeholder="Paste Client Secret" />
+            </div>
+          </div>
+          <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;">
+            <a href="/api/auth/whoop/login" id="btnConnectWhoopOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem;border-color:#10b981;color:#10b981;text-decoration:none;">
+              🔗 Authorize with Whoop
+            </a>
+            <span id="whoopConnStatus" style="font-size:0.8rem;color:#94a3b8;">Not connected</span>
+          </div>
+        </div>
+
+        <!-- Demo Mode Toggle -->
+        <div class="form-group" style="flex-direction:row;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:8px;">
+          <div>
+            <label style="margin:0;">Demo / Preview Mode</label>
+            <div class="form-hint">Uses realistic Whoop recovery & Strava training metrics to test features right away.</div>
+          </div>
+          <input type="checkbox" id="settingDemoMode" style="width:20px;height:20px;cursor:pointer;" />
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:1rem;">
+          <button class="btn btn-secondary" id="btnCancelSettings">Cancel</button>
+          <button class="btn btn-primary" id="btnSaveSettings">Save Changes</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Changelog Modal -->
+  <div class="modal-overlay" id="changelogModal">
+    <div class="modal-dialog" style="max-width:640px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span style="font-size:1.3rem;">🚀</span>
+          <h3>PowerSync Version History & Changelog</h3>
+        </div>
+        <button class="modal-close" id="btnCloseChangelog">&times;</button>
+      </div>
+      <div class="modal-body" id="changelogList" style="gap:1.5rem;">
+        <!-- Populated dynamically from /api/version -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Upcoming Target Plan Builder Modal -->
+  <div class="modal-overlay" id="modalUpcomingPlan">
+    <div class="modal-dialog" style="max-width:680px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span style="font-size:1.3rem;">🎯</span>
+          <h3 style="margin:0;">Schedule Upcoming Target Ride / Event</h3>
+        </div>
+        <button class="modal-close" id="btnClosePlanModal">&times;</button>
+      </div>
+      <div class="modal-body" style="gap:1.25rem;">
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;">
+          Tell the coach about your upcoming target ride. PowerSync will automatically calibrate your daily volume, schedule taper flushes and pre-event primers, and prepare your fueling strategy.
+        </p>
+
+        <!-- Natural Language Quick-Describe Bar -->
+        <div class="form-group" style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.25);padding:0.85rem;border-radius:8px;">
+          <label style="color:var(--accent-cyan);font-weight:700;">Describe Your Planned Ride</label>
+          <div style="display:flex;gap:0.5rem;margin-top:0.35rem;">
+            <input type="text" id="inputPlanDescribe" placeholder="e.g. 'a 50 mile ride on Sunday with 3,000 ft climbing' or 'hard 45mi Saturday group ride'" style="flex:1;" />
+            <button class="btn btn-secondary" id="btnAutoParsePlan" style="font-size:0.78rem;padding:0.4rem 0.75rem;border-color:var(--accent-cyan);color:var(--accent-cyan);white-space:nowrap;">
+              ✨ Auto-Parse
+            </button>
+          </div>
+          <span class="form-hint">Our sports-science parser extracts distance, target date, elevation gain, and intensity level.</span>
+        </div>
+
+        <!-- Route Source Selection Tabs -->
+        <div>
+          <label style="font-size:0.82rem;font-weight:700;">Route Source</label>
+          <div class="mode-tabs" id="planSourceTabs" style="margin:0.4rem 0 0.85rem 0;padding:0.2rem;">
+            <button class="mode-tab active" data-source="manual">Manual Stats</button>
+            <button class="mode-tab" data-source="strava">Strava Library</button>
+            <button class="mode-tab" data-source="gpx">Upload GPX File</button>
+          </div>
+
+          <!-- Tab Content: Manual -->
+          <div id="planSourceManual" class="plan-source-panel">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+              <div>
+                <label style="font-size:0.75rem;">Distance (Miles)</label>
+                <input type="number" step="0.5" id="inputPlanDistance" placeholder="50.0" />
+              </div>
+              <div>
+                <label style="font-size:0.75rem;">Elevation Gain (Feet)</label>
+                <input type="number" id="inputPlanElevation" placeholder="3200" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Content: Strava Candidate Selector -->
+          <div id="planSourceStrava" class="plan-source-panel" style="display:none;">
+            <label style="font-size:0.75rem;">Select from your synced Strava outdoor rides:</label>
+            <select id="selectStravaRouteCandidate" style="width:100%;padding:0.5rem;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:0.82rem;margin-top:0.35rem;">
+              <option value="">-- Choose a Strava Route --</option>
+            </select>
+          </div>
+
+          <!-- Tab Content: GPX Upload -->
+          <div id="planSourceGpx" class="plan-source-panel" style="display:none;">
+            <div style="border:2px dashed rgba(255,255,255,0.15);padding:1.25rem;border-radius:8px;text-align:center;background:rgba(0,0,0,0.2);">
+              <input type="file" id="inputPlanGpxFile" accept=".gpx" style="display:none;" />
+              <button class="btn btn-secondary" type="button" onclick="document.getElementById('inputPlanGpxFile').click()">
+                📁 Choose .gpx Route File
+              </button>
+              <div id="planGpxFilename" style="font-size:0.75rem;color:var(--accent-cyan);margin-top:0.5rem;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Date & Intensity Grid -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+          <div>
+            <label style="font-size:0.75rem;">Target Event Date</label>
+            <input type="date" id="inputPlanDate" />
+          </div>
+          <div>
+            <label style="font-size:0.75rem;">Pacing / Intensity</label>
+            <select id="selectPlanIntensity" style="width:100%;padding:0.5rem;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:0.82rem;">
+              <option value="Endurance">Zone 2 Aerobic Base</option>
+              <option value="Tempo / Group Ride">Moderate Tempo / Group Ride</option>
+              <option value="Hard / Race">Hard / Race / Gran Fondo</option>
+              <option value="Climbing Endurance">Climbing / Hill Repeats</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:0.5rem;">
+          <button class="btn btn-secondary" id="btnCancelPlanModal">Cancel</button>
+          <button class="btn btn-primary" id="btnSubmitUpcomingPlan">
+            🚀 Save Plan & Adapt Schedule
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Replace with Custom Ride & Fueling Modal -->
+  <div class="modal-overlay" id="modalReplaceRide">
+    <div class="modal-dialog" style="max-width:640px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span style="font-size:1.3rem;">⚡</span>
+          <h3 style="margin:0;">Replace Today's Ride & Generate Fueling Plan</h3>
+        </div>
+        <button class="modal-close" id="btnCloseReplaceRide">&times;</button>
+      </div>
+      <div class="modal-body" style="gap:1.25rem;">
+        <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;">
+          Describe a custom ride or upload a GPX route. PowerSync will replace today's prescription, calculate power targets, and generate an hour-by-hour fueling plan tailored to local weather and your Whoop recovery.
+        </p>
+
+        <!-- Quick Input -->
+        <div class="form-group">
+          <label>Describe Your Custom Ride</label>
+          <input type="text" id="inputCustomRideDescribe" placeholder="e.g. 'planning a 40 mile ride with 2,200 ft climbing at tempo pace'" />
+          <span class="form-hint">Or specify exact miles, duration, and elevation below:</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:0.65rem;">
+          <div>
+            <label style="font-size:0.75rem;">Distance (Miles)</label>
+            <input type="number" step="0.5" id="inputCustomRideDist" placeholder="40.0" />
+          </div>
+          <div>
+            <label style="font-size:0.75rem;">Duration (Min)</label>
+            <input type="number" id="inputCustomRideDur" placeholder="140" />
+          </div>
+          <div>
+            <label style="font-size:0.75rem;">Elevation (Ft)</label>
+            <input type="number" id="inputCustomRideElev" placeholder="2200" />
+          </div>
+        </div>
+
+        <!-- Optional GPX Upload -->
+        <div class="form-group" style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);padding:0.75rem;border-radius:6px;">
+          <label style="font-size:0.75rem;color:var(--text-secondary);">Or Upload Route File (.GPX)</label>
+          <input type="file" id="inputCustomRideGpx" accept=".gpx" style="font-size:0.78rem;margin-top:0.25rem;" />
+        </div>
+
+        <!-- Whoop Recovery & Trailing Load Context Banner -->
+        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.22);border-radius:8px;padding:0.75rem 0.85rem;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.3rem;">
+            <div style="font-size:0.78rem;font-weight:700;color:#c7d2fe;display:flex;align-items:center;gap:0.35rem;">
+              <span>🧬</span> Physiological Readiness & Trailing Load
+            </div>
+            <div style="display:flex;gap:0.35rem;" id="modalReplaceRecoveryPills">
+              <span class="badge-status" id="modalReplaceBadgeWhoop" style="font-size:0.7rem;">Whoop: Loading...</span>
+              <span class="badge-status" id="modalReplaceBadgeStrain" style="font-size:0.7rem;">7D Strain: --</span>
+              <span class="badge-status" id="modalReplaceBadgeTss" style="font-size:0.7rem;">Yesterday: -- TSS</span>
+            </div>
+          </div>
+          <div style="font-size:0.72rem;color:var(--text-secondary);line-height:1.35;" id="modalReplaceRecoveryNote">
+            PowerSync automatically adjusts pacing targets and adds +12g/hr carbohydrate boost if starting glycogen stores are fatigued.
+          </div>
+        </div>
+
+        <!-- Weather Conditions Controls -->
+        <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);padding:0.85rem;border-radius:8px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
+            <div style="font-size:0.8rem;font-weight:700;color:#10b981;">
+              🌤️ Outdoor Ambient Weather (Calibrates Sweat &amp; Sodium Loss)
+            </div>
+            <button class="btn btn-secondary" id="btnFetchModalWeather" type="button" style="padding:0.2rem 0.55rem;font-size:0.72rem;" title="Fetch live weather via browser geolocation">
+              📍 Use Current Weather
+            </button>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;">
+            <div>
+              <label style="font-size:0.75rem;">Temperature: <b id="lblCustomTemp">78°F</b></label>
+              <input type="range" id="sliderCustomTemp" min="40" max="100" value="78" style="width:100%;" />
+            </div>
+            <div>
+              <label style="font-size:0.75rem;">Humidity: <b id="lblCustomHumidity">60%</b></label>
+              <input type="range" id="sliderCustomHumidity" min="20" max="95" value="60" style="width:100%;" />
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:0.5rem;">
+          <button class="btn btn-secondary" id="btnCancelReplaceRide">Cancel</button>
+          <button class="btn btn-primary" id="btnSubmitReplaceRide" style="background:linear-gradient(135deg, #10b981, #059669);">
+            🥪 Replace Ride & Generate Fueling Plan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Floating Coach Chat Action Button (Mobile & Desktop) -->
+  <button class="floating-coach-fab" id="btnFloatingCoachChat" onclick="openCoachChat()" title="Chat with AI Coach">
+    <span class="fab-icon">💬</span>
+    <span class="fab-label">Chat with Coach</span>
+    <span class="fab-pulse-dot"></span>
+  </button>
+
+  <!-- Coach Chat Backdrop Overlay -->
+  <div class="coach-chat-backdrop" id="coachChatBackdrop"></div>
+
+  <!-- Coach Chat Slide-Out Drawer -->
+  <div class="coach-chat-drawer" id="coachChatDrawer">
+    <!-- Drawer Header -->
+    <div class="coach-chat-header">
+      <div class="coach-chat-header-info">
+        <div class="coach-chat-avatar">
+          <span>🧠</span>
+          <span class="coach-status-dot"></span>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:0.45rem;">
+            <div class="coach-chat-title">PowerSync AI Coach</div>
+            <span class="badge-status badge-gemini connected" id="badgeCoachGeminiStatus" style="font-size:0.68rem;padding:0.14rem 0.5rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.3rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:600;">
+              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #10b981;background:#10b981;border-radius:50%;"></span>
+              <span id="txtCoachGeminiStatus">Gemini Connected</span>
+            </span>
+          </div>
+          <div class="coach-chat-subtitle" id="coachChatSubtitle">Powered by Google Gemini • Live Telemetry</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:0.35rem;">
+        <button class="coach-chat-header-btn" id="btnClearChatHistory" title="Clear Chat History">🗑️</button>
+        <button class="coach-chat-header-btn" id="btnCloseCoachChat" onclick="closeCoachChat()" title="Close Chat" aria-label="Close Chat">&times;</button>
+      </div>
+    </div>
+
+    <!-- Live Telemetry Ribbon -->
+    <div class="coach-telemetry-ribbon" id="coachTelemetryRibbon">
+      <span class="telemetry-chip chip-recovery" id="chatChipRecovery">🧬 Whoop: --%</span>
+      <span class="telemetry-chip chip-ftp" id="chatChipFtp">⚡ FTP: 250W</span>
+      <span class="telemetry-chip" id="chatChipWPrime" style="border-color:rgba(168,85,247,0.4);color:#c084fc;">🔋 W': 20kJ</span>
+      <span class="telemetry-chip chip-strain" id="chatChipStrain">🔥 7D Strain: --</span>
+      <span class="telemetry-chip chip-workout" id="chatChipWorkout">🎯 Prescription: --</span>
+    </div>
+
+    <!-- Scrollable Messages Container -->
+    <div class="coach-chat-messages" id="coachChatMessages">
+      <div class="chat-msg chat-msg-coach">
+        <div class="chat-msg-avatar">🧠</div>
+        <div class="chat-msg-content">
+          <p><strong>Hey Adam! I'm your PowerSync AI Coach.</strong></p>
+          <p>I have direct live visibility into your Whoop biometrics, Strava history, and macrocycle training plan.</p>
+          <p>Ask me about your workout, recovery, or <strong>tell me about an upcoming ride or event</strong> (e.g. <em>"50-mile ride this Sunday with 3,000 ft climbing"</em>) to automatically adapt your schedule and lead-up taper!</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Starter Prompts -->
+    <div class="coach-quick-prompts" id="coachQuickPrompts">
+      <button class="quick-prompt-pill" data-prompt="📅 I have a 50-mile ride this Sunday with 3,000 ft climbing. Adapt my training schedule.">📅 Plan Upcoming Ride</button>
+      <button class="quick-prompt-pill" data-prompt="🎯 How should I train today based on my recovery?">🎯 How should I train today?</button>
+      <button class="quick-prompt-pill" data-prompt="🔋 What is my current 3-tier physiological strain and W' anaerobic battery status?">🔋 3-Tier Strain & W' Battery</button>
+      <button class="quick-prompt-pill" data-prompt="🚴 Can you design a 45-minute Sweet Spot session with 3x8m intervals?">🚴 Propose 45m Sweet Spot</button>
+      <button class="quick-prompt-pill" data-prompt="🥪 What is my optimal fueling strategy for today?">🥪 Review Fueling Plan</button>
+      <button class="quick-prompt-pill" data-prompt="🧬 How is my Whoop recovery and HRV trending?">🧬 Recovery & HRV</button>
+      <button class="quick-prompt-pill" data-prompt="🔮 How is my weekly TSS pacing toward my 360 goal?">🔮 Weekly TSS Check</button>
+    </div>
+
+    <!-- Input Bar -->
+    <div class="coach-chat-input-bar">
+      <form id="formCoachChat">
+        <textarea id="inputCoachMessage" rows="1" placeholder="Ask coach anything, or describe an upcoming ride..."></textarea>
+        <button type="submit" id="btnSendCoachMessage" class="btn btn-primary btn-chat-send" title="Send message">
+          <span>➤</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div class="banner-toast" id="bannerToast"></div>
+
+  <!-- Leaflet Interactive Map -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/js/app.js?v=70"></script>
+</body>
+</html>
