@@ -78,8 +78,38 @@ def build_adaptive_workout_local(
     yesterday_high_xss = strain_systems.get("yesterday", {}).get("high_xss", 0.0)
     acute_peak_xss = strain_systems.get("acute_48h", {}).get("peak_xss", 0.0)
     has_glycolytic_surge = (acute_high_xss >= 30.0 or yesterday_high_xss >= 20.0)
+
+    # 0A. Check if today is a scheduled weekly rest day per athlete preferences
+    from app.services.preferences_service import get_day_target_config
+    day_cfg = get_day_target_config()
+    is_scheduled_rest_day = (day_cfg.get("is_default_rest", False) or duration == 0) and not (user_note and any(k in user_note.lower() for k in ["override", "workout", "intervals", "train", "ride", "spin"]))
     
-    # 0. Check if athlete already trained today or reached target daily strain
+    if is_scheduled_rest_day:
+        title = "Scheduled Weekly Rest & Supercompensation"
+        focus_area = "Weekly Rest Day (Off the Bike)"
+        ai_rationale = (
+            f"Per your coaching schedule preferences, {day_cfg.get('day_name', 'today')} is designated as your dedicated rest day. "
+            f"Your Whoop recovery is {recovery_score}%. Full rest off the bike enables deep myofibrillar repair, "
+            f"glycogen supercompensation, and autonomic replenishment for your upcoming training blocks."
+        )
+        workout_obj = {
+            "id": "workout_primary",
+            "option_type": "rest",
+            "badge": "🛋️ Scheduled Rest Day",
+            "badge_color": "emerald",
+            "title": title,
+            "description": f"Scheduled weekly rest day for {day_cfg.get('day_name', 'today')}",
+            "focus_area": focus_area,
+            "duration_minutes": 0,
+            "estimated_tss": 0,
+            "ai_rationale": ai_rationale,
+            "intervals": []
+        }
+        workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
+        workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+        return enrich_workout_strain(workout_obj, ftp)
+
+    # 0B. Check if athlete already trained today or reached target daily strain
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
     has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0
@@ -419,123 +449,62 @@ def build_adaptive_workout_local(
         is_yesterday_surge = yesterday_tss >= 90 or yesterday_strain >= 15.0 or load_profile == "Recent Surge (Yesterday Heavy)" or has_glycolytic_surge
         chronic_heavy_strain = (trailing_7d_strain_avg >= 14.0 or trailing_7d_high_strain_count >= 4 or recent_weighted_strain >= 14.0)
 
-        if is_yesterday_surge:
-            title = "Sweet Spot Aerobic Density"
-            focus_area = "Sweet Spot (88-92% FTP)"
-            glycolytic_note = f" Additionally, your anaerobic battery incurred heavy glycolytic strain ({acute_high_xss:.1f} High XSS) in the last 48 hours." if has_glycolytic_surge else ""
-            ai_rationale = (
-                f"Strong morning recovery ({recovery_score}%, HRV {hrv_rmssd:.0f} ms), but yesterday was an intense training session ({yesterday_tss} TSS, {yesterday_strain:.1f} Whoop strain).{glycolytic_note} "
-                f"Because acute peripheral and glycolytic fatigue take 3–5 days to clear, today is capped at Sweet Spot (88–92% FTP) rather than maximum VO2 max microbursts, "
-                f"safely maximizing aerobic density while your high-intensity systems reconstitute."
-            )
-            reps = 3 if duration >= 60 else 2
-            interval_dur = 480 if duration >= 60 else 360
-            rest_dur = 180
-            warmup_sec = 480 if duration < 45 else 600
-            cooldown_sec = 300
-            repeats_sec = reps * (interval_dur + rest_dur)
-            bridge_sec = (duration * 60) - warmup_sec - repeats_sec - cooldown_sec
-            if bridge_sec < 0:
-                warmup_sec = max(300, warmup_sec + bridge_sec // 2)
-                cooldown_sec = (duration * 60) - warmup_sec - repeats_sec
-                bridge_sec = 0
+        # Standard warmup & cooldown progressive wattage ramps
+        warmup_sec = 360 if duration <= 40 else 420
+        cooldown_sec = 240 if duration <= 40 else 300
+
+        if is_yesterday_surge or chronic_heavy_strain or recent_high_intensity:
+            title = "Sweet Spot Over-Unders"
+            focus_area = "Sweet Spot Over-Unders"
+            if is_yesterday_surge:
+                glycolytic_note = f" Additionally, your anaerobic battery incurred heavy glycolytic strain ({acute_high_xss:.1f} High XSS) in the last 48 hours." if has_glycolytic_surge else ""
+                ai_rationale = (
+                    f"Strong morning recovery ({recovery_score}%, HRV {hrv_rmssd:.0f} ms), but yesterday was an intense session ({yesterday_tss} TSS, {yesterday_strain:.1f} Whoop strain).{glycolytic_note} "
+                    f"Because acute peripheral fatigue takes time to clear, today is dialed into Sweet Spot Over-Unders (oscillating between 95% and 88% FTP). "
+                    f"This drives mitochondrial density and lactate shuttling without autonomic overload."
+                )
+            elif chronic_heavy_strain:
+                ai_rationale = (
+                    f"Strong morning recovery ({recovery_score}%, HRV {hrv_rmssd:.0f} ms), but your recency-weighted Whoop strain is elevated at {recent_weighted_strain:.1f} ({trailing_7d_high_strain_count} peak days ≥14.0). "
+                    f"To balance high acute readiness against chronic systemic strain, today features Sweet Spot Over-Unders (95%/88% FTP) for maximum aerobic density without sympathetic burnout."
+                )
+            else:
+                strain_note = f" (weighted strain: {recent_weighted_strain:.1f})" if recent_weighted_strain > 0 else ""
+                ai_rationale = (
+                    f"You're in the green at {recovery_score}% recovery with strong HRV ({hrv_rmssd:.0f} ms){strain_note}. "
+                    f"Sweet Spot Over-Unders (oscillating 95% / 88% FTP) provide the optimal metabolic stimulus with manageable autonomic fatigue."
+                )
+
+            primer_sec = 180
+            valley_sec = 120
+            fixed_sec = warmup_sec + cooldown_sec + primer_sec + valley_sec
+            main_sec = max(480, (duration * 60) - fixed_sec)
+            reps = max(2, main_sec // 240)
+            work_sec = reps * 240
+            leftover = (duration * 60) - (warmup_sec + primer_sec + valley_sec + work_sec + cooldown_sec)
+            if leftover > 0:
+                cooldown_sec += leftover
 
             intervals = [
-                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 50, "power_high_pct": 80, "cadence": 90, "name": "Progressive Warmup"},
+                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
+                {"type": "SteadyState", "duration_sec": primer_sec, "power_pct": 88, "cadence": 92, "name": "Sweet Spot Primer"},
+                {"type": "SteadyState", "duration_sec": valley_sec, "power_pct": 55, "cadence": 85, "name": "Valley Spin"},
                 {
                     "type": "Repeats",
                     "repeat": reps,
-                    "on_duration_sec": interval_dur,
-                    "off_duration_sec": rest_dur,
-                    "on_power_pct": 90,
-                    "off_power_pct": 55,
+                    "on_duration_sec": 120,
+                    "off_duration_sec": 120,
+                    "on_power_pct": 95,
+                    "off_power_pct": 88,
                     "cadence": 92,
-                    "cadence_rest": 85,
-                    "name": f"{reps}x Sweet Spot"
-                }
+                    "cadence_rest": 88,
+                    "name": f"{reps}x Sweet Spot Over-Unders (2m @ 95% / 2m @ 88%)"
+                },
+                {"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
             ]
-            if bridge_sec > 0:
-                intervals.append({"type": "SteadyState", "duration_sec": bridge_sec, "power_pct": 65, "cadence": 90, "name": "Aerobic Bridge"})
-            intervals.append({"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 70, "power_high_pct": 45, "cadence": 85, "name": "Cooldown"})
-            estimated_tss = int(duration * 0.82)
-        elif chronic_heavy_strain:
-            title = "Sweet Spot Aerobic Density"
-            focus_area = "Sweet Spot (88-92% FTP)"
-            ai_rationale = (
-                f"Strong morning recovery ({recovery_score}%, HRV {hrv_rmssd:.0f} ms), but your recency-weighted Whoop strain is elevated at {recent_weighted_strain:.1f} ({trailing_7d_high_strain_count} peak days ≥14.0). "
-                f"To balance high acute readiness against chronic systemic strain, today is dialed into Sweet Spot (88-92% FTP) to maximize aerobic density without autonomic burnout."
-            )
-            reps = 3 if duration >= 60 else 2
-            interval_dur = 480 if duration >= 60 else 360
-            rest_dur = 180
-            warmup_sec = 480 if duration < 45 else 600
-            cooldown_sec = 300
-            repeats_sec = reps * (interval_dur + rest_dur)
-            bridge_sec = (duration * 60) - warmup_sec - repeats_sec - cooldown_sec
-            if bridge_sec < 0:
-                warmup_sec = max(300, warmup_sec + bridge_sec // 2)
-                cooldown_sec = (duration * 60) - warmup_sec - repeats_sec
-                bridge_sec = 0
-
-            intervals = [
-                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 50, "power_high_pct": 80, "cadence": 90, "name": "Progressive Warmup"},
-                {
-                    "type": "Repeats",
-                    "repeat": reps,
-                    "on_duration_sec": interval_dur,
-                    "off_duration_sec": rest_dur,
-                    "on_power_pct": 90,
-                    "off_power_pct": 55,
-                    "cadence": 92,
-                    "cadence_rest": 85,
-                    "name": f"{reps}x Sweet Spot"
-                }
-            ]
-            if bridge_sec > 0:
-                intervals.append({"type": "SteadyState", "duration_sec": bridge_sec, "power_pct": 65, "cadence": 90, "name": "Aerobic Bridge"})
-            intervals.append({"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 70, "power_high_pct": 45, "cadence": 85, "name": "Cooldown"})
-            estimated_tss = int(duration * 0.82)
-        elif recent_high_intensity:
-            title = "Sweet Spot Aerobic Density"
-            focus_area = "Sweet Spot (88-92% FTP)"
-            strain_note = f" (weighted strain: {recent_weighted_strain:.1f})" if recent_weighted_strain > 0 else ""
-            ai_rationale = (
-                f"You're in the green at {recovery_score}% recovery with strong HRV ({hrv_rmssd:.0f} ms){strain_note}. "
-                f"Since you recently did high-intensity work, Sweet Spot (88-92% FTP) provides optimal training stimulus "
-                f"with manageable autonomic cost."
-            )
-            reps = 3 if duration >= 60 else 2
-            interval_dur = 480 if duration >= 60 else 360
-            rest_dur = 180
-            warmup_sec = 480 if duration < 45 else 600
-            cooldown_sec = 300
-            repeats_sec = reps * (interval_dur + rest_dur)
-            bridge_sec = (duration * 60) - warmup_sec - repeats_sec - cooldown_sec
-            if bridge_sec < 0:
-                warmup_sec = max(300, warmup_sec + bridge_sec // 2)
-                cooldown_sec = (duration * 60) - warmup_sec - repeats_sec
-                bridge_sec = 0
-
-            intervals = [
-                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 50, "power_high_pct": 80, "cadence": 90, "name": "Progressive Warmup"},
-                {
-                    "type": "Repeats",
-                    "repeat": reps,
-                    "on_duration_sec": interval_dur,
-                    "off_duration_sec": rest_dur,
-                    "on_power_pct": 90,
-                    "off_power_pct": 55,
-                    "cadence": 92,
-                    "cadence_rest": 85,
-                    "name": f"{reps}x Sweet Spot"
-                }
-            ]
-            if bridge_sec > 0:
-                intervals.append({"type": "SteadyState", "duration_sec": bridge_sec, "power_pct": 65, "cadence": 90, "name": "Aerobic Bridge"})
-            intervals.append({"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 70, "power_high_pct": 45, "cadence": 85, "name": "Cooldown"})
             estimated_tss = int(duration * 0.82)
         else:
-            title = "VO2 Max / Microburst Boosters"
+            title = "VO2 Max Microburst Intervals"
             focus_area = "VO2 Max & High Aerobic"
             strain_note = f" with well-managed acute load ({recent_weighted_strain:.1f} weighted strain)" if recent_weighted_strain > 0 else ""
             ai_rationale = (
@@ -543,18 +512,16 @@ def build_adaptive_workout_local(
                 f"Low acute fatigue makes this the ideal window for high-intensity work. "
                 f"Today's session targets VO2 Max (115% FTP) to raise your aerobic ceiling."
             )
-            reps = 4 if duration >= 50 else (3 if duration >= 40 else 2)
-            warmup_sec = 480 if duration < 45 else 600
-            cooldown_sec = 300
-            repeats_sec = reps * 360
-            bridge_sec = (duration * 60) - warmup_sec - repeats_sec - cooldown_sec
-            if bridge_sec < 0:
-                warmup_sec = max(300, warmup_sec + bridge_sec // 2)
-                cooldown_sec = (duration * 60) - warmup_sec - repeats_sec
-                bridge_sec = 0
+            fixed_sec = warmup_sec + cooldown_sec
+            main_sec = max(360, (duration * 60) - fixed_sec)
+            reps = max(2, main_sec // 360)
+            work_sec = reps * 360
+            leftover = (duration * 60) - (warmup_sec + work_sec + cooldown_sec)
+            if leftover > 0:
+                cooldown_sec += leftover
 
             intervals = [
-                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 50, "power_high_pct": 85, "cadence": 92, "name": "Dynamic Warmup"},
+                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 45, "power_high_pct": 78, "cadence": 92, "name": "Gradual Wattage Ramp"},
                 {
                     "type": "Repeats",
                     "repeat": reps,
@@ -565,11 +532,9 @@ def build_adaptive_workout_local(
                     "cadence": 98,
                     "cadence_rest": 85,
                     "name": f"{reps}x VO2 Max 3-min Blocks"
-                }
+                },
+                {"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
             ]
-            if bridge_sec > 0:
-                intervals.append({"type": "SteadyState", "duration_sec": bridge_sec, "power_pct": 65, "cadence": 90, "name": "Aerobic Bridging"})
-            intervals.append({"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 65, "power_high_pct": 45, "cadence": 85, "name": "Cooldown"})
             estimated_tss = int(duration * 0.88)
 
     if user_note:
@@ -728,6 +693,46 @@ def build_workout_bundle(
         load_profile=load_profile,
         strain_profile=strain_profile
     )
+
+    if primary.get("option_type") == "rest" or primary.get("duration_minutes") == 0:
+        alt_flush = {
+            "id": "workout_alt_flush",
+            "option_type": "flush",
+            "badge": "🌱 Gentle Leg Flush (20m)",
+            "badge_color": "emerald",
+            "title": "20-Min Active Recovery Flush",
+            "description": "Very light recovery spin to keep muscles loose",
+            "focus_area": "Active Flush",
+            "duration_minutes": 20,
+            "estimated_tss": 10,
+            "ai_rationale": "Light 20-minute spin (50% FTP) to stimulate circulation and lymphatic clearance without placing metabolic strain on muscles.",
+            "intervals": [
+                {"type": "Warmup", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 50, "cadence": 85, "name": "Gentle Spin"},
+                {"type": "SteadyState", "duration_sec": 600, "power_pct": 50, "cadence": 88, "name": "Easy Flush"},
+                {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 48, "power_high_pct": 38, "cadence": 80, "name": "Spin Out"}
+            ]
+        }
+        alt_flush["zwo_content"] = generate_zwo_xml(alt_flush, ftp)
+        alt_flush["intervals_icu_text"] = generate_intervals_icu_text(alt_flush)
+        alt_flush = enrich_workout_strain(alt_flush, ftp)
+
+        alt_base = build_alternative_endurance_workout(
+            recovery_score=recovery_score,
+            duration_min=45,
+            ftp=ftp
+        )
+        alt_base["badge"] = "🚴 Optional Easy Base"
+        alt_base["title"] = "Optional 45m Aerobic Endurance"
+        alt_base["ai_rationale"] = "If you feel like riding on your scheduled rest day, keep it to a strict Zone 2 steady endurance cruise."
+        alt_base["zwo_content"] = generate_zwo_xml(alt_base, ftp)
+        alt_base["intervals_icu_text"] = generate_intervals_icu_text(alt_base)
+        alt_base = enrich_workout_strain(alt_base, ftp)
+
+        return {
+            "primary": primary,
+            "alternatives": [alt_flush, alt_base],
+            "all_options": [primary, alt_flush, alt_base]
+        }
     
     if (has_substantial_ride or high_strain_reached) and not (user_note and "override" in user_note.lower()):
         alt_rest = {

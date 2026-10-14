@@ -142,6 +142,8 @@ async function loadDashboard() {
     state.dashboard = data;
     state.whoop = data.whoop;
     state.strava = data.strava;
+    state.dayConfig = data.day_config;
+    state.coachingPreferences = data.coaching_preferences;
     state.ftp = data.athlete.ftp || 250;
     state.maxHr = data.athlete.max_hr || 185;
     state.athleteWPrime = data.athlete.w_prime_kj !== undefined ? data.athlete.w_prime_kj : 20.0;
@@ -2442,8 +2444,63 @@ function initThemeSystem() {
   }
 }
 
+// Coaching Directives & Persistent Preferences UI
+function renderCoachingDirectives(directives) {
+  const listEl = document.getElementById("preferencesDirectivesList");
+  if (!listEl) return;
+  listEl.innerHTML = "";
+  if (!directives || directives.length === 0) {
+    listEl.innerHTML = `<div style="font-size:0.75rem;color:var(--text-muted);font-style:italic;">No custom directives added yet. Add one below or tell your coach in chat!</div>`;
+    return;
+  }
+  directives.forEach((d, idx) => {
+    const item = document.createElement("div");
+    item.style.cssText = "display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.55rem;border-radius:5px;font-size:0.75rem;color:#e2e8f0;gap:0.5rem;";
+    
+    const textSpan = document.createElement("span");
+    textSpan.style.cssText = "flex:1;line-height:1.35;";
+    textSpan.textContent = `• ${d}`;
+    
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.innerHTML = "✕";
+    delBtn.title = "Delete directive";
+    delBtn.style.cssText = "background:none;border:none;color:#ef4444;font-size:0.8rem;cursor:pointer;padding:0 0.3rem;line-height:1;";
+    delBtn.addEventListener("click", async () => {
+      try {
+        const res = await fetch(`/api/settings/coaching-preferences/directives/${idx}`, { method: "DELETE" });
+        const resData = await res.json();
+        if (resData.success) {
+          showToast("🗑️ Directive removed");
+          renderCoachingDirectives(resData.directives);
+        }
+      } catch (e) {
+        console.error("Failed to delete directive:", e);
+      }
+    });
+
+    item.appendChild(textSpan);
+    item.appendChild(delBtn);
+    listEl.appendChild(item);
+  });
+}
+
+async function loadAndRenderCoachingPreferences() {
+  try {
+    const res = await fetch("/api/settings/coaching-preferences");
+    const data = await res.json();
+    if (data.success && data.preferences) {
+      state.coachingPreferences = data.preferences;
+      renderCoachingDirectives(data.preferences.directives || []);
+    }
+  } catch (err) {
+    console.warn("Failed to load coaching preferences:", err);
+  }
+}
+
 // Settings Modal Handlers
 function openSettingsModal() {
+  loadAndRenderCoachingPreferences();
   fetch("/api/settings")
     .then(r => r.json())
     .then(s => {
@@ -2541,6 +2598,57 @@ if (btnAdjustGoal) btnAdjustGoal.addEventListener("click", openSettingsModal);
 document.getElementById("btnEditFtp").addEventListener("click", openSettingsModal);
 btnCloseSettings.addEventListener("click", closeSettingsModal);
 btnCancelSettings.addEventListener("click", closeSettingsModal);
+
+// Coaching Preferences Directives Add & Reset Event Listeners
+const btnAddDirective = document.getElementById("btnAddDirective");
+const inputNewDirective = document.getElementById("inputNewDirective");
+if (btnAddDirective && inputNewDirective) {
+  btnAddDirective.addEventListener("click", async () => {
+    const text = inputNewDirective.value.trim();
+    if (!text) return;
+    try {
+      const res = await fetch("/api/settings/coaching-preferences/directives", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directive: text })
+      });
+      const data = await res.json();
+      if (data.success) {
+        inputNewDirective.value = "";
+        showToast("🎯 New coaching directive saved!");
+        renderCoachingDirectives(data.directives);
+      }
+    } catch (err) {
+      console.error("Failed to add directive:", err);
+    }
+  });
+
+  inputNewDirective.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      btnAddDirective.click();
+    }
+  });
+}
+
+const btnResetCoachingPreferences = document.getElementById("btnResetCoachingPreferences");
+if (btnResetCoachingPreferences) {
+  btnResetCoachingPreferences.addEventListener("click", async () => {
+    if (!confirm("Reset all coaching schedule rules and directives to default athlete settings?")) return;
+    try {
+      const res = await fetch("/api/settings/coaching-preferences/reset", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showToast("↺ Coaching preferences reset to defaults");
+        if (data.preferences) {
+          renderCoachingDirectives(data.preferences.directives || []);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to reset preferences:", err);
+    }
+  });
+}
 
 // Clickable badges & banner
 const btnBannerOpenConnect = document.getElementById("btnBannerOpenConnect");
@@ -5586,9 +5694,9 @@ async function bootApp() {
     const selectElem = document.getElementById("selectMapBaseLayer");
     if (selectElem) selectElem.value = outdoorBaseLayerName;
     if (outdoorMap) applyBaseTileLayer(outdoorBaseLayerName);
-  }).catch(() => {});
   await loadUpcomingPlan();
-  await loadWorkout(60, 0, "");
+  const initialDur = (state.dayConfig && state.dayConfig.preferred_duration_min !== undefined) ? state.dayConfig.preferred_duration_min : 45;
+  await loadWorkout(initialDur, 0, "");
   await loadDebrief();
 }
 

@@ -83,41 +83,49 @@ def reconcile_workout_intervals(intervals: List[Dict[str, Any]], target_duration
         if steady_bridge:
             steady_bridge["duration_sec"] = int(steady_bridge.get("duration_sec", 0)) + delta
             delta = 0
-        elif delta <= 240:
-            # Minor adjustment: distribute between Warmup and Cooldown
+        elif delta <= 360:
+            # Adjustment: distribute between Warmup and Cooldown ramps
             if warmup_item and cooldown_item:
                 w_add = (delta + 1) // 2
                 c_add = delta - w_add
-                warmup_item["duration_sec"] = int(warmup_item.get("duration_sec", 600)) + w_add
+                warmup_item["duration_sec"] = int(warmup_item.get("duration_sec", 420)) + w_add
                 cooldown_item["duration_sec"] = int(cooldown_item.get("duration_sec", 300)) + c_add
                 delta = 0
             elif warmup_item:
-                warmup_item["duration_sec"] = int(warmup_item.get("duration_sec", 600)) + delta
+                warmup_item["duration_sec"] = int(warmup_item.get("duration_sec", 420)) + delta
                 delta = 0
             elif cooldown_item:
                 cooldown_item["duration_sec"] = int(cooldown_item.get("duration_sec", 300)) + delta
                 delta = 0
         else:
-            # Significant delta (> 4 min): bring Warmup up to 10m (600s) if short, then add an Aerobic Bridge
-            if warmup_item and int(warmup_item.get("duration_sec", 600)) < 600:
-                w_add = min(delta, 600 - int(warmup_item.get("duration_sec", 600)))
-                warmup_item["duration_sec"] = int(warmup_item.get("duration_sec", 600)) + w_add
-                delta -= w_add
+            # Significant delta (> 6 min): if repeats exist, add an extra repeat block and adjust ramps
+            if repeats_item:
+                on_d = int(repeats_item.get("on_duration_sec", 120))
+                off_d = int(repeats_item.get("off_duration_sec", 60))
+                cycle = on_d + off_d
+                if cycle > 0:
+                    add_reps = max(1, delta // cycle)
+                    repeats_item["repeat"] = int(repeats_item.get("repeat", 1)) + add_reps
+                    name = repeats_item.get("name", "")
+                    if "x" in name:
+                        import re
+                        repeats_item["name"] = re.sub(r'^\d+x', f"{repeats_item['repeat']}x", name)
+                    delta -= add_reps * cycle
 
+            # Absorb any remaining delta into progressive warmup and cooldown ramps
             if delta > 0:
-                bridge_segment = {
-                    "type": "SteadyState",
-                    "duration_sec": delta,
-                    "power_pct": 65,
-                    "cadence": 90,
-                    "name": f"Aerobic Bridge ({_format_intervals_dur(delta)})"
-                }
-                if cooldown_item and cooldown_item in reconciled:
-                    c_idx = reconciled.index(cooldown_item)
-                    reconciled.insert(c_idx, bridge_segment)
-                else:
-                    reconciled.append(bridge_segment)
-                delta = 0
+                if warmup_item and cooldown_item:
+                    w_add = (delta + 1) // 2
+                    c_add = delta - w_add
+                    warmup_item["duration_sec"] = int(warmup_item.get("duration_sec", 420)) + w_add
+                    cooldown_item["duration_sec"] = int(cooldown_item.get("duration_sec", 300)) + c_add
+                    delta = 0
+                elif warmup_item:
+                    warmup_item["duration_sec"] = int(warmup_item.get("duration_sec", 420)) + delta
+                    delta = 0
+                elif cooldown_item:
+                    cooldown_item["duration_sec"] = int(cooldown_item.get("duration_sec", 300)) + delta
+                    delta = 0
 
     elif delta < 0:
         needed_cut = abs(delta)

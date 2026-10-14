@@ -171,6 +171,11 @@ def compile_athlete_context() -> Dict[str, Any]:
         }
     }
 
+    # Include persistent coaching preferences & weekday schedule rules
+    from app.services.preferences_service import get_coaching_preferences, get_day_target_config
+    snapshot["athlete_coaching_preferences"] = get_coaching_preferences()
+    snapshot["today_schedule_target"] = get_day_target_config()
+
     return snapshot
 
 def build_system_prompt(snapshot: Dict[str, Any]) -> str:
@@ -213,17 +218,31 @@ def build_system_prompt(snapshot: Dict[str, Any]) -> str:
         '  "intensity_type": "Threshold",\n'
         '  "description": "Tomorrow\'s scheduled threshold over-unders session calibrated for your current FTP and readiness.",\n'
         '  "intervals": [\n'
-        '    {"type": "Warmup", "duration_sec": 480, "power_low_pct": 50, "power_high_pct": 70, "cadence": 88, "name": "Gradual Warmup"},\n'
+        '    {"type": "Warmup", "duration_sec": 420, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},\n'
         '    {"type": "SteadyState", "duration_sec": 180, "power_pct": 90, "cadence": 92, "name": "Threshold Primer"},\n'
         '    {"type": "SteadyState", "duration_sec": 120, "power_pct": 55, "cadence": 85, "name": "Recovery Spin"},\n'
-        '    {"type": "Repeats", "repeat": 9, "on_duration_sec": 120, "off_duration_sec": 60, "on_power_pct": 105, "off_power_pct": 90, "cadence": 94, "name": "9x Over-Under Blocks (2m @ 105% / 1m @ 90%)"},\n'
-        '    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 55, "power_high_pct": 40, "cadence": 80, "name": "Cooldown Spin"}\n'
+        '    {"type": "Repeats", "repeat": 6, "on_duration_sec": 120, "off_duration_sec": 60, "on_power_pct": 105, "off_power_pct": 90, "cadence": 94, "name": "6x Over-Under Blocks (2m @ 105% / 1m @ 90%)"},\n'
+        '    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}\n'
         '  ]\n'
         "}\n"
         "```\n"
         "Only output the powersync_action block when proposing, scheduling, or clearing a specific workout or plan.\n"
         "8. 3-TIER PHYSIOLOGICAL STRAIN ENGINE (XSS & W'bal EQUIVALENT):\n"
-        "PowerSync tracks Adam's 3-parameter fitness signature (Critical Power/FTP, W' Anaerobic Work Capacity in kJ, and Peak Power P_max in Watts) and dynamically partitions training into Low (aerobic), High (glycolytic W' depletion), and Peak (neuromuscular sprint) strain alongside Skiba W'bal battery tracking. If Adam asks about training impact, XSS vs TSS, anaerobic battery depletion, or his fitness signature, reference these exact values and his current battery status."
+        "PowerSync tracks Adam's 3-parameter fitness signature (Critical Power/FTP, W' Anaerobic Work Capacity in kJ, and Peak Power P_max in Watts) and dynamically partitions training into Low (aerobic), High (glycolytic W' depletion), and Peak (neuromuscular sprint) strain alongside Skiba W'bal battery tracking. If Adam asks about training impact, XSS vs TSS, anaerobic battery depletion, or his fitness signature, reference these exact values and his current battery status.\n"
+        "9. ATHLETE'S PERMANENT WORKOUT & SCHEDULE PREFERENCES (MANDATORY INVARIANTS):\n"
+        "Adam has established strict permanent scheduling and interval training preferences that you MUST strictly respect in all advice and workout proposals:\n"
+        "- WEEKDAY DURATION CONSTRAINTS:\n"
+        "  * Monday, Tuesday, Thursday: 35–45 minutes ONLY (indoor efficiency priority). Never prescribe 60+ min workouts on these days unless explicitly requested. One of these days is also a rest candidate.\n"
+        "  * Wednesday & Friday: 60+ minutes (an hour or more), outdoor priority if weather permits.\n"
+        "  * Saturday: Dedicated weekly rest day.\n"
+        "  * Sunday: 60–90+ minutes (outdoor endurance if weather permits, or long indoor session).\n"
+        "- WARMUP & COOLDOWN RAMP INVARIANT (NO FLAT ZONE 2 BLOCKS):\n"
+        "  * Adam explicitly dislikes flat steady Zone 2 warmups and cooldowns (e.g. 10m flat Z2, 6m flat Z2).\n"
+        "  * ALWAYS prescribe progressive wattage ramps: progressive warmup ramp (45% -> 75% FTP over 6–8 min) and progressive cooldown ramp (65% -> 40% FTP over 4–5 min).\n"
+        "- INTERVAL STYLE PREFERENCE:\n"
+        "  * Adam strongly prefers Over/Unders (sweet spot / threshold over-unders, e.g. 2m @ 105% / 1m @ 90% FTP, or 2m @ 95% / 2m @ 88% FTP). Always favor Over/Unders for sweet spot and threshold work.\n"
+        "- PREFERENCES MEMORY & LEARNING:\n"
+        "  * If Adam mentions a new preference, constraint, or rule in chat (e.g., 'Remember that I prefer...', 'From now on...', 'I like/hate...'), confirm warmly that you have remembered and permanently saved it to his PowerSync coaching engine."
     )
 
 def extract_action_from_response(text: str) -> Tuple[str, Optional[Dict[str, Any]]]:
@@ -298,8 +317,8 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
 
     if wants_workout and not is_major_event and not (large_dist_match and not any(w in msg for w in ["over", "interval", "trainer", "zwift"])):
         # Detect duration
-        dur_match = re.search(r'\b(20|25|30|35|40|45|50|60|75|90)\s*(?:m|min|mins|minutes)?\b', msg)
-        dur = int(dur_match.group(1)) if dur_match else 45
+        # Detect duration with fallback to athlete's day-of-week target preferences
+        dur_match = re.search(r'\b(20|25|30|35|40|45|50|60|75|90|120)\s*(?:m|min|mins|minutes)?\b', msg)
 
         # Detect timing: tomorrow / future date vs today
         is_future = any(k in msg for k in [
@@ -329,68 +348,80 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
                 else:
                     target_date = (today + datetime.timedelta(days=1)).isoformat()
 
+        if dur_match:
+            dur = int(dur_match.group(1))
+        else:
+            from app.services.preferences_service import get_day_target_config
+            t_date = datetime.date.fromisoformat(target_date) if target_date else today
+            day_cfg = get_day_target_config(t_date)
+            preferred = day_cfg.get("preferred_duration_min", 45)
+            dur = preferred if preferred > 0 else 35
+
+        # Invariant: Warmups are progressive ramps (45% -> 75%), Cooldowns are ramps (65% -> 40%)
+        w_dur = 360 if dur <= 40 else 420
+        c_dur = 240 if dur <= 40 else 300
+
         # Build specific interval block structure
         if any(k in msg for k in ["over-under", "over under", "overunder", "threshold"]):
             focus = "Threshold Over-Unders"
             title = f"{dur}-Min Threshold Over-Unders"
             tss = round(dur * 0.82)
-            w_dur = 480
-            c_dur = 300
             primer_dur = 180
             spin_dur = 120
             fixed_dur = w_dur + c_dur + primer_dur + spin_dur
             main_dur = max(360, (dur * 60) - fixed_dur)
             reps = max(2, main_dur // 180)
             intervals = [
-                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 50, "power_high_pct": 70, "cadence": 88, "name": "Gradual Warmup"},
+                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
                 {"type": "SteadyState", "duration_sec": primer_dur, "power_pct": 90, "cadence": 92, "name": "Threshold Primer"},
                 {"type": "SteadyState", "duration_sec": spin_dur, "power_pct": 55, "cadence": 85, "name": "Recovery Spin"},
                 {"type": "Repeats", "repeat": reps, "on_duration_sec": 120, "off_duration_sec": 60, "on_power_pct": 105, "off_power_pct": 90, "cadence": 94, "name": f"{reps}x Over-Under Blocks (2m @ 105% / 1m @ 90%)"},
-                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 55, "power_high_pct": 40, "cadence": 80, "name": "Cooldown Spin"}
+                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
             ]
         elif any(k in msg for k in ["vo2", "microburst", "anaerobic", "tabata"]):
             focus = "VO2 Max"
             title = f"{dur}-Min VO2 Max High Intensity"
             tss = round(dur * 0.95)
-            w_dur = 480
-            c_dur = 300
             main_dur = max(360, (dur * 60) - w_dur - c_dur)
             reps = max(2, main_dur // 360)
             intervals = [
-                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 50, "power_high_pct": 68, "cadence": 88, "name": "Gradual Warmup"},
+                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 45, "power_high_pct": 78, "cadence": 88, "name": "Gradual Wattage Ramp"},
                 {"type": "Repeats", "repeat": reps, "on_duration_sec": 180, "off_duration_sec": 180, "on_power_pct": 115, "off_power_pct": 50, "cadence": 98, "name": f"{reps}x3m VO2 Max Intervals"},
-                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 55, "power_high_pct": 40, "cadence": 82, "name": "Cooldown Spin"}
+                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
             ]
         elif any(k in msg for k in ["sweet spot", "sst", "density"]):
-            focus = "Sweet Spot"
-            title = f"{dur}-Min Sweet Spot Aerobic Density"
-            tss = round(dur * 0.80)
-            w_dur = 480
-            c_dur = 300
-            main_dur = max(600, (dur * 60) - w_dur - c_dur)
-            reps = max(2, main_dur // 600)
+            focus = "Sweet Spot Over-Unders"
+            title = f"{dur}-Min Sweet Spot Over-Unders"
+            tss = round(dur * 0.82)
+            primer_dur = 180
+            spin_dur = 120
+            fixed_dur = w_dur + c_dur + primer_dur + spin_dur
+            main_dur = max(480, (dur * 60) - fixed_dur)
+            reps = max(2, main_dur // 240)
             intervals = [
-                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 50, "power_high_pct": 65, "cadence": 88, "name": "Warmup Spin"},
-                {"type": "Repeats", "repeat": reps, "on_duration_sec": 480, "off_duration_sec": 120, "on_power_pct": 90, "off_power_pct": 50, "cadence": 90, "name": f"{reps}x8m Sweet Spot Blocks"},
-                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 55, "power_high_pct": 42, "cadence": 80, "name": "Cooldown"}
+                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
+                {"type": "SteadyState", "duration_sec": primer_dur, "power_pct": 88, "cadence": 92, "name": "Sweet Spot Primer"},
+                {"type": "SteadyState", "duration_sec": spin_dur, "power_pct": 55, "cadence": 85, "name": "Valley Spin"},
+                {"type": "Repeats", "repeat": reps, "on_duration_sec": 120, "off_duration_sec": 120, "on_power_pct": 95, "off_power_pct": 88, "cadence": 92, "cadence_rest": 88, "name": f"{reps}x Sweet Spot Over-Unders (2m @ 95% / 2m @ 88%)"},
+                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
             ]
         elif any(k in msg for k in ["recovery", "easy", "flush", "spin", "rest"]):
             focus = "Active Recovery"
             title = f"{dur}-Min Cadence Flush & Spin"
             tss = round(dur * 0.40)
             intervals = [
-                {"type": "Warmup", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 50, "cadence": 88, "name": "Gentle Warmup"},
-                {"type": "SteadyState", "duration_sec": max(300, (dur * 60) - 600), "power_pct": 52, "cadence": 92, "name": "Zone 1 Aerobic Flush"},
-                {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 50, "power_high_pct": 38, "cadence": 82, "name": "Easy Spin Out"}
+                {"type": "Warmup", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 52, "cadence": 88, "name": "Gentle Ramp Up"},
+                {"type": "SteadyState", "duration_sec": max(300, (dur * 60) - 540), "power_pct": 52, "cadence": 92, "name": "Zone 1 Aerobic Flush"},
+                {"type": "Cooldown", "duration_sec": 240, "power_low_pct": 52, "power_high_pct": 38, "cadence": 82, "name": "Gentle Spin Out"}
             ]
         elif any(k in msg for k in ["tempo", "pace", "steady"]):
             focus = "Tempo"
             title = f"{dur}-Min Aerobic Tempo Cruise"
             tss = round(dur * 0.70)
             intervals = [
-                {"type": "Warmup", "duration_sec": 420, "power_low_pct": 50, "power_high_pct": 68, "cadence": 88, "name": "Warmup"},
-                {"type": "SteadyState", "duration_sec": max(300, (dur * 60) - 780), "power_pct": 80, "cadence": 90, "name": "Zone 3 Steady Tempo"},
-                {"type": "Cooldown", "duration_sec": 360, "power_low_pct": 55, "power_high_pct": 42, "cadence": 80, "name": "Cooldown"}
+                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 45, "power_high_pct": 72, "cadence": 88, "name": "Gradual Wattage Ramp"},
+                {"type": "SteadyState", "duration_sec": max(300, (dur * 60) - w_dur - c_dur), "power_pct": 80, "cadence": 90, "name": "Zone 3 Steady Tempo"},
+                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 65, "power_high_pct": 42, "cadence": 80, "name": "Progressive Cooldown Ramp"}
             ]
         else:
             focus = "Aerobic Base"
@@ -810,17 +841,24 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     history = history or []
     user_message = user_message.strip()
 
-    # 1. Check for inline API key configuration
+    # 1. Check for athlete preferences learning trigger
+    from app.services.preferences_service import extract_and_learn_preferences_from_text
+    learned_directive = extract_and_learn_preferences_from_text(user_message)
+    learned_notice = ""
+    if learned_directive:
+        learned_notice = f"🧠 **Saved to Coaching Profile:** *\"{learned_directive}\"*\n\n"
+
+    # 2. Check for inline API key configuration
     detected_key = extract_gemini_key_from_text(user_message)
     key_saved_notice = ""
     if detected_key:
         set_setting("gemini_api_key", detected_key)
         key_saved_notice = "✨ **Google Gemini API Key saved successfully!** Connecting to Gemini Flash...\n\n"
 
-    # 2. Retrieve athlete context snapshot
+    # 3. Retrieve athlete context snapshot (reflects newly saved preference)
     snapshot = compile_athlete_context()
 
-    # 3. Retrieve API Key
+    # 4. Retrieve API Key
     api_key = get_gemini_api_key()
 
     if api_key:
@@ -846,9 +884,14 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                     ftp=snapshot["athlete"]["ftp_watts"]
                 )
 
+            # Prepend learned notice if Gemini didn't mention saving it
+            reply_text = clean_reply
+            if learned_notice and not any(w in clean_reply.lower() for w in ["saved", "remembered", "profile", "coaching directives"]):
+                reply_text = learned_notice + reply_text
+
             return {
                 "success": True,
-                "reply": key_saved_notice + clean_reply,
+                "reply": key_saved_notice + reply_text,
                 "provider": "gemini",
                 "model": model_used,
                 "gemini_configured": True,
@@ -863,8 +906,10 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         else:
             print("Gemini API call returned null or failed, using sports science fallback.")
 
-    # 4. Sports-science rule-based fallback
+    # 5. Sports-science rule-based fallback
     fallback_reply = generate_sports_science_fallback_response(user_message, snapshot)
+    if learned_notice:
+        fallback_reply = learned_notice + fallback_reply
     proposed_action = build_sports_science_action(user_message, snapshot)
     if proposed_action and "intervals" in proposed_action and "duration_minutes" in proposed_action:
         from app.services.zwift_service import reconcile_workout_intervals

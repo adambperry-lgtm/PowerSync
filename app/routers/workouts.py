@@ -28,7 +28,7 @@ def is_planned_custom_ride_description(text: str) -> bool:
     return has_dist and has_intent
 
 class WorkoutGenerateRequest(BaseModel):
-    duration_min: int = 60
+    duration_min: Optional[int] = None
     intensity_adjust: Optional[int] = 0
     user_note: Optional[str] = ""
     temp_f: Optional[int] = 74
@@ -181,6 +181,11 @@ def generate_workout(req: WorkoutGenerateRequest):
     prog = get_current_program(strava_weekly_tss=acute_weighted_tss or total_tss or 300)
     phase_str = prog.get("phase", "Build Phase")
 
+    # Retrieve athlete day target duration preferences
+    from app.services.preferences_service import get_day_target_config
+    day_cfg = get_day_target_config()
+    target_dur = day_cfg.get("preferred_duration_min", 45) if req.duration_min is None else req.duration_min
+
     # Generate bundle (Primary + 2 Alternatives) with dual-load modeling
     bundle = build_workout_bundle(
         recovery_score=rec_score,
@@ -188,7 +193,7 @@ def generate_workout(req: WorkoutGenerateRequest):
         sleep_score=sleep,
         recent_volume_hours=vol_hours,
         recent_high_intensity=recent_high_intensity,
-        target_duration_min=req.duration_min,
+        target_duration_min=target_dur,
         ftp=ftp,
         user_note=req.user_note,
         program_phase=phase_str,

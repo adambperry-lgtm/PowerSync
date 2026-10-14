@@ -130,6 +130,10 @@ def get_dashboard_data():
         strain_systems=strain_systems
     )
 
+    from app.services.preferences_service import get_coaching_preferences, get_day_target_config
+    coaching_prefs = get_coaching_preferences()
+    day_config = get_day_target_config()
+
     return {
         "demo_mode": demo_mode,
         "athlete": {
@@ -146,6 +150,8 @@ def get_dashboard_data():
         },
         "program": program_data,
         "whoop": whoop_data,
+        "day_config": day_config,
+        "coaching_preferences": coaching_prefs,
         "strava": {
             "weekly_stats": weekly_stats,
             "strain_systems": strain_systems,

@@ -126,3 +126,52 @@ def update_settings_endpoint(payload: SettingsUpdate):
         set_setting("program_weekly_xss_target", payload.program_weekly_xss_target)
 
     return {"success": True, "message": "Settings updated successfully"}
+
+class DirectivePayload(BaseModel):
+    directive: str
+
+@router.get("/coaching-preferences")
+def get_preferences_endpoint():
+    from app.services.preferences_service import get_coaching_preferences
+    return {
+        "success": True,
+        "preferences": get_coaching_preferences()
+    }
+
+@router.post("/coaching-preferences")
+def update_preferences_endpoint(payload: Dict[str, Any]):
+    from app.services.preferences_service import save_coaching_preferences
+    updated = save_coaching_preferences(payload)
+    return {
+        "success": True,
+        "message": "Coaching directives & preferences saved successfully",
+        "preferences": updated
+    }
+
+@router.post("/coaching-preferences/directives")
+def add_directive_endpoint(payload: DirectivePayload):
+    from app.services.preferences_service import add_custom_directive
+    directives = add_custom_directive(payload.directive)
+    return {
+        "success": True,
+        "directives": directives
+    }
+
+@router.delete("/coaching-preferences/directives/{index}")
+def delete_directive_endpoint(index: int):
+    from app.services.preferences_service import remove_custom_directive
+    directives = remove_custom_directive(index)
+    return {
+        "success": True,
+        "directives": directives
+    }
+
+@router.post("/coaching-preferences/reset")
+def reset_preferences_endpoint():
+    from app.services.preferences_service import DEFAULT_COACHING_PREFERENCES, save_coaching_preferences
+    restored = save_coaching_preferences(DEFAULT_COACHING_PREFERENCES)
+    return {
+        "success": True,
+        "message": "Coaching preferences reset to defaults",
+        "preferences": restored
+    }
