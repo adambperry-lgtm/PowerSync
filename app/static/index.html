@@ -1500,25 +1500,25 @@
           <p class="form-hint" style="color:#cbd5e1;margin:0.25rem 0 0.5rem 0;">
             Calibrates your 3-tier physiological strain model (Low, High glycolytic W' depletion, and Peak neuromuscular power).
           </p>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.75rem;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;margin-top:0.5rem;">
             <div>
-              <label style="font-size:0.75rem;">Threshold Power (FTP)</label>
-              <input type="number" id="settingFtp" placeholder="250" />
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Threshold Power (FTP)</label>
+              <input type="number" id="settingFtp" placeholder="250" style="width:100%;box-sizing:border-box;" />
             </div>
             <div>
-              <div style="display:flex;justify-content:space-between;align-items:center;">
-                <label style="font-size:0.75rem;">W' Anaerobic Work (kJ)</label>
-                <button type="button" id="btnToggleWPrimeHelper" style="background:none;border:none;color:var(--accent-cyan);font-size:0.7rem;cursor:pointer;padding:0;text-decoration:underline;" title="Open W' Anaerobic Work Estimator">📐 Estimate</button>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
+                <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin:0;">W' Anaerobic Work (kJ)</label>
+                <button type="button" id="btnToggleWPrimeHelper" style="background:none;border:none;color:var(--accent-cyan);font-size:0.75rem;cursor:pointer;padding:0;text-decoration:underline;display:inline-flex;align-items:center;gap:0.2rem;" title="Open W' Anaerobic Work Estimator">📐 Estimate</button>
               </div>
-              <input type="number" step="0.5" id="settingAthleteWPrime" placeholder="20.0" />
+              <input type="number" step="0.5" id="settingAthleteWPrime" placeholder="20.0" style="width:100%;box-sizing:border-box;" />
             </div>
             <div>
-              <label style="font-size:0.75rem;">Peak Power P_max (W)</label>
-              <input type="number" id="settingAthletePeakPower" placeholder="1050" />
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Peak Power P_max (W)</label>
+              <input type="number" id="settingAthletePeakPower" placeholder="1050" style="width:100%;box-sizing:border-box;" />
             </div>
             <div>
-              <label style="font-size:0.75rem;">Max Heart Rate (BPM)</label>
-              <input type="number" id="settingMaxHr" placeholder="185" />
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Max Heart Rate (BPM)</label>
+              <input type="number" id="settingMaxHr" placeholder="185" style="width:100%;box-sizing:border-box;" />
             </div>
           </div>
 
@@ -1533,33 +1533,33 @@
             </p>
             
             <!-- Method 1: Two All-Out Efforts -->
-            <div style="font-size:0.74rem;font-weight:600;color:var(--accent-cyan);margin-bottom:0.3rem;">Option A: Calculate from 2 Max Efforts</div>
-            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.45rem;align-items:end;margin-bottom:0.55rem;">
+            <div style="font-size:0.74rem;font-weight:600;color:var(--accent-cyan);margin-bottom:0.35rem;">Option A: Calculate from 2 Max Efforts</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr auto;gap:0.5rem;align-items:end;margin-bottom:0.6rem;">
               <div>
-                <label style="font-size:0.68rem;color:var(--text-muted);display:block;margin-bottom:0.2rem;">Effort 1 (e.g. 3m / 180s)</label>
-                <div style="display:flex;gap:0.25rem;">
-                  <input type="number" id="calcWpDur1" placeholder="Sec (180)" value="180" style="width:45%;font-size:0.75rem;padding:0.3rem;" />
-                  <input type="number" id="calcWpWatts1" placeholder="Watts" style="width:55%;font-size:0.75rem;padding:0.3rem;" />
+                <label style="font-size:0.68rem;color:var(--text-muted);display:block;margin-bottom:0.25rem;">Effort 1 (e.g. 3m / 180s)</label>
+                <div style="display:flex;gap:0.3rem;">
+                  <input type="number" id="calcWpDur1" placeholder="Sec (180)" value="180" style="flex:1;min-width:0;box-sizing:border-box;font-size:0.75rem;padding:0.35rem 0.45rem;" />
+                  <input type="number" id="calcWpWatts1" placeholder="Watts" style="flex:1;min-width:0;box-sizing:border-box;font-size:0.75rem;padding:0.35rem 0.45rem;" />
                 </div>
               </div>
               <div>
-                <label style="font-size:0.68rem;color:var(--text-muted);display:block;margin-bottom:0.2rem;">Effort 2 (e.g. 10m / 600s)</label>
-                <div style="display:flex;gap:0.25rem;">
-                  <input type="number" id="calcWpDur2" placeholder="Sec (600)" value="600" style="width:45%;font-size:0.75rem;padding:0.3rem;" />
-                  <input type="number" id="calcWpWatts2" placeholder="Watts" style="width:55%;font-size:0.75rem;padding:0.3rem;" />
+                <label style="font-size:0.68rem;color:var(--text-muted);display:block;margin-bottom:0.25rem;">Effort 2 (e.g. 10m / 600s)</label>
+                <div style="display:flex;gap:0.3rem;">
+                  <input type="number" id="calcWpDur2" placeholder="Sec (600)" value="600" style="flex:1;min-width:0;box-sizing:border-box;font-size:0.75rem;padding:0.35rem 0.45rem;" />
+                  <input type="number" id="calcWpWatts2" placeholder="Watts" style="flex:1;min-width:0;box-sizing:border-box;font-size:0.75rem;padding:0.35rem 0.45rem;" />
                 </div>
               </div>
-              <button type="button" id="btnCalculateWPrime" class="btn btn-secondary" style="font-size:0.72rem;padding:0.35rem 0.65rem;white-space:nowrap;border-color:var(--accent-cyan);color:var(--accent-cyan);">Compute</button>
+              <button type="button" id="btnCalculateWPrime" class="btn btn-secondary" style="font-size:0.74rem;padding:0.4rem 0.75rem;white-space:nowrap;border-color:var(--accent-cyan);color:var(--accent-cyan);">Compute</button>
             </div>
             <div id="calcWpResult" style="display:none;font-size:0.74rem;padding:0.4rem 0.6rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:6px;color:#10b981;margin-bottom:0.55rem;"></div>
 
             <!-- Method 2: Rider Phenotype Quick-Select -->
-            <div style="font-size:0.74rem;font-weight:600;color:var(--accent-cyan);margin-bottom:0.3rem;">Option B: Quick-Select by Rider Phenotype</div>
-            <div style="display:flex;gap:0.4rem;flex-wrap:wrap;">
-              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="14.0" style="font-size:0.7rem;padding:0.25rem 0.55rem;" title="Time trialist, diesel engine, steady climber">⏱️ TT / Diesel (14 kJ)</button>
-              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="20.0" style="font-size:0.7rem;padding:0.25rem 0.55rem;" title="Balanced rouleur / all-rounder">🚴 All-Rounder (20 kJ)</button>
-              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="25.0" style="font-size:0.7rem;padding:0.25rem 0.55rem;" title="Punchy climbs, short hills, criterium racer">⚡ Puncheur (25 kJ)</button>
-              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="30.0" style="font-size:0.7rem;padding:0.25rem 0.55rem;" title="Fast-twitch sprint specialist / track racer">🚀 Sprinter (30 kJ)</button>
+            <div style="font-size:0.74rem;font-weight:600;color:var(--accent-cyan);margin-bottom:0.35rem;">Option B: Quick-Select by Rider Phenotype</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(115px, 1fr));gap:0.4rem;">
+              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="14.0" style="font-size:0.72rem;padding:0.35rem 0.45rem;text-align:center;justify-content:center;" title="Time trialist, diesel engine, steady climber">⏱️ TT (14 kJ)</button>
+              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="20.0" style="font-size:0.72rem;padding:0.35rem 0.45rem;text-align:center;justify-content:center;" title="Balanced rouleur / all-rounder">🚴 All-Rounder (20 kJ)</button>
+              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="25.0" style="font-size:0.72rem;padding:0.35rem 0.45rem;text-align:center;justify-content:center;" title="Punchy climbs, short hills, criterium racer">⚡ Puncheur (25 kJ)</button>
+              <button type="button" class="btn btn-secondary btn-wp-preset" data-wp="30.0" style="font-size:0.72rem;padding:0.35rem 0.45rem;text-align:center;justify-content:center;" title="Fast-twitch sprint specialist / track racer">🚀 Sprinter (30 kJ)</button>
             </div>
           </div>
         </div>
@@ -2050,6 +2050,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=73"></script>
+  <script src="/static/js/app.js?v=74"></script>
 </body>
 </html>
