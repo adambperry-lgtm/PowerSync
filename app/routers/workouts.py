@@ -35,6 +35,7 @@ class WorkoutGenerateRequest(BaseModel):
     humidity_pct: Optional[int] = 50
     gpx_content: Optional[str] = None
     gpx_filename: Optional[str] = None
+    target_date: Optional[str] = None
 
 class WorkoutSelectRequest(BaseModel):
     option_id: str
@@ -183,7 +184,13 @@ def generate_workout(req: WorkoutGenerateRequest):
 
     # Retrieve athlete day target duration preferences
     from app.services.preferences_service import get_day_target_config
-    day_cfg = get_day_target_config()
+    tgt_dt = None
+    if req.target_date:
+        try:
+            tgt_dt = datetime.date.fromisoformat(req.target_date[:10])
+        except Exception:
+            tgt_dt = None
+    day_cfg = get_day_target_config(tgt_dt)
     target_dur = day_cfg.get("preferred_duration_min", 45) if req.duration_min is None else req.duration_min
 
     # Generate bundle (Primary + 2 Alternatives) with dual-load modeling
@@ -207,7 +214,8 @@ def generate_workout(req: WorkoutGenerateRequest):
         acute_weighted_tss=acute_weighted_tss,
         yesterday_tss=yesterday_tss,
         load_profile=load_profile,
-        strain_profile=strain_profile
+        strain_profile=strain_profile,
+        target_date=tgt_dt
     )
 
     # Apply intensity adjustment if requested
@@ -232,18 +240,19 @@ def generate_workout(req: WorkoutGenerateRequest):
             w["zwo_content"] = generate_zwo_xml(w, ftp)
             w["intervals_icu_text"] = generate_intervals_icu_text(w)
 
-    # Check if a workout was scheduled with the coach for today
+    # Check if a workout was scheduled with the coach for target date
+    target_iso = req.target_date[:10] if req.target_date else today_iso
     from app.database import get_scheduled_workout_for_date
-    scheduled_today = get_scheduled_workout_for_date(today_iso)
-    if scheduled_today:
-        scheduled_today["badge"] = "💬 Coach Scheduled"
-        scheduled_today["badge_color"] = "cyan"
-        if not scheduled_today.get("zwo_content"):
-            scheduled_today["zwo_content"] = generate_zwo_xml(scheduled_today, ftp)
-        if not scheduled_today.get("intervals_icu_text"):
-            scheduled_today["intervals_icu_text"] = generate_intervals_icu_text(scheduled_today)
-        bundle["primary"] = scheduled_today
-        bundle["all_options"] = [scheduled_today] + [o for o in bundle["all_options"] if o["id"] != scheduled_today["id"]]
+    scheduled_target = get_scheduled_workout_for_date(target_iso)
+    if scheduled_target and not day_cfg.get("is_directive_rest"):
+        scheduled_target["badge"] = "💬 Coach Scheduled"
+        scheduled_target["badge_color"] = "cyan"
+        if not scheduled_target.get("zwo_content"):
+            scheduled_target["zwo_content"] = generate_zwo_xml(scheduled_target, ftp)
+        if not scheduled_target.get("intervals_icu_text"):
+            scheduled_target["intervals_icu_text"] = generate_intervals_icu_text(scheduled_target)
+        bundle["primary"] = scheduled_target
+        bundle["all_options"] = [scheduled_target] + [o for o in bundle["all_options"] if o["id"] != scheduled_target["id"]]
 
     CURRENT_OPTIONS_CACHE.clear()
     for opt in bundle["all_options"]:

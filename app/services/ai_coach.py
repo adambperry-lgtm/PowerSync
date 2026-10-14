@@ -65,7 +65,8 @@ def build_adaptive_workout_local(
     yesterday_tss: int = 0,
     load_profile: str = "Evenly Distributed",
     strain_profile: str = "Evenly Distributed",
-    target_plan: Optional[Dict[str, Any]] = None
+    target_plan: Optional[Dict[str, Any]] = None,
+    target_date: Optional[datetime.date] = None
 ) -> Dict[str, Any]:
     duration = target_duration_min
     active_plan = target_plan if target_plan is not None else get_active_target_plan()
@@ -81,13 +82,16 @@ def build_adaptive_workout_local(
 
     # 0A. Check if today is a scheduled weekly rest day per athlete preferences
     from app.services.preferences_service import get_day_target_config
-    day_cfg = get_day_target_config()
+    day_cfg = get_day_target_config(target_date)
     is_scheduled_rest_day = (day_cfg.get("is_default_rest", False) or duration == 0) and not (user_note and any(k in user_note.lower() for k in ["override", "workout", "intervals", "train", "ride", "spin"]))
     
     if is_scheduled_rest_day:
-        title = "Scheduled Weekly Rest & Supercompensation"
-        focus_area = "Weekly Rest Day (Off the Bike)"
+        is_dir_rest = day_cfg.get("is_directive_rest", False)
+        title = "Scheduled Directive Rest Day" if is_dir_rest else "Scheduled Weekly Rest & Supercompensation"
+        focus_area = "Schedule Directive Rest & Recovery" if is_dir_rest else "Weekly Rest Day (Off the Bike)"
+        badge_text = "🛌 Directive Rest Day" if is_dir_rest else "🛋️ Scheduled Rest Day"
         ai_rationale = (
+            day_cfg.get("notes") or
             f"Per your coaching schedule preferences, {day_cfg.get('day_name', 'today')} is designated as your dedicated rest day. "
             f"Your Whoop recovery is {recovery_score}%. Full rest off the bike enables deep myofibrillar repair, "
             f"glycogen supercompensation, and autonomic replenishment for your upcoming training blocks."
@@ -95,7 +99,7 @@ def build_adaptive_workout_local(
         workout_obj = {
             "id": "workout_primary",
             "option_type": "rest",
-            "badge": "🛋️ Scheduled Rest Day",
+            "badge": badge_text,
             "badge_color": "emerald",
             "title": title,
             "description": f"Scheduled weekly rest day for {day_cfg.get('day_name', 'today')}",
@@ -663,7 +667,8 @@ def build_workout_bundle(
     acute_weighted_tss: int = 0,
     yesterday_tss: int = 0,
     load_profile: str = "Evenly Distributed",
-    strain_profile: str = "Evenly Distributed"
+    strain_profile: str = "Evenly Distributed",
+    target_date: Optional[datetime.date] = None
 ) -> Dict[str, Any]:
     """Generates the primary prescribed workout and 2 tailored alternatives."""
     today_acts = today_activities or []
@@ -691,7 +696,8 @@ def build_workout_bundle(
         acute_weighted_tss=acute_weighted_tss,
         yesterday_tss=yesterday_tss,
         load_profile=load_profile,
-        strain_profile=strain_profile
+        strain_profile=strain_profile,
+        target_date=target_date
     )
 
     if primary.get("option_type") == "rest" or primary.get("duration_minutes") == 0:

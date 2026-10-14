@@ -115,6 +115,10 @@ def save_coaching_preferences(prefs: Dict[str, Any]) -> Dict[str, Any]:
     """Persists updated coaching preferences into SQLite."""
     current = get_coaching_preferences()
     updated = {**current, **prefs}
+    if "directives" in updated and isinstance(updated["directives"], list):
+        updated["directives"] = [
+            d.replace("//", "/").strip() for d in updated["directives"] if d and d.strip()
+        ]
     set_setting("coaching_preferences", updated)
     return updated
 
@@ -122,7 +126,7 @@ def add_custom_directive(directive: str) -> List[str]:
     """Appends a new natural-language coaching directive."""
     prefs = get_coaching_preferences()
     directives = list(prefs.get("directives", []))
-    cleaned = directive.strip()
+    cleaned = directive.replace("//", "/").strip()
     if cleaned and cleaned not in directives:
         directives.append(cleaned)
         prefs["directives"] = directives
@@ -139,6 +143,152 @@ def remove_custom_directive(index: int) -> List[str]:
         save_coaching_preferences(prefs)
     return directives
 
+def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) -> Dict[str, Any]:
+    """
+    Evaluates the athlete's forward directives regarding rest day quotas (e.g.
+    'one of Mon/Tue/Wed/Thu should be a rest day') against actual logged workout telemetry
+    for the current week (from Monday through Sunday prior).
+    Determines if remaining candidate days (e.g. Thursday) are mandated to be rest/easy days.
+    """
+    import re
+    today = ref_date or datetime.date.today()
+    monday = today - datetime.timedelta(days=today.weekday())
+    sunday_prior = monday - datetime.timedelta(days=1)
+
+    prefs = get_coaching_preferences()
+    directives = prefs.get("directives", [])
+
+    # 1. Parse rest candidate days from directives (e.g. 'one of Mon/Tue/Wed/Thu as an additional rest day')
+    pattern = re.compile(
+        r"one of\s+([A-Za-z0-9/,\s&•]+?)\s+(?:as|should be|is|are|to be)\s+(?:an?\s+)?(?:additional\s+)?(?:extra\s+)?rest\s+day",
+        re.IGNORECASE
+    )
+    candidate_days = []
+    matched_directive = ""
+    for d in directives:
+        m = pattern.search(d)
+        if m:
+            raw = m.group(1).lower().replace("//", "/").replace("&", ",").replace("or", ",")
+            for w in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]:
+                if w in raw or w[:3] in raw:
+                    if w not in candidate_days:
+                        candidate_days.append(w)
+            if candidate_days:
+                matched_directive = d.replace("//", "/")
+                break
+
+    if not candidate_days:
+        candidate_days = ["monday", "tuesday", "thursday"]
+        matched_directive = "Saturday is a dedicated rest day; plus one of Mon/Tue/Thu as an additional rest day."
+
+    # 2. Query activities from Sunday prior through today
+    from app.database import get_db_connection, get_setting
+    strava_tokens = get_setting("strava_tokens", None)
+    activities = []
+    if strava_tokens:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("""
+            SELECT id, name, start_date, moving_time_sec, suffer_score
+            FROM strava_activities
+            WHERE date(start_date) >= date(?)
+            ORDER BY start_date ASC
+        """, (sunday_prior.isoformat(),))
+        activities = [dict(r) for r in c.fetchall()]
+        conn.close()
+    else:
+        from app.services.mock_data import get_mock_strava_activities
+        activities = get_mock_strava_activities()
+
+    acts_by_date = {}
+    for a in activities:
+        d_str = a.get("start_date", "")[:10]
+        if d_str:
+            acts_by_date.setdefault(d_str, []).append(a)
+
+    weekday_keys = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+    day_status = {}
+    rest_days_taken_in_candidates = []
+    worked_out_in_candidates = []
+
+    for i, w_name in enumerate(weekday_keys):
+        d_obj = monday + datetime.timedelta(days=i)
+        d_str = d_obj.isoformat()
+
+        has_workout = False
+        day_acts = acts_by_date.get(d_str, [])
+        if day_acts:
+            has_workout = any(a.get("moving_time_sec", 0) >= 600 or a.get("suffer_score", 0) > 0 for a in day_acts)
+
+        is_past_or_today = (d_obj <= today)
+        day_status[w_name] = {
+            "date": d_str,
+            "has_workout": has_workout,
+            "is_past_or_today": is_past_or_today,
+            "is_candidate": (w_name in candidate_days),
+            "activities": [a.get("name", "Ride") for a in day_acts]
+        }
+
+        if w_name in candidate_days and is_past_or_today:
+            if has_workout:
+                worked_out_in_candidates.append(w_name)
+            else:
+                if d_obj < today:
+                    rest_days_taken_in_candidates.append(w_name)
+
+    # Calculate consecutive workout streak leading into tomorrow
+    consecutive_streak = 0
+    check_day = today
+    while True:
+        c_str = check_day.isoformat()
+        if c_str in acts_by_date and any(a.get("moving_time_sec", 0) >= 600 or a.get("suffer_score", 0) > 0 for a in acts_by_date[c_str]):
+            consecutive_streak += 1
+            check_day = check_day - datetime.timedelta(days=1)
+        else:
+            break
+
+    # Sunday prior check
+    sun_str = sunday_prior.isoformat()
+    had_sunday_prior = (sun_str in acts_by_date and any(a.get("moving_time_sec", 0) >= 600 or a.get("suffer_score", 0) > 0 for a in acts_by_date[sun_str]))
+
+    # Remaining candidate days in current week
+    remaining_candidates = [
+        w for w in candidate_days
+        if (monday + datetime.timedelta(days=weekday_keys.index(w))) > today
+    ]
+
+    must_rest_days = []
+    if len(rest_days_taken_in_candidates) == 0:
+        if len(remaining_candidates) == 1:
+            must_rest_days = list(remaining_candidates)
+
+    completed_streak_text = (
+        f"{', '.join([w.capitalize() for w in worked_out_in_candidates])}"
+        f"{' (and prior Sunday, ' + str(consecutive_streak) + '-day streak)' if had_sunday_prior else f' ({consecutive_streak}-day streak)'}"
+    )
+
+    rationale = (
+        f"Per your forward directive ('{matched_directive}') and having completed workouts on {completed_streak_text}, "
+        f"{', '.join([d.capitalize() for d in must_rest_days])} is designated as a rest day or easy day to maintain weekly balance."
+        if must_rest_days else ""
+    )
+
+    return {
+        "matched_directive": matched_directive,
+        "candidate_days": candidate_days,
+        "worked_out_in_candidates": worked_out_in_candidates,
+        "rest_days_taken_in_candidates": rest_days_taken_in_candidates,
+        "remaining_candidates": remaining_candidates,
+        "consecutive_streak": consecutive_streak,
+        "had_sunday_prior": had_sunday_prior,
+        "completed_streak_text": completed_streak_text,
+        "must_rest_days": must_rest_days,
+        "is_thursday_mandated_rest": ("thursday" in must_rest_days),
+        "rationale": rationale,
+        "day_status": day_status
+    }
+
 def get_day_target_config(target_date: Optional[datetime.date] = None) -> Dict[str, Any]:
     """
     Returns the target duration range, mode (indoor vs outdoor), and physiological focus
@@ -153,6 +303,28 @@ def get_day_target_config(target_date: Optional[datetime.date] = None) -> Dict[s
     wc = prefs.get("warmup_cooldown", DEFAULT_COACHING_PREFERENCES["warmup_cooldown"])
     intervals = prefs.get("interval_preferences", DEFAULT_COACHING_PREFERENCES["interval_preferences"])
 
+    # Check weekly rest directive quota from the perspective of today's completed workouts
+    status = get_weekday_rest_quota_and_status(ref_date=datetime.date.today())
+    is_directive_rest = (w_key in status.get("must_rest_days", []))
+
+    if is_directive_rest:
+        return {
+            "date": d.isoformat(),
+            "weekday_key": w_key,
+            "day_name": sched.get("name", w_key.capitalize()),
+            "preferred_duration_min": 0,
+            "min_duration_min": 0,
+            "max_duration_min": 30,
+            "mode": "rest_or_easy_spin",
+            "is_rest_candidate": True,
+            "is_default_rest": True,
+            "is_directive_rest": True,
+            "notes": status.get("rationale") or f"Directive Rest Day: {sched.get('name', w_key.capitalize())} is the required rest day per your weekly directive.",
+            "warmup_cooldown": wc,
+            "interval_preferences": intervals,
+            "directives": prefs.get("directives", [])
+        }
+
     return {
         "date": d.isoformat(),
         "weekday_key": w_key,
@@ -163,6 +335,7 @@ def get_day_target_config(target_date: Optional[datetime.date] = None) -> Dict[s
         "mode": sched.get("mode", "indoor_priority"),
         "is_rest_candidate": sched.get("is_rest_candidate", False),
         "is_default_rest": sched.get("is_default_rest", False),
+        "is_directive_rest": False,
         "notes": sched.get("notes", ""),
         "warmup_cooldown": wc,
         "interval_preferences": intervals,

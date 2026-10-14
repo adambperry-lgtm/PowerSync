@@ -199,7 +199,10 @@ def build_preference_aligned_outlook_days(
       - Threshold / Sweet Spot: Strongly favors Over/Under intervals
       - Dynamically adapts to subjective athlete notes (e.g. 'tomorrow will be zone 2 or a rest day')
     """
-    from app.services.preferences_service import get_day_target_config
+    from app.services.preferences_service import get_day_target_config, get_weekday_rest_quota_and_status
+
+    rest_quota_status = get_weekday_rest_quota_and_status(ref_date=today)
+    must_rest_days = rest_quota_status.get("must_rest_days", [])
 
     trained_today_heavy = is_today and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 60))
     trained_yesterday_heavy = is_yesterday and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 40) or (session_summary.get("verdict") == "Intensity Overreach"))
@@ -241,11 +244,39 @@ def build_preference_aligned_outlook_days(
         min_dur = cfg.get("min_duration_min", 35)
         max_dur = cfg.get("max_duration_min", 45)
         preferred_dur = cfg.get("preferred_duration_min", 45)
-        is_default_rest = cfg.get("is_default_rest", False) or (w_key == "saturday")
+        is_directive_rest = (w_key in must_rest_days) or cfg.get("is_directive_rest", False)
+        is_default_rest = (cfg.get("is_default_rest", False) and not is_directive_rest) or (w_key == "saturday")
         mode = cfg.get("mode", "indoor_priority")
 
+        # CASE 0: Directive-Mandated Rest / Easy Day (e.g. Thursday when Mon/Tue/Wed workouts were logged)
+        if is_directive_rest:
+            item = {
+                "day_offset": offset,
+                "date_relative": date_relative,
+                "date_formatted": date_formatted,
+                "projected_recovery": max(78, rec_est),
+                "projected_zone": "green",
+                "title": "🛌 Scheduled Directive Rest Day (or 🌱 Easy Day)",
+                "duration_min": 0,
+                "estimated_tss": 0,
+                "estimated_xss": 0,
+                "low_xss": 0,
+                "high_xss": 0,
+                "peak_xss": 0,
+                "focus_duration": "Rest & Recovery",
+                "focus": "Autonomic Supercompensation & Schedule Directive",
+                "is_directive_rest": True,
+                "description": (
+                    f"Expected Recovery: ~{max(78, rec_est)}% (Supercompensation). Schedule Directive Rest Day: "
+                    f"Per your forward directive ('{rest_quota_status.get('matched_directive', 'one of Mon/Tue/Wed/Thu should be a rest day')}') "
+                    f"and having completed workouts on {rest_quota_status.get('completed_streak_text', 'Monday, Tuesday, and Wednesday (and Sunday)')}, "
+                    f"{day_name} is recommended as a full rest day or gentle active recovery spin (<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) "
+                    f"to allow cellular supercompensation before Friday's ride."
+                )
+            }
+
         # CASE A: Dedicated Rest Day (e.g. Saturday)
-        if is_default_rest or mode == "rest_day":
+        elif is_default_rest or mode == "rest_day":
             item = {
                 "day_offset": offset,
                 "date_relative": date_relative,
@@ -810,8 +841,8 @@ def build_daily_review_and_outlook_local(
     from app.database import get_scheduled_workout_for_date
     for item in outlook_days:
         offset = item["day_offset"]
-        # If athlete explicitly requested rest or zone 2 for this day, honor athlete adjustment
-        if item.get("is_athlete_adjusted"):
+        # If athlete explicitly requested rest or zone 2 for this day, or if day is directive rest, honor it
+        if item.get("is_athlete_adjusted") or item.get("is_directive_rest"):
             continue
 
         target_iso = (today + datetime.timedelta(days=offset)).isoformat()

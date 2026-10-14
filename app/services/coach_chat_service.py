@@ -172,9 +172,10 @@ def compile_athlete_context() -> Dict[str, Any]:
     }
 
     # Include persistent coaching preferences & weekday schedule rules
-    from app.services.preferences_service import get_coaching_preferences, get_day_target_config
+    from app.services.preferences_service import get_coaching_preferences, get_day_target_config, get_weekday_rest_quota_and_status
     snapshot["athlete_coaching_preferences"] = get_coaching_preferences()
     snapshot["today_schedule_target"] = get_day_target_config()
+    snapshot["weekly_rest_directive_status"] = get_weekday_rest_quota_and_status()
 
     return snapshot
 
@@ -236,6 +237,10 @@ def build_system_prompt(snapshot: Dict[str, Any]) -> str:
         "  * Wednesday & Friday: 60+ minutes (an hour or more), outdoor priority if weather permits.\n"
         "  * Saturday: Dedicated weekly rest day.\n"
         "  * Sunday: 60–90+ minutes (outdoor endurance if weather permits, or long indoor session).\n"
+        "- REST DAY DIRECTIVE & CONSECUTIVE TRAINING REASONING:\n"
+        "  * Adam's directive specifies: one of Mon/Tue/Wed/Thu must be a rest day (or easy active recovery day).\n"
+        "  * Check snapshot['weekly_rest_directive_status']: If Adam has trained on candidate days (e.g. Sunday, Monday, Tuesday, and Wednesday) with 0 rest days taken so far, Thursday is the final candidate day and MUST BE RECOMMENDED AS A REST DAY OR EASY DAY (gentle active recovery spin).\n"
+        "  * DO NOT recommend hard intervals, Sweet Spot Over-Unders, or heavy sessions for Thursday in this state unless Adam explicitly asks to override his directive.\n"
         "- WARMUP & COOLDOWN RAMP INVARIANT (NO FLAT ZONE 2 BLOCKS):\n"
         "  * Adam explicitly dislikes flat steady Zone 2 warmups and cooldowns (e.g. 10m flat Z2, 6m flat Z2).\n"
         "  * ALWAYS prescribe progressive wattage ramps: progressive warmup ramp (45% -> 75% FTP over 6–8 min) and progressive cooldown ramp (65% -> 40% FTP over 4–5 min).\n"
@@ -662,6 +667,21 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
             "Your forward outlook and daily training prescriptions will revert to your standard macrocycle progression. "
             "Tap **Confirm Clear Plan** below to reset your dashboard."
         )
+
+    # 0d. Thursday / Tomorrow rest directive inquiry
+    rest_stat = snapshot.get("weekly_rest_directive_status", {})
+    if any(k in msg for k in ["tomorrow", "thursday", "next ride", "what should i do", "what's next", "whats next", "recommend"]):
+        if rest_stat.get("is_thursday_mandated_rest") and not any(k in msg for k in ["over-under", "over under", "vo2", "sweet spot", "threshold", "hard"]):
+            streak_text = rest_stat.get("completed_streak_text", "Sunday, Monday, Tuesday, and Wednesday")
+            return (
+                f"Taking a close look at your training week, Adam: you've already completed workouts on {streak_text}—"
+                f"that's {rest_stat.get('consecutive_streak', 4)} consecutive days on the bike!\n\n"
+                f"Your forward directive specifies that **one of Mon/Tue/Wed/Thu should be a rest day**. "
+                f"Because you haven't taken a rest day yet this week across Monday through Wednesday, **Thursday is designated as your rest day or an easy day**.\n\n"
+                f"- **Recommended Option 1 (Full Rest)**: Take Thursday completely off the bike to clear systemic fatigue and let muscle glycogen stores supercompensate.\n"
+                f"- **Recommended Option 2 (Easy Active Flush)**: A gentle 20–30 minute Zone 1 spin (<55% FTP, <{round(ftp * 0.55)}W) to promote lymphatic circulation.\n\n"
+                f"Taking Thursday easy ensures you are fresh, recovered, and ready for Friday's 60+ min ride!"
+            )
 
     # 0b. Daily Workout Scheduling Intent (e.g. tomorrow's workout, over-unders, intervals, sweet spot)
     is_workout_schedule = any(k in msg for k in [
