@@ -18,7 +18,7 @@
       } catch (_) {}
     })();
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=52">
+  <link rel="stylesheet" href="/static/css/style.css?v=53">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -1912,18 +1912,18 @@
           <span>🧠</span>
           <span class="coach-status-dot"></span>
         </div>
-        <div>
-          <div style="display:flex;align-items:center;gap:0.45rem;">
+        <div class="coach-chat-header-text">
+          <div class="coach-chat-title-row">
             <div class="coach-chat-title">PowerSync AI Coach</div>
-            <span class="badge-status badge-gemini connected" id="badgeCoachGeminiStatus" style="font-size:0.68rem;padding:0.14rem 0.5rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.3rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:600;">
-              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #10b981;background:#10b981;border-radius:50%;"></span>
-              <span id="txtCoachGeminiStatus">Gemini Connected</span>
+            <span class="badge-status badge-gemini connected" id="badgeCoachGeminiStatus">
+              <span class="dot green"></span>
+              <span id="txtCoachGeminiStatus">Connected</span>
             </span>
           </div>
           <div class="coach-chat-subtitle" id="coachChatSubtitle">Powered by Google Gemini • Live Telemetry</div>
         </div>
       </div>
-      <div style="display:flex;align-items:center;gap:0.35rem;">
+      <div class="coach-chat-header-actions">
         <button class="coach-chat-header-btn" id="btnClearChatHistory" title="Clear Chat History">🗑️</button>
         <button class="coach-chat-header-btn" id="btnCloseCoachChat" onclick="closeCoachChat()" title="Close Chat" aria-label="Close Chat">&times;</button>
       </div>
@@ -1977,6 +1977,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=70"></script>
+  <script src="/static/js/app.js?v=71"></script>
 </body>
 </html>

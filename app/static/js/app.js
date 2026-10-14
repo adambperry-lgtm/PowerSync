@@ -4367,7 +4367,8 @@ function updateGeminiConnectedIndicators(isConfigured, modelName) {
       badgeCoach.style.background = "rgba(16,185,129,0.15)";
       badgeCoach.style.borderColor = "rgba(16,185,129,0.35)";
       badgeCoach.style.color = "#10b981";
-      txtCoach.textContent = `Gemini Connected${modelSuffix}`;
+      txtCoach.textContent = "Connected";
+      badgeCoach.title = `Google Gemini Active${modelSuffix}`;
       badgeCoach.style.display = "inline-flex";
     } else {
       badgeCoach.className = "badge-status badge-gemini disconnected";
@@ -4375,6 +4376,7 @@ function updateGeminiConnectedIndicators(isConfigured, modelName) {
       badgeCoach.style.borderColor = "rgba(148,163,184,0.25)";
       badgeCoach.style.color = "#94a3b8";
       txtCoach.textContent = "Built-in Rules";
+      badgeCoach.title = "Using built-in sports-science rules";
       badgeCoach.style.display = "inline-flex";
     }
   }
@@ -4472,11 +4474,12 @@ async function checkCoachGeminiStatus() {
       const subtitle = document.getElementById("coachChatSubtitle");
       if (subtitle) {
         if (data.gemini_configured) {
-          const modelName = data.gemini_model ? ` (${data.gemini_model})` : "";
-          subtitle.textContent = `Powered by Google Gemini${modelName} • Live Telemetry`;
+          subtitle.textContent = "Google Gemini • Live Telemetry";
+          subtitle.title = `Model: ${data.gemini_model || "Gemini Flash"} • Real-time telemetry connected`;
           subtitle.style.color = "var(--accent-cyan)";
         } else {
-          subtitle.textContent = "Sports-Science Telemetry Engine • Add Gemini key in Settings";
+          subtitle.textContent = "Sports-Science Telemetry • Built-in Rules";
+          subtitle.title = "Add Google Gemini API key in Settings for AI coaching";
           subtitle.style.color = "var(--text-muted)";
         }
       }
@@ -4815,11 +4818,12 @@ async function sendCoachMessage(text) {
       const subtitle = document.getElementById("coachChatSubtitle");
       if (subtitle) {
         if (data.provider === "gemini") {
-          const modelName = data.model ? ` (${data.model})` : "";
-          subtitle.textContent = `Powered by Google Gemini${modelName} • Live Telemetry`;
+          subtitle.textContent = "Google Gemini • Live Telemetry";
+          subtitle.title = `Model: ${data.model || "Gemini"} • Live Telemetry active`;
           subtitle.style.color = "var(--accent-cyan)";
         } else {
-          subtitle.textContent = "Sports-Science Telemetry Engine • Add Gemini key in Settings";
+          subtitle.textContent = "Sports-Science Telemetry • Built-in Rules";
+          subtitle.title = "Built-in sports science rules active";
           subtitle.style.color = "var(--text-muted)";
         }
       }

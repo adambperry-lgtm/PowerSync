@@ -2726,28 +2726,32 @@ canvas#intervalCanvas {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.75rem;
   flex-shrink: 0;
   box-sizing: border-box;
+  width: 100%;
 }
 
 .coach-chat-header-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0.65rem;
   min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
 }
 
 .coach-chat-avatar {
   position: relative;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   background: linear-gradient(135deg, rgba(6, 182, 212, 0.25), rgba(16, 185, 129, 0.25));
   border: 1px solid rgba(6, 182, 212, 0.4);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   flex-shrink: 0;
 }
 
@@ -2763,16 +2767,63 @@ canvas#intervalCanvas {
   box-shadow: 0 0 6px #10b981;
 }
 
+.coach-chat-header-text {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.coach-chat-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
 .coach-chat-title {
-  font-size: 1.05rem;
+  font-size: 1.02rem;
   font-weight: 800;
   color: var(--text-primary);
   line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#badgeCoachGeminiStatus {
+  font-size: 0.65rem;
+  padding: 0.12rem 0.48rem;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  color: #10b981;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .coach-chat-subtitle {
-  font-size: 0.74rem;
+  font-size: 0.72rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.coach-chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .coach-chat-header-btn {
@@ -3250,23 +3301,47 @@ canvas#intervalCanvas {
 
   .coach-chat-header {
     padding-top: max(3.5rem, calc(1rem + env(safe-area-inset-top, 47px))) !important;
-    padding-left: max(1.15rem, env(safe-area-inset-left, 0px)) !important;
-    padding-right: max(1.15rem, env(safe-area-inset-right, 0px)) !important;
-    padding-bottom: 0.85rem !important;
+    padding-left: max(0.95rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.95rem, env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: 0.8rem !important;
     background: rgba(15, 23, 42, 0.98) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.12) !important;
     box-sizing: border-box !important;
     position: relative !important;
     z-index: 10 !important;
+    gap: 0.5rem !important;
+  }
+
+  .coach-chat-avatar {
+    width: 36px !important;
+    height: 36px !important;
+    font-size: 1.15rem !important;
+  }
+
+  .coach-chat-title {
+    font-size: 0.92rem !important;
+  }
+
+  #badgeCoachGeminiStatus {
+    font-size: 0.62rem !important;
+    padding: 0.1rem 0.42rem !important;
+  }
+
+  .coach-chat-subtitle {
+    font-size: 0.68rem !important;
+  }
+
+  .coach-chat-header-actions {
+    gap: 0.35rem !important;
   }
 
   .coach-chat-header-btn {
-    width: 44px !important;
-    height: 44px !important;
-    min-width: 44px !important;
-    min-height: 44px !important;
-    border-radius: 10px !important;
-    font-size: 1.25rem !important;
+    width: 40px !important;
+    height: 40px !important;
+    min-width: 40px !important;
+    min-height: 40px !important;
+    border-radius: 9px !important;
+    font-size: 1.15rem !important;
     touch-action: manipulation !important;
     -webkit-tap-highlight-color: transparent !important;
   }
@@ -3275,7 +3350,7 @@ canvas#intervalCanvas {
     background: rgba(239, 68, 68, 0.28) !important;
     border: 1.5px solid rgba(239, 68, 68, 0.6) !important;
     color: #fff !important;
-    font-size: 1.65rem !important;
+    font-size: 1.55rem !important;
     font-weight: 800 !important;
     line-height: 1 !important;
     box-shadow: 0 2px 10px rgba(239, 68, 68, 0.35) !important;
