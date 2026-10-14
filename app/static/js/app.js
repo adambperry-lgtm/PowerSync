@@ -5681,7 +5681,9 @@ async function bootApp() {
   await loadVersionInfo();
   await loadDashboard();
   await checkCoachGeminiStatus();
-  fetch("/api/settings").then(r => r.json()).then(s => {
+  try {
+    const sRes = await fetch("/api/settings");
+    const s = await sRes.json();
     if (s.theme_mode && ["dark", "light", "system"].includes(s.theme_mode)) {
       applyTheme(s.theme_mode, true);
     }
@@ -5694,6 +5696,10 @@ async function bootApp() {
     const selectElem = document.getElementById("selectMapBaseLayer");
     if (selectElem) selectElem.value = outdoorBaseLayerName;
     if (outdoorMap) applyBaseTileLayer(outdoorBaseLayerName);
+  } catch (err) {
+    console.warn("Failed to load settings in bootApp:", err);
+  }
+
   await loadUpcomingPlan();
   const initialDur = (state.dayConfig && state.dayConfig.preferred_duration_min !== undefined) ? state.dayConfig.preferred_duration_min : 45;
   await loadWorkout(initialDur, 0, "");
