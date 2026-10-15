@@ -9,14 +9,8 @@
   <meta name="theme-color" content="#0b0f19">
   <title>PowerSync | Whoop + Strava AI Coach & Zwift Bridge</title>
   <script>
-    (function() {
-      try {
-        var mode = localStorage.getItem("powersync_theme_mode") || localStorage.getItem("aerosync_theme_mode") || "system";
-        var isLight = mode === "light" || (mode === "system" && window.matchMedia("(prefers-color-scheme: light)").matches);
-        document.documentElement.setAttribute("data-theme", isLight ? "light" : "dark");
-        document.documentElement.setAttribute("data-theme-mode", mode);
-      } catch (_) {}
-    })();
+    document.documentElement.setAttribute("data-theme", "dark");
+    document.documentElement.setAttribute("data-theme-mode", "dark");
   </script>
   <link rel="stylesheet" href="/static/css/style.css?v=53">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -1405,31 +1399,6 @@
       </div>
       <div class="modal-body">
         
-        <!-- Appearance / Theme Mode (Light / Dark / System) -->
-        <div class="form-group" style="background:rgba(255,255,255,0.03);border:1px solid var(--border-color);padding:1rem;border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
-            <div>
-              <div style="display:flex;align-items:center;gap:0.5rem;">
-                <span style="font-size:1.25rem;">🌓</span>
-                <label style="color:var(--text-primary);font-weight:700;margin:0;">Theme &amp; Appearance</label>
-              </div>
-              <p class="form-hint" style="margin:0.25rem 0 0 0;">
-                Choose your preferred interface theme or automatically match your operating system.
-              </p>
-            </div>
-            <div class="btn-pill-group" id="themePillGroup" style="margin:0;">
-              <button type="button" class="btn-pill" data-theme-mode="dark" id="btnThemeDark">
-                🌙 Dark
-              </button>
-              <button type="button" class="btn-pill" data-theme-mode="light" id="btnThemeLight">
-                ☀️ Light
-              </button>
-              <button type="button" class="btn-pill" data-theme-mode="system" id="btnThemeSystem">
-                💻 System
-              </button>
-            </div>
-          </div>
-        </div>
 
         <!-- Apple TV / Intervals.icu Zwift Bridge -->
         <div class="form-group" style="background:rgba(252, 103, 25, 0.08);border:1px solid rgba(252, 103, 25, 0.3);padding:1rem;border-radius:8px;">
@@ -2028,6 +1997,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=82"></script>
+  <script src="/static/js/app.js?v=83"></script>
 </body>
 </html>

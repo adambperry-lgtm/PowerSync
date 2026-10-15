@@ -1830,7 +1830,7 @@ function drawWorkoutGraph(workout) {
   const hasSelection = state.selectedIntervalIndex !== null && state.selectedIntervalIndex >= 0 && state.selectedIntervalIndex < canvasSegments.length;
 
   // Draw FTP target reference line (100% FTP)
-  const isLightMode = document.documentElement.getAttribute("data-theme") === "light";
+  const isLightMode = false;
   const ftpLineY = h - (100 / maxPowerPct) * (h - 20) - 10;
   ctx.strokeStyle = isLightMode ? "rgba(0, 0, 0, 0.18)" : "rgba(255, 255, 255, 0.15)";
   ctx.setLineDash([4, 4]);
@@ -2385,86 +2385,20 @@ if (btnSyncWhoop) {
   });
 }
 // ========================================================
-// Theme & Appearance (Light / Dark / System Mode)
+// Permanent Dark Theme
 // ========================================================
-let currentThemeMode = "system";
+const currentThemeMode = "dark";
 
-function getEffectiveTheme(mode) {
-  if (mode === "system") {
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
-  }
-  return mode === "light" ? "light" : "dark";
-}
-
-function updateThemePills(mode) {
-  const btnDark = document.getElementById("btnThemeDark");
-  const btnLight = document.getElementById("btnThemeLight");
-  const btnSystem = document.getElementById("btnThemeSystem");
-
-  if (btnDark) btnDark.classList.toggle("active", mode === "dark");
-  if (btnLight) btnLight.classList.toggle("active", mode === "light");
-  if (btnSystem) btnSystem.classList.toggle("active", mode === "system");
-}
-
-function applyTheme(mode, persist = true) {
-  if (!["dark", "light", "system"].includes(mode)) {
-    mode = "system";
-  }
-  currentThemeMode = mode;
-  const effectiveTheme = getEffectiveTheme(mode);
-
-  document.documentElement.setAttribute("data-theme", effectiveTheme);
-  document.documentElement.setAttribute("data-theme-mode", mode);
-  updateThemePills(mode);
-
-  if (persist) {
-    try {
-      localStorage.setItem("powersync_theme_mode", mode);
-    } catch (_) {}
-  }
-
-  // Redraw canvas with theme-appropriate text & grid lines
-  if (state.currentWorkout && typeof drawWorkoutGraph === "function") {
-    requestAnimationFrame(() => {
-      drawWorkoutGraph(state.currentWorkout);
-    });
-  }
+function applyTheme(mode = "dark", persist = false) {
+  document.documentElement.setAttribute("data-theme", "dark");
+  document.documentElement.setAttribute("data-theme-mode", "dark");
+  try {
+    localStorage.setItem("powersync_theme_mode", "dark");
+  } catch (_) {}
 }
 
 function initThemeSystem() {
-  try {
-    const saved = localStorage.getItem("powersync_theme_mode") || localStorage.getItem("aerosync_theme_mode") || "system";
-    applyTheme(saved, false);
-  } catch (_) {
-    applyTheme("system", false);
-  }
-
-  // Listen for OS scheme changes when in System mode
-  if (window.matchMedia) {
-    window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", (e) => {
-      if (currentThemeMode === "system") {
-        const effective = e.matches ? "light" : "dark";
-        document.documentElement.setAttribute("data-theme", effective);
-        if (state.currentWorkout && typeof drawWorkoutGraph === "function") {
-          drawWorkoutGraph(state.currentWorkout);
-        }
-      }
-    });
-  }
-
-  // Button handlers for Theme Pills
-  const themePillGroup = document.getElementById("themePillGroup");
-  if (themePillGroup) {
-    themePillGroup.querySelectorAll(".btn-pill").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const mode = btn.dataset.themeMode;
-        if (mode) {
-          applyTheme(mode, true);
-          showToast(`Theme set to ${mode.charAt(0).toUpperCase() + mode.slice(1)} Mode`);
-        }
-      });
-    });
-  }
+  applyTheme("dark", false);
 }
 
 // Coaching Directives & Persistent Preferences UI
@@ -2527,12 +2461,6 @@ function openSettingsModal() {
   fetch("/api/settings")
     .then(r => r.json())
     .then(s => {
-      if (s.theme_mode && ["dark", "light", "system"].includes(s.theme_mode)) {
-        currentThemeMode = s.theme_mode;
-        updateThemePills(s.theme_mode);
-      } else {
-        updateThemePills(currentThemeMode);
-      }
       document.getElementById("settingIntervalsAthleteId").value = s.intervals_athlete_id || "";
       const intervalsKeyInput = document.getElementById("settingIntervalsApiKey");
       if (intervalsKeyInput) {
@@ -5757,10 +5685,7 @@ async function bootApp() {
   await checkCoachGeminiStatus();
   try {
     const sRes = await fetch("/api/settings");
-    const s = await sRes.json();
-    if (s.theme_mode && ["dark", "light", "system"].includes(s.theme_mode)) {
-      applyTheme(s.theme_mode, true);
-    }
+    applyTheme("dark", false);
     state.googleMapsApiKey = s.google_maps_api_key_set ? "saved" : "";
     if (s.preferred_map_layer && ["google_roads", "google_hybrid", "google_terrain"].includes(s.preferred_map_layer)) {
       outdoorBaseLayerName = s.preferred_map_layer;
