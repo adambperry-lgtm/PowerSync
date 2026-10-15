@@ -69,16 +69,31 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "1.5.1",
-        "release_name": "Clickable Workout Profile & Power Target Inspector",
-        "build_date": "2026-10-12",
+        "version": "2.0.0",
+        "release_name": "Cloud 24/7 Architecture, 1-Click Integrations & Permanent Dark Mode",
+        "build_date": "2026-10-15",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
             "zwift": "Intervals.icu Cloud Bridge + .zwo",
-            "ai_coach": "Gemini 2.5 Flash / Periodization Engine"
+            "ai_coach": "Google Gemini 2.5 Flash",
+            "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.0.0",
+                "date": "2026-10-15",
+                "title": "Cloud 24/7 Architecture, 1-Click Integrations & Permanent Dark Mode",
+                "items": [
+                    "24/7 Cloud Deployment on Railway: Docker containerized backend accessible 24/7 at powersync.up.railway.app with automated health checks",
+                    "Persistent Volume Storage: SQLite fitness database backed by persistent Railway volume (/app/data/fitness.db), preserving biometric trends, Strava activities, and tokens across redeployments",
+                    "Streamlined 1-Click Connect Cards: Replaced developer credential input fields with clean 1-click Connect & Disconnect cards for Strava and Whoop",
+                    "Secure Cloud Environment Secrets: Gemini API key, Strava/Whoop client credentials, and biometrics seamlessly loaded from Railway environment variables with alias normalization",
+                    "Permanent High-Contrast Dark Theme: Locked-in high-contrast carbon aesthetic optimized for indoor pain caves, OLED displays, and low-light training rooms",
+                    "Persistent Weekly Schedule Engine: Custom day-by-day duration rules, progressive wattage ramp warmup/cooldown invariants, and Saturday dedicated rest directives",
+                    "Dynamic OAuth Domain Resolution: Intelligent multi-environment redirect host resolution matching active browser domains"
+                ]
+            },
             {
                 "version": "v1.5.1",
                 "date": "2026-10-12",
