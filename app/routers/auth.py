@@ -238,6 +238,17 @@ def logout(request: Request):
     res.delete_cookie(key="powersync_session", path="/")
     return res
 
+@router.post("/claim-default-data")
+def claim_default_data(request: Request):
+    """
+    Imports all settings, directives, biometrics, activities, and target plans
+    from usr_default into the currently authenticated athlete account.
+    """
+    from app.database import claim_or_copy_default_data_to_user, get_current_user_id
+    uid = get_current_user_id()
+    res = claim_or_copy_default_data_to_user(uid)
+    return res
+
 # ==========================================
 # Diagnostic Telemetry
 # ==========================================

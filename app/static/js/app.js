@@ -5818,6 +5818,25 @@ if (btnSignOut) {
   });
 }
 
+const btnClaimDefaultData = document.getElementById("btnClaimDefaultData");
+if (btnClaimDefaultData) {
+  btnClaimDefaultData.addEventListener("click", async () => {
+    try {
+      showToast("📥 Importing default athlete settings & history...");
+      const res = await fetch("/api/auth/claim-default-data", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        showToast("✅ Settings and history imported! Reloading...");
+        setTimeout(() => { window.location.reload(); }, 600);
+      } else {
+        showToast("⚠️ Could not import default settings.");
+      }
+    } catch (err) {
+      showToast("Error importing data.");
+    }
+  });
+}
+
 document.querySelectorAll(".btn-dev-switch").forEach(btn => {
   btn.addEventListener("click", async () => {
     const email = btn.getAttribute("data-email");

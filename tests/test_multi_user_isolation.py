@@ -387,5 +387,28 @@ class TestMultiUserHTTPServer(unittest.TestCase):
         me_after_logout = client_a.get("/api/auth/me").json()
         self.assertTrue(me_after_logout.get("is_guest", False) or me_after_logout.get("id") == "usr_default")
 
+    def test_02_claim_default_history_endpoint(self):
+        """Verify claim-default-data imports settings and history from usr_default into active account."""
+        from app.main import app
+        from app.database import set_setting
+
+        # Seed usr_default with a distinct custom setting
+        set_setting("athlete_ftp", 288, user_id="usr_default")
+        set_setting("intervals_athlete_id", "i_legacy_777", user_id="usr_default")
+
+        # New user logs in
+        client = ASGIClient(app)
+        client.post("/api/auth/dev-login", json={"email": "claim.test@powersync.test", "name": "Claim Athlete"})
+
+        # Claim default history
+        claim_res = client.post("/api/auth/claim-default-data")
+        self.assertEqual(claim_res.status_code, 200)
+        self.assertTrue(claim_res.json()["success"])
+
+        # Check settings for this user -> should now have inherited 288W and i_legacy_777
+        settings = client.get("/api/settings").json()
+        self.assertEqual(settings["athlete_ftp"], 288)
+        self.assertEqual(settings["intervals_athlete_id"], "i_legacy_777")
+
 if __name__ == "__main__":
     unittest.main()

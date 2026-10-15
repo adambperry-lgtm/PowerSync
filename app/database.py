@@ -875,5 +875,54 @@ def get_upcoming_scheduled_workouts(from_date: str, user_id: Optional[str] = Non
         res.append(w)
     return res
 
+def claim_or_copy_default_data_to_user(target_user_id: str) -> Dict[str, Any]:
+    """
+    Copies all settings, directives, biometrics, activities, workouts, and plans
+    from the default athlete profile (usr_default) to target_user_id.
+    """
+    if not target_user_id or target_user_id == DEFAULT_USER_ID:
+        return {"success": True, "message": "Already using default athlete profile."}
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # 1. Copy settings where key does not exist yet for target_user_id
+    cursor.execute("""
+        INSERT OR IGNORE INTO settings (user_id, key, value)
+        SELECT ?, key, value FROM settings WHERE user_id = 'usr_default'
+    """, (target_user_id,))
+
+    # 2. Copy whoop metrics
+    cursor.execute("""
+        INSERT OR IGNORE INTO whoop_metrics (user_id, date, recovery_score, hrv_rmssd, resting_heart_rate, sleep_performance, sleep_duration_hours, day_strain, raw_json, updated_at)
+        SELECT ?, date, recovery_score, hrv_rmssd, resting_heart_rate, sleep_performance, sleep_duration_hours, day_strain, raw_json, updated_at
+        FROM whoop_metrics WHERE user_id = 'usr_default'
+    """, (target_user_id,))
+
+    # 3. Copy strava activities
+    cursor.execute("""
+        INSERT OR IGNORE INTO strava_activities (user_id, id, name, sport_type, start_date, elapsed_time_sec, moving_time_sec, distance_meters, total_elevation_gain, average_watts, weighted_average_watts, average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json, created_at)
+        SELECT ?, id, name, sport_type, start_date, elapsed_time_sec, moving_time_sec, distance_meters, total_elevation_gain, average_watts, weighted_average_watts, average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json, created_at
+        FROM strava_activities WHERE user_id = 'usr_default'
+    """, (target_user_id,))
+
+    # 4. Copy workouts
+    cursor.execute("""
+        INSERT OR IGNORE INTO workouts (user_id, id, date, title, description, focus_area, duration_minutes, estimated_tss, intervals_json, zwo_content, intervals_icu_text, ai_rationale, status, created_at)
+        SELECT ?, id, date, title, description, focus_area, duration_minutes, estimated_tss, intervals_json, zwo_content, intervals_icu_text, ai_rationale, status, created_at
+        FROM workouts WHERE user_id = 'usr_default'
+    """, (target_user_id,))
+
+    # 5. Copy target plans
+    cursor.execute("""
+        INSERT OR IGNORE INTO target_plans (user_id, id, title, target_date, description, distance_miles, elevation_gain_ft, estimated_duration_min, estimated_tss, intensity_type, route_source, strava_id, summary_polyline, svg_path, is_active, created_at)
+        SELECT ?, id, title, target_date, description, distance_miles, elevation_gain_ft, estimated_duration_min, estimated_tss, intensity_type, route_source, strava_id, summary_polyline, svg_path, is_active, created_at
+        FROM target_plans WHERE user_id = 'usr_default'
+    """, (target_user_id,))
+
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": "Successfully imported all settings, coaching directives, and history from default athlete."}
+
 # Initialize on module load
 init_db()
