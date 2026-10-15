@@ -1566,27 +1566,20 @@
         </div>
 
         <!-- Google Gemini AI Key -->
-        <div class="form-group" style="background:rgba(6, 182, 212, 0.05);border:1px solid rgba(6, 182, 212, 0.22);padding:1rem;border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;flex-wrap:wrap;gap:0.5rem;">
+        <div class="form-group" style="background:rgba(6, 182, 212, 0.08);border:1px solid rgba(6, 182, 212, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
             <div style="display:flex;align-items:center;gap:0.45rem;">
               <span style="font-size:1.15rem;">✨</span>
-              <label style="color:var(--accent-cyan);font-weight:700;margin:0;">Google Gemini AI Integration</label>
+              <label style="color:var(--accent-cyan);font-weight:700;margin:0;">AI Coach Engine</label>
             </div>
             <span id="geminiConnStatus" class="badge-status badge-gemini connected" style="font-size:0.75rem;padding:0.18rem 0.55rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:600;">
               <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #10b981;background:#10b981;border-radius:50%;"></span>
-              <span id="txtGeminiConnStatus">Connected</span>
+              <span id="txtGeminiConnStatus">Active (Gemini 2.5 Flash)</span>
             </span>
           </div>
-          <p class="form-hint" style="color:var(--text-secondary);margin:0 0 0.5rem 0;">
-            Powers deep conversational LLM reasoning, post-ride debriefs, and automatic schedule adaptation.
+          <p class="form-hint" style="color:var(--text-secondary);margin:0.4rem 0 0 0;font-size:0.8rem;">
+            Powers conversational sports-science reasoning, daily ride debriefs, and automatic schedule adaptation.
           </p>
-          <div style="display:flex;gap:0.5rem;">
-            <input type="password" id="settingGeminiKey" placeholder="Paste Gemini API Key..." style="flex:1;" />
-            <button type="button" class="btn btn-secondary" id="btnTestGeminiKey" style="font-size:0.78rem;padding:0.4rem 0.8rem;border-color:var(--accent-cyan);color:var(--accent-cyan);white-space:nowrap;">
-              ⚡ Test Connection
-            </button>
-          </div>
-          <span class="form-hint" id="geminiTestFeedback" style="display:none;margin-top:0.4rem;font-weight:600;"></span>
         </div>
 
         <!-- Persistent Coaching Preferences & Weekly Schedule Engine -->
@@ -1674,73 +1667,57 @@
           <p class="form-hint" style="margin-top:0.25rem;color:#cbd5e1;">
             Course map views use official <b>Google Maps</b> (Roadmap, Satellite Hybrid, and Terrain). Select your default Google Maps layer below:
           </p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
-            <div>
-              <label style="font-size:0.75rem;">Default Google Maps Layer</label>
-              <select id="settingPreferredMapLayer" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border-color);border-radius:6px;padding:0.45rem;color:#fff;font-size:0.85rem;">
-                <option value="google_roads" selected>🗺️ Google Roadmap (Default)</option>
-                <option value="google_hybrid">🛰️ Google Satellite Hybrid</option>
-                <option value="google_terrain">⛰️ Google Terrain</option>
-              </select>
-            </div>
-            <div>
-              <label style="font-size:0.75rem;">Google Maps API Key (Optional)</label>
-              <input type="password" id="settingGoogleMapsApiKey" placeholder="AIzaSy..." />
-            </div>
+          <div style="margin-top:0.5rem;">
+            <label style="font-size:0.75rem;">Default Google Maps Layer</label>
+            <select id="settingPreferredMapLayer" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border-color);border-radius:6px;padding:0.45rem;color:#fff;font-size:0.85rem;">
+              <option value="google_roads" selected>🗺️ Google Roadmap (Default)</option>
+              <option value="google_hybrid">🛰️ Google Satellite Hybrid</option>
+              <option value="google_terrain">⛰️ Google Terrain</option>
+            </select>
           </div>
         </div>
 
-        <!-- Strava API Credentials -->
+        <!-- Strava Integration Card -->
         <div class="form-group" style="background:rgba(252, 82, 0, 0.08);border:1px solid rgba(252, 82, 0, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <label style="color:#fc5200;font-weight:700;margin:0;">Strava Integration</label>
-            <a href="https://www.strava.com/settings/api" target="_blank" style="color:#fc5200;font-size:0.75rem;text-decoration:underline;">Create Strava App ↗</a>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.25rem;">🚴</span>
+              <label style="color:#fc5200;font-weight:700;margin:0;">Strava Integration</label>
+            </div>
+            <span id="stravaConnStatus" style="font-size:0.8rem;color:#94a3b8;font-weight:600;">Not connected</span>
           </div>
-          <p class="form-hint" style="margin-top:0.25rem;">
-            Go to <b>strava.com/settings/api</b>. Set <i>"Authorization Callback Domain"</i> to <b id="stravaCallbackDomainHint">localhost</b>. Then paste your Client ID & Secret below:
+          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+            Syncs historical training load, ride GPS tracks, weighted power telemetry, and outdoor route matching.
           </p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
-            <div>
-              <label style="font-size:0.75rem;">Client ID</label>
-              <input type="text" id="settingStravaClientId" placeholder="e.g. 123456" />
-            </div>
-            <div>
-              <label style="font-size:0.75rem;">Client Secret</label>
-              <input type="password" id="settingStravaClientSecret" placeholder="Paste Client Secret" />
-            </div>
-          </div>
           <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;">
-            <a href="/api/auth/strava/login" id="btnConnectStravaOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem;border-color:#fc5200;color:#fc5200;text-decoration:none;">
-              🔗 Authorize with Strava
+            <a href="/api/auth/strava/login" id="btnConnectStravaOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#fc5200;color:#fc5200;text-decoration:none;font-weight:600;">
+              🔗 Connect Strava
             </a>
-            <span id="stravaConnStatus" style="font-size:0.8rem;color:#94a3b8;">Not connected</span>
+            <button type="button" id="btnDisconnectStrava" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#f87171;border-color:rgba(239,68,68,0.3);display:none;">
+              Disconnect
+            </button>
           </div>
         </div>
 
-        <!-- Whoop API Credentials -->
+        <!-- Whoop Biometrics Card -->
         <div class="form-group" style="background:rgba(16, 185, 129, 0.08);border:1px solid rgba(16, 185, 129, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <label style="color:#10b981;font-weight:700;margin:0;">Whoop Developer Integration</label>
-            <a href="https://developer.whoop.com" target="_blank" style="color:#10b981;font-size:0.75rem;text-decoration:underline;">Whoop Developer Portal ↗</a>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.25rem;">🔋</span>
+              <label style="color:#10b981;font-weight:700;margin:0;">Whoop Biometrics</label>
+            </div>
+            <span id="whoopConnStatus" style="font-size:0.8rem;color:#94a3b8;font-weight:600;">Not connected</span>
           </div>
-          <p class="form-hint" style="margin-top:0.25rem;">
-            Go to <b>developer.whoop.com</b>. Set <i>Redirect URI</i> to <b id="whoopRedirectUriHint">http://localhost:8000/api/auth/whoop/callback</b>. Paste your Client ID & Secret below:
+          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+            Syncs real-time Recovery Score, HRV baseline shift, Sleep Performance, and Day Strain rings.
           </p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
-            <div>
-              <label style="font-size:0.75rem;">Client ID</label>
-              <input type="text" id="settingWhoopClientId" placeholder="e.g. your-client-id" />
-            </div>
-            <div>
-              <label style="font-size:0.75rem;">Client Secret</label>
-              <input type="password" id="settingWhoopClientSecret" placeholder="Paste Client Secret" />
-            </div>
-          </div>
           <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;">
-            <a href="/api/auth/whoop/login" id="btnConnectWhoopOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.4rem 0.8rem;border-color:#10b981;color:#10b981;text-decoration:none;">
-              🔗 Authorize with Whoop
+            <a href="/api/auth/whoop/login" id="btnConnectWhoopOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#10b981;color:#10b981;text-decoration:none;font-weight:600;">
+              🔗 Connect Whoop
             </a>
-            <span id="whoopConnStatus" style="font-size:0.8rem;color:#94a3b8;">Not connected</span>
+            <button type="button" id="btnDisconnectWhoop" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#f87171;border-color:rgba(239,68,68,0.3);display:none;">
+              Disconnect
+            </button>
           </div>
         </div>
 
@@ -2051,6 +2028,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=81"></script>
+  <script src="/static/js/app.js?v=82"></script>
 </body>
 </html>

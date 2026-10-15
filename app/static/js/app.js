@@ -2547,38 +2547,6 @@ function openSettingsModal() {
       const peakPowerInput = document.getElementById("settingAthletePeakPower");
       if (peakPowerInput) peakPowerInput.value = s.athlete_peak_power_watts !== undefined ? s.athlete_peak_power_watts : 1050;
       
-      const geminiKeyInput = document.getElementById("settingGeminiKey");
-      if (geminiKeyInput) {
-        geminiKeyInput.value = "";
-        geminiKeyInput.placeholder = s.gemini_api_key_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Enter Gemini API Key";
-      }
-
-      document.getElementById("settingStravaClientId").value = s.strava_client_id || "";
-      const stravaSecretInput = document.getElementById("settingStravaClientSecret");
-      if (stravaSecretInput) {
-        stravaSecretInput.value = "";
-        stravaSecretInput.placeholder = s.strava_client_secret_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Client Secret";
-      }
-
-      document.getElementById("settingWhoopClientId").value = s.whoop_client_id || "";
-      const whoopSecretInput = document.getElementById("settingWhoopClientSecret");
-      if (whoopSecretInput) {
-        whoopSecretInput.value = "";
-        whoopSecretInput.placeholder = s.whoop_client_secret_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Client Secret";
-      }
-
-      // Dynamic OAuth hints based on current deployment host
-      const domainHint = document.getElementById("stravaCallbackDomainHint");
-      if (domainHint) domainHint.textContent = window.location.hostname || "localhost";
-      const whoopHint = document.getElementById("whoopRedirectUriHint");
-      if (whoopHint) whoopHint.textContent = `${window.location.origin}/api/auth/whoop/callback`;
-
-      state.googleMapsApiKey = s.google_maps_api_key_set ? "saved" : "";
-      const googleMapKeyInput = document.getElementById("settingGoogleMapsApiKey");
-      if (googleMapKeyInput) {
-        googleMapKeyInput.value = "";
-        googleMapKeyInput.placeholder = s.google_maps_api_key_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Enter Google Maps API Key";
-      }
       const prefMapLayerEl = document.getElementById("settingPreferredMapLayer");
       if (prefMapLayerEl) {
         prefMapLayerEl.value = (s.preferred_map_layer && ["google_roads", "google_hybrid", "google_terrain"].includes(s.preferred_map_layer)) ? s.preferred_map_layer : (outdoorBaseLayerName || "google_roads");
@@ -2597,22 +2565,39 @@ function openSettingsModal() {
       const progWeeklyXssEl = document.getElementById("settingProgramWeeklyXss");
       if (progWeeklyXssEl) progWeeklyXssEl.value = s.program_weekly_xss_target || s.program_weekly_tss_target || 360;
 
+      // Strava Connection & Buttons
       const stravaStat = document.getElementById("stravaConnStatus");
+      const btnConnectStrava = document.getElementById("btnConnectStravaOAuth");
+      const btnDisconnectStrava = document.getElementById("btnDisconnectStrava");
       if (stravaStat) {
         stravaStat.textContent = s.strava_connected ? "Connected ✅" : "Not connected";
         stravaStat.style.color = s.strava_connected ? "#10b981" : "#94a3b8";
       }
+      if (btnConnectStrava) {
+        btnConnectStrava.textContent = s.strava_connected ? "🔄 Reconnect Strava" : "🔗 Connect Strava";
+      }
+      if (btnDisconnectStrava) {
+        btnDisconnectStrava.style.display = s.strava_connected ? "inline-block" : "none";
+      }
+
+      // Whoop Connection & Buttons
       const whoopStat = document.getElementById("whoopConnStatus");
+      const btnConnectWhoop = document.getElementById("btnConnectWhoopOAuth");
+      const btnDisconnectWhoop = document.getElementById("btnDisconnectWhoop");
       if (whoopStat) {
         whoopStat.textContent = s.whoop_connected ? "Connected ✅" : "Not connected";
         whoopStat.style.color = s.whoop_connected ? "#10b981" : "#94a3b8";
       }
+      if (btnConnectWhoop) {
+        btnConnectWhoop.textContent = s.whoop_connected ? "🔄 Reconnect Whoop" : "🔗 Connect Whoop";
+      }
+      if (btnDisconnectWhoop) {
+        btnDisconnectWhoop.style.display = s.whoop_connected ? "inline-block" : "none";
+      }
 
-      // Gemini Connection Status in Settings
+      // Gemini AI Engine Status
       const isGeminiSet = Boolean(s.gemini_api_key_set);
       updateGeminiConnectedIndicators(isGeminiSet);
-      const geminiFeedback = document.getElementById("geminiTestFeedback");
-      if (geminiFeedback) geminiFeedback.style.display = "none";
 
       settingsModal.classList.add("open");
     });
@@ -2698,75 +2683,67 @@ if (footerPillGeminiEl) {
   footerPillGeminiEl.addEventListener("click", openSettingsModal);
 }
 
-// Direct OAuth connect buttons (auto-save credentials first, then redirect)
+// Direct OAuth connect buttons & Disconnect listeners
 const stravaOAuthBtn = document.getElementById("btnConnectStravaOAuth");
 if (stravaOAuthBtn) {
-  stravaOAuthBtn.addEventListener("click", async (e) => {
+  stravaOAuthBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    const clientId = document.getElementById("settingStravaClientId").value.trim();
-    const clientSecret = document.getElementById("settingStravaClientSecret").value.trim();
-    
-    showToast("Connecting to Strava...");
-    
-    const payload = {};
-    if (clientId) payload.strava_client_id = clientId;
-    if (clientSecret && !clientSecret.includes("•")) payload.strava_client_secret = clientSecret;
-    
-    if (Object.keys(payload).length > 0) {
-      await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-    }
+    showToast("Redirecting to Strava...");
     window.location.href = "/api/auth/strava/login";
+  });
+}
+
+const btnDisconnectStrava = document.getElementById("btnDisconnectStrava");
+if (btnDisconnectStrava) {
+  btnDisconnectStrava.addEventListener("click", async () => {
+    if (!confirm("Are you sure you want to disconnect Strava?")) return;
+    try {
+      await fetch("/api/auth/disconnect/strava", { method: "POST" });
+      showToast("Strava disconnected");
+      openSettingsModal();
+      fetchDashboardData();
+    } catch (err) {
+      showToast("Error disconnecting Strava");
+    }
   });
 }
 
 const whoopOAuthBtn = document.getElementById("btnConnectWhoopOAuth");
 if (whoopOAuthBtn) {
-  whoopOAuthBtn.addEventListener("click", async (e) => {
+  whoopOAuthBtn.addEventListener("click", (e) => {
     e.preventDefault();
-    const clientId = document.getElementById("settingWhoopClientId").value.trim();
-    const clientSecret = document.getElementById("settingWhoopClientSecret").value.trim();
-    
-    showToast("Connecting to Whoop...");
-    
-    const payload = {};
-    if (clientId) payload.whoop_client_id = clientId;
-    if (clientSecret && !clientSecret.includes("•")) payload.whoop_client_secret = clientSecret;
-    
-    if (Object.keys(payload).length > 0) {
-      await fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-    }
+    showToast("Redirecting to Whoop...");
     window.location.href = "/api/auth/whoop/login";
+  });
+}
+
+const btnDisconnectWhoop = document.getElementById("btnDisconnectWhoop");
+if (btnDisconnectWhoop) {
+  btnDisconnectWhoop.addEventListener("click", async () => {
+    if (!confirm("Are you sure you want to disconnect Whoop?")) return;
+    try {
+      await fetch("/api/auth/disconnect/whoop", { method: "POST" });
+      showToast("Whoop disconnected");
+      openSettingsModal();
+      fetchDashboardData();
+    } catch (err) {
+      showToast("Error disconnecting Whoop");
+    }
   });
 }
 
 btnSaveSettings.addEventListener("click", async () => {
   const intervalsApiKeyVal = document.getElementById("settingIntervalsApiKey") ? document.getElementById("settingIntervalsApiKey").value.trim() : "";
-  const geminiKeyVal = document.getElementById("settingGeminiKey") ? document.getElementById("settingGeminiKey").value.trim() : "";
-  const googleMapKeyVal = document.getElementById("settingGoogleMapsApiKey") ? document.getElementById("settingGoogleMapsApiKey").value.trim() : "";
-  const preferredMapLayerVal = document.getElementById("settingPreferredMapLayer") ? document.getElementById("settingPreferredMapLayer").value : "satellite";
-  const stravaSecretEl = document.getElementById("settingStravaClientSecret");
-  const stravaSecretVal = stravaSecretEl ? stravaSecretEl.value.trim() : "";
-  const whoopSecretEl = document.getElementById("settingWhoopClientSecret");
-  const whoopSecretVal = whoopSecretEl ? whoopSecretEl.value.trim() : "";
+  const preferredMapLayerVal = document.getElementById("settingPreferredMapLayer") ? document.getElementById("settingPreferredMapLayer").value : "google_roads";
 
   const payload = {
     theme_mode: currentThemeMode,
-    intervals_athlete_id: document.getElementById("settingIntervalsAthleteId").value.trim(),
-    athlete_ftp: parseInt(document.getElementById("settingFtp").value, 10) || 250,
-    athlete_max_hr: parseInt(document.getElementById("settingMaxHr").value, 10) || 185,
+    intervals_athlete_id: document.getElementById("settingIntervalsAthleteId") ? document.getElementById("settingIntervalsAthleteId").value.trim() : "",
+    athlete_ftp: parseInt(document.getElementById("settingFtp")?.value, 10) || 250,
+    athlete_max_hr: parseInt(document.getElementById("settingMaxHr")?.value, 10) || 185,
     athlete_w_prime_kj: parseFloat(document.getElementById("settingAthleteWPrime")?.value) || 20.0,
     athlete_peak_power_watts: parseInt(document.getElementById("settingAthletePeakPower")?.value, 10) || 1050,
-    strava_client_id: document.getElementById("settingStravaClientId").value.trim(),
-    whoop_client_id: document.getElementById("settingWhoopClientId").value.trim(),
-    demo_mode: document.getElementById("settingDemoMode").checked,
+    demo_mode: document.getElementById("settingDemoMode") ? document.getElementById("settingDemoMode").checked : false,
     program_goal: document.getElementById("settingProgramGoal")?.value || "FTP_BUILD",
     program_target_ftp: parseInt(document.getElementById("settingProgramTargetFtp")?.value, 10) || 265,
     program_target_date: document.getElementById("settingProgramTargetDate")?.value || "",
@@ -2775,22 +2752,8 @@ btnSaveSettings.addEventListener("click", async () => {
     preferred_map_layer: preferredMapLayerVal
   };
 
-  // Only include secrets if user actually typed a new, unmasked value
   if (intervalsApiKeyVal && !intervalsApiKeyVal.includes("•")) {
     payload.intervals_icu_api_key = intervalsApiKeyVal;
-  }
-  if (geminiKeyVal && !geminiKeyVal.includes("•")) {
-    payload.gemini_api_key = geminiKeyVal;
-  }
-  if (googleMapKeyVal && !googleMapKeyVal.includes("•")) {
-    payload.google_maps_api_key = googleMapKeyVal;
-    state.googleMapsApiKey = googleMapKeyVal;
-  }
-  if (stravaSecretVal && !stravaSecretVal.includes("•")) {
-    payload.strava_client_secret = stravaSecretVal;
-  }
-  if (whoopSecretVal && !whoopSecretVal.includes("•")) {
-    payload.whoop_client_secret = whoopSecretVal;
   }
 
   try {
