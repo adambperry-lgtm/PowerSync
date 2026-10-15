@@ -1767,7 +1767,7 @@
             <div style="overflow:hidden;">
               <div id="authProfileName" style="font-weight:700;font-size:1.05rem;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Athlete</div>
               <div id="authProfileEmail" style="font-size:0.8rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">athlete@example.com</div>
-              <div style="font-size:0.72rem;color:#06b6d4;margin-top:0.2rem;">🔒 Private Isolated Athlete Database</div>
+              <div id="authProfileBadge" style="font-size:0.72rem;color:#06b6d4;margin-top:0.2rem;">🔒 Private Isolated Athlete Database</div>
             </div>
           </div>
           <div style="display:flex;gap:0.75rem;margin-top:0.25rem;">
@@ -1780,8 +1780,32 @@
           </div>
         </div>
 
+        <!-- Primary Athlete Direct Login (Owner Access) -->
+        <div id="authPrimaryDirectCard" style="display:flex;flex-direction:column;gap:0.5rem;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:10px;padding:1rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:700;font-size:0.88rem;color:#06b6d4;display:flex;align-items:center;gap:0.4rem;">
+              <span>⭐</span> Primary Athlete (Account Owner)
+            </div>
+            <span style="font-size:0.7rem;color:#10b981;font-weight:600;">Saved History</span>
+          </div>
+          <p style="font-size:0.74rem;color:#cbd5e1;margin:0;line-height:1.4;">
+            Direct access to your private intervals.icu credentials (i748824), FTP history, custom coaching directives, and saved workouts.
+          </p>
+          <button type="button" id="btnPrimaryAthleteLogin" class="btn btn-primary" style="background:linear-gradient(135deg, #0891b2, #06b6d4);color:#fff;font-weight:700;font-size:0.85rem;padding:0.6rem;border:none;border-radius:6px;cursor:pointer;margin-top:0.25rem;">
+            ⚡ Sign In as Primary Athlete
+          </button>
+        </div>
+
         <!-- Google Sign-In Card -->
         <div id="authGoogleCard" style="display:flex;flex-direction:column;gap:0.75rem;">
+          <div id="googleConfigNotice" style="display:none;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;padding:0.65rem 0.85rem;font-size:0.75rem;color:#fde047;">
+            <div style="display:flex;align-items:center;gap:0.4rem;font-weight:700;margin-bottom:0.2rem;">
+              <span>⚠️</span> Google Sign-In Setup Needed
+            </div>
+            <div>
+              Set <code>GOOGLE_CLIENT_ID</code> in Railway variables or in <a href="#" id="linkOpenGoogleSettings" style="color:#38bdf8;text-decoration:underline;">Settings ⚙️</a> to enable 1-click Google OAuth.
+            </div>
+          </div>
           <a href="/api/auth/google/login" id="btnGoogleSignIn" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;background:#ffffff;color:#1f2937;font-weight:600;font-size:0.95rem;padding:0.75rem 1rem;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);transition:all 0.2s ease;">
             <svg width="18" height="18" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
@@ -1792,7 +1816,7 @@
             <span>Continue with Google</span>
           </a>
           <p style="font-size:0.75rem;color:var(--text-secondary);text-align:center;margin:0;">
-            Sign in with Google to keep your Whoop, Strava, and workout targets private and synchronized across all your devices.
+            Signing in with Google preserves and claims your account history so it stays synchronized across devices.
           </p>
         </div>
 
@@ -1808,9 +1832,6 @@
             </button>
             <button type="button" class="btn btn-secondary btn-dev-switch" data-email="rider.jordan@powersync.app" data-name="Rider Jordan" style="font-size:0.75rem;padding:0.35rem 0.65rem;">
               ⚡ Rider Jordan
-            </button>
-            <button type="button" class="btn btn-secondary btn-dev-switch" data-email="default@powersync.local" data-name="Default Athlete" style="font-size:0.75rem;padding:0.35rem 0.65rem;">
-              🏠 Default Athlete
             </button>
           </div>
           <div style="display:flex;gap:0.4rem;">

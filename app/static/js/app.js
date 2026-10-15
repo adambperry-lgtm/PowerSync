@@ -3,6 +3,31 @@ if (typeof window !== "undefined") {
   if ((window.navigator && window.navigator.standalone) || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)) {
     document.documentElement.classList.add("is-standalone-app");
   }
+
+  // Intercept fetch to automatically attach Authorization header if token exists in localStorage
+  const originalFetch = window.fetch;
+  window.fetch = async function(...args) {
+    let [resource, config] = args;
+    const token = localStorage.getItem("powersync_token");
+    if (token && typeof resource === "string" && (resource.startsWith("/api") || resource.startsWith("/"))) {
+      config = config || {};
+      config.headers = config.headers || {};
+      if (config.headers instanceof Headers) {
+        if (!config.headers.has("Authorization")) {
+          config.headers.set("Authorization", `Bearer ${token}`);
+        }
+      } else if (Array.isArray(config.headers)) {
+        if (!config.headers.some(([k]) => k.toLowerCase() === "authorization")) {
+          config.headers.push(["Authorization", `Bearer ${token}`]);
+        }
+      } else {
+        if (!config.headers["Authorization"] && !config.headers["authorization"]) {
+          config.headers["Authorization"] = `Bearer ${token}`;
+        }
+      }
+    }
+    return originalFetch(resource, config);
+  };
 }
 
 let state = {
@@ -5723,15 +5748,24 @@ function initAllCollapsibleTiles() {
 
 // --- Multi-User Athlete Authentication & Google Sign-In ---
 let currentAthleteUser = null;
+let isGoogleOauthConfigured = false;
 
 async function checkAuthStatus() {
   try {
-    const res = await fetch("/api/auth/me");
-    if (!res.ok) return;
-    const user = await res.json();
-    currentAthleteUser = user;
-    renderUserNavPill(user);
-    renderAuthModalContent(user);
+    const [meRes, googleRes] = await Promise.all([
+      fetch("/api/auth/me"),
+      fetch("/api/auth/google/status").catch(() => null)
+    ]);
+    if (meRes.ok) {
+      const user = await meRes.json();
+      currentAthleteUser = user;
+      renderUserNavPill(user);
+    }
+    if (googleRes && googleRes.ok) {
+      const gData = await googleRes.json();
+      isGoogleOauthConfigured = !!gData.configured;
+    }
+    renderAuthModalContent(currentAthleteUser);
   } catch (e) {
     console.warn("Failed to check auth status:", e);
   }
@@ -5753,22 +5787,42 @@ function renderUserNavPill(user) {
       }
     }
     if (nameEl) {
-      nameEl.textContent = user.name || user.email.split("@")[0];
+      nameEl.textContent = user.name || (user.email ? user.email.split("@")[0] : "Athlete");
     }
   }
 }
 
 function renderAuthModalContent(user) {
   const profileCard = document.getElementById("authProfileCard");
+  const primaryDirectCard = document.getElementById("authPrimaryDirectCard");
   const avatarEl = document.getElementById("authProfileAvatar");
   const nameEl = document.getElementById("authProfileName");
   const emailEl = document.getElementById("authProfileEmail");
+  const profileBadge = document.getElementById("authProfileBadge");
   const googleBtnText = document.querySelector("#btnGoogleSignIn span");
+  const googleNotice = document.getElementById("googleConfigNotice");
+
+  // Google config alert
+  if (googleNotice) {
+    googleNotice.style.display = isGoogleOauthConfigured ? "none" : "block";
+  }
 
   if (user && !user.is_guest) {
     if (profileCard) profileCard.style.display = "flex";
+    if (primaryDirectCard) {
+      primaryDirectCard.style.display = (user.id === "usr_default") ? "none" : "flex";
+    }
     if (nameEl) nameEl.textContent = user.name || "Athlete";
     if (emailEl) emailEl.textContent = user.email || "";
+    if (profileBadge) {
+      if (user.id === "usr_default") {
+        profileBadge.textContent = "⭐ Account Owner (Intervals.icu & Saved History)";
+        profileBadge.style.color = "#06b6d4";
+      } else {
+        profileBadge.textContent = "🔒 Private Isolated Athlete Profile";
+        profileBadge.style.color = "#10b981";
+      }
+    }
     if (avatarEl) {
       if (user.picture) {
         avatarEl.innerHTML = `<img src="${user.picture}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
@@ -5780,6 +5834,7 @@ function renderAuthModalContent(user) {
     if (googleBtnText) googleBtnText.textContent = "Switch Google Account";
   } else {
     if (profileCard) profileCard.style.display = "none";
+    if (primaryDirectCard) primaryDirectCard.style.display = "flex";
     if (googleBtnText) googleBtnText.textContent = "Continue with Google";
   }
 }
@@ -5790,7 +5845,7 @@ const btnCloseAuthModal = document.getElementById("btnCloseAuthModal");
 
 function openAuthModal() {
   if (authModal) authModal.classList.add("open");
-  if (currentAthleteUser) renderAuthModalContent(currentAthleteUser);
+  checkAuthStatus();
 }
 
 function closeAuthModal() {
@@ -5805,14 +5860,65 @@ if (authModal) {
   });
 }
 
+const linkOpenGoogleSettings = document.getElementById("linkOpenGoogleSettings");
+if (linkOpenGoogleSettings) {
+  linkOpenGoogleSettings.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeAuthModal();
+    openSettingsModal();
+    setTimeout(() => {
+      document.getElementById("settingGoogleClientId")?.focus();
+    }, 300);
+  });
+}
+
+const btnGoogleSignIn = document.getElementById("btnGoogleSignIn");
+if (btnGoogleSignIn) {
+  btnGoogleSignIn.addEventListener("click", (e) => {
+    if (!isGoogleOauthConfigured) {
+      e.preventDefault();
+      showToast("⚙️ Google Sign-In needs Client ID & Secret. Opening Settings...");
+      closeAuthModal();
+      openSettingsModal();
+      setTimeout(() => {
+        document.getElementById("settingGoogleClientId")?.focus();
+      }, 300);
+    }
+  });
+}
+
+const btnPrimaryAthleteLogin = document.getElementById("btnPrimaryAthleteLogin");
+if (btnPrimaryAthleteLogin) {
+  btnPrimaryAthleteLogin.addEventListener("click", async () => {
+    try {
+      showToast("Signing in as Primary Athlete (Account Owner)...");
+      const res = await fetch("/api/auth/primary-login", { method: "POST" });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.session_token) {
+          localStorage.setItem("powersync_token", data.session_token);
+        }
+        showToast("Signed in as Primary Athlete! Reloading...");
+        setTimeout(() => { window.location.reload(); }, 400);
+      } else {
+        showToast("Failed to authenticate as primary athlete.");
+      }
+    } catch (e) {
+      showToast("Error signing in.");
+    }
+  });
+}
+
 const btnSignOut = document.getElementById("btnSignOut");
 if (btnSignOut) {
   btnSignOut.addEventListener("click", async () => {
     try {
+      localStorage.removeItem("powersync_token");
       await fetch("/api/auth/logout", { method: "POST" });
       showToast("Signed out. Refreshing session...");
-      setTimeout(() => { window.location.reload(); }, 500);
+      setTimeout(() => { window.location.reload(); }, 400);
     } catch (e) {
+      localStorage.removeItem("powersync_token");
       window.location.reload();
     }
   });
@@ -5867,8 +5973,12 @@ async function performDevLogin(email, name) {
       body: JSON.stringify({ email, name })
     });
     if (res.ok) {
+      const data = await res.json();
+      if (data.session_token) {
+        localStorage.setItem("powersync_token", data.session_token);
+      }
       showToast(`Switched account to ${name || email}! Reloading...`);
-      setTimeout(() => { window.location.reload(); }, 500);
+      setTimeout(() => { window.location.reload(); }, 400);
     } else {
       showToast("Failed to switch account.");
     }
@@ -5897,13 +6007,17 @@ async function bootApp() {
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (_) {}
   }
+  const sessionTokenParam = urlParams.get("session_token");
+  if (sessionTokenParam) {
+    localStorage.setItem("powersync_token", sessionTokenParam);
+  }
   if (urlParams.get("login_success")) {
     showToast("🎉 Signed in successfully! Welcome to PowerSync.");
     try {
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (_) {}
   } else if (urlParams.get("auth_error")) {
-    showToast(`⚠️ Authentication error: ${urlParams.get("auth_error")}`);
+    showToast(`⚠️ Authentication: ${urlParams.get("auth_error")}`);
     try {
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (_) {}

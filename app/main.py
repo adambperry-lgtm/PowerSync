@@ -9,7 +9,7 @@ from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import (
-    init_db, get_user_by_session, get_default_or_guest_user,
+    init_db, get_user_by_session, get_guest_user, get_default_athlete_user,
     set_current_user_context, reset_current_user_context
 )
 from app.routers import dashboard, workouts, settings, auth, review, plans, chat
@@ -41,6 +41,7 @@ async def user_session_middleware(request, call_next):
     Multi-User Context Middleware.
     Resolves session token from powersync_session cookie or Bearer header,
     sets request.state.user, and binds CURRENT_USER_ID for complete data isolation.
+    Unauthenticated visitors are safely bound to an isolated guest context.
     """
     token = request.cookies.get("powersync_session")
     if not token and "authorization" in request.headers:
@@ -53,7 +54,7 @@ async def user_session_middleware(request, call_next):
         user = get_user_by_session(token)
 
     if not user:
-        user = get_default_or_guest_user()
+        user = get_guest_user()
 
     request.state.user = user
     ctx_token = set_current_user_context(user["id"])

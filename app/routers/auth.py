@@ -13,7 +13,8 @@ from app.database import (
     create_or_get_google_user, create_or_get_dev_user, get_user_by_id,
     create_session, get_user_by_session, delete_session,
     save_oauth_state, verify_and_consume_oauth_state, get_default_or_guest_user,
-    DEFAULT_USER_ID
+    get_guest_user, get_default_athlete_user,
+    DEFAULT_USER_ID, GUEST_USER_ID
 )
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -54,20 +55,25 @@ def get_current_user_profile(request: Request):
     user = getattr(request.state, "user", None)
     if not user:
         token = request.cookies.get("powersync_session")
+        if not token and "authorization" in request.headers:
+            auth_val = request.headers["authorization"]
+            if auth_val.startswith("Bearer "):
+                token = auth_val[7:].strip()
         user = get_user_by_session(token) if token else None
         if not user:
-            user = get_default_or_guest_user()
+            user = get_guest_user()
 
-    uid = user.get("id", DEFAULT_USER_ID)
-    is_guest = (uid == DEFAULT_USER_ID and not user.get("google_id") and user.get("email") == "athlete@powersync.local")
+    uid = user.get("id", GUEST_USER_ID)
+    is_guest = (uid == GUEST_USER_ID or user.get("is_guest", False))
     
     user_payload = {
         "id": uid,
         "email": user.get("email", ""),
-        "name": user.get("name", "Athlete"),
+        "name": user.get("name", "Guest" if is_guest else "Athlete"),
         "picture": user.get("picture", ""),
         "google_linked": bool(user.get("google_id")),
-        "created_at": user.get("created_at")
+        "created_at": user.get("created_at"),
+        "is_guest": is_guest
     }
 
     return {
@@ -75,7 +81,7 @@ def get_current_user_profile(request: Request):
         "is_guest": is_guest,
         "id": uid,
         "email": user.get("email", ""),
-        "name": user.get("name", "Athlete"),
+        "name": user.get("name", "Guest" if is_guest else "Athlete"),
         "picture": user.get("picture", ""),
         "google_linked": bool(user.get("google_id")),
         "created_at": user.get("created_at"),
@@ -180,14 +186,15 @@ def google_callback(
         user = create_or_get_google_user(email=email, name=name, picture=picture, google_id=google_id)
         session_token = create_session(user["id"], days_valid=30)
 
-        response = RedirectResponse("/?login_success=1", status_code=302)
+        response = RedirectResponse(f"/?login_success=1&session_token={session_token}", status_code=302)
         response.set_cookie(
             key="powersync_session",
             value=session_token,
             max_age=30 * 86400,
             httponly=True,
             samesite="lax",
-            secure=is_production_req(request)
+            secure=is_production_req(request),
+            path="/"
         )
         return response
     except Exception as e:
@@ -197,6 +204,32 @@ class DevLoginPayload(BaseModel):
     email: str
     name: Optional[str] = None
     picture: Optional[str] = None
+
+@router.post("/primary-login")
+def primary_login(request: Request):
+    """
+    Direct login as the primary athlete account owner holding all historical directives and intervals credentials.
+    Allows instant access without requiring Google OAuth to be set up first.
+    """
+    user = get_default_athlete_user()
+    session_token = create_session(user["id"], days_valid=30)
+
+    res = JSONResponse({
+        "success": True,
+        "message": f"Successfully authenticated as {user['name']} (Owner)",
+        "session_token": session_token,
+        "user": user
+    })
+    res.set_cookie(
+        key="powersync_session",
+        value=session_token,
+        max_age=30 * 86400,
+        httponly=True,
+        samesite="lax",
+        secure=is_production_req(request),
+        path="/"
+    )
+    return res
 
 @router.post("/dev-login")
 def dev_login(request: Request, payload: DevLoginPayload):
@@ -224,7 +257,8 @@ def dev_login(request: Request, payload: DevLoginPayload):
         max_age=30 * 86400,
         httponly=True,
         samesite="lax",
-        secure=is_production_req(request)
+        secure=is_production_req(request),
+        path="/"
     )
     return res
 
@@ -232,6 +266,10 @@ def dev_login(request: Request, payload: DevLoginPayload):
 def logout(request: Request):
     """Revokes active session token and clears the authentication cookie."""
     token = request.cookies.get("powersync_session")
+    if not token and "authorization" in request.headers:
+        auth_val = request.headers["authorization"]
+        if auth_val.startswith("Bearer "):
+            token = auth_val[7:].strip()
     if token:
         delete_session(token)
     res = JSONResponse({"success": True, "message": "Signed out successfully"})

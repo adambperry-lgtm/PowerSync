@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional, List
 from contextvars import ContextVar
 
 DEFAULT_USER_ID = "usr_default"
+GUEST_USER_ID = "usr_guest"
 CURRENT_USER_ID: ContextVar[str] = ContextVar("CURRENT_USER_ID", default=DEFAULT_USER_ID)
 
 def get_current_user_id() -> str:
@@ -345,6 +346,20 @@ def init_db():
         VALUES ('usr_default', 'athlete@powersync.local', 'Primary Athlete', '')
     """)
 
+    # Ensure isolated guest user exists for unauthenticated browsing
+    cursor.execute("""
+        INSERT OR IGNORE INTO users (id, email, name, picture)
+        VALUES ('usr_guest', 'guest@powersync.local', 'Guest Athlete', '')
+    """)
+
+    # Auto-repair: If usr_default was accidentally renamed to Coach Alex in earlier dev switching,
+    # restore its identity back to Primary Athlete so the owner's credentials remain clean.
+    cursor.execute("""
+        UPDATE users
+        SET email = 'athlete@powersync.local', name = 'Primary Athlete'
+        WHERE id = 'usr_default' AND (google_id IS NULL OR google_id = '') AND email LIKE '%@powersync.app'
+    """)
+
     conn.commit()
     conn.close()
 
@@ -387,6 +402,35 @@ def get_env_fallback(key: str) -> Optional[Any]:
 
 def get_setting(key: str, default: Any = None, user_id: Optional[str] = None) -> Any:
     uid = user_id or get_current_user_id()
+
+    # Guest user isolation & defaults
+    if uid == GUEST_USER_ID:
+        if key == "demo_mode":
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE user_id = ? AND key = ?", (uid, key))
+            row = cursor.fetchone()
+            conn.close()
+            if row and row["value"]:
+                try:
+                    return json.loads(row["value"])
+                except Exception:
+                    return row["value"]
+            return True
+        # For sensitive personal credentials, guests NEVER inherit usr_default's credentials
+        if key in ("intervals_icu_api_key", "intervals_athlete_id", "strava_tokens", "whoop_tokens"):
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE user_id = ? AND key = ?", (uid, key))
+            row = cursor.fetchone()
+            conn.close()
+            if row and row["value"]:
+                try:
+                    return json.loads(row["value"])
+                except Exception:
+                    return row["value"]
+            return default
+
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT value FROM settings WHERE user_id = ? AND key = ?", (uid, key))
@@ -406,7 +450,24 @@ def get_setting(key: str, default: Any = None, user_id: Optional[str] = None) ->
             return val
     
     # Global environment fallback: only for app credentials or for default athlete account
-    if key in GLOBAL_ENV_KEYS or uid == DEFAULT_USER_ID:
+    if key in GLOBAL_ENV_KEYS:
+        # Check if saved under usr_default if current user is not usr_default
+        if uid != DEFAULT_USER_ID:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT value FROM settings WHERE user_id = ? AND key = ?", (DEFAULT_USER_ID, key))
+            def_row = cursor.fetchone()
+            conn.close()
+            if def_row and def_row["value"] and str(def_row["value"]).strip() != "":
+                try:
+                    return json.loads(def_row["value"])
+                except Exception:
+                    return def_row["value"]
+        env_val = get_env_fallback(key)
+        if env_val is not None:
+            return env_val
+
+    if uid == DEFAULT_USER_ID:
         env_val = get_env_fallback(key)
         if env_val is not None:
             return env_val
@@ -520,11 +581,22 @@ def create_or_get_google_user(email: str, name: str, picture: Optional[str] = No
     return user
 
 def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None) -> Dict[str, Any]:
-    """Helper for dev/testing authentication with automatic default data preservation."""
+    """Helper for dev/testing authentication with complete data isolation."""
     conn = get_db_connection()
     cursor = conn.cursor()
     clean_email = email.strip().lower()
-    cursor.execute("SELECT * FROM users WHERE email = ?", (clean_email,))
+
+    # Explicit request for the primary account owner
+    if clean_email in ("athlete@powersync.local", "default@powersync.local", "owner@powersync.app", "primary@powersync.local"):
+        cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            return dict(row)
+        return get_default_athlete_user()
+
+    # Lookup existing dev/test user by email (excluding usr_default)
+    cursor.execute("SELECT * FROM users WHERE email = ? AND id != 'usr_default'", (clean_email,))
     row = cursor.fetchone()
     if row:
         cursor.execute("UPDATE users SET name = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?", (name, row["id"]))
@@ -534,17 +606,7 @@ def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None)
         conn.close()
         return user
 
-    # Check if usr_default is unclaimed and can be adopted
-    cursor.execute("SELECT * FROM users WHERE id = 'usr_default' AND (google_id IS NULL OR google_id = '') AND (email = 'athlete@powersync.local' OR email = 'default@powersync.local')")
-    default_row = cursor.fetchone()
-    if default_row:
-        cursor.execute("UPDATE users SET email = ?, name = ?, picture = COALESCE(?, picture), last_login = CURRENT_TIMESTAMP WHERE id = 'usr_default'", (clean_email, name, picture or ""))
-        conn.commit()
-        cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
-        user = dict(cursor.fetchone())
-        conn.close()
-        return user
-
+    # Otherwise create a distinct new user - NEVER adopt or mutate usr_default!
     user_id = f"usr_{uuid.uuid4().hex[:12]}"
     cursor.execute("""
         INSERT INTO users (id, email, name, picture, last_login)
@@ -572,11 +634,30 @@ def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     conn.close()
     return dict(row) if row else None
 
-def get_default_or_guest_user() -> Dict[str, Any]:
-    """Returns the default primary athlete profile."""
+def get_guest_user() -> Dict[str, Any]:
+    """Returns the unauthenticated guest athlete profile with demo-mode isolation."""
+    u = get_user_by_id(GUEST_USER_ID)
+    if u:
+        user_dict = dict(u)
+        user_dict["is_guest"] = True
+        return user_dict
+    return {
+        "id": GUEST_USER_ID,
+        "email": "guest@powersync.local",
+        "name": "Guest Athlete",
+        "picture": "",
+        "google_id": None,
+        "is_guest": True,
+        "created_at": None
+    }
+
+def get_default_athlete_user() -> Dict[str, Any]:
+    """Returns the default primary athlete profile holding all historical data."""
     u = get_user_by_id(DEFAULT_USER_ID)
     if u:
-        return u
+        user_dict = dict(u)
+        user_dict["is_guest"] = False
+        return user_dict
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -587,7 +668,12 @@ def get_default_or_guest_user() -> Dict[str, Any]:
     cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
     user = dict(cursor.fetchone())
     conn.close()
+    user["is_guest"] = False
     return user
+
+def get_default_or_guest_user() -> Dict[str, Any]:
+    """Backward compatibility alias for primary athlete."""
+    return get_default_athlete_user()
 
 def create_session(user_id: str, days_valid: int = 30) -> str:
     """Generates a secure cryptographically random session token for user_id."""

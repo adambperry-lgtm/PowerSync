@@ -417,7 +417,8 @@ class TestMultiUserHTTPServer(unittest.TestCase):
         logout_res = client_a.post("/api/auth/logout")
         self.assertEqual(logout_res.status_code, 200)
         me_after_logout = client_a.get("/api/auth/me").json()
-        self.assertTrue(me_after_logout.get("is_guest", False) or me_after_logout.get("id") == "usr_default")
+        self.assertTrue(me_after_logout.get("is_guest", False))
+        self.assertEqual(me_after_logout.get("id"), "usr_guest")
 
     def test_02_claim_default_history_endpoint(self):
         """Verify claim-default-data imports settings and history from usr_default into active account."""
@@ -442,5 +443,78 @@ class TestMultiUserHTTPServer(unittest.TestCase):
         self.assertEqual(settings["athlete_ftp"], 288)
         self.assertEqual(settings["intervals_athlete_id"], "i_legacy_777")
 
+    def test_03_guest_strict_data_isolation(self):
+        """Verify unauthenticated guests receive usr_guest and cannot see usr_default private data."""
+        from app.main import app
+        from app.database import set_setting
+
+        # Set private credentials on usr_default
+        set_setting("intervals_athlete_id", "i748824_SECRET", user_id="usr_default")
+        set_setting("intervals_icu_api_key", "secret_key_123", user_id="usr_default")
+
+        # Unauthenticated client
+        guest_client = ASGIClient(app)
+        me = guest_client.get("/api/auth/me").json()
+        self.assertTrue(me["is_guest"])
+        self.assertFalse(me["authenticated"])
+        self.assertEqual(me["id"], "usr_guest")
+
+        # Guest viewing settings: private credentials must NOT be leaked
+        settings = guest_client.get("/api/settings").json()
+        self.assertNotEqual(settings.get("intervals_athlete_id"), "i748824_SECRET")
+        self.assertTrue(settings.get("demo_mode"))
+
+    def test_04_primary_login_and_dev_user_non_adoption(self):
+        """Verify primary-login signs into usr_default, and dev switching does NOT adopt usr_default."""
+        from app.main import app
+        from app.database import set_setting, get_user_by_id
+
+        set_setting("athlete_ftp", 275, user_id="usr_default")
+
+        # 1. Primary login endpoint
+        client_owner = ASGIClient(app)
+        res = client_owner.post("/api/auth/primary-login")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["user"]["id"], "usr_default")
+
+        me = client_owner.get("/api/auth/me").json()
+        self.assertFalse(me["is_guest"])
+        self.assertEqual(me["id"], "usr_default")
+
+        # 2. Dev switch to Coach Alex
+        client_alex = ASGIClient(app)
+        res_alex = client_alex.post("/api/auth/dev-login", json={"email": "coach.alex@powersync.app", "name": "Coach Alex"})
+        self.assertEqual(res_alex.status_code, 200)
+        data_alex = res_alex.json()
+        self.assertNotEqual(data_alex["user"]["id"], "usr_default")
+        self.assertTrue(data_alex["user"]["id"].startswith("usr_"))
+
+        # Confirm usr_default was NOT overwritten
+        usr_def = get_user_by_id("usr_default")
+        self.assertNotEqual(usr_def["email"], "coach.alex@powersync.app")
+
+    def test_05_google_sign_in_method_1_claims_default(self):
+        """Verify Method 1: Google login automatically adopts usr_default when unclaimed."""
+        from app.database import create_or_get_google_user, get_db_connection
+
+        # Reset usr_default google_id to test clean adoption
+        conn = get_db_connection()
+        conn.cursor().execute("UPDATE users SET google_id = NULL, email = 'athlete@powersync.local' WHERE id = 'usr_default'")
+        conn.commit()
+        conn.close()
+
+        google_user = create_or_get_google_user(
+            email="primary.cyclist@gmail.com",
+            name="Primary Cyclist",
+            picture="https://example.com/avatar.jpg",
+            google_id="gid_99887766"
+        )
+        self.assertEqual(google_user["id"], "usr_default")
+        self.assertEqual(google_user["email"], "primary.cyclist@gmail.com")
+        self.assertEqual(google_user["google_id"], "gid_99887766")
+
 if __name__ == "__main__":
     unittest.main()
+
