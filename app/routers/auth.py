@@ -12,19 +12,28 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 def get_app_base_url(request: Request) -> str:
     """
     Returns the public base URL of the application.
-    Prioritizes explicit environment overrides (e.g. APP_BASE_URL, RENDER_EXTERNAL_URL)
-    and enforces HTTPS when running on public / cloud domains.
+    Prioritizes explicit APP_BASE_URL, otherwise derives the exact hostname
+    from incoming request headers (Host or X-Forwarded-Host) so it always matches
+    the domain currently visited in the athlete's browser.
     """
-    override = os.environ.get("APP_BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
-    if override:
+    if os.environ.get("APP_BASE_URL"):
+        override = os.environ["APP_BASE_URL"].rstrip("/")
         if not override.startswith("http://") and not override.startswith("https://"):
             override = f"https://{override}"
-        return override.rstrip("/")
+        return override
 
-    base_url = str(request.base_url).rstrip("/")
-    if base_url.startswith("http://") and not ("localhost" in base_url or "127.0.0.1" in base_url):
-        base_url = "https://" + base_url[7:]
-    return base_url
+    host = request.headers.get("x-forwarded-host") or request.headers.get("host")
+    if not host:
+        host = str(request.base_url.netloc)
+
+    # In production/cloud environments (non-localhost), enforce https and strip internal container ports
+    if "localhost" not in host and "127.0.0.1" not in host:
+        if ":" in host:
+            host = host.split(":")[0]
+        return f"https://{host}"
+
+    proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "http"
+    return f"{proto}://{host}"
 
 @router.get("/strava/login")
 def strava_login(request: Request, client_id: Optional[str] = None, client_secret: Optional[str] = None):
