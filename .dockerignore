@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+data/*.db
+data/*.sqlite*
+fitness.db
+server.log
+*.log
+.DS_Store
+.git
+.gitignore

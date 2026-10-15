@@ -1697,7 +1697,7 @@
             <a href="https://www.strava.com/settings/api" target="_blank" style="color:#fc5200;font-size:0.75rem;text-decoration:underline;">Create Strava App ↗</a>
           </div>
           <p class="form-hint" style="margin-top:0.25rem;">
-            Go to <b>strava.com/settings/api</b>. Set <i>"Authorization Callback Domain"</i> to <b>localhost</b>. Then paste your Client ID & Secret below:
+            Go to <b>strava.com/settings/api</b>. Set <i>"Authorization Callback Domain"</i> to <b id="stravaCallbackDomainHint">localhost</b>. Then paste your Client ID & Secret below:
           </p>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
             <div>
@@ -1724,7 +1724,7 @@
             <a href="https://developer.whoop.com" target="_blank" style="color:#10b981;font-size:0.75rem;text-decoration:underline;">Whoop Developer Portal ↗</a>
           </div>
           <p class="form-hint" style="margin-top:0.25rem;">
-            Go to <b>developer.whoop.com</b>. Set <i>Redirect URI</i> to <b>http://localhost:8000/api/auth/whoop/callback</b>. Paste your Client ID & Secret below:
+            Go to <b>developer.whoop.com</b>. Set <i>Redirect URI</i> to <b id="whoopRedirectUriHint">http://localhost:8000/api/auth/whoop/callback</b>. Paste your Client ID & Secret below:
           </p>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
             <div>
@@ -2051,6 +2051,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=80"></script>
+  <script src="/static/js/app.js?v=81"></script>
 </body>
 </html>

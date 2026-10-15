@@ -109,6 +109,41 @@ fitness-dashboard/
 │       ├── css/style.css    # Clean modern responsive styling
 │       └── js/app.js        # Canvas workout visualizer & dashboard reactivity
 ├── data/                    # SQLite database storage (fitness.db)
-├── run.sh                   # One-click startup script
+├── Dockerfile               # Universal container definition for cloud platforms
+├── render.yaml              # Render 1-click cloud deployment blueprint
+├── Procfile                 # Production WSGI/ASGI process runner
+├── run.sh                   # One-click startup script (local)
 └── requirements.txt         # Python dependencies
 ```
+
+---
+
+## ☁️ Deploying to the Cloud (24/7 Access Without Your Mac)
+
+To access PowerSync 24/7 from your phone, tablet, or browser without needing your Mac or Antigravity running:
+
+### Option A: Render.com (Recommended — Easiest & Free/Low-Cost)
+1. Push this repository to your GitHub account (public or private).
+2. Go to [Render.com](https://render.com) and create a free account (log in with GitHub).
+3. Click **New +** -> **Web Service** -> Connect your `fitness-dashboard` repository.
+4. Render automatically detects `requirements.txt` and `Procfile`.
+   * **Build Command**: `pip install -r requirements.txt`
+   * **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips='*'`
+5. *(Optional for persistence)*: In Render Settings, add a **Persistent Disk** mounted at `/var/data` and add an Environment Variable `DATABASE_PATH=/var/data/fitness.db`.
+6. Click **Deploy Web Service**. You will get a permanent public HTTPS URL (e.g., `https://powersync.onrender.com`).
+
+### Option B: Railway.app (1-Click Persistent SQLite)
+1. Push this repository to your GitHub account.
+2. Go to [Railway.app](https://railway.app) and click **New Project** -> **Deploy from GitHub repo**.
+3. Railway automatically builds and deploys the app using the included `Dockerfile` or `Procfile`.
+4. In the Railway service settings, click **Add Volume** -> mount to `/data`.
+5. Generate a public domain under **Networking**.
+
+### 🔗 Updating Your OAuth Portals for Cloud URL
+Once your cloud app is live (e.g. `https://your-app.onrender.com`):
+* **Whoop**: In [developer.whoop.com](https://developer.whoop.com), update your Redirect URI to:
+  `https://your-app.onrender.com/api/auth/whoop/callback`
+* **Strava**: In [strava.com/settings/api](https://www.strava.com/settings/api), update Authorization Callback Domain to:
+  `your-app.onrender.com` (just the host, without `https://`)
+* **Intervals.icu**: No URL change needed! Just keep your Athlete ID and API Key saved in Settings.
+

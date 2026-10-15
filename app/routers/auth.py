@@ -1,6 +1,7 @@
+import os
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import RedirectResponse
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from app.services.strava_service import get_strava_auth_url, exchange_strava_code, fetch_recent_strava_activities
 from app.services.whoop_service import get_whoop_auth_url, exchange_whoop_code, fetch_latest_whoop_metrics
@@ -8,7 +9,22 @@ from app.database import set_setting, get_setting
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-from typing import Dict, Any, Optional
+def get_app_base_url(request: Request) -> str:
+    """
+    Returns the public base URL of the application.
+    Prioritizes explicit environment overrides (e.g. APP_BASE_URL, RENDER_EXTERNAL_URL)
+    and enforces HTTPS when running on public / cloud domains.
+    """
+    override = os.environ.get("APP_BASE_URL") or os.environ.get("RENDER_EXTERNAL_URL") or os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+    if override:
+        if not override.startswith("http://") and not override.startswith("https://"):
+            override = f"https://{override}"
+        return override.rstrip("/")
+
+    base_url = str(request.base_url).rstrip("/")
+    if base_url.startswith("http://") and not ("localhost" in base_url or "127.0.0.1" in base_url):
+        base_url = "https://" + base_url[7:]
+    return base_url
 
 @router.get("/strava/login")
 def strava_login(request: Request, client_id: Optional[str] = None, client_secret: Optional[str] = None):
@@ -17,7 +33,7 @@ def strava_login(request: Request, client_id: Optional[str] = None, client_secre
     if client_secret:
         set_setting("strava_client_secret", client_secret)
 
-    base_url = str(request.base_url).rstrip("/")
+    base_url = get_app_base_url(request)
     redirect_uri = f"{base_url}/api/auth/strava/callback"
     url = get_strava_auth_url(redirect_uri)
     return RedirectResponse(url)
@@ -38,7 +54,7 @@ def whoop_login(request: Request, client_id: Optional[str] = None, client_secret
     if client_secret:
         set_setting("whoop_client_secret", client_secret)
 
-    base_url = str(request.base_url).rstrip("/")
+    base_url = get_app_base_url(request)
     redirect_uri = f"{base_url}/api/auth/whoop/callback"
     url = get_whoop_auth_url(redirect_uri)
     return RedirectResponse(url)
@@ -56,7 +72,7 @@ def whoop_callback(
     if not code:
         return {"error": "No authorization code received from Whoop"}
 
-    base_url = str(request.base_url).rstrip("/")
+    base_url = get_app_base_url(request)
     redirect_uri = f"{base_url}/api/auth/whoop/callback"
     res = exchange_whoop_code(code, redirect_uri)
     if res.get("success"):

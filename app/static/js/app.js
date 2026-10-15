@@ -2567,6 +2567,12 @@ function openSettingsModal() {
         whoopSecretInput.placeholder = s.whoop_client_secret_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Client Secret";
       }
 
+      // Dynamic OAuth hints based on current deployment host
+      const domainHint = document.getElementById("stravaCallbackDomainHint");
+      if (domainHint) domainHint.textContent = window.location.hostname || "localhost";
+      const whoopHint = document.getElementById("whoopRedirectUriHint");
+      if (whoopHint) whoopHint.textContent = `${window.location.origin}/api/auth/whoop/callback`;
+
       state.googleMapsApiKey = s.google_maps_api_key_set ? "saved" : "";
       const googleMapKeyInput = document.getElementById("settingGoogleMapsApiKey");
       if (googleMapKeyInput) {
