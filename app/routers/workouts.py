@@ -191,7 +191,14 @@ def generate_workout(req: WorkoutGenerateRequest):
         except Exception:
             tgt_dt = None
     day_cfg = get_day_target_config(tgt_dt)
-    target_dur = day_cfg.get("preferred_duration_min", 45) if req.duration_min is None else req.duration_min
+    is_rest_day = day_cfg.get("is_directive_rest", False) or day_cfg.get("is_default_rest", False)
+    has_explicit_override = bool(req.user_note and any(k in req.user_note.lower() for k in ["override", "force", "train anyway", "ignore rest"]))
+    if is_rest_day and not has_explicit_override:
+        target_dur = 0
+    elif req.duration_min is not None:
+        target_dur = req.duration_min
+    else:
+        target_dur = day_cfg.get("preferred_duration_min", 45)
 
     # Generate bundle (Primary + 2 Alternatives) with dual-load modeling
     bundle = build_workout_bundle(

@@ -561,30 +561,34 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
       subtext.style.color = "var(--accent-cyan)";
     }
 
-    if (preHeading) preHeading.textContent = "TODAY'S PRESCRIBED SESSION";
-    title.textContent = w.title || "Zone 2 Aerobic Base Flush";
+    const isRest = (w.duration_minutes === 0 || w.option_type === "rest");
+    if (preHeading) preHeading.textContent = isRest ? "TODAY'S REST DAY DIRECTIVE" : "TODAY'S PRESCRIBED SESSION";
+    title.textContent = w.title || (isRest ? "Rest Day or Easy Spin" : "Zone 2 Aerobic Base Flush");
 
     if (lbl1) lbl1.textContent = "Duration";
     if (val1) {
-      val1.textContent = w.duration_minutes ? `${w.duration_minutes}m` : "60m";
+      val1.textContent = `${w.duration_minutes !== undefined ? w.duration_minutes : 0}m`;
       val1.style.color = "#fff";
     }
 
     if (lbl2) lbl2.textContent = "Target Watts";
     if (val2) {
-      val2.textContent = w.target_power ? `${w.target_power} W` : (w.intervals && w.intervals[1] ? `${Math.round((state.ftp || 250) * (w.intervals[1].power_pct || 65) / 100)} W` : "165 W");
-      val2.style.color = "var(--accent-cyan)";
+      val2.textContent = isRest ? "0 W" : (w.target_power ? `${w.target_power} W` : (w.intervals && w.intervals[1] ? `${Math.round((state.ftp || 250) * (w.intervals[1].power_pct || 65) / 100)} W` : "165 W"));
+      val2.style.color = isRest ? "#10b981" : "var(--accent-cyan)";
     }
 
     if (lbl3) lbl3.textContent = "Target Zone";
     if (val3) {
-      val3.textContent = w.focus_area || w.target_zone || "Zone 2";
-      val3.style.color = "#38bdf8";
+      val3.textContent = w.focus_area || w.target_zone || (isRest ? "Rest & Recovery" : "Zone 2");
+      val3.style.color = isRest ? "#10b981" : "#38bdf8";
     }
 
     if (lbl4) lbl4.textContent = (w.total_xss !== undefined && w.total_xss > 0) ? "Target Strain" : "Est. TSS";
     if (val4) {
-      if (w.total_xss !== undefined && w.total_xss > 0) {
+      if (isRest) {
+        val4.textContent = "0 TSS";
+        val4.style.color = "var(--text-muted)";
+      } else if (w.total_xss !== undefined && w.total_xss > 0) {
         val4.textContent = `${w.total_xss} XSS`;
         val4.style.color = "#c084fc";
       } else {
@@ -594,12 +598,19 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     }
 
     if (narrative) {
-      narrative.textContent = w.ai_rationale || `Whoop recovery sits at ${whoopRec}%. Keep power strictly within aerobic boundaries to protect recovery and build aerobic fitness.`;
+      narrative.textContent = w.ai_rationale || (isRest
+        ? `Per your forward directive, today is recommended as a full rest day or gentle active recovery spin.`
+        : `Whoop recovery sits at ${whoopRec}%. Keep power strictly within aerobic boundaries to protect recovery and build aerobic fitness.`);
     }
 
     if (subtext) {
-      subtext.textContent = `Whoop: ${whoopRec}% Recovery`;
-      subtext.style.color = whoopRec >= 67 ? "#10b981" : (whoopRec < 40 ? "#f43f5e" : "#f59e0b");
+      if (w.badge) {
+        subtext.textContent = w.badge;
+        subtext.style.color = isRest ? "#10b981" : "var(--accent-cyan)";
+      } else {
+        subtext.textContent = `Whoop: ${whoopRec}% Recovery`;
+        subtext.style.color = whoopRec >= 67 ? "#10b981" : (whoopRec < 40 ? "#f43f5e" : "#f59e0b");
+      }
     }
 
     if (jumpLink) {
@@ -754,7 +765,7 @@ function renderWorkoutOptions(options, activeId) {
     const isActive = opt.id === activeId;
     const badgeColor = opt.badge_color === "emerald" ? "var(--accent-emerald)" : 
                        (opt.badge_color === "amber" ? "var(--accent-amber)" : "var(--accent-cyan)");
-    const carbPreview = opt.duration_minutes <= 45 ? "~30g/h" : (opt.duration_minutes <= 75 ? "~60g/h" : "~75g/h");
+    const carbPreview = (opt.duration_minutes === 0 || opt.option_type === "rest") ? "Hydrate & Rest" : (opt.duration_minutes <= 45 ? "~30g/h" : (opt.duration_minutes <= 75 ? "~60g/h" : "~75g/h"));
     const strainPreview = (opt.total_xss !== undefined && opt.total_xss > 0)
       ? `<span style="color:#c084fc;font-weight:600;" title="3-Tier Strain: ${opt.low_xss || 0} Low • ${opt.high_xss || 0} High • ${opt.peak_xss || 0} Peak">⚡ ${opt.total_xss} XSS</span>`
       : `<span>⚡ ~${opt.estimated_tss} TSS</span>`;
@@ -1528,7 +1539,7 @@ async function selectOutdoorOption(rideId) {
 window.selectOutdoorOption = selectOutdoorOption;
 
 // 2. Fetch or Generate Workout
-async function loadWorkout(duration = 60, intensity = 0, userNote = "") {
+async function loadWorkout(duration = null, intensity = 0, userNote = "") {
   try {
     workoutRationale.innerHTML = "<em>Analyzing Whoop recovery and generating tailored intervals...</em>";
     const tempF = fuelingTempSlider ? parseInt(fuelingTempSlider.value, 10) : 74;
@@ -1574,7 +1585,7 @@ async function loadWorkout(duration = 60, intensity = 0, userNote = "") {
         state.activeOptionId = (data.active_workout && data.active_workout.id) || "workout_primary";
       }
     }
-    state.currentDuration = state.currentWorkout.duration_minutes || duration;
+    state.currentDuration = (state.currentWorkout.duration_minutes !== undefined) ? state.currentWorkout.duration_minutes : duration;
     syncDurationPills(state.currentDuration);
     renderWorkout(state.currentWorkout);
     renderWorkoutOptions(state.workoutOptions, state.activeOptionId);
@@ -1833,6 +1844,18 @@ function drawWorkoutGraph(workout) {
   ctx.fillStyle = isLightMode ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.4)";
   ctx.font = "10px sans-serif";
   ctx.fillText(`100% FTP (${state.ftp}W)`, 6, ftpLineY - 4);
+
+  if (canvasSegments.length === 0) {
+    ctx.fillStyle = isLightMode ? "#059669" : "#10b981";
+    ctx.font = "bold 13px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("🛋️ Rest Day Directive • No Intervals Scheduled (Active Recovery / Off the Bike)", w / 2, h / 2 - 8);
+    ctx.fillStyle = isLightMode ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.6)";
+    ctx.font = "12px sans-serif";
+    ctx.fillText("Select '20-Min Active Recovery Flush' or 'Optional 45m Base' above if you wish to ride.", w / 2, h / 2 + 14);
+    ctx.textAlign = "left";
+    return;
+  }
 
   let currentX = 0;
 

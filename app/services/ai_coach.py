@@ -83,18 +83,19 @@ def build_adaptive_workout_local(
     # 0A. Check if today is a scheduled weekly rest day per athlete preferences
     from app.services.preferences_service import get_day_target_config
     day_cfg = get_day_target_config(target_date)
-    is_scheduled_rest_day = (day_cfg.get("is_default_rest", False) or duration == 0) and not (user_note and any(k in user_note.lower() for k in ["override", "workout", "intervals", "train", "ride", "spin"]))
+    is_dir_rest = day_cfg.get("is_directive_rest", False)
+    is_default_rest = day_cfg.get("is_default_rest", False)
+    has_explicit_override = bool(user_note and any(k in user_note.lower() for k in ["override", "force", "ignore rest", "train anyway"]))
+    is_scheduled_rest_day = (is_default_rest or is_dir_rest or duration == 0) and not has_explicit_override
     
     if is_scheduled_rest_day:
-        is_dir_rest = day_cfg.get("is_directive_rest", False)
-        title = "Scheduled Directive Rest Day" if is_dir_rest else "Scheduled Weekly Rest & Supercompensation"
-        focus_area = "Schedule Directive Rest & Recovery" if is_dir_rest else "Weekly Rest Day (Off the Bike)"
-        badge_text = "🛌 Directive Rest Day" if is_dir_rest else "🛋️ Scheduled Rest Day"
+        title = "Rest Day or Easy Spin" if is_dir_rest else "Rest & Recovery"
+        focus_area = "Rest & Recovery"
+        badge_text = "📋 Schedule Directive" if is_dir_rest else "🛋️ Scheduled Rest Day"
         ai_rationale = (
-            day_cfg.get("notes") or
-            f"Per your coaching schedule preferences, {day_cfg.get('day_name', 'today')} is designated as your dedicated rest day. "
-            f"Your Whoop recovery is {recovery_score}%. Full rest off the bike enables deep myofibrillar repair, "
-            f"glycogen supercompensation, and autonomic replenishment for your upcoming training blocks."
+            f"Expected Recovery: ~{recovery_score}% (Supercompensation). Per your forward directive, {day_cfg.get('day_name', 'today')} is recommended as a full rest day or gentle active recovery spin (<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) to allow cellular supercompensation before Friday's ride."
+            if is_dir_rest else
+            (day_cfg.get("notes") or f"Per your coaching schedule preferences, {day_cfg.get('day_name', 'today')} is designated as your dedicated rest day. Your Whoop recovery is {recovery_score}%. Focus on hydration, mobility, and restorative sleep before your upcoming sessions.")
         )
         workout_obj = {
             "id": "workout_primary",
@@ -102,7 +103,7 @@ def build_adaptive_workout_local(
             "badge": badge_text,
             "badge_color": "emerald",
             "title": title,
-            "description": f"Scheduled weekly rest day for {day_cfg.get('day_name', 'today')}",
+            "description": f"Scheduled rest day for {day_cfg.get('day_name', 'today')}",
             "focus_area": focus_area,
             "duration_minutes": 0,
             "estimated_tss": 0,

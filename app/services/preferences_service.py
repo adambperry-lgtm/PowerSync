@@ -252,10 +252,13 @@ def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) 
     sun_str = sunday_prior.isoformat()
     had_sunday_prior = (sun_str in acts_by_date and any(a.get("moving_time_sec", 0) >= 600 or a.get("suffer_score", 0) > 0 for a in acts_by_date[sun_str]))
 
-    # Remaining candidate days in current week
+    # Remaining candidate days in current week:
+    # A candidate day is still open/pending if it is in the future (> today),
+    # or if it is today and the athlete has not logged a workout yet today.
     remaining_candidates = [
         w for w in candidate_days
         if (monday + datetime.timedelta(days=weekday_keys.index(w))) > today
+        or ((monday + datetime.timedelta(days=weekday_keys.index(w))) == today and not day_status.get(w, {}).get("has_workout", False))
     ]
 
     must_rest_days = []
@@ -289,7 +292,7 @@ def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) 
         "day_status": day_status
     }
 
-def get_day_target_config(target_date: Optional[datetime.date] = None) -> Dict[str, Any]:
+def get_day_target_config(target_date: Optional[datetime.date] = None, ref_date: Optional[datetime.date] = None) -> Dict[str, Any]:
     """
     Returns the target duration range, mode (indoor vs outdoor), and physiological focus
     for a given date based on the athlete's weekly scheduling preferences.
@@ -304,7 +307,8 @@ def get_day_target_config(target_date: Optional[datetime.date] = None) -> Dict[s
     intervals = prefs.get("interval_preferences", DEFAULT_COACHING_PREFERENCES["interval_preferences"])
 
     # Check weekly rest directive quota from the perspective of today's completed workouts
-    status = get_weekday_rest_quota_and_status(ref_date=datetime.date.today())
+    eval_date = ref_date or (d if d <= datetime.date.today() else datetime.date.today())
+    status = get_weekday_rest_quota_and_status(ref_date=eval_date)
     is_directive_rest = (w_key in status.get("must_rest_days", []))
 
     if is_directive_rest:
