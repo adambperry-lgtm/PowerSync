@@ -1119,9 +1119,34 @@ canvas#intervalCanvas {
 }
 
 .form-group label {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 600;
-  color: var(--text-secondary);
+  color: #cbd5e1;
+  display: block;
+}
+
+.modal-body input[type="text"],
+.modal-body input[type="number"],
+.modal-body input[type="date"],
+.modal-body input[type="password"],
+.modal-body select {
+  width: 100% !important;
+  box-sizing: border-box !important;
+  height: 38px !important;
+  background-color: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 6px !important;
+  padding: 0.5rem 0.75rem !important;
+  color: #ffffff !important;
+  font-size: 0.85rem !important;
+  font-family: inherit !important;
+}
+
+.modal-body input:focus,
+.modal-body select:focus {
+  border-color: var(--accent-cyan) !important;
+  box-shadow: 0 0 0 2px var(--accent-cyan-glow) !important;
+  outline: none !important;
 }
 
 .form-group input, .form-group textarea {

@@ -12,7 +12,7 @@
     document.documentElement.setAttribute("data-theme", "dark");
     document.documentElement.setAttribute("data-theme-mode", "dark");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=53">
+  <link rel="stylesheet" href="/static/css/style.css?v=54">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -1398,44 +1398,20 @@
         <button class="modal-close" id="btnCloseSettings">&times;</button>
       </div>
       <div class="modal-body">
-        
-
-        <!-- Apple TV / Intervals.icu Zwift Bridge -->
-        <div class="form-group" style="background:rgba(252, 103, 25, 0.08);border:1px solid rgba(252, 103, 25, 0.3);padding:1rem;border-radius:8px;">
-          <div style="display:flex;align-items:center;gap:0.5rem;">
-            <span style="font-size:1.25rem;">📺</span>
-            <label style="color:#fc6719;font-weight:700;">Zwift Direct Sync for Apple TV (Intervals.icu Bridge)</label>
-          </div>
-          <p class="form-hint" style="color:#cbd5e1;margin-top:0.25rem;">
-            Because Apple TV doesn't have a filesystem to drop files into, Zwift connects to free accounts like <b>Intervals.icu</b>. 
-            When you click "Send to Zwift", PowerSync schedules today's workout on your Intervals.icu calendar, which Zwift on Apple TV instantly loads into your custom workouts menu!
-          </p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
-            <div>
-              <label>Athlete ID</label>
-              <input type="text" id="settingIntervalsAthleteId" placeholder="e.g. i12345" />
-            </div>
-            <div>
-              <label>API Key</label>
-              <input type="password" id="settingIntervalsApiKey" placeholder="API Key" />
-            </div>
-          </div>
-          <span class="form-hint">Find your ID & key in Intervals.icu -> Settings -> Developer Settings (Free).</span>
-        </div>
 
         <!-- Long-Term Fitness Goal & Program (Xert Alternative) -->
         <div class="form-group" style="background:rgba(6, 182, 212, 0.08);border:1px solid rgba(6, 182, 212, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;align-items:center;gap:0.5rem;">
             <span style="font-size:1.25rem;">🎯</span>
-            <label style="color:#06b6d4;font-weight:700;">Long-Term Fitness Goal & Program (Xert Alternative)</label>
+            <label style="color:#06b6d4;font-weight:700;margin:0;">Long-Term Fitness Goal & Program (Xert Alternative)</label>
           </div>
-          <p class="form-hint" style="color:#cbd5e1;margin-top:0.25rem;">
+          <p class="form-hint" style="color:#cbd5e1;margin-top:0.35rem;font-size:0.8rem;">
             PowerSync structures your macrocycles (Base &rarr; Build &rarr; Peak &rarr; Taper) towards your target power output or event date.
           </p>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.75rem;margin-top:0.5rem;">
-            <div>
-              <label>Program Focus / Goal Archetype</label>
-              <select id="settingProgramGoal" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border-color);border-radius:6px;padding:0.5rem;color:#fff;font-size:0.85rem;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;margin-top:0.75rem;">
+            <div style="grid-column: span 2;">
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Program Focus / Goal Archetype</label>
+              <select id="settingProgramGoal">
                 <option value="FTP_BUILD">Threshold & FTP Booster (+15W)</option>
                 <option value="GRAN_FONDO">Gran Fondo & Century Base (+10W)</option>
                 <option value="VO2_CRIT">Punchy Power & Criterium (+12W)</option>
@@ -1443,19 +1419,19 @@
               </select>
             </div>
             <div>
-              <label>Target FTP (Watts)</label>
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Target FTP (Watts)</label>
               <input type="number" id="settingProgramTargetFtp" placeholder="265" />
             </div>
             <div>
-              <label>Target Event / Completion Date</label>
-              <input type="date" id="settingProgramTargetDate" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border-color);border-radius:6px;padding:0.45rem;color:#fff;font-size:0.85rem;" />
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Target Event / Completion Date</label>
+              <input type="date" id="settingProgramTargetDate" />
             </div>
             <div>
-              <label>Weekly Target TSS</label>
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Weekly Target TSS</label>
               <input type="number" id="settingProgramWeeklyTss" placeholder="360" />
             </div>
             <div>
-              <label>Weekly Target XSS (3-Tier Strain)</label>
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Weekly Target XSS (3-Tier Strain)</label>
               <input type="number" id="settingProgramWeeklyXss" placeholder="360" />
             </div>
           </div>
@@ -1636,9 +1612,9 @@
           <p class="form-hint" style="margin-top:0.25rem;color:#cbd5e1;">
             Course map views use official <b>Google Maps</b> (Roadmap, Satellite Hybrid, and Terrain). Select your default Google Maps layer below:
           </p>
-          <div style="margin-top:0.5rem;">
-            <label style="font-size:0.75rem;">Default Google Maps Layer</label>
-            <select id="settingPreferredMapLayer" style="width:100%;background:rgba(0,0,0,0.4);border:1px solid var(--border-color);border-radius:6px;padding:0.45rem;color:#fff;font-size:0.85rem;">
+          <div style="margin-top:0.75rem;">
+            <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Default Google Maps Layer</label>
+            <select id="settingPreferredMapLayer">
               <option value="google_roads" selected>🗺️ Google Roadmap (Default)</option>
               <option value="google_hybrid">🛰️ Google Satellite Hybrid</option>
               <option value="google_terrain">⛰️ Google Terrain</option>
@@ -1688,6 +1664,36 @@
               Disconnect
             </button>
           </div>
+        </div>
+
+        <!-- Zwift & Intervals.icu Cloud Bridge Card -->
+        <div class="form-group" style="background:rgba(252, 103, 25, 0.08);border:1px solid rgba(252, 103, 25, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.25rem;">📺</span>
+              <label style="color:#fc6719;font-weight:700;margin:0;">Zwift Direct Sync (Intervals.icu Bridge)</label>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+              <a href="https://intervals.icu/settings" target="_blank" style="color:#fc6719;font-size:0.75rem;text-decoration:underline;">Developer Settings ↗</a>
+              <span id="intervalsConnStatus" style="font-size:0.8rem;color:#94a3b8;font-weight:600;">Not configured</span>
+            </div>
+          </div>
+          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+            Bridges daily recommended workouts to Zwift on Apple TV, iPad, or PC without manual file copying.
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;margin-top:0.75rem;">
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Intervals Athlete ID</label>
+              <input type="text" id="settingIntervalsAthleteId" placeholder="e.g. i12345" />
+            </div>
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Intervals API Key</label>
+              <input type="password" id="settingIntervalsApiKey" placeholder="API Key" />
+            </div>
+          </div>
+          <span class="form-hint" style="margin-top:0.35rem;font-size:0.75rem;color:#94a3b8;display:block;">
+            Find your Athlete ID (e.g. i12345) and API Key in <b>Intervals.icu &rarr; Settings &rarr; Developer Settings</b> (Free).
+          </span>
         </div>
 
         <!-- Demo Mode Toggle -->
@@ -1997,6 +2003,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=85"></script>
+  <script src="/static/js/app.js?v=86"></script>
 </body>
 </html>

@@ -2523,6 +2523,14 @@ function openSettingsModal() {
         btnDisconnectWhoop.style.display = s.whoop_connected ? "inline-block" : "none";
       }
 
+      // Intervals.icu / Zwift Connection Status
+      const intervalsStat = document.getElementById("intervalsConnStatus");
+      if (intervalsStat) {
+        const isIntervalsConfigured = Boolean(s.intervals_athlete_id && s.intervals_icu_api_key_set);
+        intervalsStat.textContent = isIntervalsConfigured ? "Connected ✅" : "Not configured";
+        intervalsStat.style.color = isIntervalsConfigured ? "#10b981" : "#94a3b8";
+      }
+
       // Gemini AI Engine Status
       const isGeminiSet = Boolean(s.gemini_api_key_set);
       updateGeminiConnectedIndicators(isGeminiSet);
