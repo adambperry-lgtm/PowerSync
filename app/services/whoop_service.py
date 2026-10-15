@@ -16,8 +16,8 @@ def get_whoop_auth_url(redirect_uri: str) -> str:
     return f"{WHOOP_AUTH_URL}?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scopes}&state={state}"
 
 def exchange_whoop_code(code: str, redirect_uri: str) -> Dict[str, Any]:
-    client_id = get_setting("whoop_client_id", "").strip()
-    client_secret = get_setting("whoop_client_secret", "").strip()
+    client_id = str(get_setting("whoop_client_id", "") or "").strip()
+    client_secret = str(get_setting("whoop_client_secret", "") or "").strip()
     
     if not client_id:
         return {"success": False, "error": "Missing Whoop Client ID. Please configure it in Settings."}

@@ -5717,9 +5717,15 @@ async function bootApp() {
   }
   if (urlParams.get("strava_connected")) {
     showToast("🎉 Strava connected successfully!");
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (_) {}
     await fetch("/api/settings", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ demo_mode: false }) });
   } else if (urlParams.get("whoop_connected")) {
     showToast("🎉 Whoop connected successfully!");
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (_) {}
     await fetch("/api/settings", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ demo_mode: false }) });
   }
 
@@ -5728,6 +5734,7 @@ async function bootApp() {
   await checkCoachGeminiStatus();
   try {
     const sRes = await fetch("/api/settings");
+    const s = await sRes.json();
     applyTheme("dark", false);
     state.googleMapsApiKey = s.google_maps_api_key_set ? "saved" : "";
     if (s.preferred_map_layer && ["google_roads", "google_hybrid", "google_terrain"].includes(s.preferred_map_layer)) {

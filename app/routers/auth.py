@@ -95,15 +95,23 @@ def debug_headers(request: Request):
         "tokens_connected": {
             "strava_tokens_present": bool(get_setting("strava_tokens")),
             "whoop_tokens_present": bool(get_setting("whoop_tokens"))
+        },
+        "database_stats": {
+            "settings_keys": [
+                row[0] for row in (
+                    get_db_connection().cursor().execute("SELECT key FROM settings").fetchall()
+                    if os.path.exists(current_db) else []
+                )
+            ]
         }
     }
 
 @router.get("/strava/login")
 def strava_login(request: Request, client_id: Optional[str] = None, client_secret: Optional[str] = None):
     if client_id:
-        set_setting("strava_client_id", client_id)
+        set_setting("strava_client_id", str(client_id).strip())
     if client_secret:
-        set_setting("strava_client_secret", client_secret)
+        set_setting("strava_client_secret", str(client_secret).strip())
 
     base_url = get_app_base_url(request)
     redirect_uri = f"{base_url}/api/auth/strava/callback"
@@ -111,20 +119,28 @@ def strava_login(request: Request, client_id: Optional[str] = None, client_secre
     return RedirectResponse(url)
 
 @router.get("/strava/callback")
-def strava_callback(code: str):
+def strava_callback(code: Optional[str] = None, error: Optional[str] = None):
+    if error:
+        return {"error": f"Strava authorization was cancelled or denied: {error}"}
+    if not code:
+        return {"error": "No authorization code received from Strava"}
+
     res = exchange_strava_code(code)
     if res.get("success"):
-        # Auto-fetch initial activities
-        fetch_recent_strava_activities(20)
-        return RedirectResponse("/?strava_connected=1")
+        # Auto-fetch initial activities safely without blocking callback redirect
+        try:
+            fetch_recent_strava_activities(20)
+        except Exception as e:
+            print(f"[PowerSync] Note: Background Strava pre-fetch error (tokens saved successfully): {e}")
+        return RedirectResponse("/?strava_connected=1", status_code=302)
     return {"error": res.get("error", "Failed to authenticate with Strava")}
 
 @router.get("/whoop/login")
 def whoop_login(request: Request, client_id: Optional[str] = None, client_secret: Optional[str] = None):
     if client_id:
-        set_setting("whoop_client_id", client_id)
+        set_setting("whoop_client_id", str(client_id).strip())
     if client_secret:
-        set_setting("whoop_client_secret", client_secret)
+        set_setting("whoop_client_secret", str(client_secret).strip())
 
     base_url = get_app_base_url(request)
     redirect_uri = f"{base_url}/api/auth/whoop/callback"
@@ -148,9 +164,12 @@ def whoop_callback(
     redirect_uri = f"{base_url}/api/auth/whoop/callback"
     res = exchange_whoop_code(code, redirect_uri)
     if res.get("success"):
-        # Auto-fetch latest metrics
-        fetch_latest_whoop_metrics()
-        return RedirectResponse("/?whoop_connected=1")
+        # Auto-fetch latest metrics safely without blocking callback redirect
+        try:
+            fetch_latest_whoop_metrics()
+        except Exception as e:
+            print(f"[PowerSync] Note: Background Whoop pre-fetch error (tokens saved successfully): {e}")
+        return RedirectResponse("/?whoop_connected=1", status_code=302)
     return {"error": res.get("error", "Failed to authenticate with Whoop")}
 
 @router.post("/sync/strava")

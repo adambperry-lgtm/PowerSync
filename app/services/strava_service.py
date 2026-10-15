@@ -13,13 +13,13 @@ def get_strava_auth_url(redirect_uri: str) -> str:
     return f"{STRAVA_AUTH_URL}?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&approval_prompt=auto&scope={scope}"
 
 def exchange_strava_code(code: str) -> Dict[str, Any]:
-    client_id = get_setting("strava_client_id", "")
-    client_secret = get_setting("strava_client_secret", "")
+    client_id = str(get_setting("strava_client_id", "")).strip()
+    client_secret = str(get_setting("strava_client_secret", "")).strip()
     
     data = {
         "client_id": client_id,
         "client_secret": client_secret,
-        "code": code,
+        "code": code.strip(),
         "grant_type": "authorization_code"
     }
     
