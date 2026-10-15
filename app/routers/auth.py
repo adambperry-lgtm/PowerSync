@@ -35,6 +35,16 @@ def get_app_base_url(request: Request) -> str:
     proto = request.headers.get("x-forwarded-proto") or request.url.scheme or "http"
     return f"{proto}://{host}"
 
+@router.get("/debug-headers")
+def debug_headers(request: Request):
+    return {
+        "headers": dict(request.headers),
+        "base_url": str(request.base_url),
+        "calculated_base_url": get_app_base_url(request),
+        "env_app_base_url": os.environ.get("APP_BASE_URL"),
+        "env_railway_public_domain": os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+    }
+
 @router.get("/strava/login")
 def strava_login(request: Request, client_id: Optional[str] = None, client_secret: Optional[str] = None):
     if client_id:
