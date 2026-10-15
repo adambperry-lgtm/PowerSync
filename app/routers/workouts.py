@@ -6,7 +6,7 @@ import uuid
 import datetime
 import re
 
-from app.database import get_setting, get_db_connection, set_setting
+from app.database import get_setting, get_db_connection, set_setting, get_current_user_id
 from app.services.ai_coach import build_workout_bundle
 from app.services.program_service import get_current_program
 from app.services.zwift_service import generate_zwo_xml, generate_intervals_icu_text, push_to_intervals_icu
@@ -76,11 +76,27 @@ class FuelingPlanRequest(BaseModel):
     humidity_pct: Optional[int] = 50
     is_outdoor: Optional[bool] = True
 
-# In-memory caches for active selection
-CURRENT_OPTIONS_CACHE: Dict[str, Dict[str, Any]] = {}
-CURRENT_WORKOUT_CACHE: Dict[str, Any] = {}
-CURRENT_OUTDOOR_OPTIONS: Dict[str, Dict[str, Any]] = {}
-CURRENT_OUTDOOR_CACHE: Dict[str, Any] = {}
+# In-memory caches for active selection scoped by user_id
+USER_OPTIONS_CACHE: Dict[str, Dict[str, Dict[str, Any]]] = {}
+USER_WORKOUT_CACHE: Dict[str, Dict[str, Any]] = {}
+USER_OUTDOOR_OPTIONS: Dict[str, Dict[str, Dict[str, Any]]] = {}
+USER_OUTDOOR_CACHE: Dict[str, Dict[str, Any]] = {}
+
+def get_current_options_cache() -> Dict[str, Dict[str, Any]]:
+    uid = get_current_user_id()
+    return USER_OPTIONS_CACHE.setdefault(uid, {})
+
+def get_current_workout_cache() -> Dict[str, Any]:
+    uid = get_current_user_id()
+    return USER_WORKOUT_CACHE.setdefault(uid, {})
+
+def get_current_outdoor_options() -> Dict[str, Dict[str, Any]]:
+    uid = get_current_user_id()
+    return USER_OUTDOOR_OPTIONS.setdefault(uid, {})
+
+def get_current_outdoor_cache() -> Dict[str, Any]:
+    uid = get_current_user_id()
+    return USER_OUTDOOR_CACHE.setdefault(uid, {})
 
 @router.post("/generate")
 def generate_workout(req: WorkoutGenerateRequest):
@@ -89,11 +105,12 @@ def generate_workout(req: WorkoutGenerateRequest):
     whoop_tokens = get_setting("whoop_tokens", None)
     
     # Retrieve latest recovery metrics
+    uid = get_current_user_id()
     today_strain = 0.0
     if whoop_tokens:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
         row = c.fetchone()
         conn.close()
         if row:
@@ -116,7 +133,7 @@ def generate_workout(req: WorkoutGenerateRequest):
     if strava_tokens:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM strava_activities ORDER BY start_date DESC LIMIT 10")
+        c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 10", (uid,))
         rows = c.fetchall()
         conn.close()
         recent_acts = [dict(r) for r in rows] if rows else get_mock_strava_activities()
@@ -261,13 +278,15 @@ def generate_workout(req: WorkoutGenerateRequest):
         bundle["primary"] = scheduled_target
         bundle["all_options"] = [scheduled_target] + [o for o in bundle["all_options"] if o["id"] != scheduled_target["id"]]
 
-    CURRENT_OPTIONS_CACHE.clear()
+    options_cache = get_current_options_cache()
+    workout_cache = get_current_workout_cache()
+    options_cache.clear()
     for opt in bundle["all_options"]:
-        CURRENT_OPTIONS_CACHE[opt["id"]] = opt
+        options_cache[opt["id"]] = opt
 
     primary_workout = bundle["primary"]
-    CURRENT_WORKOUT_CACHE.clear()
-    CURRENT_WORKOUT_CACHE.update(primary_workout)
+    workout_cache.clear()
+    workout_cache.update(primary_workout)
 
     # Check if user describes planning a custom ride or uploaded a route
     if req.gpx_content or (req.user_note and is_planned_custom_ride_description(req.user_note)):
@@ -304,15 +323,17 @@ def generate_workout(req: WorkoutGenerateRequest):
 
 @router.post("/select")
 def select_workout_option(req: WorkoutSelectRequest):
-    if req.option_id in CURRENT_OPTIONS_CACHE:
-        selected = CURRENT_OPTIONS_CACHE[req.option_id]
-        CURRENT_WORKOUT_CACHE.clear()
-        CURRENT_WORKOUT_CACHE.update(selected)
+    options_cache = get_current_options_cache()
+    workout_cache = get_current_workout_cache()
+    if req.option_id in options_cache:
+        selected = options_cache[req.option_id]
+        workout_cache.clear()
+        workout_cache.update(selected)
 
         ftp = int(get_setting("athlete_ftp", 250))
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (get_current_user_id(),))
         whoop_row = c.fetchone()
         conn.close()
         rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
@@ -339,7 +360,7 @@ def select_workout_option(req: WorkoutSelectRequest):
         return {
             "success": True,
             "active_workout": selected,
-            "options": list(CURRENT_OPTIONS_CACHE.values()),
+            "options": list(options_cache.values()),
             "fueling_plan": fueling
         }
     raise HTTPException(status_code=404, detail="Option not found in current session")
@@ -349,13 +370,15 @@ def get_current_workout():
     today_iso = datetime.date.today().isoformat()
     from app.database import get_scheduled_workout_for_date
     scheduled = get_scheduled_workout_for_date(today_iso)
-    if scheduled and (not CURRENT_WORKOUT_CACHE or CURRENT_WORKOUT_CACHE.get("id") != scheduled.get("id")):
+    workout_cache = get_current_workout_cache()
+    options_cache = get_current_options_cache()
+    if scheduled and (not workout_cache or workout_cache.get("id") != scheduled.get("id")):
         return generate_workout(WorkoutGenerateRequest(duration_min=scheduled.get("duration_minutes", 60)))
 
-    if CURRENT_WORKOUT_CACHE:
+    if workout_cache:
         return {
-            "active_workout": CURRENT_WORKOUT_CACHE,
-            "options": list(CURRENT_OPTIONS_CACHE.values())
+            "active_workout": workout_cache,
+            "options": list(options_cache.values())
         }
     return generate_workout(WorkoutGenerateRequest(duration_min=60))
 
@@ -380,7 +403,7 @@ def replace_with_custom_ride(req: ReplaceCustomRideRequest):
     
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (get_current_user_id(),))
     whoop_row = c.fetchone()
     conn.close()
     
@@ -523,11 +546,14 @@ def replace_with_custom_ride(req: ReplaceCustomRideRequest):
     custom_workout["zwo_content"] = generate_zwo_xml(custom_workout, ftp)
     custom_workout["intervals_icu_text"] = generate_intervals_icu_text(custom_workout)
 
-    CURRENT_WORKOUT_CACHE.clear()
-    CURRENT_WORKOUT_CACHE.update(custom_workout)
-    CURRENT_OUTDOOR_CACHE.clear()
-    CURRENT_OUTDOOR_CACHE.update(custom_workout)
-    CURRENT_OPTIONS_CACHE["workout_custom_replaced"] = custom_workout
+    workout_cache = get_current_workout_cache()
+    outdoor_cache = get_current_outdoor_cache()
+    options_cache = get_current_options_cache()
+    workout_cache.clear()
+    workout_cache.update(custom_workout)
+    outdoor_cache.clear()
+    outdoor_cache.update(custom_workout)
+    options_cache["workout_custom_replaced"] = custom_workout
 
     return {
         "success": True,
@@ -543,7 +569,7 @@ def get_custom_fueling_plan(req: FuelingPlanRequest):
     
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (get_current_user_id(),))
     whoop_row = c.fetchone()
     conn.close()
     
@@ -572,7 +598,10 @@ def get_custom_fueling_plan(req: FuelingPlanRequest):
 @router.get("/fueling-plan")
 def get_active_fueling_plan(temp_f: int = 74, humidity_pct: int = 50, is_outdoor: bool = True):
     """Returns fueling plan for current active workout/ride."""
-    workout = CURRENT_WORKOUT_CACHE or CURRENT_OUTDOOR_CACHE or CURRENT_OPTIONS_CACHE.get("workout_primary")
+    workout_cache = get_current_workout_cache()
+    outdoor_cache = get_current_outdoor_cache()
+    options_cache = get_current_options_cache()
+    workout = workout_cache or outdoor_cache or options_cache.get("workout_primary")
     if not workout:
         gen = generate_workout(WorkoutGenerateRequest(duration_min=60))
         workout = gen["active_workout"]
@@ -596,7 +625,9 @@ def get_active_fueling_plan(temp_f: int = 74, humidity_pct: int = 50, is_outdoor
 
 @router.get("/download-zwo")
 def download_zwo_file():
-    workout = CURRENT_WORKOUT_CACHE or CURRENT_OPTIONS_CACHE.get("workout_primary")
+    workout_cache = get_current_workout_cache()
+    options_cache = get_current_options_cache()
+    workout = workout_cache or options_cache.get("workout_primary")
     if not workout:
         gen = generate_workout(WorkoutGenerateRequest(duration_min=60))
         workout = gen["active_workout"]
@@ -622,7 +653,9 @@ def push_to_zwift_via_intervals(req: IntervalsPushRequest):
             "error": "Intervals.icu API Key is unconfigured or needs to be re-entered. Please open Settings (⚙️) and enter your Intervals.icu API Key to enable direct Zwift sync."
         }
         
-    workout = CURRENT_WORKOUT_CACHE or CURRENT_OPTIONS_CACHE.get("workout_primary")
+    workout_cache = get_current_workout_cache()
+    options_cache = get_current_options_cache()
+    workout = workout_cache or options_cache.get("workout_primary")
     if not workout:
         gen = generate_workout(WorkoutGenerateRequest(duration_min=60))
         workout = gen["active_workout"]
@@ -637,11 +670,12 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
     ftp = int(get_setting("athlete_ftp", 250))
     whoop_tokens = get_setting("whoop_tokens", None)
     
+    uid = get_current_user_id()
     today_strain = 0.0
     if whoop_tokens:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
         row = c.fetchone()
         conn.close()
         if row:
@@ -663,7 +697,7 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
     if strava_tokens:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM strava_activities ORDER BY start_date DESC LIMIT 15")
+        c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 15", (uid,))
         rows = c.fetchall()
         conn.close()
         recent_acts = [dict(r) for r in rows] if rows else get_mock_strava_activities()
@@ -745,13 +779,15 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
         today_activities=today_activities
     )
 
-    CURRENT_OUTDOOR_OPTIONS.clear()
+    outdoor_options = get_current_outdoor_options()
+    outdoor_cache = get_current_outdoor_cache()
+    outdoor_options.clear()
     for opt in outdoor_bundle["all_options"]:
-        CURRENT_OUTDOOR_OPTIONS[opt["id"]] = opt
+        outdoor_options[opt["id"]] = opt
 
     primary_ride = outdoor_bundle["primary"]
-    CURRENT_OUTDOOR_CACHE.clear()
-    CURRENT_OUTDOOR_CACHE.update(primary_ride)
+    outdoor_cache.clear()
+    outdoor_cache.update(primary_ride)
 
     ftp = int(get_setting("athlete_ftp", 250))
     outdoor_fueling = generate_fueling_plan(
@@ -790,13 +826,16 @@ def select_outdoor_option(req: OutdoorSelectRequest):
     ftp = int(get_setting("athlete_ftp", 250))
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (get_current_user_id(),))
     whoop_row = c.fetchone()
     conn.close()
     rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
     strava_trailing = get_strava_trailing_stats(days=7)
     trailing_strain = float(strava_trailing.get("trailing_7d_strain_avg", 11.0))
     yesterday_tss = int(strava_trailing.get("yesterday_tss", 0))
+
+    outdoor_options = get_current_outdoor_options()
+    outdoor_cache = get_current_outdoor_cache()
 
     def make_fueling(ride_dict):
         return generate_fueling_plan(
@@ -815,36 +854,36 @@ def select_outdoor_option(req: OutdoorSelectRequest):
             yesterday_tss=yesterday_tss
         )
 
-    # 1. Check in CURRENT_OUTDOOR_OPTIONS with flexible key matching
-    for k, v in list(CURRENT_OUTDOOR_OPTIONS.items()):
+    # 1. Check in outdoor_options with flexible key matching
+    for k, v in list(outdoor_options.items()):
         if str(k).strip("'\"") == target_id or str(v.get("id")).strip("'\"") == target_id:
-            CURRENT_OUTDOOR_CACHE.clear()
-            CURRENT_OUTDOOR_CACHE.update(v)
+            outdoor_cache.clear()
+            outdoor_cache.update(v)
             return {
                 "success": True,
                 "active_ride": v,
-                "options": list(CURRENT_OUTDOOR_OPTIONS.values()),
+                "options": list(outdoor_options.values()),
                 "fueling_plan": make_fueling(v)
             }
 
     # 2. Cache might have cleared (e.g. server auto-reload) -> Regenerate
     rec = generate_outdoor_recommendation(OutdoorRecommendRequest(duration_min=60))
-    for k, v in list(CURRENT_OUTDOOR_OPTIONS.items()):
+    for k, v in list(outdoor_options.items()):
         if str(k).strip("'\"") == target_id or str(v.get("id")).strip("'\"") == target_id:
-            CURRENT_OUTDOOR_CACHE.clear()
-            CURRENT_OUTDOOR_CACHE.update(v)
+            outdoor_cache.clear()
+            outdoor_cache.update(v)
             return {
                 "success": True,
                 "active_ride": v,
-                "options": list(CURRENT_OUTDOOR_OPTIONS.values()),
+                "options": list(outdoor_options.values()),
                 "fueling_plan": make_fueling(v)
             }
 
     # 3. Search in all_routes fallback
     for r in rec.get("all_routes", []):
         if str(r.get("id")).strip("'\"") == target_id:
-            CURRENT_OUTDOOR_CACHE.clear()
-            CURRENT_OUTDOOR_CACHE.update(r)
+            outdoor_cache.clear()
+            outdoor_cache.update(r)
             return {
                 "success": True,
                 "active_ride": r,

@@ -2,18 +2,17 @@ import requests
 import datetime
 import secrets
 from typing import Dict, Any, Optional
-from app.database import get_setting, set_setting, get_db_connection
+from app.database import get_setting, set_setting, get_db_connection, get_current_user_id
 
 WHOOP_AUTH_URL = "https://api.prod.whoop.com/oauth/oauth2/auth"
 WHOOP_TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"
 WHOOP_API_BASE = "https://api.prod.whoop.com/developer/v2"
 
-def get_whoop_auth_url(redirect_uri: str) -> str:
+def get_whoop_auth_url(redirect_uri: str, state: Optional[str] = None) -> str:
     client_id = get_setting("whoop_client_id", "")
     scopes = "offline read:recovery read:cycles read:workout read:sleep read:profile"
-    state = secrets.token_urlsafe(16)
-    set_setting("whoop_oauth_state", state)
-    return f"{WHOOP_AUTH_URL}?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scopes}&state={state}"
+    auth_state = state or secrets.token_urlsafe(16)
+    return f"{WHOOP_AUTH_URL}?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scopes}&state={auth_state}"
 
 def exchange_whoop_code(code: str, redirect_uri: str) -> Dict[str, Any]:
     client_id = str(get_setting("whoop_client_id", "") or "").strip()
@@ -91,20 +90,22 @@ def refresh_whoop_token() -> Optional[str]:
         print(f"Error refreshing Whoop token: {e}")
     return None
 
-def get_trailing_whoop_stats(days: int = 7) -> Dict[str, Any]:
+def get_trailing_whoop_stats(days: int = 7, user_id: Optional[str] = None) -> Dict[str, Any]:
     """
-    Computes trailing 7-day average daily strain and peak strain days from the database.
+    Computes trailing 7-day average daily strain and peak strain days from the database for user_id.
     Excludes today's incomplete/morning cycle to accurately measure trailing physiological load.
     """
+    uid = user_id or get_current_user_id()
     today_iso = datetime.date.today().isoformat()
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
         SELECT date, day_strain, recovery_score, hrv_rmssd
         FROM whoop_metrics
+        WHERE user_id = ?
         ORDER BY date DESC
         LIMIT ?
-    """, (days + 3,))
+    """, (uid, days + 3))
     rows = c.fetchall()
     conn.close()
 
@@ -165,8 +166,9 @@ def get_trailing_whoop_stats(days: int = 7) -> Dict[str, Any]:
         "days_analyzed": len(strains)
     }
 
-def fetch_latest_whoop_metrics() -> Dict[str, Any]:
-    tokens = get_setting("whoop_tokens", {})
+def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
+    uid = user_id or get_current_user_id()
+    tokens = get_setting("whoop_tokens", {}, user_id=uid)
     access_token = tokens.get("access_token")
     if not access_token:
         return {"error": "Whoop not connected", "auth_expired": True}
@@ -269,11 +271,11 @@ def fetch_latest_whoop_metrics() -> Dict[str, Any]:
 
         c.execute("""
             INSERT INTO whoop_metrics (
-                date, recovery_score, hrv_rmssd, resting_heart_rate,
+                user_id, date, recovery_score, hrv_rmssd, resting_heart_rate,
                 sleep_performance, sleep_duration_hours, day_strain
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(date) DO UPDATE SET
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, date) DO UPDATE SET
                 recovery_score = COALESCE(excluded.recovery_score, whoop_metrics.recovery_score),
                 hrv_rmssd = COALESCE(excluded.hrv_rmssd, whoop_metrics.hrv_rmssd),
                 resting_heart_rate = COALESCE(excluded.resting_heart_rate, whoop_metrics.resting_heart_rate),
@@ -281,6 +283,7 @@ def fetch_latest_whoop_metrics() -> Dict[str, Any]:
                 sleep_duration_hours = COALESCE(excluded.sleep_duration_hours, whoop_metrics.sleep_duration_hours),
                 day_strain = COALESCE(excluded.day_strain, whoop_metrics.day_strain)
         """, (
+            uid,
             cycle_date,
             int(rec_score) if rec_score is not None else 50,
             round(hrv_val, 1) if hrv_val is not None else 35.0,
@@ -293,7 +296,7 @@ def fetch_latest_whoop_metrics() -> Dict[str, Any]:
     conn.commit()
     conn.close()
 
-    trailing_stats = get_trailing_whoop_stats(days=7)
+    trailing_stats = get_trailing_whoop_stats(days=7, user_id=uid)
 
     return {
         "success": True,

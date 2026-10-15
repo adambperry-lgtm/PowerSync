@@ -60,6 +60,10 @@
         <span class="dot green" id="geminiNavDot"></span> Gemini: <span id="geminiNavStatusText">Ready</span>
       </div>
       <button class="btn btn-secondary" id="btnOpenSettings">⚙️ Settings</button>
+      <button class="btn btn-secondary" id="btnUserAccount" style="display:flex;align-items:center;gap:0.45rem;padding:0.45rem 0.85rem;border-color:rgba(6,182,212,0.4);" title="Account & Google Sign-In">
+        <span id="navUserAvatar" style="width:20px;height:20px;border-radius:50%;background:rgba(6,182,212,0.2);display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#06b6d4;">👤</span>
+        <span id="navUserName" style="font-size:0.85rem;font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Sign In</span>
+      </button>
     </div>
   </header>
 
@@ -1696,6 +1700,34 @@
           </span>
         </div>
 
+        <!-- Google Sign-In & Multi-User Setup Card -->
+        <div class="form-group" style="background:rgba(66, 133, 244, 0.08);border:1px solid rgba(66, 133, 244, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.25rem;">🔐</span>
+              <label style="color:#60a5fa;font-weight:700;margin:0;">Google Sign-In & Multi-User Engine</label>
+            </div>
+            <span id="googleOauthStatusPill" style="font-size:0.8rem;color:#10b981;font-weight:600;">OIDC Ready</span>
+          </div>
+          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+            Enables instant 1-click Google Sign-In with complete athlete data isolation. Users each get private Whoop, Strava, and workout databases.
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.85rem;margin-top:0.75rem;">
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Google Client ID</label>
+              <input type="text" id="settingGoogleClientId" placeholder="e.g. 123456789-xyz.apps.googleusercontent.com" />
+            </div>
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Google Client Secret</label>
+              <input type="password" id="settingGoogleClientSecret" placeholder="••••••••••••" />
+            </div>
+          </div>
+          <div style="margin-top:0.6rem;font-size:0.75rem;color:#94a3b8;background:rgba(0,0,0,0.25);padding:0.4rem 0.6rem;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <span>Authorized Redirect URI: <code id="googleRedirectUriText" style="color:#38bdf8;">/api/auth/google/callback</code></span>
+            <button type="button" class="btn btn-secondary" id="btnCopyGoogleRedirect" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Copy</button>
+          </div>
+        </div>
+
         <!-- Demo Mode Toggle -->
         <div class="form-group" style="flex-direction:row;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:8px;">
           <div>
@@ -1708,6 +1740,82 @@
         <div style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:1rem;">
           <button class="btn btn-secondary" id="btnCancelSettings">Cancel</button>
           <button class="btn btn-primary" id="btnSaveSettings">Save Changes</button>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Athlete Sign-In & Multi-User Accounts Modal -->
+  <div class="modal-overlay" id="authModal">
+    <div class="modal-dialog" style="max-width:480px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span style="font-size:1.3rem;">👤</span>
+          <h3 style="margin:0;">Athlete Account</h3>
+        </div>
+        <button class="modal-close" id="btnCloseAuthModal">&times;</button>
+      </div>
+      <div class="modal-body" style="gap:1.25rem;">
+        
+        <!-- Logged-in Profile Card (Shown when logged in) -->
+        <div id="authProfileCard" style="background:rgba(255,255,255,0.03);border:1px solid var(--border-color);border-radius:12px;padding:1.25rem;display:none;flex-direction:column;gap:1rem;">
+          <div style="display:flex;align-items:center;gap:1rem;">
+            <div id="authProfileAvatar" style="width:48px;height:48px;border-radius:50%;background:rgba(6,182,212,0.2);border:2px solid #06b6d4;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:#06b6d4;overflow:hidden;">
+              👤
+            </div>
+            <div style="overflow:hidden;">
+              <div id="authProfileName" style="font-weight:700;font-size:1.05rem;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Athlete</div>
+              <div id="authProfileEmail" style="font-size:0.8rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">athlete@example.com</div>
+              <div style="font-size:0.72rem;color:#06b6d4;margin-top:0.2rem;">🔒 Private Isolated Athlete Database</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:0.75rem;margin-top:0.25rem;">
+            <button type="button" class="btn btn-secondary" id="btnSignOut" style="flex:1;border-color:rgba(239,68,68,0.4);color:#f87171;">
+              Sign Out
+            </button>
+          </div>
+        </div>
+
+        <!-- Google Sign-In Card -->
+        <div id="authGoogleCard" style="display:flex;flex-direction:column;gap:0.75rem;">
+          <a href="/api/auth/google/login" id="btnGoogleSignIn" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;background:#ffffff;color:#1f2937;font-weight:600;font-size:0.95rem;padding:0.75rem 1rem;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);transition:all 0.2s ease;">
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </a>
+          <p style="font-size:0.75rem;color:var(--text-secondary);text-align:center;margin:0;">
+            Sign in with Google to keep your Whoop, Strava, and workout targets private and synchronized across all your devices.
+          </p>
+        </div>
+
+        <!-- Dev & Test Athlete Switcher -->
+        <div style="border-top:1px solid var(--border-color);padding-top:1rem;margin-top:0.25rem;">
+          <div style="font-size:0.8rem;font-weight:700;color:#94a3b8;margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center;">
+            <span>🧪 Athlete Switcher (Dev / Test)</span>
+            <span style="font-size:0.7rem;color:#06b6d4;">Data Isolated</span>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
+            <button type="button" class="btn btn-secondary btn-dev-switch" data-email="coach.alex@powersync.app" data-name="Coach Alex" style="font-size:0.75rem;padding:0.35rem 0.65rem;">
+              🚴 Coach Alex
+            </button>
+            <button type="button" class="btn btn-secondary btn-dev-switch" data-email="rider.jordan@powersync.app" data-name="Rider Jordan" style="font-size:0.75rem;padding:0.35rem 0.65rem;">
+              ⚡ Rider Jordan
+            </button>
+            <button type="button" class="btn btn-secondary btn-dev-switch" data-email="default@powersync.local" data-name="Default Athlete" style="font-size:0.75rem;padding:0.35rem 0.65rem;">
+              🏠 Default Athlete
+            </button>
+          </div>
+          <div style="display:flex;gap:0.4rem;">
+            <input type="email" id="inputDevLoginEmail" placeholder="custom.athlete@domain.com" style="flex:1;font-size:0.78rem;padding:0.4rem 0.6rem;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;color:#fff;" />
+            <button type="button" id="btnDevLoginSubmit" class="btn btn-secondary" style="font-size:0.75rem;padding:0.4rem 0.8rem;color:#06b6d4;border-color:rgba(6,182,212,0.4);">
+              Switch
+            </button>
+          </div>
         </div>
 
       </div>
@@ -2003,6 +2111,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=87"></script>
+  <script src="/static/js/app.js?v=88"></script>
 </body>
 </html>

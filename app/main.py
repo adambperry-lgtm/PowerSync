@@ -8,7 +8,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import init_db
+from app.database import (
+    init_db, get_user_by_session, get_default_or_guest_user,
+    set_current_user_context, reset_current_user_context
+)
 from app.routers import dashboard, workouts, settings, auth, review, plans, chat
 
 app = FastAPI(
@@ -30,6 +33,35 @@ async def add_no_cache_header(request, call_next):
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    return response
+
+@app.middleware("http")
+async def user_session_middleware(request, call_next):
+    """
+    Multi-User Context Middleware.
+    Resolves session token from powersync_session cookie or Bearer header,
+    sets request.state.user, and binds CURRENT_USER_ID for complete data isolation.
+    """
+    token = request.cookies.get("powersync_session")
+    if not token and "authorization" in request.headers:
+        auth_val = request.headers["authorization"]
+        if auth_val.startswith("Bearer "):
+            token = auth_val[7:].strip()
+
+    user = None
+    if token:
+        user = get_user_by_session(token)
+
+    if not user:
+        user = get_default_or_guest_user()
+
+    request.state.user = user
+    ctx_token = set_current_user_context(user["id"])
+    try:
+        response = await call_next(request)
+    finally:
+        reset_current_user_context(ctx_token)
+
     return response
 
 # Initialize DB tables

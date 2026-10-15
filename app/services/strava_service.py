@@ -1,20 +1,22 @@
 import requests
 import datetime
 from typing import Dict, Any, List, Optional
-from app.database import get_setting, set_setting, get_db_connection
+from app.database import get_setting, set_setting, get_db_connection, get_current_user_id
 
 STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 
-def get_strava_auth_url(redirect_uri: str) -> str:
+def get_strava_auth_url(redirect_uri: str, state: Optional[str] = None) -> str:
     client_id = get_setting("strava_client_id", "")
     scope = "read,activity:read_all"
-    return f"{STRAVA_AUTH_URL}?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&approval_prompt=auto&scope={scope}"
+    state_param = f"&state={state}" if state else ""
+    return f"{STRAVA_AUTH_URL}?client_id={client_id}&response_type=code&redirect_uri={redirect_uri}&approval_prompt=auto&scope={scope}{state_param}"
 
-def exchange_strava_code(code: str) -> Dict[str, Any]:
-    client_id = str(get_setting("strava_client_id", "")).strip()
-    client_secret = str(get_setting("strava_client_secret", "")).strip()
+def exchange_strava_code(code: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    uid = user_id or get_current_user_id()
+    client_id = str(get_setting("strava_client_id", "", user_id=uid)).strip()
+    client_secret = str(get_setting("strava_client_secret", "", user_id=uid)).strip()
     
     data = {
         "client_id": client_id,
@@ -27,20 +29,21 @@ def exchange_strava_code(code: str) -> Dict[str, Any]:
         res = requests.post(STRAVA_TOKEN_URL, data=data, timeout=10)
         if res.status_code == 200:
             token_info = res.json()
-            set_setting("strava_tokens", token_info)
+            set_setting("strava_tokens", token_info, user_id=uid)
             return {"success": True, "token_info": token_info}
         return {"success": False, "error": f"Strava returned HTTP {res.status_code}: {res.text}"}
     except Exception as e:
         return {"success": False, "error": f"Network error connecting to Strava: {str(e)}"}
 
-def refresh_strava_token() -> Optional[str]:
-    tokens = get_setting("strava_tokens", {})
+def refresh_strava_token(user_id: Optional[str] = None) -> Optional[str]:
+    uid = user_id or get_current_user_id()
+    tokens = get_setting("strava_tokens", {}, user_id=uid)
     refresh_token = tokens.get("refresh_token")
     if not refresh_token:
         return None
         
-    client_id = get_setting("strava_client_id", "")
-    client_secret = get_setting("strava_client_secret", "")
+    client_id = str(get_setting("strava_client_id", "", user_id=uid)).strip()
+    client_secret = str(get_setting("strava_client_secret", "", user_id=uid)).strip()
     
     data = {
         "client_id": client_id,
@@ -51,12 +54,13 @@ def refresh_strava_token() -> Optional[str]:
     res = requests.post(STRAVA_TOKEN_URL, data=data, timeout=10)
     if res.status_code == 200:
         new_tokens = res.json()
-        set_setting("strava_tokens", new_tokens)
+        set_setting("strava_tokens", new_tokens, user_id=uid)
         return new_tokens.get("access_token")
     return None
 
-def fetch_recent_strava_activities(limit: int = 20) -> List[Dict[str, Any]]:
-    tokens = get_setting("strava_tokens", {})
+def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    uid = user_id or get_current_user_id()
+    tokens = get_setting("strava_tokens", {}, user_id=uid)
     access_token = tokens.get("access_token")
     if not access_token:
         print("fetch_recent_strava_activities: No strava access_token found.")
@@ -68,7 +72,7 @@ def fetch_recent_strava_activities(limit: int = 20) -> List[Dict[str, Any]]:
         
         if res.status_code == 401:
             print("Strava access token expired (401). Attempting token refresh...")
-            access_token = refresh_strava_token()
+            access_token = refresh_strava_token(user_id=uid)
             if access_token:
                 headers = {"Authorization": f"Bearer {access_token}"}
                 res = requests.get(f"{STRAVA_API_BASE}/athlete/activities?per_page={limit}", headers=headers, timeout=10)
@@ -105,16 +109,16 @@ def fetch_recent_strava_activities(limit: int = 20) -> List[Dict[str, Any]]:
         
         c.execute("""
             INSERT INTO strava_activities (
-                id, name, sport_type, start_date, moving_time_sec, distance_meters,
+                user_id, id, name, sport_type, start_date, moving_time_sec, distance_meters,
                 total_elevation_gain, average_watts, weighted_average_watts,
                 average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, id) DO UPDATE SET
                 name = excluded.name,
                 moving_time_sec = excluded.moving_time_sec,
                 average_watts = excluded.average_watts,
                 weighted_average_watts = excluded.weighted_average_watts
-        """, (act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, str(a)))
+        """, (uid, act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, str(a)))
         
         saved.append({
             "id": act_id,
@@ -136,19 +140,20 @@ def fetch_recent_strava_activities(limit: int = 20) -> List[Dict[str, Any]]:
     conn.close()
     return saved
 
-def get_strava_trailing_stats(activities: Optional[List[Dict[str, Any]]] = None, days: int = 7) -> Dict[str, Any]:
+def get_strava_trailing_stats(activities: Optional[List[Dict[str, Any]]] = None, days: int = 7, user_id: Optional[str] = None) -> Dict[str, Any]:
     """
     Computes trailing 7-day training load with exponential recency weighting.
     More heavily weights recent training (e.g. yesterday) over training early in the cycle (7 days ago),
     accounting for acute fatigue decay (tau ~ 3.0 days).
     """
     import math
+    uid = user_id or get_current_user_id()
     if activities is None:
-        strava_tokens = get_setting("strava_tokens", None)
+        strava_tokens = get_setting("strava_tokens", None, user_id=uid)
         if strava_tokens:
             conn = get_db_connection()
             c = conn.cursor()
-            c.execute("SELECT * FROM strava_activities ORDER BY start_date DESC LIMIT 30")
+            c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
             rows = c.fetchall()
             conn.close()
             activities = [dict(r) for r in rows] if rows else []

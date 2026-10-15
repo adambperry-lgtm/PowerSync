@@ -30,7 +30,7 @@ def compile_athlete_context() -> Dict[str, Any]:
     including Whoop biometrics, Strava history, prescriptions, fueling, and goals.
     """
     from app.routers.dashboard import get_dashboard_data
-    from app.routers.workouts import CURRENT_WORKOUT_CACHE, CURRENT_OPTIONS_CACHE
+    from app.routers.workouts import get_current_workout_cache, get_current_options_cache
     from app.services.review_coach import get_today_and_recent_activities
 
     dash = get_dashboard_data()
@@ -64,8 +64,10 @@ def compile_athlete_context() -> Dict[str, Any]:
     }
 
     # Current Prescribed Workout
-    active_workout = CURRENT_WORKOUT_CACHE or CURRENT_OPTIONS_CACHE.get("workout_primary") or {}
-    all_options = list(CURRENT_OPTIONS_CACHE.values()) if CURRENT_OPTIONS_CACHE else []
+    workout_cache = get_current_workout_cache()
+    options_cache = get_current_options_cache()
+    active_workout = workout_cache or options_cache.get("workout_primary") or {}
+    all_options = list(options_cache.values()) if options_cache else []
 
     # Active Target Plan (e.g. Gran Fondo, Race)
     target_plan = get_active_target_plan()

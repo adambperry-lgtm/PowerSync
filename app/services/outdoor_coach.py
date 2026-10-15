@@ -3,7 +3,7 @@ import math
 import json
 import ast
 from typing import Dict, Any, List, Optional
-from app.database import get_db_connection, get_setting
+from app.database import get_db_connection, get_setting, get_current_user_id
 from app.services.mock_data import get_mock_strava_activities
 
 def decode_polyline(polyline_str: str) -> List[List[float]]:
@@ -92,6 +92,7 @@ def get_candidate_outdoor_rides() -> List[Dict[str, Any]]:
     rides: List[Dict[str, Any]] = []
 
     if strava_tokens:
+        uid = get_current_user_id()
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("""
@@ -99,11 +100,12 @@ def get_candidate_outdoor_rides() -> List[Dict[str, Any]]:
                    total_elevation_gain, average_watts, weighted_average_watts,
                    average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
             FROM strava_activities
-            WHERE (sport_type = 'Ride' OR sport_type != 'VirtualRide')
+            WHERE user_id = ?
+              AND (sport_type = 'Ride' OR sport_type != 'VirtualRide')
               AND moving_time_sec >= 1200
             ORDER BY start_date DESC
             LIMIT 40
-        """)
+        """, (uid,))
         rows = c.fetchall()
         conn.close()
         for r in rows:

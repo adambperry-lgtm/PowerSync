@@ -182,18 +182,19 @@ def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) 
         matched_directive = "Saturday is a dedicated rest day; plus one of Mon/Tue/Thu as an additional rest day."
 
     # 2. Query activities from Sunday prior through today
-    from app.database import get_db_connection, get_setting
+    from app.database import get_db_connection, get_setting, get_current_user_id
     strava_tokens = get_setting("strava_tokens", None)
     activities = []
     if strava_tokens:
+        uid = get_current_user_id()
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("""
             SELECT id, name, start_date, moving_time_sec, suffer_score
             FROM strava_activities
-            WHERE date(start_date) >= date(?)
+            WHERE user_id = ? AND date(start_date) >= date(?)
             ORDER BY start_date ASC
-        """, (sunday_prior.isoformat(),))
+        """, (uid, sunday_prior.isoformat()))
         activities = [dict(r) for r in c.fetchall()]
         conn.close()
     else:

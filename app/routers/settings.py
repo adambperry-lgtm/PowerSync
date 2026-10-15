@@ -26,6 +26,8 @@ class SettingsUpdate(BaseModel):
     google_maps_api_key: Optional[str] = None
     preferred_map_layer: Optional[str] = None
     theme_mode: Optional[str] = None
+    google_client_id: Optional[str] = None
+    google_client_secret: Optional[str] = None
 
 def is_valid_secret(secret: Optional[str]) -> bool:
     if not secret or not secret.strip():
@@ -53,6 +55,8 @@ def get_settings_endpoint():
     google_maps_key = all_s.get("google_maps_api_key", "")
     strava_secret = all_s.get("strava_client_secret", "")
     whoop_secret = all_s.get("whoop_client_secret", "")
+    google_client_id = all_s.get("google_client_id", "")
+    google_secret = all_s.get("google_client_secret", "")
 
     return {
         "athlete_ftp": int(all_s.get("athlete_ftp", 250)),
@@ -64,6 +68,9 @@ def get_settings_endpoint():
         "gemini_api_key_masked": mask_secret(gemini_key),
         "google_maps_api_key_set": is_valid_secret(google_maps_key),
         "google_maps_api_key_masked": mask_secret(google_maps_key),
+        "google_client_id": google_client_id,
+        "google_client_secret_set": is_valid_secret(google_secret),
+        "google_configured": bool(google_client_id and is_valid_secret(google_secret)),
         "preferred_map_layer": all_s.get("preferred_map_layer", "google_roads"),
         "intervals_athlete_id": all_s.get("intervals_athlete_id", ""),
         "intervals_icu_api_key_set": is_valid_secret(intervals_key),
@@ -84,6 +91,10 @@ def get_settings_endpoint():
 
 @router.post("")
 def update_settings_endpoint(payload: SettingsUpdate):
+    if payload.google_client_id is not None and payload.google_client_id.strip():
+        set_setting("google_client_id", payload.google_client_id.strip())
+    if is_valid_secret(payload.google_client_secret):
+        set_setting("google_client_secret", payload.google_client_secret.strip())
     if payload.theme_mode is not None and payload.theme_mode.strip() in ("dark", "light", "system"):
         set_setting("theme_mode", payload.theme_mode.strip())
     if payload.athlete_ftp is not None:

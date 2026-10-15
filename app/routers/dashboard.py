@@ -1,13 +1,20 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 import datetime
-from app.database import get_setting, get_db_connection
+from app.database import get_setting, get_db_connection, get_current_user_id, get_user_by_id
 from app.services.mock_data import get_mock_whoop_data, get_mock_strava_activities, get_mock_weekly_stats
 from app.services.program_service import get_current_program
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
 @router.get("")
-def get_dashboard_data():
+def get_dashboard_data(request: Request = None):
+    uid = get_current_user_id()
+    current_user = None
+    if request and hasattr(request, "state"):
+        current_user = getattr(request.state, "user", None)
+    if not current_user:
+        current_user = get_user_by_id(uid) or {}
+    
     whoop_tokens = get_setting("whoop_tokens", None)
     strava_tokens = get_setting("strava_tokens", None)
     
@@ -27,18 +34,18 @@ def get_dashboard_data():
     if whoop_tokens:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
         row = c.fetchone()
         conn.close()
 
         # If we don't have today's metrics yet, attempt an automatic sync
         if not row or row["date"] != today_iso:
             from app.services.whoop_service import fetch_latest_whoop_metrics
-            sync_res = fetch_latest_whoop_metrics()
+            sync_res = fetch_latest_whoop_metrics(user_id=uid)
             if sync_res.get("success"):
                 conn = get_db_connection()
                 c = conn.cursor()
-                c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+                c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
                 row = c.fetchone()
                 conn.close()
             elif sync_res.get("auth_expired"):
@@ -84,15 +91,15 @@ def get_dashboard_data():
     if strava_tokens:
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM strava_activities ORDER BY start_date DESC LIMIT 30")
+        c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
         rows = c.fetchall()
         conn.close()
         activities = [dict(r) for r in rows] if rows else get_mock_strava_activities()
-        weekly_stats = get_strava_trailing_stats(activities=activities, days=7)
+        weekly_stats = get_strava_trailing_stats(activities=activities, days=7, user_id=uid)
         strava_connected = True
     else:
         activities = get_mock_strava_activities()
-        weekly_stats = get_strava_trailing_stats(activities=activities, days=7)
+        weekly_stats = get_strava_trailing_stats(activities=activities, days=7, user_id=uid)
         strava_connected = False
 
     from app.services.strain_model_service import calculate_trailing_strain_systems, calculate_activity_strain
@@ -134,7 +141,17 @@ def get_dashboard_data():
     coaching_prefs = get_coaching_preferences()
     day_config = get_day_target_config()
 
+    is_guest = (uid == "usr_default" and not current_user.get("google_id") and current_user.get("email") == "athlete@powersync.local")
+
     return {
+        "user": {
+            "id": uid,
+            "email": current_user.get("email", "athlete@powersync.local"),
+            "name": current_user.get("name", "Primary Athlete"),
+            "picture": current_user.get("picture", ""),
+            "is_guest": is_guest,
+            "google_linked": bool(current_user.get("google_id"))
+        },
         "demo_mode": demo_mode,
         "athlete": {
             "ftp": ftp,

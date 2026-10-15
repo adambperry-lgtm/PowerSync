@@ -111,7 +111,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
     import datetime
 
     if action_type == "apply_today_workout":
-        from app.routers.workouts import CURRENT_WORKOUT_CACHE, CURRENT_OPTIONS_CACHE
+        from app.routers.workouts import get_current_workout_cache, get_current_options_cache
         from app.services.zwift_service import generate_zwo_xml, generate_intervals_icu_text, reconcile_workout_intervals
         from app.services.fueling_service import generate_fueling_plan
         from app.database import get_db_connection
@@ -145,14 +145,17 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
         workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
         workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
 
-        CURRENT_WORKOUT_CACHE.clear()
-        CURRENT_WORKOUT_CACHE.update(workout_obj)
-        CURRENT_OPTIONS_CACHE["workout_coach_prescribed"] = workout_obj
+        workout_cache = get_current_workout_cache()
+        options_cache = get_current_options_cache()
+        workout_cache.clear()
+        workout_cache.update(workout_obj)
+        options_cache["workout_coach_prescribed"] = workout_obj
 
         # Calculate fueling plan
+        uid = get_current_user_id()
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM whoop_metrics ORDER BY date DESC LIMIT 1")
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
         whoop_row = c.fetchone()
         conn.close()
         rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
@@ -181,7 +184,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             "action_type": "apply_today_workout",
             "message": f"Applied '{title}' as today's workout!",
             "active_workout": workout_obj,
-            "options": list(CURRENT_OPTIONS_CACHE.values()),
+            "options": list(options_cache.values()),
             "fueling_plan": fueling
         }
 

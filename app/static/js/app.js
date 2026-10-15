@@ -2502,6 +2502,14 @@ function openSettingsModal() {
         intervalsKeyInput.placeholder = s.intervals_icu_api_key_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Enter Intervals.icu API Key";
       }
 
+      const googleClientIdInput = document.getElementById("settingGoogleClientId");
+      if (googleClientIdInput) googleClientIdInput.value = s.google_client_id || "";
+      const googleSecretInput = document.getElementById("settingGoogleClientSecret");
+      if (googleSecretInput) {
+        googleSecretInput.value = "";
+        googleSecretInput.placeholder = s.google_client_secret_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Enter Google Client Secret";
+      }
+
       document.getElementById("settingFtp").value = s.athlete_ftp || 250;
       document.getElementById("settingMaxHr").value = s.athlete_max_hr || 185;
       const wPrimeInput = document.getElementById("settingAthleteWPrime");
@@ -2725,6 +2733,15 @@ btnSaveSettings.addEventListener("click", async () => {
 
   if (intervalsApiKeyVal && !intervalsApiKeyVal.includes("•")) {
     payload.intervals_icu_api_key = intervalsApiKeyVal;
+  }
+
+  const googleClientIdVal = document.getElementById("settingGoogleClientId")?.value.trim();
+  if (googleClientIdVal !== undefined) {
+    payload.google_client_id = googleClientIdVal;
+  }
+  const googleSecretVal = document.getElementById("settingGoogleClientSecret")?.value.trim();
+  if (googleSecretVal && !googleSecretVal.includes("•")) {
+    payload.google_client_secret = googleSecretVal;
   }
 
   try {
@@ -5704,6 +5721,152 @@ function initAllCollapsibleTiles() {
   syncMasterToggleState();
 }
 
+// --- Multi-User Athlete Authentication & Google Sign-In ---
+let currentAthleteUser = null;
+
+async function checkAuthStatus() {
+  try {
+    const res = await fetch("/api/auth/me");
+    if (!res.ok) return;
+    const user = await res.json();
+    currentAthleteUser = user;
+    renderUserNavPill(user);
+    renderAuthModalContent(user);
+  } catch (e) {
+    console.warn("Failed to check auth status:", e);
+  }
+}
+
+function renderUserNavPill(user) {
+  const avatarEl = document.getElementById("navUserAvatar");
+  const nameEl = document.getElementById("navUserName");
+  if (!user || user.is_guest) {
+    if (avatarEl) avatarEl.textContent = "👤";
+    if (nameEl) nameEl.textContent = "Sign In";
+  } else {
+    if (avatarEl) {
+      if (user.picture) {
+        avatarEl.innerHTML = `<img src="${user.picture}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+      } else {
+        const initials = (user.name || user.email || "U").substring(0, 2).toUpperCase();
+        avatarEl.textContent = initials;
+      }
+    }
+    if (nameEl) {
+      nameEl.textContent = user.name || user.email.split("@")[0];
+    }
+  }
+}
+
+function renderAuthModalContent(user) {
+  const profileCard = document.getElementById("authProfileCard");
+  const avatarEl = document.getElementById("authProfileAvatar");
+  const nameEl = document.getElementById("authProfileName");
+  const emailEl = document.getElementById("authProfileEmail");
+  const googleBtnText = document.querySelector("#btnGoogleSignIn span");
+
+  if (user && !user.is_guest) {
+    if (profileCard) profileCard.style.display = "flex";
+    if (nameEl) nameEl.textContent = user.name || "Athlete";
+    if (emailEl) emailEl.textContent = user.email || "";
+    if (avatarEl) {
+      if (user.picture) {
+        avatarEl.innerHTML = `<img src="${user.picture}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`;
+      } else {
+        const initials = (user.name || user.email || "U").substring(0, 2).toUpperCase();
+        avatarEl.textContent = initials;
+      }
+    }
+    if (googleBtnText) googleBtnText.textContent = "Switch Google Account";
+  } else {
+    if (profileCard) profileCard.style.display = "none";
+    if (googleBtnText) googleBtnText.textContent = "Continue with Google";
+  }
+}
+
+const authModal = document.getElementById("authModal");
+const btnUserAccount = document.getElementById("btnUserAccount");
+const btnCloseAuthModal = document.getElementById("btnCloseAuthModal");
+
+function openAuthModal() {
+  if (authModal) authModal.classList.add("open");
+  if (currentAthleteUser) renderAuthModalContent(currentAthleteUser);
+}
+
+function closeAuthModal() {
+  if (authModal) authModal.classList.remove("open");
+}
+
+if (btnUserAccount) btnUserAccount.addEventListener("click", openAuthModal);
+if (btnCloseAuthModal) btnCloseAuthModal.addEventListener("click", closeAuthModal);
+if (authModal) {
+  authModal.addEventListener("click", (e) => {
+    if (e.target === authModal) closeAuthModal();
+  });
+}
+
+const btnSignOut = document.getElementById("btnSignOut");
+if (btnSignOut) {
+  btnSignOut.addEventListener("click", async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      showToast("Signed out. Refreshing session...");
+      setTimeout(() => { window.location.reload(); }, 500);
+    } catch (e) {
+      window.location.reload();
+    }
+  });
+}
+
+document.querySelectorAll(".btn-dev-switch").forEach(btn => {
+  btn.addEventListener("click", async () => {
+    const email = btn.getAttribute("data-email");
+    const name = btn.getAttribute("data-name");
+    await performDevLogin(email, name);
+  });
+});
+
+const btnDevLoginSubmit = document.getElementById("btnDevLoginSubmit");
+const inputDevLoginEmail = document.getElementById("inputDevLoginEmail");
+if (btnDevLoginSubmit && inputDevLoginEmail) {
+  btnDevLoginSubmit.addEventListener("click", async () => {
+    const email = inputDevLoginEmail.value.trim();
+    if (!email) {
+      showToast("Please enter an email address.");
+      return;
+    }
+    await performDevLogin(email, email.split("@")[0]);
+  });
+}
+
+async function performDevLogin(email, name) {
+  try {
+    showToast(`Switching to athlete ${name || email}...`);
+    const res = await fetch("/api/auth/dev-login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, name })
+    });
+    if (res.ok) {
+      showToast(`Switched account to ${name || email}! Reloading...`);
+      setTimeout(() => { window.location.reload(); }, 500);
+    } else {
+      showToast("Failed to switch account.");
+    }
+  } catch (err) {
+    showToast("Error switching account.");
+  }
+}
+
+const btnCopyGoogleRedirect = document.getElementById("btnCopyGoogleRedirect");
+if (btnCopyGoogleRedirect) {
+  btnCopyGoogleRedirect.addEventListener("click", () => {
+    const origin = window.location.origin;
+    navigator.clipboard.writeText(`${origin}/api/auth/google/callback`);
+    showToast("📋 Redirect URI copied to clipboard!");
+  });
+}
+
 // Initial boot
 async function bootApp() {
   initThemeSystem();
@@ -5711,6 +5874,17 @@ async function bootApp() {
   initAllCollapsibleTiles();
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has("reload")) {
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (_) {}
+  }
+  if (urlParams.get("login_success")) {
+    showToast("🎉 Signed in successfully! Welcome to PowerSync.");
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } catch (_) {}
+  } else if (urlParams.get("auth_error")) {
+    showToast(`⚠️ Authentication error: ${urlParams.get("auth_error")}`);
     try {
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (_) {}
@@ -5729,6 +5903,7 @@ async function bootApp() {
     await fetch("/api/settings", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ demo_mode: false }) });
   }
 
+  await checkAuthStatus();
   await loadVersionInfo();
   await loadDashboard();
   await checkCoachGeminiStatus();

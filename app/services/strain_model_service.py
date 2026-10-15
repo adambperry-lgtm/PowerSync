@@ -1,7 +1,7 @@
 import math
 import datetime
 from typing import Dict, Any, List, Optional
-from app.database import get_setting, get_db_connection
+from app.database import get_setting, get_db_connection, get_current_user_id
 
 # ============================================================================
 # 3-Tier Physiological Strain Engine (Xert XSS / Skiba W'bal Equivalent)
@@ -245,9 +245,10 @@ def calculate_trailing_strain_systems(
     cp = sig["tp"]
     
     if activities is None:
+        uid = get_current_user_id()
         conn = get_db_connection()
         c = conn.cursor()
-        c.execute("SELECT * FROM strava_activities ORDER BY start_date DESC LIMIT 30")
+        c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
         rows = c.fetchall()
         conn.close()
         activities = [dict(r) for r in rows] if rows else []

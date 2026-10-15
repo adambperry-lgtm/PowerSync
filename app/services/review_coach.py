@@ -3,7 +3,7 @@ import math
 import json
 import requests
 from typing import Dict, Any, List, Optional
-from app.database import get_db_connection, get_setting, set_setting, get_active_target_plan
+from app.database import get_db_connection, get_setting, set_setting, get_active_target_plan, get_current_user_id
 from app.services.mock_data import get_mock_whoop_data, get_mock_strava_activities
 from app.services.program_service import get_current_program
 from app.services.strava_service import get_strava_trailing_stats
@@ -18,6 +18,7 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
     activities = []
     
     if strava_tokens:
+        uid = get_current_user_id()
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("""
@@ -25,9 +26,10 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
                    total_elevation_gain, average_watts, weighted_average_watts,
                    average_heartrate, max_heartrate, suffer_score, kilojoules
             FROM strava_activities
+            WHERE user_id = ?
             ORDER BY start_date DESC
             LIMIT 15
-        """)
+        """, (uid,))
         rows = c.fetchall()
         conn.close()
         activities = [dict(r) for r in rows]
@@ -65,15 +67,16 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
     }
 
 def get_whoop_for_date(target_date_str: str) -> Optional[Dict[str, Any]]:
-    """Fetches stored Whoop metrics for a specific date (YYYY-MM-DD)."""
+    """Fetches stored Whoop metrics for a specific date (YYYY-MM-DD) for active user."""
+    uid = get_current_user_id()
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
         SELECT date, recovery_score, hrv_rmssd, resting_heart_rate,
                sleep_performance, sleep_duration_hours, day_strain
         FROM whoop_metrics
-        WHERE date = ?
-    """, (target_date_str,))
+        WHERE user_id = ? AND date = ?
+    """, (uid, target_date_str))
     row = c.fetchone()
     conn.close()
     if row:
