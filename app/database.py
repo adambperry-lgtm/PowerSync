@@ -580,6 +580,277 @@ def create_or_get_google_user(email: str, name: str, picture: Optional[str] = No
     claim_or_copy_default_data_to_user(user_id)
     return user
 
+DEV_USER_PROFILES: Dict[str, Dict[str, Any]] = {
+    "coach.alex@powersync.app": {
+        "id": "usr_coach_alex",
+        "name": "Coach Alex",
+        "email": "coach.alex@powersync.app",
+        "settings": {
+            "athlete_ftp": 315,
+            "athlete_max_hr": 194,
+            "athlete_w_prime_kj": 25.0,
+            "athlete_peak_power_watts": 1250,
+            "program_goal": "FTP_BUILD",
+            "program_target_ftp": 335,
+            "program_target_date": "2026-08-15",
+            "program_weekly_tss_target": 480,
+            "demo_mode": False,
+            "coaching_preferences": {
+                "directives": [
+                    "Warmup: 45% -> 75% FTP ramp, Cooldown: 65% -> 40% FTP ramp",
+                    "Indoor intervals on Tuesday/Thursday, outdoor endurance on weekends",
+                    "Focus on anaerobic capacity and power above threshold"
+                ]
+            }
+        },
+        "whoop": {
+            "recovery_score": 88,
+            "hrv_rmssd": 84.2,
+            "resting_heart_rate": 42,
+            "sleep_performance": 94,
+            "sleep_duration_hours": 8.5,
+            "day_strain": 7.4
+        },
+        "plan": {
+            "id": "plan_coach_alex",
+            "title": "Leadville 100 MTB Prep",
+            "target_date": "2026-08-15",
+            "description": "High-altitude mountain bike endurance preparation focusing on threshold repeatability and sustained climbing.",
+            "distance_miles": 100.0,
+            "elevation_gain_ft": 12000.0,
+            "estimated_duration_min": 420,
+            "estimated_tss": 460,
+            "intensity_type": "Threshold",
+            "is_active": 1
+        },
+        "activities": [
+            {
+                "id": "alex_act_1",
+                "name": "High-Altitude VO2 Max Climbing Repeats",
+                "sport_type": "Ride",
+                "days_ago": 1,
+                "moving_time_sec": 4800,
+                "distance_meters": 38500,
+                "total_elevation_gain": 850,
+                "average_watts": 285,
+                "weighted_average_watts": 320,
+                "average_heartrate": 164,
+                "max_heartrate": 188,
+                "suffer_score": 92,
+                "kilojoules": 1368
+            },
+            {
+                "id": "alex_act_2",
+                "name": "Sweet Spot Threshold Progression",
+                "sport_type": "VirtualRide",
+                "days_ago": 2,
+                "moving_time_sec": 4200,
+                "distance_meters": 36000,
+                "total_elevation_gain": 320,
+                "average_watts": 275,
+                "weighted_average_watts": 298,
+                "average_heartrate": 156,
+                "max_heartrate": 178,
+                "suffer_score": 78,
+                "kilojoules": 1155
+            },
+            {
+                "id": "alex_act_3",
+                "name": "Sub-Threshold Canyon Tempo",
+                "sport_type": "Ride",
+                "days_ago": 4,
+                "moving_time_sec": 7200,
+                "distance_meters": 64000,
+                "total_elevation_gain": 1200,
+                "average_watts": 250,
+                "weighted_average_watts": 270,
+                "average_heartrate": 148,
+                "max_heartrate": 170,
+                "suffer_score": 115,
+                "kilojoules": 1800
+            }
+        ]
+    },
+    "rider.jordan@powersync.app": {
+        "id": "usr_rider_jordan",
+        "name": "Rider Jordan",
+        "email": "rider.jordan@powersync.app",
+        "settings": {
+            "athlete_ftp": 210,
+            "athlete_max_hr": 174,
+            "athlete_w_prime_kj": 16.0,
+            "athlete_peak_power_watts": 850,
+            "program_goal": "GRAN_FONDO",
+            "program_target_ftp": 230,
+            "program_target_date": "2026-10-04",
+            "program_weekly_tss_target": 260,
+            "demo_mode": False,
+            "coaching_preferences": {
+                "directives": [
+                    "Strictly cap heart rate under Zone 3 on recovery days",
+                    "Prefers high cadence 90-95 RPM spinning",
+                    "Saturday dedicated gravel endurance roll"
+                ]
+            }
+        },
+        "whoop": {
+            "recovery_score": 38,
+            "hrv_rmssd": 41.5,
+            "resting_heart_rate": 58,
+            "sleep_performance": 68,
+            "sleep_duration_hours": 6.2,
+            "day_strain": 15.8
+        },
+        "plan": {
+            "id": "plan_rider_jordan",
+            "title": "Belgian Waffle Ride 100k",
+            "target_date": "2026-10-04",
+            "description": "Challenging mixed-surface dirt and gravel endurance ride with punchy sectors.",
+            "distance_miles": 65.0,
+            "elevation_gain_ft": 4500.0,
+            "estimated_duration_min": 240,
+            "estimated_tss": 250,
+            "intensity_type": "Endurance",
+            "is_active": 1
+        },
+        "activities": [
+            {
+                "id": "jordan_act_1",
+                "name": "Heavy Trail Day (High Fatigue)",
+                "sport_type": "Ride",
+                "days_ago": 1,
+                "moving_time_sec": 5400,
+                "distance_meters": 32000,
+                "total_elevation_gain": 650,
+                "average_watts": 170,
+                "weighted_average_watts": 192,
+                "average_heartrate": 152,
+                "max_heartrate": 168,
+                "suffer_score": 88,
+                "kilojoules": 918
+            },
+            {
+                "id": "jordan_act_2",
+                "name": "Easy Coffee & Bakery Spin",
+                "sport_type": "Ride",
+                "days_ago": 3,
+                "moving_time_sec": 3000,
+                "distance_meters": 18000,
+                "total_elevation_gain": 110,
+                "average_watts": 140,
+                "weighted_average_watts": 148,
+                "average_heartrate": 122,
+                "max_heartrate": 138,
+                "suffer_score": 24,
+                "kilojoules": 420
+            },
+            {
+                "id": "jordan_act_3",
+                "name": "Canal Gravel Endurance",
+                "sport_type": "Ride",
+                "days_ago": 5,
+                "moving_time_sec": 4800,
+                "distance_meters": 34000,
+                "total_elevation_gain": 180,
+                "average_watts": 155,
+                "weighted_average_watts": 165,
+                "average_heartrate": 130,
+                "max_heartrate": 145,
+                "suffer_score": 42,
+                "kilojoules": 744
+            }
+        ]
+    }
+}
+
+def seed_dev_user_profile(user_id: str, profile: Dict[str, Any]):
+    """Seeds distinct athlete biometrics, settings, activities, and goals for a dev athlete."""
+    clean_email = (profile.get("email") or f"{user_id}@powersync.app").strip().lower()
+    conn = get_db_connection()
+    c = conn.cursor()
+    # Clean up any legacy row that had this email under a random UUID to avoid UNIQUE constraint violation
+    c.execute("DELETE FROM users WHERE email = ? AND id != ?", (clean_email, user_id))
+    c.execute("""
+        INSERT INTO users (id, email, name, picture, last_login)
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET email = excluded.email, name = excluded.name, last_login = CURRENT_TIMESTAMP
+    """, (user_id, clean_email, profile["name"], profile.get("picture", "")))
+    conn.commit()
+    conn.close()
+
+    # Settings
+    for k, v in profile.get("settings", {}).items():
+        set_setting(k, v, user_id=user_id)
+
+    # Whoop metrics: seed today + 6 trailing days
+    today = datetime.date.today()
+    whoop = profile.get("whoop", {})
+    base_rec = whoop.get("recovery_score", 75)
+    base_hrv = whoop.get("hrv_rmssd", 55.0)
+    base_rhr = whoop.get("resting_heart_rate", 50)
+    base_sleep = whoop.get("sleep_performance", 85)
+    base_sleep_hrs = whoop.get("sleep_duration_hours", 7.5)
+    base_strain = whoop.get("day_strain", 10.0)
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    for d in range(7):
+        d_date = (today - datetime.timedelta(days=d)).isoformat()
+        jitter = (d % 3) * 2 - 2
+        d_rec = max(20, min(99, base_rec + jitter))
+        d_strain = max(4.0, min(20.0, base_strain - jitter * 0.8))
+        c.execute("""
+            INSERT INTO whoop_metrics (user_id, date, recovery_score, hrv_rmssd, resting_heart_rate, sleep_performance, sleep_duration_hours, day_strain)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, date) DO UPDATE SET
+                recovery_score = excluded.recovery_score,
+                hrv_rmssd = excluded.hrv_rmssd,
+                resting_heart_rate = excluded.resting_heart_rate,
+                sleep_performance = excluded.sleep_performance,
+                sleep_duration_hours = excluded.sleep_duration_hours,
+                day_strain = excluded.day_strain
+        """, (user_id, d_date, d_rec, base_hrv, base_rhr, base_sleep, base_sleep_hrs, d_strain))
+
+    # Strava activities
+    for act in profile.get("activities", []):
+        act_date = (today - datetime.timedelta(days=act.get("days_ago", 1))).strftime("%Y-%m-%dT08:00:00Z")
+        c.execute("""
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, elapsed_time_sec, moving_time_sec,
+                distance_meters, total_elevation_gain, average_watts, weighted_average_watts,
+                average_heartrate, max_heartrate, suffer_score, kilojoules
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, id) DO UPDATE SET
+                name = excluded.name, average_watts = excluded.average_watts, weighted_average_watts = excluded.weighted_average_watts
+        """, (
+            user_id, act["id"], act["name"], act["sport_type"], act_date,
+            act["moving_time_sec"] + 300, act["moving_time_sec"],
+            act["distance_meters"], act["total_elevation_gain"],
+            act["average_watts"], act["weighted_average_watts"],
+            act["average_heartrate"], act["max_heartrate"],
+            act["suffer_score"], act["kilojoules"]
+        ))
+
+    # Target plan
+    plan = profile.get("plan")
+    if plan:
+        c.execute("""
+            INSERT INTO target_plans (
+                user_id, id, title, target_date, description, distance_miles, elevation_gain_ft,
+                estimated_duration_min, estimated_tss, intensity_type, is_active
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, id) DO UPDATE SET title = excluded.title, target_date = excluded.target_date
+        """, (
+            user_id, plan["id"], plan["title"], plan["target_date"], plan["description"],
+            plan["distance_miles"], plan["elevation_gain_ft"], plan["estimated_duration_min"],
+            plan["estimated_tss"], plan["intensity_type"], plan["is_active"]
+        ))
+
+    conn.commit()
+    conn.close()
+
 def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None) -> Dict[str, Any]:
     """Helper for dev/testing authentication with complete data isolation."""
     conn = get_db_connection()
@@ -594,6 +865,15 @@ def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None)
         if row:
             return dict(row)
         return get_default_athlete_user()
+
+    # Built-in test athletes: Coach Alex & Rider Jordan with distinct data
+    if clean_email in DEV_USER_PROFILES:
+        prof = DEV_USER_PROFILES[clean_email]
+        user_id = prof["id"]
+        seed_dev_user_profile(user_id, prof)
+        user = get_user_by_id(user_id)
+        if user:
+            return user
 
     # Lookup existing dev/test user by email (excluding usr_default)
     cursor.execute("SELECT * FROM users WHERE email = ? AND id != 'usr_default'", (clean_email,))
@@ -1031,3 +1311,6 @@ def claim_or_copy_default_data_to_user(target_user_id: str) -> Dict[str, Any]:
 
 # Initialize on module load
 init_db()
+for _email, _prof in DEV_USER_PROFILES.items():
+    seed_dev_user_profile(_prof["id"], _prof)
+

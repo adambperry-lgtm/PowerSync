@@ -107,36 +107,32 @@ def generate_workout(req: WorkoutGenerateRequest):
     # Retrieve latest recovery metrics
     uid = get_current_user_id()
     today_strain = 0.0
-    if whoop_tokens:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
-        row = c.fetchone()
-        conn.close()
-        if row:
-            whoop = {
-                "recovery_score": int(row["recovery_score"]),
-                "hrv_rmssd": float(row["hrv_rmssd"]),
-                "sleep_performance": int(row["sleep_performance"] or 85),
-                "day_strain": float(row["day_strain"] or 0.0)
-            }
-            today_strain = float(row["day_strain"] or 0.0)
-        else:
-            whoop = get_mock_whoop_data()
-            today_strain = float(whoop.get("day_strain", 0.0))
+    # Whoop metrics: prioritize athlete's private whoop_metrics table records
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+    row = c.fetchone()
+    conn.close()
+    if row:
+        whoop = {
+            "recovery_score": int(row["recovery_score"]),
+            "hrv_rmssd": float(row["hrv_rmssd"]),
+            "sleep_performance": int(row["sleep_performance"] or 85),
+            "day_strain": float(row["day_strain"] or 0.0)
+        }
+        today_strain = float(row["day_strain"] or 0.0)
     else:
         whoop = get_mock_whoop_data()
         today_strain = float(whoop.get("day_strain", 0.0))
 
-    # Strava metrics
-    strava_tokens = get_setting("strava_tokens", None)
-    if strava_tokens:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 10", (uid,))
-        rows = c.fetchall()
-        conn.close()
-        recent_acts = [dict(r) for r in rows] if rows else get_mock_strava_activities()
+    # Strava metrics: prioritize athlete's private strava_activities table records
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 10", (uid,))
+    rows = c.fetchall()
+    conn.close()
+    if rows:
+        recent_acts = [dict(r) for r in rows]
     else:
         recent_acts = get_mock_strava_activities()
 

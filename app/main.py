@@ -43,11 +43,13 @@ async def user_session_middleware(request, call_next):
     sets request.state.user, and binds CURRENT_USER_ID for complete data isolation.
     Unauthenticated visitors are safely bound to an isolated guest context.
     """
-    token = request.cookies.get("powersync_session")
-    if not token and "authorization" in request.headers:
+    token = None
+    if "authorization" in request.headers:
         auth_val = request.headers["authorization"]
         if auth_val.startswith("Bearer "):
             token = auth_val[7:].strip()
+    if not token:
+        token = request.cookies.get("powersync_session")
 
     user = None
     if token:

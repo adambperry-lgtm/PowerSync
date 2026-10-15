@@ -515,6 +515,35 @@ class TestMultiUserHTTPServer(unittest.TestCase):
         self.assertEqual(google_user["email"], "primary.cyclist@gmail.com")
         self.assertEqual(google_user["google_id"], "gid_99887766")
 
+    def test_06_dev_athletes_distinct_visible_telemetry(self):
+        """Verify Coach Alex and Rider Jordan have completely distinct visible biometrics, FTP, and workouts."""
+        from app.database import set_current_user_context
+        from app.routers.dashboard import get_dashboard_data
+        from app.routers.workouts import generate_workout, WorkoutGenerateRequest
+
+        set_current_user_context("usr_coach_alex")
+        dash_alex = get_dashboard_data()
+        w_alex = generate_workout(WorkoutGenerateRequest(duration_min=45))
+
+        set_current_user_context("usr_rider_jordan")
+        dash_jordan = get_dashboard_data()
+        w_jordan = generate_workout(WorkoutGenerateRequest(duration_min=45))
+
+        # Check FTP divergence
+        self.assertEqual(dash_alex["athlete"]["ftp"], 315)
+        self.assertEqual(dash_jordan["athlete"]["ftp"], 210)
+
+        # Check Recovery divergence
+        self.assertGreaterEqual(dash_alex["whoop"]["recovery_score"], 80)
+        self.assertLessEqual(dash_jordan["whoop"]["recovery_score"], 50)
+
+        # Check Strava divergence
+        self.assertGreater(dash_alex["strava"]["weekly_stats"]["total_tss"], dash_jordan["strava"]["weekly_stats"]["total_tss"])
+
+        # Check workout divergence
+        self.assertNotEqual(w_alex["active_workout"]["title"], w_jordan["active_workout"]["title"])
+
 if __name__ == "__main__":
     unittest.main()
+
 

@@ -28,79 +28,76 @@ def get_dashboard_data(request: Request = None):
     intervals_icu_key = get_setting("intervals_icu_api_key", "")
     intervals_athlete_id = get_setting("intervals_athlete_id", "")
     
-    # Whoop Data: if user has connected Whoop tokens, ALWAYS use their real data
+    # Whoop Data: prioritize athlete's private whoop_metrics table records
     today_iso = datetime.date.today().isoformat()
     whoop_auth_expired = False
-    if whoop_tokens:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
-        row = c.fetchone()
-        conn.close()
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+    row = c.fetchone()
+    conn.close()
 
-        # If we don't have today's metrics yet, attempt an automatic sync
-        if not row or row["date"] != today_iso:
-            from app.services.whoop_service import fetch_latest_whoop_metrics
-            sync_res = fetch_latest_whoop_metrics(user_id=uid)
-            if sync_res.get("success"):
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
-                row = c.fetchone()
-                conn.close()
-            elif sync_res.get("auth_expired"):
-                whoop_auth_expired = True
+    # If user has connected live Whoop tokens and today's metric is missing, attempt live sync
+    if whoop_tokens and (not row or row["date"] != today_iso):
+        from app.services.whoop_service import fetch_latest_whoop_metrics
+        sync_res = fetch_latest_whoop_metrics(user_id=uid)
+        if sync_res.get("success"):
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+            row = c.fetchone()
+            conn.close()
+        elif sync_res.get("auth_expired"):
+            whoop_auth_expired = True
 
-        if row:
-            from app.services.whoop_service import get_trailing_whoop_stats
-            trailing_stats = get_trailing_whoop_stats(days=7)
-            is_today = (row["date"] == today_iso)
-            whoop_data = {
-                "date": row["date"],
-                "is_today": is_today,
-                "auth_expired": whoop_auth_expired,
-                "recovery_score": int(row["recovery_score"]),
-                "recovery_zone": "green" if row["recovery_score"] > 66 else ("yellow" if row["recovery_score"] >= 34 else "red"),
-                "hrv_rmssd": round(float(row["hrv_rmssd"]), 1),
-                "resting_heart_rate": int(row["resting_heart_rate"]),
-                "sleep_performance": int(row["sleep_performance"] or 85),
-                "sleep_duration_hours": round(float(row["sleep_duration_hours"] or 7.5), 1),
-                "day_strain": round(float(row["day_strain"] or 0.0), 1),
-                "trailing_7d_strain_avg": trailing_stats.get("trailing_7d_strain_avg", 0.0),
-                "recent_weighted_strain": trailing_stats.get("recent_weighted_strain", 0.0),
-                "yesterday_strain": trailing_stats.get("yesterday_strain", 0.0),
-                "strain_profile": trailing_stats.get("strain_profile", "Evenly Distributed"),
-                "trailing_7d_high_strain_days": trailing_stats.get("trailing_7d_high_strain_count", 0),
-                "trailing_strains": trailing_stats.get("trailing_strains", []),
-                "trends": {
-                    "hrv_vs_baseline": f"{round(float(row['hrv_rmssd']), 1)} ms",
-                    "rhr_vs_baseline": f"{int(row['resting_heart_rate'])} bpm",
-                    "sleep_consistency": "Synced Today" if is_today else f"Last: {row['date']}"
-                }
+    if row:
+        from app.services.whoop_service import get_trailing_whoop_stats
+        trailing_stats = get_trailing_whoop_stats(days=7, user_id=uid)
+        is_today = (row["date"] == today_iso)
+        whoop_data = {
+            "date": row["date"],
+            "is_today": is_today,
+            "auth_expired": whoop_auth_expired,
+            "recovery_score": int(row["recovery_score"]),
+            "recovery_zone": "green" if row["recovery_score"] > 66 else ("yellow" if row["recovery_score"] >= 34 else "red"),
+            "hrv_rmssd": round(float(row["hrv_rmssd"]), 1),
+            "resting_heart_rate": int(row["resting_heart_rate"]),
+            "sleep_performance": int(row["sleep_performance"] or 85),
+            "sleep_duration_hours": round(float(row["sleep_duration_hours"] or 7.5), 1),
+            "day_strain": round(float(row["day_strain"] or 0.0), 1),
+            "trailing_7d_strain_avg": trailing_stats.get("trailing_7d_strain_avg", 0.0),
+            "recent_weighted_strain": trailing_stats.get("recent_weighted_strain", 0.0),
+            "yesterday_strain": trailing_stats.get("yesterday_strain", 0.0),
+            "strain_profile": trailing_stats.get("strain_profile", "Evenly Distributed"),
+            "trailing_7d_high_strain_days": trailing_stats.get("trailing_7d_high_strain_count", 0),
+            "trailing_strains": trailing_stats.get("trailing_strains", []),
+            "trends": {
+                "hrv_vs_baseline": f"{round(float(row['hrv_rmssd']), 1)} ms",
+                "rhr_vs_baseline": f"{int(row['resting_heart_rate'])} bpm",
+                "sleep_consistency": "Synced Today" if is_today else f"Last: {row['date']}"
             }
-        else:
-            whoop_data = get_mock_whoop_data()
-            whoop_data["auth_expired"] = whoop_auth_expired
-        whoop_connected = True
+        }
+        whoop_connected = bool(whoop_tokens)
     else:
         whoop_data = get_mock_whoop_data()
-        whoop_connected = False
+        whoop_data["auth_expired"] = whoop_auth_expired
+        whoop_connected = bool(whoop_tokens)
 
-    # Strava Data: if user has connected Strava tokens, ALWAYS use their real data
+    # Strava Data: prioritize athlete's private strava_activities table records
     from app.services.strava_service import get_strava_trailing_stats
-    if strava_tokens:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
-        rows = c.fetchall()
-        conn.close()
-        activities = [dict(r) for r in rows] if rows else get_mock_strava_activities()
-        weekly_stats = get_strava_trailing_stats(activities=activities, days=7, user_id=uid)
-        strava_connected = True
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
+    rows = c.fetchall()
+    conn.close()
+
+    if rows:
+        activities = [dict(r) for r in rows]
     else:
         activities = get_mock_strava_activities()
-        weekly_stats = get_strava_trailing_stats(activities=activities, days=7, user_id=uid)
-        strava_connected = False
+    weekly_stats = get_strava_trailing_stats(activities=activities, days=7, user_id=uid)
+    strava_connected = bool(strava_tokens)
 
     from app.services.strain_model_service import calculate_trailing_strain_systems, calculate_activity_strain
     w_prime_kj = float(get_setting("athlete_w_prime_kj", 20.0))
@@ -141,7 +138,7 @@ def get_dashboard_data(request: Request = None):
     coaching_prefs = get_coaching_preferences()
     day_config = get_day_target_config()
 
-    is_guest = (uid == "usr_default" and not current_user.get("google_id") and current_user.get("email") == "athlete@powersync.local")
+    is_guest = (uid == "usr_guest" or current_user.get("is_guest", False))
 
     return {
         "user": {
