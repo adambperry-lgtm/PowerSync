@@ -105,6 +105,33 @@ def init_db():
     conn.commit()
     conn.close()
 
+ENV_FALLBACK_ALIASES = {
+    "athlete_ftp": ["ATHLETE_FTP", "FTP"],
+    "athlete_max_hr": ["ATHLETE_MAX_HR", "MAX_HR"],
+    "intervals_icu_api_key": ["INTERVALS_ICU_API_KEY", "INTERVALS_API_KEY"],
+    "intervals_athlete_id": ["INTERVALS_ATHLETE_ID", "INTERVALS_ID"],
+    "strava_client_id": ["STRAVA_CLIENT_ID"],
+    "strava_client_secret": ["STRAVA_CLIENT_SECRET"],
+    "whoop_client_id": ["WHOOP_CLIENT_ID"],
+    "whoop_client_secret": ["WHOOP_CLIENT_SECRET"],
+    "gemini_api_key": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+    "google_maps_api_key": ["GOOGLE_MAPS_API_KEY", "MAPS_API_KEY"],
+    "strava_tokens": ["STRAVA_TOKENS"],
+    "whoop_tokens": ["WHOOP_TOKENS"],
+}
+
+def get_env_fallback(key: str) -> Optional[Any]:
+    candidates = ENV_FALLBACK_ALIASES.get(key, [key.upper(), key])
+    for cand in candidates:
+        val = os.environ.get(cand)
+        if val is not None and str(val).strip():
+            val = str(val).strip()
+            try:
+                return json.loads(val)
+            except Exception:
+                return val
+    return None
+
 def get_setting(key: str, default: Any = None) -> Any:
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -116,21 +143,18 @@ def get_setting(key: str, default: Any = None) -> Any:
         if isinstance(val, str):
             val = val.strip()
         try:
-            return json.loads(val)
+            parsed = json.loads(val)
+            if parsed is not None:
+                return parsed
+            # Explicit null stored in database (e.g. disconnected)
+            return default
         except Exception:
             return val
     
-    # Cloud / Environment fallback (e.g. Render, Railway, Fly.io, Heroku)
-    env_val = os.environ.get(key.upper())
-    if env_val is None:
-        env_val = os.environ.get(key)
+    # Cloud / Environment fallback (e.g. Railway, Render, Fly.io, Heroku)
+    env_val = get_env_fallback(key)
     if env_val is not None:
-        if isinstance(env_val, str):
-            env_val = env_val.strip()
-        try:
-            return json.loads(env_val)
-        except Exception:
-            return env_val
+        return env_val
 
     return default
 
@@ -157,6 +181,14 @@ def get_all_settings() -> Dict[str, Any]:
             result[r["key"]] = json.loads(r["value"])
         except Exception:
             result[r["key"]] = r["value"]
+
+    # Fallback to environment variables for keys not present in database or empty
+    for k in ENV_FALLBACK_ALIASES.keys():
+        if k not in result or result[k] is None or (isinstance(result[k], str) and not result[k].strip()):
+            env_val = get_env_fallback(k)
+            if env_val is not None:
+                result[k] = env_val
+
     return result
 
 def save_target_plan(plan: Dict[str, Any]) -> str:

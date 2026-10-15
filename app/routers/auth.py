@@ -37,12 +37,35 @@ def get_app_base_url(request: Request) -> str:
 
 @router.get("/debug-headers")
 def debug_headers(request: Request):
+    from app.database import DB_PATH
     return {
         "headers": dict(request.headers),
         "base_url": str(request.base_url),
         "calculated_base_url": get_app_base_url(request),
         "env_app_base_url": os.environ.get("APP_BASE_URL"),
-        "env_railway_public_domain": os.environ.get("RAILWAY_PUBLIC_DOMAIN")
+        "env_railway_public_domain": os.environ.get("RAILWAY_PUBLIC_DOMAIN"),
+        "database": {
+            "path": DB_PATH,
+            "exists": os.path.exists(DB_PATH),
+            "size_bytes": os.path.getsize(DB_PATH) if os.path.exists(DB_PATH) else 0,
+            "parent_dir_writable": os.access(os.path.dirname(DB_PATH), os.W_OK) if os.path.exists(os.path.dirname(DB_PATH)) else False,
+            "railway_volume_mount_path": os.environ.get("RAILWAY_VOLUME_MOUNT_PATH"),
+            "railway_volume_name": os.environ.get("RAILWAY_VOLUME_NAME")
+        },
+        "env_configured": {
+            "gemini_api_key": bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("gemini_api_key")),
+            "strava_client_id": bool(os.environ.get("STRAVA_CLIENT_ID") or os.environ.get("strava_client_id")),
+            "strava_client_secret": bool(os.environ.get("STRAVA_CLIENT_SECRET") or os.environ.get("strava_client_secret")),
+            "whoop_client_id": bool(os.environ.get("WHOOP_CLIENT_ID") or os.environ.get("whoop_client_id")),
+            "whoop_client_secret": bool(os.environ.get("WHOOP_CLIENT_SECRET") or os.environ.get("whoop_client_secret")),
+            "intervals_icu_api_key": bool(os.environ.get("INTERVALS_ICU_API_KEY") or os.environ.get("INTERVALS_API_KEY")),
+            "athlete_ftp": os.environ.get("ATHLETE_FTP") or os.environ.get("FTP") or None,
+            "athlete_max_hr": os.environ.get("ATHLETE_MAX_HR") or os.environ.get("MAX_HR") or None
+        },
+        "tokens_connected": {
+            "strava_tokens_present": bool(get_setting("strava_tokens")),
+            "whoop_tokens_present": bool(get_setting("whoop_tokens"))
+        }
     }
 
 @router.get("/strava/login")

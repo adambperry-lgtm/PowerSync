@@ -2526,6 +2526,7 @@ function openSettingsModal() {
       // Gemini AI Engine Status
       const isGeminiSet = Boolean(s.gemini_api_key_set);
       updateGeminiConnectedIndicators(isGeminiSet);
+      checkCoachGeminiStatus();
 
       settingsModal.classList.add("open");
     });
