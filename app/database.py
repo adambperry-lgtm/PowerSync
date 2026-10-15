@@ -462,6 +462,7 @@ def get_all_settings(user_id: Optional[str] = None) -> Dict[str, Any]:
 
 def create_or_get_google_user(email: str, name: str, picture: Optional[str] = None, google_id: Optional[str] = None) -> Dict[str, Any]:
     """Finds or creates a user account authenticated via Google."""
+    clean_email = email.strip().lower()
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -488,31 +489,38 @@ def create_or_get_google_user(email: str, name: str, picture: Optional[str] = No
         conn.close()
         return user
 
-    # 3. Check if only usr_default exists with default placeholder email -> link it
-    cursor.execute("SELECT * FROM users WHERE id = 'usr_default' AND (google_id IS NULL OR google_id = '') AND email = 'athlete@powersync.local'")
+    # 3. Check if usr_default has not been claimed by a Google account yet -> Claim it directly!
+    cursor.execute("SELECT * FROM users WHERE id = 'usr_default' AND (google_id IS NULL OR google_id = '')")
     default_row = cursor.fetchone()
     if default_row:
-        cursor.execute("UPDATE users SET email = ?, name = ?, picture = ?, google_id = ?, last_login = CURRENT_TIMESTAMP WHERE id = 'usr_default'", (email.strip().lower(), name, picture or "", google_id))
+        cursor.execute("""
+            UPDATE users
+            SET email = ?, name = ?, picture = COALESCE(?, picture), google_id = ?, last_login = CURRENT_TIMESTAMP
+            WHERE id = 'usr_default'
+        """, (clean_email, name, picture or "", google_id))
         conn.commit()
         cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
         user = dict(cursor.fetchone())
         conn.close()
         return user
 
-    # 4. Create brand new isolated user
+    # 4. If usr_default was already claimed, create a new user and copy default history
     user_id = f"usr_{uuid.uuid4().hex[:12]}"
     cursor.execute("""
         INSERT INTO users (id, email, name, picture, google_id, last_login)
         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-    """, (user_id, email.strip().lower(), name, picture or "", google_id))
+    """, (user_id, clean_email, name, picture or "", google_id))
     conn.commit()
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     user = dict(cursor.fetchone())
     conn.close()
+
+    # Automatically copy default athlete settings and history to guarantee zero data loss
+    claim_or_copy_default_data_to_user(user_id)
     return user
 
 def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None) -> Dict[str, Any]:
-    """Helper for dev/testing authentication."""
+    """Helper for dev/testing authentication with automatic default data preservation."""
     conn = get_db_connection()
     cursor = conn.cursor()
     clean_email = email.strip().lower()
@@ -522,6 +530,17 @@ def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None)
         cursor.execute("UPDATE users SET name = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?", (name, row["id"]))
         conn.commit()
         cursor.execute("SELECT * FROM users WHERE id = ?", (row["id"],))
+        user = dict(cursor.fetchone())
+        conn.close()
+        return user
+
+    # Check if usr_default is unclaimed and can be adopted
+    cursor.execute("SELECT * FROM users WHERE id = 'usr_default' AND (google_id IS NULL OR google_id = '') AND (email = 'athlete@powersync.local' OR email = 'default@powersync.local')")
+    default_row = cursor.fetchone()
+    if default_row:
+        cursor.execute("UPDATE users SET email = ?, name = ?, picture = COALESCE(?, picture), last_login = CURRENT_TIMESTAMP WHERE id = 'usr_default'", (clean_email, name, picture or ""))
+        conn.commit()
+        cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
         user = dict(cursor.fetchone())
         conn.close()
         return user

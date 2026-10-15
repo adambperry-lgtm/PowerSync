@@ -244,6 +244,38 @@ class TestMultiUserDirectAndIsolation(unittest.TestCase):
         self.assertEqual(me_resp.json()["email"], "bearer.test@powersync.test")
         self.assertFalse(me_resp.json()["is_guest"])
 
+    def test_09_method_1_automatic_default_claim_on_first_google_login(self):
+        """Method 1: First Google login automatically claims usr_default preserving all history & settings."""
+        from app.database import create_or_get_google_user, get_db_connection
+
+        # Ensure usr_default is present with sample settings & directives
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("UPDATE users SET email = 'athlete@powersync.local', google_id = NULL WHERE id = 'usr_default'")
+        c.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES ('usr_default', 'athlete_ftp', '275')")
+        c.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES ('usr_default', 'intervals_athlete_id', 'i748824')")
+        conn.commit()
+        conn.close()
+
+        # Athlete logs in with Google for the first time
+        user = create_or_get_google_user(
+            email="adam.athlete@gmail.com",
+            name="Adam Perry",
+            picture="https://lh3.googleusercontent.com/a/sample_avatar",
+            google_id="gid_1092837465"
+        )
+
+        # Must claim usr_default without changing user_id
+        self.assertEqual(user["id"], "usr_default")
+        self.assertEqual(user["email"], "adam.athlete@gmail.com")
+        self.assertEqual(user["name"], "Adam Perry")
+        self.assertEqual(user["google_id"], "gid_1092837465")
+
+        # Verify all settings and directives are intact
+        set_current_user_context(user["id"])
+        self.assertEqual(get_setting("athlete_ftp"), 275)
+        self.assertEqual(get_setting("intervals_athlete_id"), "i748824")
+
 class ASGIClient:
     """Lightweight in-process ASGI test client supporting cookies and JSON payloads."""
     def __init__(self, app):
