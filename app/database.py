@@ -3,13 +3,60 @@ import json
 import os
 from typing import Dict, Any, Optional, List
 
-DB_PATH = os.environ.get("DATABASE_PATH", os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "fitness.db"))
+def get_db_path() -> str:
+    # 1. Explicit DATABASE_PATH override
+    if os.environ.get("DATABASE_PATH") and os.environ["DATABASE_PATH"].strip():
+        return os.environ["DATABASE_PATH"].strip()
+
+    # 2. Check Railway Volume mount path (both raw and stripped)
+    railway_vol = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH")
+    if railway_vol:
+        if os.path.isdir(railway_vol):
+            return os.path.join(railway_vol, "fitness.db")
+        if os.path.isdir(railway_vol.strip()):
+            return os.path.join(railway_vol.strip(), "fitness.db")
+
+    # 3. Check /app/data (Docker standard)
+    if os.path.isdir("/app/data"):
+        return "/app/data/fitness.db"
+
+    # 4. Default local repository data folder
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "fitness.db")
+
+DB_PATH = get_db_path()
+
+def ensure_db_migrated():
+    """Guarantees that an existing database with athlete data is preserved on the persistent volume."""
+    target = get_db_path()
+    target_has_data = os.path.exists(target) and os.path.getsize(target) > 0
+    if target_has_data:
+        return
+
+    # Look for candidate existing databases that have data
+    candidates = [
+        "/app/data/fitness.db",
+        os.path.join(os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", ""), "fitness.db") if os.environ.get("RAILWAY_VOLUME_MOUNT_PATH") else "",
+        os.path.join(os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "").strip(), "fitness.db") if os.environ.get("RAILWAY_VOLUME_MOUNT_PATH") else "",
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "fitness.db")
+    ]
+    import shutil
+    for cand in candidates:
+        if cand and cand != target and os.path.exists(cand) and os.path.getsize(cand) > 0:
+            try:
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                shutil.copy2(cand, target)
+                print(f"[PowerSync] Migrated existing database ({os.path.getsize(cand)} bytes) from {cand} to persistent volume at {target}")
+                break
+            except Exception as e:
+                print(f"[PowerSync] Could not copy {cand} to {target}: {e}")
 
 def get_db_connection() -> sqlite3.Connection:
-    db_dir = os.path.dirname(DB_PATH)
+    ensure_db_migrated()
+    active_path = get_db_path()
+    db_dir = os.path.dirname(active_path)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(active_path)
     conn.row_factory = sqlite3.Row
     return conn
 
