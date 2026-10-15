@@ -670,8 +670,42 @@ function renderIntegrations(integrations) {
     if (whoopDot) whoopDot.className = isDemo ? "dot amber" : "dot gray";
   }
 
-  stravaText.textContent = integrations.strava?.connected ? "Connected" : (isDemo ? "Demo Mode" : "Not connected");
-  zwiftText.textContent = integrations.intervals_icu?.configured ? "Linked" : "Direct (.zwo)";
+  const stravaBadge = document.getElementById("badgeStrava");
+  const stravaDot = stravaBadge ? stravaBadge.querySelector(".dot") : null;
+  if (integrations.strava?.connected) {
+    stravaText.textContent = "Connected";
+    if (stravaDot) {
+      stravaDot.className = "dot green";
+      stravaDot.style.background = "#10b981";
+      stravaDot.style.boxShadow = "0 0 8px #10b981";
+    }
+  } else {
+    stravaText.textContent = isDemo ? "Demo Mode" : "Not connected";
+    if (stravaDot) {
+      stravaDot.className = isDemo ? "dot amber" : "dot gray";
+      stravaDot.style.background = isDemo ? "var(--accent-amber)" : "#94a3b8";
+      stravaDot.style.boxShadow = "none";
+    }
+  }
+
+  const zwiftBadge = document.getElementById("badgeZwift");
+  const zwiftDot = zwiftBadge ? (document.getElementById("zwiftNavDot") || zwiftBadge.querySelector(".dot")) : null;
+  const isZwiftConnected = Boolean(integrations.intervals_icu?.configured);
+  if (isZwiftConnected) {
+    zwiftText.textContent = "Connected";
+    if (zwiftDot) {
+      zwiftDot.className = "dot green";
+      zwiftDot.style.background = "#10b981";
+      zwiftDot.style.boxShadow = "0 0 8px #10b981";
+    }
+  } else {
+    zwiftText.textContent = isDemo ? "Demo Mode" : "Not connected";
+    if (zwiftDot) {
+      zwiftDot.className = isDemo ? "dot amber" : "dot gray";
+      zwiftDot.style.background = isDemo ? "var(--accent-amber)" : "#94a3b8";
+      zwiftDot.style.boxShadow = "none";
+    }
+  }
 
   const geminiText = document.getElementById("geminiNavStatusText");
   const geminiDot = document.getElementById("geminiNavDot");
