@@ -112,16 +112,21 @@ def get_setting(key: str, default: Any = None) -> Any:
     row = cursor.fetchone()
     conn.close()
     if row and row["value"] is not None and str(row["value"]).strip() != "":
+        val = row["value"]
+        if isinstance(val, str):
+            val = val.strip()
         try:
-            return json.loads(row["value"])
+            return json.loads(val)
         except Exception:
-            return row["value"]
+            return val
     
     # Cloud / Environment fallback (e.g. Render, Railway, Fly.io, Heroku)
     env_val = os.environ.get(key.upper())
     if env_val is None:
         env_val = os.environ.get(key)
     if env_val is not None:
+        if isinstance(env_val, str):
+            env_val = env_val.strip()
         try:
             return json.loads(env_val)
         except Exception:
