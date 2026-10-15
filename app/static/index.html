@@ -1700,6 +1700,29 @@
           </span>
         </div>
 
+        <!-- Primary Athlete Ownership Lock Card -->
+        <div class="form-group" style="background:rgba(6, 182, 212, 0.08);border:1px solid rgba(6, 182, 212, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.25rem;">👑</span>
+              <label style="color:#06b6d4;font-weight:700;margin:0;">Exclusive Primary Athlete Lock</label>
+            </div>
+            <span id="ownerLockStatusPill" style="font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:12px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:600;">Lock Active</span>
+          </div>
+          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+            Restricts the Primary Athlete account (Intervals.icu credentials <code>i748824</code>, master settings, and history) exclusively to your email. All other users receive their own private isolated athlete databases.
+          </p>
+          <div style="display:flex;gap:0.6rem;margin-top:0.65rem;">
+            <input type="email" id="settingPrimaryOwnerEmail" placeholder="e.g. your.email@domain.com" style="flex:1;font-size:0.85rem;" />
+            <button type="button" class="btn btn-primary" id="btnSaveOwnerLock" style="font-size:0.8rem;white-space:nowrap;padding:0.45rem 0.85rem;background:#0891b2;border:none;">
+              🔒 Set Owner
+            </button>
+          </div>
+          <span class="form-hint" style="margin-top:0.35rem;font-size:0.73rem;color:#94a3b8;display:block;">
+            You can also configure <code>OWNER_EMAIL</code> in Railway environment variables for immutable server-level locking.
+          </span>
+        </div>
+
         <!-- Google Sign-In & Multi-User Setup Card -->
         <div class="form-group" style="background:rgba(66, 133, 244, 0.08);border:1px solid rgba(66, 133, 244, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
@@ -2136,6 +2159,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=96"></script>
+  <script src="/static/js/app.js?v=97"></script>
 </body>
 </html>

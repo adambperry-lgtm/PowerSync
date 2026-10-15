@@ -2535,6 +2535,21 @@ function openSettingsModal() {
         googleSecretInput.placeholder = s.google_client_secret_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Enter Google Client Secret";
       }
 
+      const ownerInput = document.getElementById("settingPrimaryOwnerEmail");
+      const ownerPill = document.getElementById("ownerLockStatusPill");
+      if (ownerInput) ownerInput.value = s.primary_owner_email || "";
+      if (ownerPill) {
+        if (s.primary_owner_email) {
+          ownerPill.textContent = "Lock Active";
+          ownerPill.style.background = "rgba(16,185,129,0.15)";
+          ownerPill.style.color = "#10b981";
+        } else {
+          ownerPill.textContent = "Unset (Open)";
+          ownerPill.style.background = "rgba(234,179,8,0.15)";
+          ownerPill.style.color = "#fde047";
+        }
+      }
+
       document.getElementById("settingFtp").value = s.athlete_ftp || 250;
       document.getElementById("settingMaxHr").value = s.athlete_max_hr || 185;
       const wPrimeInput = document.getElementById("settingAthleteWPrime");
@@ -2767,6 +2782,11 @@ btnSaveSettings.addEventListener("click", async () => {
   const googleSecretVal = document.getElementById("settingGoogleClientSecret")?.value.trim();
   if (googleSecretVal && !googleSecretVal.includes("•")) {
     payload.google_client_secret = googleSecretVal;
+  }
+
+  const primaryOwnerEmailVal = document.getElementById("settingPrimaryOwnerEmail")?.value.trim();
+  if (primaryOwnerEmailVal !== undefined) {
+    payload.primary_owner_email = primaryOwnerEmailVal.toLowerCase();
   }
 
   try {
@@ -5749,12 +5769,14 @@ function initAllCollapsibleTiles() {
 // --- Multi-User Athlete Authentication & Google Sign-In ---
 let currentAthleteUser = null;
 let isGoogleOauthConfigured = false;
+let primaryOwnerInfo = { is_locked: false, owner_email: null };
 
 async function checkAuthStatus() {
   try {
-    const [meRes, googleRes] = await Promise.all([
+    const [meRes, googleRes, ownerRes] = await Promise.all([
       fetch("/api/auth/me"),
-      fetch("/api/auth/google/status").catch(() => null)
+      fetch("/api/auth/google/status").catch(() => null),
+      fetch("/api/auth/owner-status").catch(() => null)
     ]);
     if (meRes.ok) {
       const user = await meRes.json();
@@ -5764,6 +5786,9 @@ async function checkAuthStatus() {
     if (googleRes && googleRes.ok) {
       const gData = await googleRes.json();
       isGoogleOauthConfigured = !!gData.configured;
+    }
+    if (ownerRes && ownerRes.ok) {
+      primaryOwnerInfo = await ownerRes.json();
     }
     renderAuthModalContent(currentAthleteUser);
   } catch (e) {
@@ -5801,10 +5826,23 @@ function renderAuthModalContent(user) {
   const profileBadge = document.getElementById("authProfileBadge");
   const googleBtnText = document.querySelector("#btnGoogleSignIn span");
   const googleNotice = document.getElementById("googleConfigNotice");
+  const chkClaimPrimary = document.getElementById("chkClaimPrimary");
+  const chkClaimLabel = chkClaimPrimary ? chkClaimPrimary.closest("label") : null;
 
   // Google config alert
   if (googleNotice) {
     googleNotice.style.display = isGoogleOauthConfigured ? "none" : "block";
+  }
+
+  // Owner lock check: if locked to a specific email, hide the claim primary checkbox from random users
+  if (chkClaimLabel) {
+    if (primaryOwnerInfo && primaryOwnerInfo.is_locked && primaryOwnerInfo.owner_email) {
+      const isOwnerNow = user && (user.id === "usr_default" || user.email === primaryOwnerInfo.owner_email);
+      chkClaimLabel.style.display = isOwnerNow ? "flex" : "none";
+      if (!isOwnerNow && chkClaimPrimary) chkClaimPrimary.checked = false;
+    } else {
+      chkClaimLabel.style.display = "flex";
+    }
   }
 
   if (user && !user.is_guest) {
@@ -6013,6 +6051,40 @@ async function performEmailLogin(email, name, claimPrimary = false) {
 
 async function performDevLogin(email, name) {
   return performEmailLogin(email, name, false);
+}
+
+const btnSaveOwnerLock = document.getElementById("btnSaveOwnerLock");
+if (btnSaveOwnerLock) {
+  btnSaveOwnerLock.addEventListener("click", async () => {
+    const email = document.getElementById("settingPrimaryOwnerEmail")?.value.trim();
+    if (!email || !email.includes("@")) {
+      showToast("Please enter a valid owner email address.");
+      return;
+    }
+    try {
+      showToast(`Locking primary athlete to ${email}...`);
+      const res = await fetch("/api/auth/lock-owner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        showToast(`🔒 Primary account locked to ${email}`);
+        await checkAuthStatus();
+        const ownerPill = document.getElementById("ownerLockStatusPill");
+        if (ownerPill) {
+          ownerPill.textContent = "Lock Active";
+          ownerPill.style.background = "rgba(16,185,129,0.15)";
+          ownerPill.style.color = "#10b981";
+        }
+      } else {
+        showToast(data.detail || "Could not lock account.");
+      }
+    } catch (e) {
+      showToast("Error locking account.");
+    }
+  });
 }
 
 const btnCopyGoogleRedirect = document.getElementById("btnCopyGoogleRedirect");

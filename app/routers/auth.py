@@ -14,6 +14,7 @@ from app.database import (
     create_session, get_user_by_session, delete_session,
     save_oauth_state, verify_and_consume_oauth_state, get_default_or_guest_user,
     get_guest_user, get_default_athlete_user,
+    get_primary_owner_email, set_primary_owner_email,
     DEFAULT_USER_ID, GUEST_USER_ID
 )
 
@@ -208,12 +209,47 @@ class EmailLoginPayload(BaseModel):
 
 DevLoginPayload = EmailLoginPayload
 
+@router.get("/owner-status")
+def get_owner_status():
+    """Returns whether the primary athlete account has been locked to an exclusive email address."""
+    locked_owner = get_primary_owner_email()
+    return {
+        "is_locked": bool(locked_owner),
+        "owner_email": locked_owner
+    }
+
+class LockOwnerPayload(BaseModel):
+    email: str
+
+@router.post("/lock-owner")
+def lock_owner_email(payload: LockOwnerPayload, request: Request):
+    """Locks the primary athlete account exclusively to this email address."""
+    clean_email = payload.email.strip().lower()
+    if not clean_email or "@" not in clean_email or "." not in clean_email:
+        raise HTTPException(status_code=400, detail="Valid email address is required.")
+        
+    current_uid = get_current_user_id()
+    locked_owner = get_primary_owner_email()
+    if locked_owner and locked_owner != clean_email and current_uid != DEFAULT_USER_ID:
+        raise HTTPException(status_code=403, detail=f"Primary account is already locked to {locked_owner}.")
+
+    set_primary_owner_email(clean_email)
+    return {"success": True, "message": f"Primary athlete account locked to {clean_email}.", "owner_email": clean_email}
+
 @router.post("/primary-login")
 def primary_login(request: Request):
     """
     Direct login as the primary athlete account owner holding all historical directives and intervals credentials.
-    Allows instant access without requiring Google OAuth to be set up first.
+    If an owner email is locked, anonymous access is rejected.
     """
+    locked_owner = get_primary_owner_email()
+    current_uid = get_current_user_id()
+    if locked_owner and current_uid != DEFAULT_USER_ID:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Primary athlete account is locked to {locked_owner}. Please enter your email to sign in."
+        )
+
     user = get_default_athlete_user()
     session_token = create_session(user["id"], days_valid=30)
 

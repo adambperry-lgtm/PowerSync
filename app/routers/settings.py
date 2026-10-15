@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-from app.database import get_setting, set_setting, get_all_settings
+from app.database import get_setting, set_setting, get_all_settings, get_primary_owner_email, set_primary_owner_email
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -28,6 +28,7 @@ class SettingsUpdate(BaseModel):
     theme_mode: Optional[str] = None
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
+    primary_owner_email: Optional[str] = None
 
 def is_valid_secret(secret: Optional[str]) -> bool:
     if not secret or not secret.strip():
@@ -86,11 +87,14 @@ def get_settings_endpoint():
         "program_target_date": all_s.get("program_target_date", ""),
         "program_weekly_tss_target": int(all_s.get("program_weekly_tss_target", 360)),
         "program_weekly_xss_target": int(all_s.get("program_weekly_xss_target", all_s.get("program_weekly_tss_target", 360))),
-        "theme_mode": all_s.get("theme_mode", "system")
+        "theme_mode": all_s.get("theme_mode", "system"),
+        "primary_owner_email": get_primary_owner_email() or ""
     }
 
 @router.post("")
 def update_settings_endpoint(payload: SettingsUpdate):
+    if payload.primary_owner_email is not None and payload.primary_owner_email.strip():
+        set_primary_owner_email(payload.primary_owner_email.strip())
     if payload.google_client_id is not None and payload.google_client_id.strip():
         set_setting("google_client_id", payload.google_client_id.strip())
     if is_valid_secret(payload.google_client_secret):

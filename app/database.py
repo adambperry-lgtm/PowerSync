@@ -550,10 +550,19 @@ def create_or_get_google_user(email: str, name: str, picture: Optional[str] = No
         conn.close()
         return user
 
-    # 3. Check if usr_default has not been claimed by a Google account yet -> Claim it directly!
+    # 3. Check if usr_default has not been claimed by a Google account yet -> Claim it directly IF owner matches or unclaimed
+    locked_owner = get_primary_owner_email()
     cursor.execute("SELECT * FROM users WHERE id = 'usr_default' AND (google_id IS NULL OR google_id = '')")
     default_row = cursor.fetchone()
+    can_claim_default = False
     if default_row:
+        if not locked_owner:
+            can_claim_default = True
+            set_primary_owner_email(clean_email)
+        elif locked_owner == clean_email:
+            can_claim_default = True
+
+    if can_claim_default:
         cursor.execute("""
             UPDATE users
             SET email = ?, name = ?, picture = COALESCE(?, picture), google_id = ?, last_login = CURRENT_TIMESTAMP
@@ -565,7 +574,7 @@ def create_or_get_google_user(email: str, name: str, picture: Optional[str] = No
         conn.close()
         return user
 
-    # 4. If usr_default was already claimed, create a new user and copy default history
+    # 4. If usr_default was already claimed or reserved, create a new isolated user and copy default history
     user_id = f"usr_{uuid.uuid4().hex[:12]}"
     cursor.execute("""
         INSERT INTO users (id, email, name, picture, google_id, last_login)
@@ -851,11 +860,33 @@ def seed_dev_user_profile(user_id: str, profile: Dict[str, Any]):
     conn.commit()
     conn.close()
 
+def get_primary_owner_email() -> Optional[str]:
+    """Returns the locked primary owner email address, if one has been established."""
+    env_owner = os.environ.get("OWNER_EMAIL") or os.environ.get("PRIMARY_ATHLETE_EMAIL")
+    if env_owner and env_owner.strip():
+        return env_owner.strip().lower()
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT value FROM settings WHERE user_id = 'usr_default' AND key = 'primary_owner_email'")
+    row = c.fetchone()
+    conn.close()
+    if row and row["value"]:
+        val = str(row["value"]).strip().lower()
+        if "@" in val:
+            return val
+    return None
+
+def set_primary_owner_email(email: str):
+    """Permanently locks the primary athlete account to this specific email address."""
+    clean = email.strip().lower()
+    set_setting("primary_owner_email", clean, user_id="usr_default")
+
 def create_or_get_email_user(email: str, name: Optional[str] = None, picture: Optional[str] = None, claim_primary: bool = False) -> Dict[str, Any]:
     """
     Finds or creates an isolated athlete account authenticated via email.
-    If claim_primary is True, links the email to the primary account owner (usr_default),
-    preserving all saved Intervals.icu credentials, FTP, and coaching directives.
+    If the primary owner email is locked, ONLY that specific email can access usr_default.
+    Anyone else is strictly routed to their own private isolated athlete database.
     """
     clean_email = email.strip().lower()
     auto_name = name.strip() if name and name.strip() else clean_email.split("@")[0].replace(".", " ").title()
@@ -873,12 +904,23 @@ def create_or_get_email_user(email: str, name: Optional[str] = None, picture: Op
         if user:
             return user
 
-    # 2. Check if claiming primary owner account (usr_default)
+    # 2. Check primary owner locking
+    locked_owner = get_primary_owner_email()
     cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
     default_row = cursor.fetchone()
 
-    # If explicitly claiming primary, or if usr_default currently has this email:
-    if claim_primary or (default_row and default_row["email"] == clean_email):
+    is_matching_owner = bool(locked_owner and clean_email == locked_owner)
+    is_default_row_email = bool(default_row and default_row["email"] == clean_email)
+
+    can_access_primary = False
+    if is_matching_owner or is_default_row_email:
+        can_access_primary = True
+    elif not locked_owner and claim_primary:
+        # First-time claim permanently locks primary ownership to this email!
+        can_access_primary = True
+        set_primary_owner_email(clean_email)
+
+    if can_access_primary:
         # Remove any non-default row with this email to avoid UNIQUE constraint
         cursor.execute("DELETE FROM users WHERE email = ? AND id != 'usr_default'", (clean_email,))
         cursor.execute("""

@@ -251,6 +251,8 @@ class TestMultiUserDirectAndIsolation(unittest.TestCase):
         # Ensure usr_default is present with sample settings & directives
         conn = get_db_connection()
         c = conn.cursor()
+        c.execute("DELETE FROM users WHERE email = 'adam.athlete@gmail.com' AND id != 'usr_default'")
+        c.execute("DELETE FROM settings WHERE user_id = 'usr_default' AND key = 'primary_owner_email'")
         c.execute("UPDATE users SET email = 'athlete@powersync.local', google_id = NULL WHERE id = 'usr_default'")
         c.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES ('usr_default', 'athlete_ftp', '275')")
         c.execute("INSERT OR REPLACE INTO settings (user_id, key, value) VALUES ('usr_default', 'intervals_athlete_id', 'i748824')")
@@ -357,6 +359,15 @@ class ASGIClient:
         return self.request("POST", path, json_data=json, headers=headers)
 
 class TestMultiUserHTTPServer(unittest.TestCase):
+    def setUp(self):
+        from app.database import get_db_connection
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("DELETE FROM settings WHERE user_id = 'usr_default' AND key = 'primary_owner_email'")
+        c.execute("UPDATE users SET email = 'athlete@powersync.local', google_id = NULL WHERE id = 'usr_default'")
+        conn.commit()
+        conn.close()
+
     def test_01_http_sessions_and_cookie_isolation(self):
         """Verify HTTP cookies isolate sessions and data across independent requests."""
         from app.main import app
@@ -499,9 +510,11 @@ class TestMultiUserHTTPServer(unittest.TestCase):
         """Verify Method 1: Google login automatically adopts usr_default when unclaimed."""
         from app.database import create_or_get_google_user, get_db_connection
 
-        # Reset usr_default google_id to test clean adoption
+        # Reset usr_default google_id and clean up prior test user to test clean adoption
         conn = get_db_connection()
-        conn.cursor().execute("UPDATE users SET google_id = NULL, email = 'athlete@powersync.local' WHERE id = 'usr_default'")
+        c = conn.cursor()
+        c.execute("DELETE FROM users WHERE email = 'primary.cyclist@gmail.com' AND id != 'usr_default'")
+        c.execute("UPDATE users SET google_id = NULL, email = 'athlete@powersync.local' WHERE id = 'usr_default'")
         conn.commit()
         conn.close()
 
@@ -558,6 +571,12 @@ class TestMultiUserHTTPServer(unittest.TestCase):
         self.assertEqual(user_owner["id"], DEFAULT_USER_ID)
         self.assertEqual(user_owner["email"], "owner@cyclingpro.com")
         self.assertEqual(user_owner["name"], "Owner Cyclist")
+
+        # 3. Another user attempts to claim primary -> MUST BE DENIED and isolated!
+        user_intruder = create_or_get_email_user(email="intruder@other.com", name="Intruder", claim_primary=True)
+        self.assertNotEqual(user_intruder["id"], DEFAULT_USER_ID)
+        self.assertTrue(user_intruder["id"].startswith("usr_"))
+        self.assertEqual(user_intruder["email"], "intruder@other.com")
 
 if __name__ == "__main__":
     unittest.main()
