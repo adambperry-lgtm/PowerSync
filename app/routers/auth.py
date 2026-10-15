@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional
 
 from app.services.strava_service import get_strava_auth_url, exchange_strava_code, fetch_recent_strava_activities
 from app.services.whoop_service import get_whoop_auth_url, exchange_whoop_code, fetch_latest_whoop_metrics
-from app.database import set_setting, get_setting
+from app.database import set_setting, get_setting, get_db_connection
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -97,12 +97,9 @@ def debug_headers(request: Request):
             "whoop_tokens_present": bool(get_setting("whoop_tokens"))
         },
         "database_stats": {
-            "settings_keys": [
-                row[0] for row in (
-                    get_db_connection().cursor().execute("SELECT key FROM settings").fetchall()
-                    if os.path.exists(current_db) else []
-                )
-            ]
+            "settings_keys": (lambda: [
+                row[0] for row in get_db_connection().cursor().execute("SELECT key FROM settings").fetchall()
+            ] if os.path.exists(current_db) else [])()
         }
     }
 
