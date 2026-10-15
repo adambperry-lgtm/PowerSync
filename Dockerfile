@@ -15,8 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p /app/data && chmod +x /app/start.sh
+RUN mkdir -p /app/data
 
 EXPOSE 8000
 
-CMD ["/app/start.sh"]
+CMD ["python3", "run.py"]
