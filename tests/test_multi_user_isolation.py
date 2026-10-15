@@ -543,6 +543,22 @@ class TestMultiUserHTTPServer(unittest.TestCase):
         # Check workout divergence
         self.assertNotEqual(w_alex["active_workout"]["title"], w_jordan["active_workout"]["title"])
 
+    def test_07_email_login_direct(self):
+        """Verify direct email login creates isolated athlete accounts and preserves primary account when requested."""
+        from app.database import create_or_get_email_user, get_user_by_id, DEFAULT_USER_ID
+
+        # 1. New user signs in with email
+        user_bob = create_or_get_email_user(email="bob@cyclingclub.org", name="Bob Cyclist", claim_primary=False)
+        self.assertNotEqual(user_bob["id"], DEFAULT_USER_ID)
+        self.assertEqual(user_bob["email"], "bob@cyclingclub.org")
+        self.assertEqual(user_bob["name"], "Bob Cyclist")
+
+        # 2. Primary owner links email
+        user_owner = create_or_get_email_user(email="owner@cyclingpro.com", name="Owner Cyclist", claim_primary=True)
+        self.assertEqual(user_owner["id"], DEFAULT_USER_ID)
+        self.assertEqual(user_owner["email"], "owner@cyclingpro.com")
+        self.assertEqual(user_owner["name"], "Owner Cyclist")
+
 if __name__ == "__main__":
     unittest.main()
 

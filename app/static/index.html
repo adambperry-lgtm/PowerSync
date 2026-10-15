@@ -1780,34 +1780,60 @@
           </div>
         </div>
 
-        <!-- Primary Athlete Direct Login (Owner Access) -->
-        <div id="authPrimaryDirectCard" style="display:flex;flex-direction:column;gap:0.5rem;background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.25);border-radius:10px;padding:1rem;">
+        <!-- Email Sign-In (Primary Method: Simple, Fast, Zero Setup) -->
+        <div id="authEmailCard" style="display:flex;flex-direction:column;gap:0.75rem;background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:10px;padding:1.1rem;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div style="font-weight:700;font-size:0.88rem;color:#06b6d4;display:flex;align-items:center;gap:0.4rem;">
-              <span>⭐</span> Primary Athlete (Account Owner)
+            <div style="font-weight:700;font-size:0.92rem;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+              <span>✉️</span> Sign In with Email
             </div>
-            <span style="font-size:0.7rem;color:#10b981;font-weight:600;">Saved History</span>
+            <span style="font-size:0.7rem;color:#06b6d4;background:rgba(6,182,212,0.1);padding:0.15rem 0.5rem;border-radius:12px;border:1px solid rgba(6,182,212,0.25);">Instant & Isolated</span>
           </div>
-          <p style="font-size:0.74rem;color:#cbd5e1;margin:0;line-height:1.4;">
-            Direct access to your private intervals.icu credentials (i748824), FTP history, custom coaching directives, and saved workouts.
+          <p style="font-size:0.75rem;color:#94a3b8;margin:0;line-height:1.4;">
+            Enter your email to log in or create an isolated athlete profile. No third-party accounts or passwords required.
           </p>
-          <button type="button" id="btnPrimaryAthleteLogin" class="btn btn-primary" style="background:linear-gradient(135deg, #0891b2, #06b6d4);color:#fff;font-weight:700;font-size:0.85rem;padding:0.6rem;border:none;border-radius:6px;cursor:pointer;margin-top:0.25rem;">
-            ⚡ Sign In as Primary Athlete
-          </button>
-        </div>
-
-        <!-- Google Sign-In Card -->
-        <div id="authGoogleCard" style="display:flex;flex-direction:column;gap:0.75rem;">
-          <div id="googleConfigNotice" style="display:none;background:rgba(234,179,8,0.1);border:1px solid rgba(234,179,8,0.3);border-radius:8px;padding:0.65rem 0.85rem;font-size:0.75rem;color:#fde047;">
-            <div style="display:flex;align-items:center;gap:0.4rem;font-weight:700;margin-bottom:0.2rem;">
-              <span>⚠️</span> Google Sign-In Setup Needed
+          <form id="formEmailLogin" style="display:flex;flex-direction:column;gap:0.65rem;" onsubmit="return false;">
+            <div>
+              <label for="inputAthleteEmail" style="display:block;font-size:0.72rem;font-weight:600;color:#94a3b8;margin-bottom:0.25rem;">Email Address</label>
+              <input type="email" id="inputAthleteEmail" placeholder="you@example.com" required style="width:100%;box-sizing:border-box;font-size:0.85rem;padding:0.55rem 0.75rem;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;color:#fff;" />
             </div>
             <div>
-              Set <code>GOOGLE_CLIENT_ID</code> in Railway variables or in <a href="#" id="linkOpenGoogleSettings" style="color:#38bdf8;text-decoration:underline;">Settings ⚙️</a> to enable 1-click Google OAuth.
+              <label for="inputAthleteName" style="display:block;font-size:0.72rem;font-weight:600;color:#94a3b8;margin-bottom:0.25rem;">Athlete Name (Optional)</label>
+              <input type="text" id="inputAthleteName" placeholder="e.g. Adam" style="width:100%;box-sizing:border-box;font-size:0.85rem;padding:0.55rem 0.75rem;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;color:#fff;" />
             </div>
+            <label style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.75rem;color:#cbd5e1;cursor:pointer;margin-top:0.1rem;">
+              <input type="checkbox" id="chkClaimPrimary" checked style="margin-top:0.15rem;" />
+              <span>Link as Account Owner (keep my saved Intervals.icu credentials <code>i748824</code> and coaching directives)</span>
+            </label>
+            <button type="submit" id="btnEmailLoginSubmit" class="btn btn-primary" style="margin-top:0.35rem;padding:0.65rem;font-weight:700;font-size:0.88rem;display:flex;align-items:center;justify-content:center;gap:0.4rem;background:linear-gradient(135deg, #0891b2, #06b6d4);border:none;border-radius:6px;color:#fff;cursor:pointer;">
+              ⚡ Continue with Email
+            </button>
+          </form>
+        </div>
+
+        <!-- Quick 1-Click Athletes -->
+        <div style="display:flex;flex-direction:column;gap:0.6rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:0.78rem;font-weight:700;color:#94a3b8;">⭐ Quick 1-Click Athletes</span>
+            <span style="font-size:0.7rem;color:#10b981;">Data Isolated</span>
           </div>
-          <a href="/api/auth/google/login" id="btnGoogleSignIn" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;background:#ffffff;color:#1f2937;font-weight:600;font-size:0.95rem;padding:0.75rem 1rem;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);transition:all 0.2s ease;">
-            <svg width="18" height="18" viewBox="0 0 48 48">
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+            <button type="button" id="btnPrimaryAthleteLogin" class="btn btn-secondary" style="flex:1;min-width:140px;border-color:rgba(6,182,212,0.5);color:#06b6d4;font-size:0.78rem;padding:0.45rem 0.65rem;" title="Sign in as Primary Owner">
+              ⭐ Primary Owner (Adam)
+            </button>
+            <button type="button" class="btn btn-secondary btn-dev-switch" data-email="coach.alex@powersync.app" data-name="Coach Alex" style="font-size:0.75rem;padding:0.45rem 0.65rem;">
+              🚴 Coach Alex (315W)
+            </button>
+            <button type="button" class="btn btn-secondary btn-dev-switch" data-email="rider.jordan@powersync.app" data-name="Rider Jordan" style="font-size:0.75rem;padding:0.45rem 0.65rem;">
+              ⚡ Rider Jordan (210W)
+            </button>
+          </div>
+        </div>
+
+        <!-- Optional Google Sign-In (Unobtrusive) -->
+        <div id="authGoogleCard" style="border-top:1px solid var(--border-color);padding-top:0.85rem;display:flex;flex-direction:column;gap:0.5rem;">
+          <div style="font-size:0.75rem;color:#64748b;text-align:center;">Optional: Sign in with Google Account</div>
+          <a href="/api/auth/google/login" id="btnGoogleSignIn" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;background:#ffffff;color:#1f2937;font-weight:600;font-size:0.85rem;padding:0.55rem 1rem;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);transition:all 0.2s ease;">
+            <svg width="16" height="16" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
               <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
               <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -1815,31 +1841,6 @@
             </svg>
             <span>Continue with Google</span>
           </a>
-          <p style="font-size:0.75rem;color:var(--text-secondary);text-align:center;margin:0;">
-            Signing in with Google preserves and claims your account history so it stays synchronized across devices.
-          </p>
-        </div>
-
-        <!-- Dev & Test Athlete Switcher -->
-        <div style="border-top:1px solid var(--border-color);padding-top:1rem;margin-top:0.25rem;">
-          <div style="font-size:0.8rem;font-weight:700;color:#94a3b8;margin-bottom:0.5rem;display:flex;justify-content:space-between;align-items:center;">
-            <span>🧪 Athlete Switcher (Dev / Test)</span>
-            <span style="font-size:0.7rem;color:#06b6d4;">Data Isolated</span>
-          </div>
-          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.75rem;">
-            <button type="button" class="btn btn-secondary btn-dev-switch" data-email="coach.alex@powersync.app" data-name="Coach Alex" style="font-size:0.75rem;padding:0.35rem 0.65rem;">
-              🚴 Coach Alex
-            </button>
-            <button type="button" class="btn btn-secondary btn-dev-switch" data-email="rider.jordan@powersync.app" data-name="Rider Jordan" style="font-size:0.75rem;padding:0.35rem 0.65rem;">
-              ⚡ Rider Jordan
-            </button>
-          </div>
-          <div style="display:flex;gap:0.4rem;">
-            <input type="email" id="inputDevLoginEmail" placeholder="custom.athlete@domain.com" style="flex:1;font-size:0.78rem;padding:0.4rem 0.6rem;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;color:#fff;" />
-            <button type="button" id="btnDevLoginSubmit" class="btn btn-secondary" style="font-size:0.75rem;padding:0.4rem 0.8rem;color:#06b6d4;border-color:rgba(6,182,212,0.4);">
-              Switch
-            </button>
-          </div>
         </div>
 
       </div>
@@ -2135,6 +2136,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=95"></script>
+  <script src="/static/js/app.js?v=96"></script>
 </body>
 </html>

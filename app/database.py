@@ -851,23 +851,21 @@ def seed_dev_user_profile(user_id: str, profile: Dict[str, Any]):
     conn.commit()
     conn.close()
 
-def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None) -> Dict[str, Any]:
-    """Helper for dev/testing authentication with complete data isolation."""
+def create_or_get_email_user(email: str, name: Optional[str] = None, picture: Optional[str] = None, claim_primary: bool = False) -> Dict[str, Any]:
+    """
+    Finds or creates an isolated athlete account authenticated via email.
+    If claim_primary is True, links the email to the primary account owner (usr_default),
+    preserving all saved Intervals.icu credentials, FTP, and coaching directives.
+    """
+    clean_email = email.strip().lower()
+    auto_name = name.strip() if name and name.strip() else clean_email.split("@")[0].replace(".", " ").title()
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    clean_email = email.strip().lower()
 
-    # Explicit request for the primary account owner
-    if clean_email in ("athlete@powersync.local", "default@powersync.local", "owner@powersync.app", "primary@powersync.local"):
-        cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
-        row = cursor.fetchone()
-        conn.close()
-        if row:
-            return dict(row)
-        return get_default_athlete_user()
-
-    # Built-in test athletes: Coach Alex & Rider Jordan with distinct data
+    # 1. Built-in test athletes: Coach Alex & Rider Jordan with distinct data
     if clean_email in DEV_USER_PROFILES:
+        conn.close()
         prof = DEV_USER_PROFILES[clean_email]
         user_id = prof["id"]
         seed_dev_user_profile(user_id, prof)
@@ -875,28 +873,50 @@ def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None)
         if user:
             return user
 
-    # Lookup existing dev/test user by email (excluding usr_default)
-    cursor.execute("SELECT * FROM users WHERE email = ? AND id != 'usr_default'", (clean_email,))
+    # 2. Check if claiming primary owner account (usr_default)
+    cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
+    default_row = cursor.fetchone()
+
+    # If explicitly claiming primary, or if usr_default currently has this email:
+    if claim_primary or (default_row and default_row["email"] == clean_email):
+        # Remove any non-default row with this email to avoid UNIQUE constraint
+        cursor.execute("DELETE FROM users WHERE email = ? AND id != 'usr_default'", (clean_email,))
+        cursor.execute("""
+            UPDATE users SET email = ?, name = ?, last_login = CURRENT_TIMESTAMP
+            WHERE id = 'usr_default'
+        """, (clean_email, auto_name))
+        conn.commit()
+        cursor.execute("SELECT * FROM users WHERE id = 'usr_default'")
+        user = dict(cursor.fetchone())
+        conn.close()
+        return user
+
+    # 3. Lookup existing user by email
+    cursor.execute("SELECT * FROM users WHERE email = ?", (clean_email,))
     row = cursor.fetchone()
     if row:
-        cursor.execute("UPDATE users SET name = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?", (name, row["id"]))
+        cursor.execute("UPDATE users SET name = ?, last_login = CURRENT_TIMESTAMP WHERE id = ?", (auto_name, row["id"]))
         conn.commit()
         cursor.execute("SELECT * FROM users WHERE id = ?", (row["id"],))
         user = dict(cursor.fetchone())
         conn.close()
         return user
 
-    # Otherwise create a distinct new user - NEVER adopt or mutate usr_default!
+    # 4. Create new isolated athlete user
     user_id = f"usr_{uuid.uuid4().hex[:12]}"
     cursor.execute("""
         INSERT INTO users (id, email, name, picture, last_login)
         VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
-    """, (user_id, clean_email, name, picture or ""))
+    """, (user_id, clean_email, auto_name, picture or ""))
     conn.commit()
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     user = dict(cursor.fetchone())
     conn.close()
     return user
+
+def create_or_get_dev_user(email: str, name: str, picture: Optional[str] = None) -> Dict[str, Any]:
+    """Helper for dev/testing authentication with complete data isolation."""
+    return create_or_get_email_user(email=email, name=name, picture=picture, claim_primary=False)
 
 def get_user_by_id(user_id: str) -> Optional[Dict[str, Any]]:
     conn = get_db_connection()

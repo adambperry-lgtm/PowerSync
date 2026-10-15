@@ -10,7 +10,7 @@ from app.services.strava_service import get_strava_auth_url, exchange_strava_cod
 from app.services.whoop_service import get_whoop_auth_url, exchange_whoop_code, fetch_latest_whoop_metrics
 from app.database import (
     set_setting, get_setting, get_db_connection, get_current_user_id,
-    create_or_get_google_user, create_or_get_dev_user, get_user_by_id,
+    create_or_get_google_user, create_or_get_email_user, create_or_get_dev_user, get_user_by_id,
     create_session, get_user_by_session, delete_session,
     save_oauth_state, verify_and_consume_oauth_state, get_default_or_guest_user,
     get_guest_user, get_default_athlete_user,
@@ -200,10 +200,13 @@ def google_callback(
     except Exception as e:
         return RedirectResponse(f"/?auth_error=Google%20sign-in%20network%20error:%20{str(e)}", status_code=302)
 
-class DevLoginPayload(BaseModel):
+class EmailLoginPayload(BaseModel):
     email: str
     name: Optional[str] = None
     picture: Optional[str] = None
+    claim_primary: Optional[bool] = False
+
+DevLoginPayload = EmailLoginPayload
 
 @router.post("/primary-login")
 def primary_login(request: Request):
@@ -231,18 +234,25 @@ def primary_login(request: Request):
     )
     return res
 
+@router.post("/email-login")
 @router.post("/dev-login")
-def dev_login(request: Request, payload: DevLoginPayload):
+def email_login(request: Request, payload: EmailLoginPayload):
     """
-    Developer / Testing / Fast Switch athlete login.
-    Creates or switches to an isolated athlete account by email for instant multi-user verification.
+    Direct Email Login: allows any athlete to sign in with their email address.
+    Completely isolated data without requiring Google Cloud Console or third-party OAuth setup.
+    If claim_primary is True, links the email to the primary owner profile (preserving intervals.icu credentials).
     """
     clean_email = payload.email.strip().lower()
-    if not clean_email or "@" not in clean_email:
-        raise HTTPException(status_code=400, detail="Valid email address is required.")
+    if not clean_email or "@" not in clean_email or "." not in clean_email:
+        raise HTTPException(status_code=400, detail="Please enter a valid email address.")
         
-    name = payload.name or clean_email.split("@")[0].capitalize()
-    user = create_or_get_dev_user(email=clean_email, name=name, picture=payload.picture)
+    name = payload.name or clean_email.split("@")[0].replace(".", " ").title()
+    user = create_or_get_email_user(
+        email=clean_email,
+        name=name,
+        picture=payload.picture,
+        claim_primary=bool(payload.claim_primary)
+    )
     session_token = create_session(user["id"], days_valid=30)
 
     res = JSONResponse({

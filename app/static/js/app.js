@@ -5947,9 +5947,29 @@ document.querySelectorAll(".btn-dev-switch").forEach(btn => {
   btn.addEventListener("click", async () => {
     const email = btn.getAttribute("data-email");
     const name = btn.getAttribute("data-name");
-    await performDevLogin(email, name);
+    await performEmailLogin(email, name, false);
   });
 });
+
+const formEmailLogin = document.getElementById("formEmailLogin");
+const inputAthleteEmail = document.getElementById("inputAthleteEmail");
+const inputAthleteName = document.getElementById("inputAthleteName");
+const chkClaimPrimary = document.getElementById("chkClaimPrimary");
+
+if (formEmailLogin) {
+  formEmailLogin.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = inputAthleteEmail ? inputAthleteEmail.value.trim() : "";
+    const name = inputAthleteName ? inputAthleteName.value.trim() : "";
+    const claimPrimary = chkClaimPrimary ? chkClaimPrimary.checked : false;
+
+    if (!email || !email.includes("@")) {
+      showToast("Please enter a valid email address.");
+      return;
+    }
+    await performEmailLogin(email, name, claimPrimary);
+  });
+}
 
 const btnDevLoginSubmit = document.getElementById("btnDevLoginSubmit");
 const inputDevLoginEmail = document.getElementById("inputDevLoginEmail");
@@ -5960,31 +5980,39 @@ if (btnDevLoginSubmit && inputDevLoginEmail) {
       showToast("Please enter an email address.");
       return;
     }
-    await performDevLogin(email, email.split("@")[0]);
+    await performEmailLogin(email, email.split("@")[0], false);
   });
 }
 
-async function performDevLogin(email, name) {
+async function performEmailLogin(email, name, claimPrimary = false) {
   try {
-    showToast(`Switching to athlete ${name || email}...`);
-    const res = await fetch("/api/auth/dev-login", {
+    showToast(`Signing in as ${name || email}...`);
+    const res = await fetch("/api/auth/email-login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, name })
+      body: JSON.stringify({
+        email,
+        name: name || undefined,
+        claim_primary: claimPrimary
+      })
     });
-    if (res.ok) {
-      const data = await res.json();
+    const data = await res.json();
+    if (res.ok && data.success) {
       if (data.session_token) {
         localStorage.setItem("powersync_token", data.session_token);
       }
-      showToast(`Switched account to ${name || email}! Reloading...`);
+      showToast(`Authenticated as ${data.user?.name || email}! Reloading...`);
       setTimeout(() => { window.location.reload(); }, 400);
     } else {
-      showToast("Failed to switch account.");
+      showToast(data.detail || "Authentication failed.");
     }
   } catch (err) {
-    showToast("Error switching account.");
+    showToast("Error connecting to login server.");
   }
+}
+
+async function performDevLogin(email, name) {
+  return performEmailLogin(email, name, false);
 }
 
 const btnCopyGoogleRedirect = document.getElementById("btnCopyGoogleRedirect");
