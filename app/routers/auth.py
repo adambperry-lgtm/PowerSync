@@ -521,7 +521,10 @@ def sync_strava():
     if not tokens or not tokens.get("access_token"):
         return {"success": False, "error": "Strava is not connected for this account. Please connect in Settings.", "count": 0}
         
-    acts = fetch_recent_strava_activities(20, user_id=uid)
+    try:
+        acts = fetch_recent_strava_activities(20, user_id=uid)
+    except Exception as e:
+        return {"success": False, "error": f"Error syncing Strava activities: {str(e)}", "count": 0}
     if not acts:
         curr_tokens = get_setting("strava_tokens", {}, user_id=uid)
         import time
