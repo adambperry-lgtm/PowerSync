@@ -498,6 +498,31 @@ function cleanCoachInsightsText(text) {
   return str;
 }
 
+// Compute Target Watts for a Workout
+function computeWorkoutTargetWatts(w, ftp) {
+  if (!w) return "--";
+  if (w.duration_minutes === 0 || w.option_type === "rest") return "0 W";
+  if (w.target_power && w.target_power > 0) return `${Math.round(w.target_power)} W`;
+  const f = ftp || state.ftp || 250;
+  if (w.intervals && Array.isArray(w.intervals) && w.intervals.length > 0) {
+    const workInt = w.intervals.find(i => {
+      const t = (i.type || i.name || "").toLowerCase();
+      return !t.includes("warmup") && !t.includes("cooldown");
+    }) || w.intervals[1] || w.intervals[0];
+    if (workInt) {
+      const pct = workInt.power_pct || workInt.on_power_pct || workInt.power_high_pct || workInt.power_low_pct;
+      if (pct) return `${Math.round(f * pct / 100)} W`;
+    }
+  }
+  const focus = (w.focus_area || w.intensity_type || "").toLowerCase();
+  if (focus.includes("sweet spot")) return `${Math.round(f * 0.90)} W`;
+  if (focus.includes("threshold")) return `${Math.round(f * 1.0)} W`;
+  if (focus.includes("tempo")) return `${Math.round(f * 0.82)} W`;
+  if (focus.includes("vo2")) return `${Math.round(f * 1.15)} W`;
+  if (focus.includes("anaerobic")) return `${Math.round(f * 1.25)} W`;
+  return `${Math.round(f * 0.68)} W`;
+}
+
 // Render Top-Right AI Coach Directive Panel (Completed vs Scheduled)
 function renderAiCoachTodayCard(debriefData, workoutData) {
   const badge = document.getElementById("coachCardStatusBadge");
@@ -519,12 +544,34 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
   if (badge) badge.style.display = "none";
 
   const assessment = (debriefData && debriefData.today_assessment) || (state.dailyDebrief && state.dailyDebrief.today_assessment) || {};
-  const isCompletedToday = assessment.is_today && assessment.title && assessment.title !== "Rest / Off-Bike Day";
+  const isCompletedToday = Boolean(assessment.is_today && assessment.title && assessment.title !== "Rest / Off-Bike Day");
 
-  if (isCompletedToday) {
+  const w = workoutData || state.currentWorkout || {};
+  const hasActivePrescription = Boolean(
+    w && (
+      w.coach_prescribed ||
+      w.pushed_to_zwift ||
+      w.synced_to_zwift ||
+      w.id === "workout_coach_prescribed" ||
+      w.option_type === "coach_chat" ||
+      w.is_user_adapted ||
+      w.id === "workout_custom_replaced" ||
+      (w.title && w.title !== "Rest Day or Easy Spin")
+    )
+  );
+
+  // If user explicitly chose a view, honor it. Otherwise, if an active prescription or zwift sync exists, show it!
+  const showPrescribed = (state.activeCoachView === "prescribed") ||
+    (!state.activeCoachView && hasActivePrescription) ||
+    (!isCompletedToday);
+
+  if (!showPrescribed && isCompletedToday) {
     // State 1: Workout Completed Today
-
-    if (preHeading) preHeading.textContent = "TODAY'S COMPLETED WORKOUT";
+    if (preHeading) {
+      preHeading.innerHTML = hasActivePrescription
+        ? '<span style="color:var(--text-muted);font-weight:700;">TODAY\'S COMPLETED WORKOUT</span> · <a href="#" id="linkSwitchToPrescribed" style="color:var(--accent-cyan);text-decoration:none;font-weight:600;font-size:0.75rem;">Switch to Zwift Directive 🚀</a>'
+        : 'TODAY\'S COMPLETED WORKOUT';
+    }
     title.textContent = assessment.title;
 
     if (lbl1) lbl1.textContent = "Duration";
@@ -568,37 +615,67 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     }
 
     if (jumpLink) {
-      jumpLink.href = "#cardCoachDebrief";
-      jumpLink.innerHTML = "Full Debrief ↓";
-      jumpLink.onclick = (e) => {
+      if (hasActivePrescription) {
+        jumpLink.href = "#";
+        jumpLink.innerHTML = "View Zwift Directive ↗";
+        jumpLink.onclick = (e) => {
+          e.preventDefault();
+          state.activeCoachView = "prescribed";
+          renderAiCoachTodayCard(debriefData, workoutData);
+        };
+      } else {
+        jumpLink.href = "#cardCoachDebrief";
+        jumpLink.innerHTML = "Full Debrief ↓";
+        jumpLink.onclick = (e) => {
+          e.preventDefault();
+          const debriefEl = document.getElementById("cardCoachDebrief");
+          if (debriefEl) debriefEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        };
+      }
+    }
+
+    const linkSwitch = document.getElementById("linkSwitchToPrescribed");
+    if (linkSwitch) {
+      linkSwitch.onclick = (e) => {
         e.preventDefault();
-        const debriefEl = document.getElementById("cardCoachDebrief");
-        if (debriefEl) debriefEl.scrollIntoView({ behavior: "smooth", block: "start" });
+        state.activeCoachView = "prescribed";
+        renderAiCoachTodayCard(debriefData, workoutData);
       };
     }
   } else {
-    // State 2: Scheduled for Today
-    const w = workoutData || state.currentWorkout || {};
+    // State 2: Active Coach Directive / Prescribed Session
     const whoopRec = (state.whoop && state.whoop.recovery_score) || (state.dashboard && state.dashboard.whoop && state.dashboard.whoop.recovery_score) || 50;
+    const isRest = (w.duration_minutes === 0 || w.option_type === "rest");
+    const isZwiftSynced = Boolean(w.pushed_to_zwift || w.synced_to_zwift);
 
-    if (subtext) {
-      subtext.textContent = "Scheduled Today ⚡";
-      subtext.style.color = "var(--accent-cyan)";
+    if (preHeading) {
+      if (isZwiftSynced) {
+        preHeading.innerHTML = '<span style="color:#10b981;font-weight:700;">ACTIVE DIRECTIVE</span> · <span style="color:var(--accent-cyan);font-weight:700;">SENT TO ZWIFT 🚀</span>' +
+          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Morning Ride ↗</a>' : '');
+      } else if (hasActivePrescription && (w.coach_prescribed || w.option_type === "coach_chat")) {
+        preHeading.innerHTML = '<span style="color:var(--accent-cyan);font-weight:700;">ACTIVE COACH DIRECTIVE</span> · <span style="color:#c084fc;font-weight:700;">CHAT REVISED 💬</span>' +
+          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Morning Ride ↗</a>' : '');
+      } else if (hasActivePrescription && w.is_user_adapted) {
+        preHeading.innerHTML = '<span style="color:var(--accent-cyan);font-weight:700;">ACTIVE COACH DIRECTIVE</span> · <span style="color:#f59e0b;font-weight:700;">CUSTOM ADAPTED ⚡</span>' +
+          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Morning Ride ↗</a>' : '');
+      } else if (isRest) {
+        preHeading.textContent = "TODAY'S REST DAY DIRECTIVE";
+      } else {
+        preHeading.textContent = "TODAY'S PRESCRIBED SESSION";
+      }
     }
 
-    const isRest = (w.duration_minutes === 0 || w.option_type === "rest");
-    if (preHeading) preHeading.textContent = isRest ? "TODAY'S REST DAY DIRECTIVE" : "TODAY'S PRESCRIBED SESSION";
     title.textContent = w.title || (isRest ? "Rest Day or Easy Spin" : "Zone 2 Aerobic Base Flush");
 
     if (lbl1) lbl1.textContent = "Duration";
     if (val1) {
-      val1.textContent = `${w.duration_minutes !== undefined ? w.duration_minutes : 0}m`;
+      val1.textContent = `${w.duration_minutes !== undefined ? w.duration_minutes : 60}m`;
       val1.style.color = "#fff";
     }
 
     if (lbl2) lbl2.textContent = "Target Watts";
     if (val2) {
-      val2.textContent = isRest ? "0 W" : (w.target_power ? `${w.target_power} W` : (w.intervals && w.intervals[1] ? `${Math.round((state.ftp || 250) * (w.intervals[1].power_pct || 65) / 100)} W` : "165 W"));
+      val2.textContent = computeWorkoutTargetWatts(w, state.ftp || 250);
       val2.style.color = isRest ? "#10b981" : "var(--accent-cyan)";
     }
 
@@ -617,19 +694,21 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
         val4.textContent = `${w.total_xss} XSS`;
         val4.style.color = "#c084fc";
       } else {
-        val4.textContent = w.tss ? `~${w.tss}` : (w.estimated_tss ? `~${w.estimated_tss}` : "~45");
+        val4.textContent = w.tss ? `~${w.tss}` : (w.estimated_tss ? `~${w.estimated_tss}` : "~50");
         val4.style.color = "var(--accent-amber)";
       }
     }
 
     if (narrative) {
-      narrative.textContent = w.ai_rationale || (isRest
+      narrative.textContent = w.ai_rationale || w.description || (isRest
         ? `Per your forward directive, today is recommended as a full rest day or gentle active recovery spin.`
         : `Whoop recovery sits at ${whoopRec}%. Keep power strictly within aerobic boundaries to protect recovery and build aerobic fitness.`);
     }
 
     if (subtext) {
-      if (w.badge) {
+      if (isZwiftSynced) {
+        subtext.innerHTML = '<span style="color:#10b981;font-weight:600;">✓ Synced to Zwift 🚀</span>';
+      } else if (w.badge) {
         subtext.textContent = w.badge;
         subtext.style.color = isRest ? "#10b981" : "var(--accent-cyan)";
       } else {
@@ -639,17 +718,36 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     }
 
     if (jumpLink) {
-      jumpLink.href = "#workoutStageSection";
-      jumpLink.innerHTML = "Jump to Plan ↓";
-      jumpLink.onclick = (e) => {
-        e.preventDefault();
-        const stageEl = document.getElementById("workoutStageSection") || document.getElementById("indoorContainer");
-        if (stageEl) {
-          if (typeof isWorkoutStageCollapsed === "function" && isWorkoutStageCollapsed()) {
-            setWorkoutStageCollapsed(false);
+      if (isCompletedToday) {
+        jumpLink.href = "#";
+        jumpLink.innerHTML = "View Morning Ride ↗";
+        jumpLink.onclick = (e) => {
+          e.preventDefault();
+          state.activeCoachView = "completed";
+          renderAiCoachTodayCard(debriefData, workoutData);
+        };
+      } else {
+        jumpLink.href = "#workoutStageSection";
+        jumpLink.innerHTML = "Jump to Plan ↓";
+        jumpLink.onclick = (e) => {
+          e.preventDefault();
+          const stageEl = document.getElementById("workoutStageSection") || document.getElementById("indoorContainer");
+          if (stageEl) {
+            if (typeof isWorkoutStageCollapsed === "function" && isWorkoutStageCollapsed()) {
+              setWorkoutStageCollapsed(false);
+            }
+            stageEl.scrollIntoView({ behavior: "smooth", block: "start" });
           }
-          stageEl.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
+        };
+      }
+    }
+
+    const linkSwitchComp = document.getElementById("linkSwitchToCompleted");
+    if (linkSwitchComp) {
+      linkSwitchComp.onclick = (e) => {
+        e.preventDefault();
+        state.activeCoachView = "completed";
+        renderAiCoachTodayCard(debriefData, workoutData);
       };
     }
   }
@@ -657,11 +755,15 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
   // Update Collapsed Coach Directive Summary Chips
   const collapsedCoachSession = document.getElementById("collapsedCoachSession");
   if (collapsedCoachSession) {
-    collapsedCoachSession.textContent = isCompletedToday ? assessment.title : ((workoutData && workoutData.title) || (state.currentWorkout && state.currentWorkout.title) || "Today's Session");
+    collapsedCoachSession.textContent = showPrescribed
+      ? (w.title || "Today's Session")
+      : (assessment.title || "Today's Session");
   }
   const collapsedCoachVerdict = document.getElementById("collapsedCoachVerdict");
   if (collapsedCoachVerdict && val4) {
-    collapsedCoachVerdict.textContent = val4.textContent;
+    collapsedCoachVerdict.textContent = (showPrescribed && (w.pushed_to_zwift || w.synced_to_zwift))
+      ? "On Zwift 🚀"
+      : val4.textContent;
   }
   const collapsedCoachDur = document.getElementById("collapsedCoachDur");
   if (collapsedCoachDur && val1) {
@@ -891,6 +993,7 @@ async function selectWorkoutOption(optionId) {
     state.activeOptionId = localMatch.id;
     state.currentDuration = localMatch.duration_minutes;
     state.selectedIntervalIndex = null;
+    state.activeCoachView = "prescribed";
     syncDurationPills(state.currentDuration);
     renderWorkout(state.currentWorkout);
     renderWorkoutOptions(state.workoutOptions, state.activeOptionId);
@@ -914,6 +1017,7 @@ async function selectWorkoutOption(optionId) {
       state.currentWorkout = data.active_workout;
       state.activeOptionId = data.active_workout.id;
       state.currentDuration = data.active_workout.duration_minutes;
+      state.activeCoachView = "prescribed";
       syncDurationPills(state.currentDuration);
       renderWorkout(state.currentWorkout);
       renderWorkoutOptions(state.workoutOptions, state.activeOptionId);
@@ -1634,6 +1738,7 @@ async function loadWorkout(duration = null, intensity = 0, userNote = "") {
     if (data.is_custom_replaced || data.is_user_adapted || hasUserNote || (data.active_workout && data.active_workout.id === "workout_custom_replaced")) {
       state.currentWorkout = data.active_workout;
       state.activeOptionId = (data.active_workout && data.active_workout.id) || "workout_primary";
+      state.activeCoachView = "prescribed";
       if (typeof setWorkoutStageCollapsed === "function" && state.workoutStageCollapsed) {
         setWorkoutStageCollapsed(false);
       }
@@ -2445,7 +2550,17 @@ btnPushZwift.addEventListener("click", async () => {
     const result = await res.json();
 
     if (result.success) {
+      if (state.currentWorkout) {
+        state.currentWorkout.pushed_to_zwift = true;
+        state.currentWorkout.synced_to_zwift = true;
+        state.currentWorkout.badge = "🚀 Sent to Zwift";
+      }
+      state.activeCoachView = "prescribed";
       showToast("🚀 Workout scheduled! Open Zwift — today's workout is ready on your home screen!");
+      renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
+      if (typeof renderWorkout === "function" && state.currentWorkout) {
+        renderWorkout(state.currentWorkout);
+      }
     } else {
       showToast(`⚠️ ${result.error || 'Could not sync to Zwift.'}`);
       const errStr = (result.error || '').toLowerCase();
@@ -5025,13 +5140,23 @@ function appendCoachChatMessage(role, text, actionData = null) {
           applyBtn.classList.add("btn-applied");
           showToast(resData.message || `Activated ${actionData.title || 'Plan'}`);
 
-          if (isToday && resData.active_workout) {
+          state.activeCoachView = "prescribed";
+          const todayIso = new Date().toISOString().slice(0, 10);
+          const isForToday = isToday || (isScheduleWorkout && (resData.is_for_today || resData.target_date === todayIso || actionData.target_date === todayIso));
+
+          if (isForToday && (resData.active_workout || resData.workout)) {
+            const activeW = resData.active_workout || resData.workout;
+            if (resData.synced_to_zwift) {
+              activeW.pushed_to_zwift = true;
+              activeW.synced_to_zwift = true;
+              activeW.badge = "🚀 Sent to Zwift";
+            }
             if (typeof setWorkoutStageCollapsed === "function") {
               setWorkoutStageCollapsed(false);
             }
-            state.currentWorkout = resData.active_workout;
-            state.activeOptionId = resData.active_workout.id;
-            state.currentDuration = resData.active_workout.duration_minutes;
+            state.currentWorkout = activeW;
+            state.activeOptionId = activeW.id;
+            state.currentDuration = activeW.duration_minutes;
             if (resData.options) state.workoutOptions = resData.options;
             syncDurationPills(state.currentDuration);
             renderWorkout(state.currentWorkout);
@@ -5046,9 +5171,11 @@ function appendCoachChatMessage(role, text, actionData = null) {
             }
           } else if (isScheduleWorkout) {
             // Scheduled for tomorrow / Zwift calendar — refresh 3-day forecast immediately!
+            state.scheduledZwiftWorkout = resData.workout;
             if (typeof loadDebrief === "function") {
               await loadDebrief();
             }
+            renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
           } else {
             if (typeof loadUpcomingPlan === "function") {
               await loadUpcomingPlan();

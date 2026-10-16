@@ -411,7 +411,13 @@ def get_current_workout():
     workout_cache = get_current_workout_cache()
     options_cache = get_current_options_cache()
     if scheduled and (not workout_cache or workout_cache.get("id") != scheduled.get("id")):
-        return generate_workout(WorkoutGenerateRequest(duration_min=scheduled.get("duration_minutes", 60)))
+        workout_cache.clear()
+        workout_cache.update(scheduled)
+        options_cache[scheduled.get("id", "workout_scheduled")] = scheduled
+        return {
+            "active_workout": scheduled,
+            "options": list(options_cache.values())
+        }
 
     if workout_cache:
         return {
@@ -707,6 +713,16 @@ def push_to_zwift_via_intervals(req: IntervalsPushRequest):
     target_date = req.target_date or datetime.date.today().isoformat()
     ftp = int(get_setting("athlete_ftp", 250))
     result = push_to_intervals_icu(athlete_id, api_key, workout, target_date, ftp=ftp)
+    if result.get("success"):
+        if workout:
+            workout["pushed_to_zwift"] = True
+            workout["synced_to_zwift"] = True
+            workout["badge"] = "🚀 Sent to Zwift"
+        if workout_cache:
+            workout_cache["pushed_to_zwift"] = True
+            workout_cache["synced_to_zwift"] = True
+            workout_cache["badge"] = "🚀 Sent to Zwift"
+        result["active_workout"] = workout
     return result
 
 @router.post("/outdoor-recommendation")

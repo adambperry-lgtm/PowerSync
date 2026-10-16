@@ -168,8 +168,9 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 "focus_area": focus,
                 "duration_minutes": duration,
                 "estimated_tss": tss,
-                "ai_rationale": "Prescribed directly from your coach consultation. Calibrated for your current recovery and training phase.",
-                "intervals": intervals
+                "ai_rationale": data.get("ai_rationale") or "Prescribed directly from your coach consultation. Calibrated for your current recovery and training phase.",
+                "intervals": intervals,
+                "coach_prescribed": True
             }
             workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
@@ -223,8 +224,10 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             from app.services.zwift_service import generate_zwo_xml, generate_intervals_icu_text, push_to_intervals_icu, reconcile_workout_intervals
 
             target_date = data.get("target_date")
+            today_str = datetime.date.today().isoformat()
             if not target_date or target_date == "tomorrow":
                 target_date = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+            is_for_today = (target_date == today_str)
 
             ftp = _clean_int(get_setting("athlete_ftp", 250), 250)
             title = data.get("title") or "Scheduled Workout"
@@ -239,10 +242,10 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             intervals = reconcile_workout_intervals(raw_intervals, duration, ftp=ftp)
 
             workout_obj = {
-                "id": f"workout_scheduled_{target_date.replace('-', '')}",
-                "option_type": "coach_scheduled",
-                "badge": "📅 Scheduled",
-                "badge_color": "blue",
+                "id": "workout_coach_prescribed" if is_for_today else f"workout_scheduled_{target_date.replace('-', '')}",
+                "option_type": "coach_chat" if is_for_today else "coach_scheduled",
+                "badge": "🚀 Sent to Zwift" if is_for_today else "📅 Scheduled",
+                "badge_color": "cyan" if is_for_today else "blue",
                 "title": title,
                 "target_date": target_date,
                 "description": data.get("description") or f"Scheduled {focus} session for {target_date} ({duration}m, ~{tss} TSS).",
@@ -251,8 +254,9 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 "estimated_tss": tss,
                 "distance_miles": 0.0,
                 "elevation_gain_ft": 0.0,
-                "ai_rationale": f"Scheduled for {target_date} via AI Coach chat. Calibrated to your {ftp}W FTP.",
-                "intervals": intervals
+                "ai_rationale": data.get("ai_rationale") or f"Prescribed via AI Coach chat. Calibrated to your {ftp}W FTP.",
+                "intervals": intervals,
+                "coach_prescribed": True
             }
             workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
@@ -270,13 +274,26 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                     print("Error pushing scheduled workout to Intervals.icu:", e)
 
             synced_zwift = bool(sync_result and sync_result.get("success"))
+            workout_obj["synced_to_zwift"] = synced_zwift
+            workout_obj["pushed_to_zwift"] = synced_zwift
+
+            if is_for_today:
+                from app.routers.workouts import get_current_workout_cache, get_current_options_cache
+                workout_cache = get_current_workout_cache()
+                options_cache = get_current_options_cache()
+                workout_cache.clear()
+                workout_cache.update(workout_obj)
+                options_cache["workout_coach_prescribed"] = workout_obj
+
             sync_msg = " & synced to Zwift calendar" if synced_zwift else " (ready to sync to Zwift)"
             return {
                 "success": True,
                 "action_type": "schedule_workout",
                 "message": f"'{title}' scheduled for {target_date}{sync_msg}! 🚀",
                 "workout": workout_obj,
+                "active_workout": workout_obj if is_for_today else None,
                 "target_date": target_date,
+                "is_for_today": is_for_today,
                 "synced_to_zwift": synced_zwift
             }
 
