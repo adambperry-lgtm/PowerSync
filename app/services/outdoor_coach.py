@@ -192,6 +192,20 @@ def build_outdoor_ride_recommendation(
     """
     candidates = get_candidate_outdoor_rides()
 
+    import re
+    note_clean = (user_note or "").strip().lower()
+    if note_clean:
+        dur_min_match = re.search(r'\b(\d{2,3})\s*(?:m|min|mins|minute|minutes)\b', note_clean)
+        dur_hr_match = re.search(r'\b(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b', note_clean)
+        if dur_min_match:
+            parsed_d = int(dur_min_match.group(1))
+            if 20 <= parsed_d <= 300:
+                target_duration_min = parsed_d
+        elif dur_hr_match:
+            parsed_d = round(float(dur_hr_match.group(1)) * 60)
+            if 20 <= parsed_d <= 300:
+                target_duration_min = parsed_d
+
     # Determine desired physiological stimulus today
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
@@ -199,7 +213,7 @@ def build_outdoor_ride_recommendation(
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and recovery_score <= 55)
 
     is_recovery_needed = (
-        (has_substantial_ride or high_strain_reached) and not (user_note and "override" in user_note.lower())
+        (has_substantial_ride or high_strain_reached) and not bool(note_clean)
     ) or recovery_score < 34
 
     effective_strain = recent_weighted_strain if recent_weighted_strain > 0 else trailing_7d_strain_avg
@@ -237,7 +251,27 @@ def build_outdoor_ride_recommendation(
 
     is_yesterday_surge = yesterday_tss >= 90 or yesterday_strain >= 15.0 or load_profile == "Recent Surge (Yesterday Heavy)"
 
-    if is_recovery_needed:
+    if note_clean and any(k in note_clean for k in ["recovery", "easy", "flush", "spin", "flat", "zone 1", "z1", "light"]):
+        target_zone = "Active Recovery"
+        target_pct_ftp = 52
+        target_suffer_max = 35
+        zone_badge = "Active Recovery Flush"
+    elif note_clean and any(k in note_clean for k in ["zone 2", "z2", "endurance", "base", "steady", "aerobic"]):
+        target_zone = "Zone 2 Aerobic Base"
+        target_pct_ftp = 66
+        target_suffer_max = 60
+        zone_badge = "Zone 2 Aerobic Base"
+    elif note_clean and any(k in note_clean for k in ["tempo", "zone 3", "z3", "rolling"]):
+        target_zone = "Tempo / Muscular Endurance"
+        target_pct_ftp = 80
+        target_suffer_max = 80
+        zone_badge = "Tempo Rolling Route"
+    elif note_clean and any(k in note_clean for k in ["climb", "climbing", "hill", "hills", "punchy", "hard", "threshold", "sweet spot", "sst", "vo2"]):
+        target_zone = "High Aerobic / Punchy Climbing"
+        target_pct_ftp = 88
+        target_suffer_max = 110
+        zone_badge = "High Aerobic / Punchy"
+    elif is_recovery_needed:
         target_zone = "Active Recovery"
         target_pct_ftp = 50
         target_suffer_max = 30
@@ -507,8 +541,10 @@ def generate_outdoor_coaching_rationale(
     elev_m = primary_match.get("elevation_gain_m", 0)
     w = primary_match.get("average_watts", 0)
 
+    note_prefix = f"Adapted to your instruction ('{user_note.strip()}'): " if (user_note and user_note.strip()) else ""
+
     if is_recovery_needed:
-        return (
+        return note_prefix + (
             f"Your Whoop recovery is low ({recovery_score}%) with accumulated strain. "
             f"Instead of a hard route, your historical ride '{name}' ({dur_str}, {dist_km} km) from {date_str} "
             f"is the ideal reference for an active flush. Keep climbing power strictly below {int(ftp * 0.55)}W "
@@ -516,7 +552,7 @@ def generate_outdoor_coaching_rationale(
         )
 
     if is_recent_fatigue_surge and target_zone == "Zone 2 Aerobic Base":
-        return (
+        return note_prefix + (
             f"Whoop recovery is moderate at {recovery_score}%. While your 7-day volume totals {recent_volume_hours:.1f} hrs ({total_tss} TSS), "
             f"your fatigue is acutely concentrated in the last 24 hours (yesterday logged {yesterday_tss} TSS and {yesterday_strain:.1f} Whoop strain, "
             f"producing an acute weighted load of {acute_weighted_tss} TSS). Because acute muscular fatigue takes 3–5 days to clear, "
@@ -525,7 +561,7 @@ def generate_outdoor_coaching_rationale(
         )
 
     if is_front_loaded_fresh and target_zone == "Tempo / Muscular Endurance":
-        return (
+        return note_prefix + (
             f"Whoop recovery is stable at {recovery_score}%. While your 7-day load totals {recent_volume_hours:.1f} hrs ({total_tss} TSS), "
             f"your heavy training was front-loaded earlier in the cycle. With yesterday being an easy recovery day ({yesterday_strain:.1f} strain, {yesterday_tss} TSS), "
             f"acute residual fatigue has decayed (acute weighted load: {acute_weighted_tss} TSS). Your body has supercompensated, "
@@ -533,7 +569,7 @@ def generate_outdoor_coaching_rationale(
         )
 
     if target_zone == "Zone 2 Aerobic Base":
-        return (
+        return note_prefix + (
             f"Whoop recovery is moderate at {recovery_score}%. Combined with {recent_volume_hours:.1f} Strava hours "
             f"and a recency-weighted Whoop strain of {recent_weighted_strain:.1f} ({trailing_7d_high_strain_count} peak days ≥14.0), "
             f"your body needs steady aerobic base building rather than high cardiac cost. "
@@ -542,7 +578,7 @@ def generate_outdoor_coaching_rationale(
         )
 
     if target_zone == "Tempo / Muscular Endurance":
-        return (
+        return note_prefix + (
             f"With stable Whoop recovery ({recovery_score}%) and moderate trailing strain ({recent_weighted_strain:.1f}), "
             f"you have the reserves for a brisk outdoor session. Your prior '{name}' from {date_str} "
             f"({dur_str}, {dist_km} km, {w}W avg) is recommended. Ride the flats in steady Zone 2/3 and hold a controlled "
@@ -550,13 +586,13 @@ def generate_outdoor_coaching_rationale(
         )
 
     if target_zone == "Sweet Spot / Controlled Elevation":
-        return (
+        return note_prefix + (
             f"Good morning recovery ({recovery_score}%), but yesterday's heavy effort ({yesterday_tss} TSS, {yesterday_strain:.1f} strain) "
             f"still requires intelligent load management. Your prior '{name}' from {date_str} ({dur_str}, {dist_km} km, {elev_m}m elevation) "
             f"allows controlled Sweet Spot climbing (~{int(ftp * 0.88)}W) without the extreme anaerobic spikes of high-mountain efforts."
         )
 
-    return (
+    return note_prefix + (
         f"Strong Whoop readiness today ({recovery_score}% Recovery, {hrv_rmssd:.0f} ms HRV). "
         f"Your prior '{name}' from {date_str} ({dur_str}, {dist_km} km, {elev_m}m elevation) provides the ideal outdoor stimulus. "
         f"Push the punchy climbs at Sweet Spot / Threshold (~{int(ftp * 0.88)}–{int(ftp * 0.95)}W) and maintain cadence over the crests."

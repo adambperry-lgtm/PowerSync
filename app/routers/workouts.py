@@ -21,11 +21,12 @@ def is_planned_custom_ride_description(text: str) -> bool:
         return False
     lower = text.lower()
     has_dist = bool(re.search(r'\b\d+(?:\.\d+)?\s*(?:miles?|mi|km|k)\b', lower))
-    has_intent = any(k in lower for k in [
-        "plan", "planning", "ride", "doing", "custom", "replace",
-        "gravel", "outdoor", "route", "road", "fondo", "century"
+    if has_dist:
+        return True
+    has_outdoor_route = any(k in lower for k in [
+        "gravel", "outdoor ride", "outdoor route", "road ride", "gran fondo", "century", "group ride"
     ])
-    return has_dist and has_intent
+    return has_outdoor_route
 
 class WorkoutGenerateRequest(BaseModel):
     duration_min: Optional[int] = None
@@ -205,13 +206,19 @@ def generate_workout(req: WorkoutGenerateRequest):
             tgt_dt = None
     day_cfg = get_day_target_config(tgt_dt)
     is_rest_day = day_cfg.get("is_directive_rest", False) or day_cfg.get("is_default_rest", False)
-    has_explicit_override = bool(req.user_note and any(k in req.user_note.lower() for k in ["override", "force", "train anyway", "ignore rest"]))
-    if is_rest_day and not has_explicit_override:
+    note_clean = (req.user_note or "").strip().lower()
+    wants_rest_note = bool(note_clean and any(k in note_clean for k in [
+        "rest day", "take today off", "full rest", "skip today", "no ride", "day off"
+    ]) and not any(k in note_clean for k in ["active", "spin", "flush"]))
+    has_explicit_override = bool(note_clean and not wants_rest_note)
+
+    if wants_rest_note or (is_rest_day and not has_explicit_override and (req.duration_min is None or req.duration_min == 0)):
         target_dur = 0
-    elif req.duration_min is not None:
+    elif req.duration_min is not None and req.duration_min > 0:
         target_dur = req.duration_min
     else:
-        target_dur = day_cfg.get("preferred_duration_min", 45)
+        pref_dur = day_cfg.get("preferred_duration_min", 45)
+        target_dur = pref_dur if pref_dur > 0 else 45
 
     # Generate bundle (Primary + 2 Alternatives) with dual-load modeling
     bundle = build_workout_bundle(
@@ -240,6 +247,7 @@ def generate_workout(req: WorkoutGenerateRequest):
 
     # Apply intensity adjustment if requested
     if req.intensity_adjust and req.intensity_adjust != 0:
+        from app.services.ai_coach import enrich_workout_strain
         multiplier = 1.0 + (req.intensity_adjust / 100.0)
         for w in bundle["all_options"]:
             for interval in w.get("intervals", []):
@@ -259,11 +267,17 @@ def generate_workout(req: WorkoutGenerateRequest):
             w["ai_rationale"] += f" [Intensity scaled by {req.intensity_adjust:+d}%]"
             w["zwo_content"] = generate_zwo_xml(w, ftp)
             w["intervals_icu_text"] = generate_intervals_icu_text(w)
+            enrich_workout_strain(w, ftp)
 
     # Check if a workout was scheduled with the coach for target date
     target_iso = req.target_date[:10] if req.target_date else today_iso
     from app.database import get_scheduled_workout_for_date
     scheduled_target = get_scheduled_workout_for_date(target_iso)
+    is_explicit_adaptation = bool(
+        note_clean or
+        (req.intensity_adjust and req.intensity_adjust != 0) or
+        (req.duration_min is not None and scheduled_target and req.duration_min > 0 and req.duration_min != scheduled_target.get("duration_minutes"))
+    )
     if scheduled_target and not day_cfg.get("is_directive_rest"):
         scheduled_target["badge"] = "💬 Coach Scheduled"
         scheduled_target["badge_color"] = "cyan"
@@ -271,8 +285,15 @@ def generate_workout(req: WorkoutGenerateRequest):
             scheduled_target["zwo_content"] = generate_zwo_xml(scheduled_target, ftp)
         if not scheduled_target.get("intervals_icu_text"):
             scheduled_target["intervals_icu_text"] = generate_intervals_icu_text(scheduled_target)
-        bundle["primary"] = scheduled_target
-        bundle["all_options"] = [scheduled_target] + [o for o in bundle["all_options"] if o["id"] != scheduled_target["id"]]
+        from app.services.ai_coach import enrich_workout_strain
+        scheduled_target = enrich_workout_strain(scheduled_target, ftp)
+        if not is_explicit_adaptation:
+            bundle["primary"] = scheduled_target
+            bundle["all_options"] = [scheduled_target] + [o for o in bundle["all_options"] if o["id"] != scheduled_target["id"]]
+        else:
+            bundle["all_options"] = [bundle["primary"]] + [
+                o for o in bundle["all_options"] if o["id"] != bundle["primary"]["id"] and o["id"] != scheduled_target["id"]
+            ] + [scheduled_target]
 
     options_cache = get_current_options_cache()
     workout_cache = get_current_workout_cache()
@@ -312,10 +333,29 @@ def generate_workout(req: WorkoutGenerateRequest):
             "is_custom_replaced": True
         }
 
-    return {
+    response_payload: Dict[str, Any] = {
         "active_workout": primary_workout,
         "options": bundle["all_options"]
     }
+    if note_clean:
+        response_payload["is_user_adapted"] = True
+        response_payload["fueling_plan"] = generate_fueling_plan(
+            duration_min=int(primary_workout.get("duration_minutes") or 45),
+            distance_miles=float(primary_workout.get("distance_miles") or 0.0),
+            avg_power_watts=round(ftp * 0.72),
+            ftp=ftp,
+            intensity_type=primary_workout.get("focus_area", "Endurance"),
+            ride_title=primary_workout.get("title", "Adapted Workout"),
+            athlete_weight_kg=70.0,
+            temp_f=int(req.temp_f or 74),
+            humidity_pct=int(req.humidity_pct or 50),
+            is_outdoor=False,
+            recovery_score=rec_score,
+            trailing_strain_avg=trailing_7d_strain_avg,
+            yesterday_tss=yesterday_tss
+        )
+
+    return response_payload
 
 @router.post("/select")
 def select_workout_option(req: WorkoutSelectRequest):
@@ -545,6 +585,8 @@ def replace_with_custom_ride(req: ReplaceCustomRideRequest):
     }
     custom_workout["zwo_content"] = generate_zwo_xml(custom_workout, ftp)
     custom_workout["intervals_icu_text"] = generate_intervals_icu_text(custom_workout)
+    from app.services.ai_coach import enrich_workout_strain
+    custom_workout = enrich_workout_strain(custom_workout, ftp)
 
     workout_cache = get_current_workout_cache()
     outdoor_cache = get_current_outdoor_cache()

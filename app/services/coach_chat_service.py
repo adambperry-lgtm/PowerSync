@@ -94,6 +94,14 @@ def compile_athlete_context() -> Dict[str, Any]:
         })
 
     sys_status = strain_systems.get("system_status", {})
+    if isinstance(sys_status, dict):
+        glyc_fatigued = sys_status.get("high_glycolytic") in ("FATIGUED", "FRESHENING") or strain_systems.get("glycolytic_fatigued", False)
+        neuro_fatigued = sys_status.get("peak_neuromuscular") in ("FATIGUED", "FRESHENING") or strain_systems.get("neuromuscular_fatigued", False)
+    else:
+        sys_status_str = str(sys_status).lower()
+        glyc_fatigued = "glycolytic" in sys_status_str or strain_systems.get("glycolytic_fatigued", False)
+        neuro_fatigued = "neuromuscular" in sys_status_str or strain_systems.get("neuromuscular_fatigued", False)
+
     snapshot = {
         "local_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "athlete": {
@@ -121,8 +129,8 @@ def compile_athlete_context() -> Dict[str, Any]:
             "trailing_7d_peak_xss": strain_systems.get("trailing_7d", {}).get("peak_xss", 0.0),
             "acute_48h_high_xss": strain_systems.get("acute_48h", {}).get("high_xss", 0.0),
             "acute_48h_peak_xss": strain_systems.get("acute_48h", {}).get("peak_xss", 0.0),
-            "glycolytic_fatigued": sys_status.get("high_glycolytic") in ("FATIGUED", "FRESHENING") or strain_systems.get("glycolytic_fatigued", False),
-            "neuromuscular_fatigued": sys_status.get("peak_neuromuscular") in ("FATIGUED", "FRESHENING") or strain_systems.get("neuromuscular_fatigued", False),
+            "glycolytic_fatigued": glyc_fatigued,
+            "neuromuscular_fatigued": neuro_fatigued,
             "directive": strain_systems.get("recommendation_directive", strain_systems.get("directive", "BALANCED_TRAINING")),
             "directive_explanation": strain_systems.get("system_rationale", strain_systems.get("directive_explanation", ""))
         },

@@ -80,22 +80,49 @@ def build_adaptive_workout_local(
     acute_peak_xss = strain_systems.get("acute_48h", {}).get("peak_xss", 0.0)
     has_glycolytic_surge = (acute_high_xss >= 30.0 or yesterday_high_xss >= 20.0)
 
+    # 0. Parse explicit duration or intent from user_note if provided
+    import re
+    note_clean = (user_note or "").strip().lower()
+    wants_rest_note = bool(note_clean and any(k in note_clean for k in [
+        "rest day", "take today off", "full rest", "skip today", "no ride", "day off"
+    ]) and not any(k in note_clean for k in ["active", "spin", "flush"]))
+
+    if note_clean and not wants_rest_note:
+        dur_min_match = re.search(r'\b(\d{2,3})\s*(?:m|min|mins|minute|minutes)\b', note_clean)
+        dur_hr_match = re.search(r'\b(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b', note_clean)
+        if dur_min_match:
+            parsed_d = int(dur_min_match.group(1))
+            if 15 <= parsed_d <= 240:
+                duration = parsed_d
+        elif dur_hr_match:
+            parsed_d = round(float(dur_hr_match.group(1)) * 60)
+            if 15 <= parsed_d <= 240:
+                duration = parsed_d
+
     # 0A. Check if today is a scheduled weekly rest day per athlete preferences
     from app.services.preferences_service import get_day_target_config
     day_cfg = get_day_target_config(target_date)
     is_dir_rest = day_cfg.get("is_directive_rest", False)
     is_default_rest = day_cfg.get("is_default_rest", False)
-    has_explicit_override = bool(user_note and any(k in user_note.lower() for k in ["override", "force", "ignore rest", "train anyway"]))
-    is_scheduled_rest_day = (is_default_rest or is_dir_rest or duration == 0) and not has_explicit_override
+    has_explicit_override = bool(note_clean and not wants_rest_note)
+
+    if has_explicit_override and duration <= 0:
+        pref_d = day_cfg.get("preferred_duration_min", 45)
+        duration = pref_d if pref_d > 0 else 45
+
+    is_scheduled_rest_day = wants_rest_note or ((is_default_rest or is_dir_rest or duration == 0) and not has_explicit_override)
     
     if is_scheduled_rest_day:
-        title = "Rest Day or Easy Spin" if is_dir_rest else "Rest & Recovery"
+        title = "Rest Day or Easy Spin" if is_dir_rest and not wants_rest_note else "Rest & Recovery"
         focus_area = "Rest & Recovery"
-        badge_text = "📋 Schedule Directive" if is_dir_rest else "🛋️ Scheduled Rest Day"
+        badge_text = "✨ Adapted Rest Day" if wants_rest_note else ("📋 Schedule Directive" if is_dir_rest else "🛋️ Scheduled Rest Day")
         ai_rationale = (
-            f"Expected Recovery: ~{recovery_score}% (Supercompensation). Per your forward directive, {day_cfg.get('day_name', 'today')} is recommended as a full rest day or gentle active recovery spin (<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) to allow cellular supercompensation before Friday's ride."
-            if is_dir_rest else
-            (day_cfg.get("notes") or f"Per your coaching schedule preferences, {day_cfg.get('day_name', 'today')} is designated as your dedicated rest day. Your Whoop recovery is {recovery_score}%. Focus on hydration, mobility, and restorative sleep before your upcoming sessions.")
+            f"Adapted to your instruction ('{user_note}'): Today is set as a full passive rest day to prioritize autonomic recovery ({recovery_score}% Whoop recovery) and glycogen restoration."
+            if wants_rest_note else (
+                f"Expected Recovery: ~{recovery_score}% (Supercompensation). Per your forward directive, {day_cfg.get('day_name', 'today')} is recommended as a full rest day or gentle active recovery spin (<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) to allow cellular supercompensation before Friday's ride."
+                if is_dir_rest else
+                (day_cfg.get("notes") or f"Per your coaching schedule preferences, {day_cfg.get('day_name', 'today')} is designated as your dedicated rest day. Your Whoop recovery is {recovery_score}%. Focus on hydration, mobility, and restorative sleep before your upcoming sessions.")
+            )
         )
         workout_obj = {
             "id": "workout_primary",
@@ -120,7 +147,7 @@ def build_adaptive_workout_local(
     has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and recovery_score <= 55)
     
-    if (has_substantial_ride or high_strain_reached) and not (user_note and "override" in user_note.lower()):
+    if (has_substantial_ride or high_strain_reached) and not has_explicit_override:
         act_name = today_acts[0].get("name", "training session") if today_acts else "an intense session"
         dur_note = f" ({today_moving_min}m)" if today_moving_min > 0 else ""
         title = "Daily Target Achieved — Rest & Recovery"
@@ -156,8 +183,150 @@ def build_adaptive_workout_local(
         workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
         return enrich_workout_strain(workout_obj, ftp)
 
-    # 0B. TARGET PLAN ACTIVE ADAPTATION: T-0 (Event Day), T-1 (Primer), T-2 (Flush), T-3 (Taper Onset)
-    if active_plan and days_until is not None and days_until >= 0 and not (user_note and "ignore plan" in user_note.lower()):
+    # 0C. Explicit User Note Workout Adaptation (when athlete enters a training instruction)
+    if note_clean:
+        from app.services.zwift_service import reconcile_workout_intervals
+        w_sec = 360 if duration <= 40 else 420
+        c_sec = 240 if duration <= 40 else 300
+        custom_matched = True
+
+        if any(k in note_clean for k in ["recovery", "easy", "flush", "zone 1", "z1", "spin", "tired", "exhausted", "sore", "light", "gentle"]):
+            title = f"{duration}-Min Active Recovery & Flush"
+            focus_area = "Active Recovery"
+            estimated_tss = max(8, int(duration * 0.38))
+            ai_rationale = (
+                f"Adapted to your instruction ('{user_note}'): Dialed into a gentle {duration}-minute Zone 1 active recovery spin (<55% FTP, ~{round(ftp * 0.50)}W) "
+                f"calibrated for your {recovery_score}% Whoop recovery to promote blood flow and clear metabolic fatigue without autonomic strain."
+            )
+            intervals = [
+                {"type": "Warmup", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 52, "cadence": 86, "name": "Gentle Ramp Up"},
+                {"type": "SteadyState", "duration_sec": max(300, (duration * 60) - 540), "power_pct": 52, "cadence": 90, "name": "Zone 1 Active Flush"},
+                {"type": "Cooldown", "duration_sec": 240, "power_low_pct": 52, "power_high_pct": 38, "cadence": 82, "name": "Easy Spin Out"}
+            ]
+        elif any(k in note_clean for k in ["sweet spot", "sweetspot", "sst", "sub-threshold", "subthreshold"]):
+            title = f"{duration}-Min Sweet Spot Over-Unders"
+            focus_area = "Sweet Spot Over-Unders"
+            estimated_tss = int(duration * 0.82)
+            primer_sec = 180
+            valley_sec = 120
+            main_sec = max(480, (duration * 60) - w_sec - c_sec - primer_sec - valley_sec)
+            reps = max(2, main_sec // 240)
+            ai_rationale = (
+                f"Adapted to your instruction ('{user_note}'): Configured a {duration}-minute Sweet Spot Over-Unders workout "
+                f"(2m @ 95% FTP / {round(ftp * 0.95)}W, 2m @ 88% FTP / {round(ftp * 0.88)}W) for high aerobic density with controlled autonomic cost ({recovery_score}% Whoop recovery)."
+            )
+            intervals = [
+                {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
+                {"type": "SteadyState", "duration_sec": primer_sec, "power_pct": 88, "cadence": 92, "name": "Sweet Spot Primer"},
+                {"type": "SteadyState", "duration_sec": valley_sec, "power_pct": 55, "cadence": 85, "name": "Valley Spin"},
+                {"type": "Repeats", "repeat": reps, "on_duration_sec": 120, "off_duration_sec": 120, "on_power_pct": 95, "off_power_pct": 88, "cadence": 92, "cadence_rest": 88, "name": f"{reps}x Sweet Spot Over-Unders (2m @ 95% / 2m @ 88%)"},
+                {"type": "Cooldown", "duration_sec": c_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
+            ]
+        elif any(k in note_clean for k in ["over-under", "over under", "overunder", "threshold", "zone 4", "z4", "lactate", "ftp"]):
+            title = f"{duration}-Min Threshold Over-Unders"
+            focus_area = "Threshold Over-Unders"
+            estimated_tss = int(duration * 0.85)
+            primer_sec = 180
+            valley_sec = 120
+            main_sec = max(360, (duration * 60) - w_sec - c_sec - primer_sec - valley_sec)
+            reps = max(2, main_sec // 180)
+            ai_rationale = (
+                f"Adapted to your instruction ('{user_note}'): Built a {duration}-minute Threshold Over-Unders session "
+                f"oscillating between 105% FTP ({round(ftp * 1.05)}W) and 90% FTP ({round(ftp * 0.90)}W) to maximize lactate clearance and raise your threshold ceiling."
+            )
+            intervals = [
+                {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
+                {"type": "SteadyState", "duration_sec": primer_sec, "power_pct": 90, "cadence": 92, "name": "Threshold Primer"},
+                {"type": "SteadyState", "duration_sec": valley_sec, "power_pct": 55, "cadence": 85, "name": "Recovery Spin"},
+                {"type": "Repeats", "repeat": reps, "on_duration_sec": 120, "off_duration_sec": 60, "on_power_pct": 105, "off_power_pct": 90, "cadence": 94, "cadence_rest": 88, "name": f"{reps}x Over-Under Blocks (2m @ 105% / 1m @ 90%)"},
+                {"type": "Cooldown", "duration_sec": c_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
+            ]
+        elif any(k in note_clean for k in ["vo2", "hiit", "microburst", "high intensity", "hard", "anaerobic", "sprint", "tabata", "zone 5", "z5", "intervals", "30/30", "40/20"]):
+            if any(k in note_clean for k in ["microburst", "30/30", "40/20", "tabata", "sprint"]):
+                title = f"{duration}-Min High-Cadence Microbursts"
+                focus_area = "VO2 Max & Neuromuscular"
+                estimated_tss = int(duration * 0.88)
+                main_sec = max(480, (duration * 60) - w_sec - c_sec - 300)
+                reps = max(6, main_sec // 60)
+                ai_rationale = (
+                    f"Adapted to your instruction ('{user_note}'): Prescribed {duration}-minute High-Cadence Microbursts "
+                    f"(30s @ 120% FTP / {round(ftp * 1.20)}W, 30s @ 50% FTP) to drive peak oxygen uptake and fast-twitch recruitment."
+                )
+                intervals = [
+                    {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 45, "power_high_pct": 78, "cadence": 90, "name": "Gradual Wattage Ramp"},
+                    {"type": "Repeats", "repeat": reps, "on_duration_sec": 30, "off_duration_sec": 30, "on_power_pct": 120, "off_power_pct": 50, "cadence": 102, "cadence_rest": 85, "name": f"{reps}x 30/30s VO2 Microbursts"},
+                    {"type": "SteadyState", "duration_sec": 300, "power_pct": 65, "cadence": 90, "name": "Aerobic Bridge"},
+                    {"type": "Cooldown", "duration_sec": c_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
+                ]
+            else:
+                title = f"{duration}-Min VO2 Max Intervals"
+                focus_area = "VO2 Max & High Aerobic"
+                estimated_tss = int(duration * 0.90)
+                main_sec = max(360, (duration * 60) - w_sec - c_sec)
+                reps = max(2, main_sec // 360)
+                ai_rationale = (
+                    f"Adapted to your instruction ('{user_note}'): Prescribed {duration}-minute VO2 Max 3-minute intervals at 115% FTP ({round(ftp * 1.15)}W) "
+                    f"to push maximal stroke volume and aerobic ceiling."
+                )
+                intervals = [
+                    {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 45, "power_high_pct": 78, "cadence": 90, "name": "Gradual Wattage Ramp"},
+                    {"type": "Repeats", "repeat": reps, "on_duration_sec": 180, "off_duration_sec": 180, "on_power_pct": 115, "off_power_pct": 50, "cadence": 98, "cadence_rest": 85, "name": f"{reps}x 3m VO2 Max Blocks (115% FTP)"},
+                    {"type": "Cooldown", "duration_sec": c_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
+                ]
+        elif any(k in note_clean for k in ["tempo", "zone 3", "z3", "muscular endurance", "cadence", "climbing", "climb"]):
+            title = f"{duration}-Min Tempo Cadence Ladders"
+            focus_area = "Tempo / Muscular Endurance"
+            estimated_tss = int(duration * 0.70)
+            val_sec = 180 if duration < 45 else 240
+            work_sec = max(240, ((duration * 60) - w_sec - c_sec - val_sec) // 2)
+            ai_rationale = (
+                f"Adapted to your instruction ('{user_note}'): Built a {duration}-minute Zone 3 Tempo session (80–82% FTP, ~{round(ftp * 0.81)}W) "
+                f"targeting muscular endurance and sustained torque."
+            )
+            intervals = [
+                {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 45, "power_high_pct": 72, "cadence": 88, "name": "Gradual Wattage Ramp"},
+                {"type": "SteadyState", "duration_sec": work_sec, "power_pct": 80, "cadence": 92, "name": "Tempo Block 1"},
+                {"type": "SteadyState", "duration_sec": val_sec, "power_pct": 55, "cadence": 85, "name": "Recovery Valley"},
+                {"type": "SteadyState", "duration_sec": work_sec, "power_pct": 82, "cadence": 94, "name": "Tempo Block 2"},
+                {"type": "Cooldown", "duration_sec": c_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
+            ]
+        elif any(k in note_clean for k in ["zone 2", "z2", "endurance", "base", "aerobic", "steady", "foundation", "fat burn"]):
+            title = f"{duration}-Min Zone 2 Aerobic Foundation"
+            focus_area = "Zone 2 Aerobic Base"
+            estimated_tss = int(duration * 0.58)
+            ai_rationale = (
+                f"Adapted to your instruction ('{user_note}'): Prescribed a {duration}-minute steady Zone 2 aerobic base session at 68% FTP ({round(ftp * 0.68)}W) "
+                f"with progressive warmup and cooldown ramps to build mitochondrial density and fat oxidation."
+            )
+            intervals = [
+                {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 45, "power_high_pct": 68, "cadence": 88, "name": "Gradual Wattage Ramp"},
+                {"type": "SteadyState", "duration_sec": max(300, (duration * 60) - w_sec - c_sec), "power_pct": 68, "cadence": 90, "name": "Zone 2 Endurance Base"},
+                {"type": "Cooldown", "duration_sec": c_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
+            ]
+        else:
+            custom_matched = False
+
+        if custom_matched:
+            intervals = reconcile_workout_intervals(intervals, duration, ftp=ftp)
+            workout_obj = {
+                "id": "workout_primary",
+                "option_type": "primary",
+                "badge": "✨ Adapted to Your Note",
+                "badge_color": "cyan",
+                "title": title,
+                "description": f"Adapted workout: {user_note}",
+                "focus_area": focus_area,
+                "duration_minutes": duration,
+                "estimated_tss": estimated_tss,
+                "ai_rationale": ai_rationale,
+                "intervals": intervals
+            }
+            workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
+            workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+            return enrich_workout_strain(workout_obj, ftp)
+
+    # 0D. TARGET PLAN ACTIVE ADAPTATION: T-0 (Event Day), T-1 (Primer), T-2 (Flush), T-3 (Taper Onset)
+    if active_plan and days_until is not None and days_until >= 0 and not has_explicit_override:
         plan_title = active_plan.get("title", "Target Event")
         plan_dist = float(active_plan.get("distance_miles") or 50.0)
         plan_tss = int(active_plan.get("estimated_tss") or 160)
@@ -542,14 +711,15 @@ def build_adaptive_workout_local(
             ]
             estimated_tss = int(duration * 0.88)
 
-    if user_note:
-        ai_rationale += f" (Note: '{user_note}')"
-
     badge_text = "⭐ Coach's Choice"
     badge_color = "cyan"
     if active_plan and days_until is not None and days_until >= 4:
         badge_text = f"🎯 T-{days_until} Prep • Coach's Choice"
         ai_rationale = f"Target Event Horizon: '{active_plan.get('title')}' ({float(active_plan.get('distance_miles') or 50):.1f} mi) in {days_until} days. {ai_rationale}"
+
+    if user_note and user_note.strip():
+        badge_text = "✨ Adapted to Your Note"
+        ai_rationale = f"Adapted to your instruction ('{user_note.strip()}'): {ai_rationale}"
 
     workout_obj = {
         "id": "workout_primary",
@@ -741,7 +911,7 @@ def build_workout_bundle(
             "all_options": [primary, alt_flush, alt_base]
         }
     
-    if (has_substantial_ride or high_strain_reached) and not (user_note and "override" in user_note.lower()):
+    if (has_substantial_ride or high_strain_reached) and not (user_note and user_note.strip()):
         alt_rest = {
             "id": "workout_alt_rest",
             "option_type": "rest",
@@ -761,7 +931,7 @@ def build_workout_bundle(
 
         alt_override = build_alternative_endurance_workout(
             recovery_score=recovery_score,
-            duration_min=target_duration_min,
+            duration_min=max(30, target_duration_min or 45),
             ftp=ftp
         )
         alt_override["badge"] = "⚠️ Manual Override (Z2)"
@@ -780,7 +950,7 @@ def build_workout_bundle(
 
     active_plan = get_active_target_plan()
     days_until = active_plan.get("days_until") if active_plan else None
-    if active_plan and days_until is not None and days_until <= 1:
+    if active_plan and days_until is not None and days_until <= 1 and not (user_note and user_note.strip()):
         alt_rest = {
             "id": "workout_alt_rest",
             "option_type": "rest",
@@ -827,7 +997,7 @@ def build_workout_bundle(
 
     alt_base = build_alternative_endurance_workout(
         recovery_score=recovery_score,
-        duration_min=target_duration_min,
+        duration_min=max(30, int(primary.get("duration_minutes") or target_duration_min or 45)),
         ftp=ftp
     )
     

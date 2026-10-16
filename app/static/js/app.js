@@ -1625,10 +1625,14 @@ async function loadWorkout(duration = null, intensity = 0, userNote = "") {
     const data = await res.json();
     const prevOptionId = state.activeOptionId;
     state.workoutOptions = data.options || [data.active_workout];
+    const hasUserNote = Boolean(userNote && userNote.trim());
     
-    if (data.is_custom_replaced || (data.active_workout && data.active_workout.id === "workout_custom_replaced")) {
+    if (data.is_custom_replaced || data.is_user_adapted || hasUserNote || (data.active_workout && data.active_workout.id === "workout_custom_replaced")) {
       state.currentWorkout = data.active_workout;
-      state.activeOptionId = data.active_workout.id;
+      state.activeOptionId = (data.active_workout && data.active_workout.id) || "workout_primary";
+      if (typeof setWorkoutStageCollapsed === "function" && state.workoutStageCollapsed) {
+        setWorkoutStageCollapsed(false);
+      }
     } else {
       const matchingOption = state.workoutOptions.find(o => o.id === prevOptionId);
       if (matchingOption) {
@@ -1650,12 +1654,21 @@ async function loadWorkout(duration = null, intensity = 0, userNote = "") {
     renderWorkoutOptions(state.workoutOptions, state.activeOptionId);
     renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
 
-    if (data.fueling_plan) {
+    if (data.is_custom_replaced && data.fueling_plan) {
       currentFuelingPlan = data.fueling_plan;
       renderFuelingPlan(data.fueling_plan);
       const fuelingPanel = document.getElementById("fuelingPlanPanel");
       if (fuelingPanel) fuelingPanel.style.display = "block";
       showToast(`✨ Plan active: ${state.currentWorkout.title}! Fueling strategy loaded.`);
+    } else if (data.is_user_adapted || hasUserNote) {
+      if (data.fueling_plan) {
+        currentFuelingPlan = data.fueling_plan;
+        const fuelingPanel = document.getElementById("fuelingPlanPanel");
+        if (fuelingPanel && fuelingPanel.style.display !== "none") {
+          renderFuelingPlan(data.fueling_plan);
+        }
+      }
+      showToast(`✨ Workout adapted: ${state.currentWorkout.title} (${state.currentWorkout.duration_minutes}m)`);
     }
   } catch (err) {
     console.error("Failed to generate workout:", err);
@@ -2337,20 +2350,77 @@ if (outdoorDurPillGroup) {
 
 // Outdoor Rematch / Regenerate Buttons
 if (btnRegenerateOutdoor) {
-  btnRegenerateOutdoor.addEventListener("click", () => {
-    loadOutdoorRecommendation(state.outdoorDuration, inputOutdoorUserNote ? inputOutdoorUserNote.value.trim() : "");
+  btnRegenerateOutdoor.addEventListener("click", async () => {
+    const origText = btnRegenerateOutdoor.textContent;
+    btnRegenerateOutdoor.textContent = "⏳ Matching...";
+    btnRegenerateOutdoor.disabled = true;
+    try {
+      const noteVal = inputOutdoorUserNote ? inputOutdoorUserNote.value.trim() : "";
+      await loadOutdoorRecommendation(state.outdoorDuration, noteVal);
+      if (typeof setWorkoutStageCollapsed === "function" && state.workoutStageCollapsed) {
+        setWorkoutStageCollapsed(false);
+      }
+      if (state.currentOutdoorRide) {
+        showToast(`✨ Outdoor route matched: ${state.currentOutdoorRide.name}`);
+      }
+    } finally {
+      btnRegenerateOutdoor.textContent = origText;
+      btnRegenerateOutdoor.disabled = false;
+    }
   });
 }
 if (btnRematchOutdoor) {
-  btnRematchOutdoor.addEventListener("click", () => {
-    loadOutdoorRecommendation(state.outdoorDuration, inputOutdoorUserNote ? inputOutdoorUserNote.value.trim() : "");
+  btnRematchOutdoor.addEventListener("click", async () => {
+    const origText = btnRematchOutdoor.textContent;
+    btnRematchOutdoor.textContent = "⏳ Matching...";
+    btnRematchOutdoor.disabled = true;
+    try {
+      const noteVal = inputOutdoorUserNote ? inputOutdoorUserNote.value.trim() : "";
+      await loadOutdoorRecommendation(state.outdoorDuration, noteVal);
+      if (state.currentOutdoorRide) {
+        showToast(`✨ Outdoor route matched: ${state.currentOutdoorRide.name}`);
+      }
+    } finally {
+      btnRematchOutdoor.textContent = origText;
+      btnRematchOutdoor.disabled = false;
+    }
+  });
+}
+if (inputOutdoorUserNote && btnRegenerateOutdoor) {
+  inputOutdoorUserNote.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      btnRegenerateOutdoor.click();
+    }
   });
 }
 
 // Regenerate / Adapt Workout Button
-btnRegenerateWorkout.addEventListener("click", () => {
-  loadWorkout(state.currentDuration, state.currentIntensity, inputUserNote.value.trim());
+btnRegenerateWorkout.addEventListener("click", async () => {
+  const origText = btnRegenerateWorkout.textContent;
+  btnRegenerateWorkout.textContent = "⏳ Adapting...";
+  btnRegenerateWorkout.disabled = true;
+  try {
+    state.activeOptionId = "workout_primary";
+    const noteVal = inputUserNote ? inputUserNote.value.trim() : "";
+    await loadWorkout(state.currentDuration, state.currentIntensity, noteVal);
+    if (!noteVal && state.currentWorkout) {
+      showToast(`✨ Workout refreshed: ${state.currentWorkout.title} (${state.currentWorkout.duration_minutes}m)`);
+    }
+  } finally {
+    btnRegenerateWorkout.textContent = origText;
+    btnRegenerateWorkout.disabled = false;
+  }
 });
+
+if (inputUserNote && btnRegenerateWorkout) {
+  inputUserNote.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      btnRegenerateWorkout.click();
+    }
+  });
+}
 
 // Send to Zwift (Apple TV via Intervals.icu)
 btnPushZwift.addEventListener("click", async () => {
@@ -6173,8 +6243,7 @@ async function bootApp() {
   }
 
   await loadUpcomingPlan();
-  const initialDur = (state.dayConfig && state.dayConfig.preferred_duration_min !== undefined) ? state.dayConfig.preferred_duration_min : 45;
-  await loadWorkout(initialDur, 0, "");
+  await loadWorkout(null, 0, "");
   await loadDebrief();
 }
 

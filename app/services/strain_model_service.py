@@ -331,6 +331,9 @@ def calculate_trailing_strain_systems(
         recommendation_directive = "READY_FOR_INTENSITY"
         rationale = "Anaerobic and neuromuscular systems are completely reconstituted. High-intensity intervals are fully cleared if Whoop recovery permits."
         
+    glycolytic_fatigued = (acute_high_48h >= 35.0 or yesterday_strains["high"] >= 25.0)
+    neuromuscular_fatigued = (acute_peak_48h >= 12.0 or yesterday_strains["peak"] >= 8.0)
+
     return {
         "signature": sig,
         "total_xss": round(total_xss_7d, 1),
@@ -355,6 +358,8 @@ def calculate_trailing_strain_systems(
             "peak_xss": round(yesterday_strains["peak"], 1),
             "total_xss": round(yesterday_strains["total"], 1)
         },
+        "glycolytic_fatigued": glycolytic_fatigued,
+        "neuromuscular_fatigued": neuromuscular_fatigued,
         "system_status": system_status,
         "system_badge": system_badge,
         "system_color": system_color,
