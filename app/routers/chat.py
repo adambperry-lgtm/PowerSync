@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-from app.database import get_setting, set_setting
+from app.database import get_setting, set_setting, get_current_user_id
 from app.services.coach_chat_service import handle_coach_chat, compile_athlete_context, get_gemini_api_key
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])

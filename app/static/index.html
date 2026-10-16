@@ -12,7 +12,7 @@
     document.documentElement.setAttribute("data-theme", "dark");
     document.documentElement.setAttribute("data-theme-mode", "dark");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=57">
+  <link rel="stylesheet" href="/static/css/style.css?v=58">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -291,11 +291,11 @@
         
         <!-- Collapsible Body Container -->
         <div class="collapsible-tile-body" id="coachCardBody">
-          <div style="display:flex;flex-direction:column;gap:0.2rem;">
-            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;" id="coachCardPreHeading">
+          <div style="display:flex;flex-direction:column;gap:0.15rem;">
+            <div class="section-eyebrow" id="coachCardPreHeading" style="color:var(--text-muted);margin-bottom:0;">
               TODAY'S COMPLETED WORKOUT
             </div>
-            <div style="font-size:1.02rem;font-weight:700;color:#fff;line-height:1.3;" id="coachCardSessionTitle">
+            <div style="font-size:var(--type-item-title);font-weight:700;color:var(--text-primary);line-height:1.3;" id="coachCardSessionTitle">
               Zwift -PowerSync: 35-Min Microburst &amp; Cadence Flush
             </div>
           </div>
@@ -572,7 +572,7 @@
           </button>
         </div>
         <div class="mode-subtext" id="modeSubtext">
-          Intervals scaled to Whoop recovery with 1-click Zwift export
+          ⚡ Indoor ERG &amp; Zwift Cloud Bridge
         </div>
       </div>
 
@@ -593,8 +593,8 @@
         
         <div class="workout-header">
           <div class="workout-title-area">
-            <div style="font-size:0.8rem;color:var(--accent-cyan);font-weight:700;letter-spacing:0.05em;text-transform:uppercase;">
-              TODAY'S TRAINING
+            <div class="section-eyebrow" id="workoutActiveEyebrow">
+              ⭐ ACTIVE PRESCRIPTION • COACH'S CHOICE
             </div>
             <div style="display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;">
               <h2 id="workoutTitle" style="margin:0;">Sweet Spot Aerobic Density</h2>
@@ -634,9 +634,9 @@
           <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;">
             <div>
               <div style="display:flex;align-items:center;gap:0.5rem;">
-                <span style="font-size:1.3rem;">🥪</span>
-                <h3 style="font-size:1.15rem;font-weight:800;color:#10b981;margin:0;" id="fuelingRideTitle">
-                  Personalized Fueling & Hydration Strategy
+                <span style="font-size:1.25rem;">🥪</span>
+                <h3 class="session-heading" style="color:#10b981;margin:0;" id="fuelingRideTitle">
+                  Personalized Fueling &amp; Hydration Strategy
                 </h3>
               </div>
               <p style="font-size:0.78rem;color:var(--text-secondary);margin:0.25rem 0 0 0;" id="fuelingSubtext">
@@ -1111,10 +1111,10 @@
       <div id="debriefTabAssessment" class="debrief-tab-panel">
         <div class="debrief-session-header">
           <div>
-            <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;" id="debriefActivityMeta">
+            <div class="section-eyebrow" id="debriefActivityMeta" style="color:var(--text-muted);margin-bottom:0;">
               EVALUATION OF COMPLETED SESSION
             </div>
-            <h3 id="debriefActivityTitle" style="font-size:1.15rem;font-weight:700;margin:0.15rem 0;color:var(--text-primary);">
+            <h3 id="debriefActivityTitle" class="session-heading">
               Loading completed session analysis...
             </h3>
           </div>
@@ -1316,20 +1316,20 @@
       <div class="collapsible-tile-body" id="athleteCardBody">
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:1rem;padding:0.5rem 0;">
           <div>
-            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">THRESHOLD POWER (FTP)</div>
-            <div style="font-size:2rem;font-weight:800;color:var(--accent-cyan);" id="valFtpDisplay">250 <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">W</span></div>
+            <div class="athlete-metric-lbl">THRESHOLD POWER (FTP)</div>
+            <div class="athlete-metric-val" style="color:var(--accent-cyan);" id="valFtpDisplay">250 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span></div>
           </div>
           <div>
-            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">W' WORK CAPACITY</div>
-            <div style="font-size:2rem;font-weight:800;color:#c084fc;" id="valWPrimeDisplay">20.0 <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">kJ</span></div>
+            <div class="athlete-metric-lbl">W' WORK CAPACITY</div>
+            <div class="athlete-metric-val" style="color:#c084fc;" id="valWPrimeDisplay">20.0 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">kJ</span></div>
           </div>
           <div>
-            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">PEAK SPRINT POWER</div>
-            <div style="font-size:2rem;font-weight:800;color:#f43f5e;" id="valPeakPowerDisplay">1050 <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">W</span></div>
+            <div class="athlete-metric-lbl">PEAK SPRINT POWER</div>
+            <div class="athlete-metric-val" style="color:#f43f5e;" id="valPeakPowerDisplay">1050 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span></div>
           </div>
           <div>
-            <div style="font-size:0.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">MAX HEART RATE</div>
-            <div style="font-size:2rem;font-weight:700;" id="valMaxHrDisplay">185 <span style="font-size:1rem;color:var(--text-muted);">BPM</span></div>
+            <div class="athlete-metric-lbl">MAX HEART RATE</div>
+            <div class="athlete-metric-val" id="valMaxHrDisplay">185 <span style="font-size:0.85rem;color:var(--text-muted);font-weight:600;">BPM</span></div>
           </div>
         </div>
 
@@ -2159,6 +2159,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=99"></script>
+  <script src="/static/js/app.js?v=101"></script>
 </body>
 </html>

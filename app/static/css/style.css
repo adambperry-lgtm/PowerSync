@@ -35,6 +35,18 @@
   --z-drawer: 260;
   --z-modal: 500;
   --z-toast: 600;
+
+  /* 5-Level Coherent Typographic Scale */
+  --type-tile-title: 1.22rem;        /* L1: Primary Tile Header Title */
+  --type-tile-subtitle: 0.8rem;      /* L1b: Tile Header Subtitle */
+  --type-hero-heading: 1.38rem;      /* L2a: Active Prescription Headline */
+  --type-session-heading: 1.12rem;   /* L2b: Inner Session / Panel Headline */
+  --type-item-title: 0.94rem;        /* L3: Option Card / Sub-Card Title */
+  --type-body: 0.88rem;              /* L4: Coach Narrative & Body Copy */
+  --type-section-label: 0.76rem;     /* L5a: Section Eyebrow / Sub-Header */
+  --type-metric-label: 0.72rem;      /* L5b: Metric Box Uppercase Label */
+  --type-metric-lg: 1.35rem;         /* KPI Primary Value */
+  --type-metric-xl: 1.65rem;         /* Athlete Profile Signature Value */
 }
 
 * {
@@ -371,27 +383,27 @@ body {
 .card-header-icon,
 .workout-stage-header-icon,
 .program-icon {
-  font-size: 1.15rem;
+  font-size: 1.25rem;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
+  width: 38px;
+  height: 38px;
   background: rgba(6, 182, 212, 0.12);
-  border: 1px solid rgba(6, 182, 212, 0.25);
-  border-radius: var(--radius-sm);
+  border: 1px solid rgba(6, 182, 212, 0.28);
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
 .card-title,
 .workout-stage-header-badge,
 .program-heading {
-  font-size: 0.95rem !important;
-  font-weight: 700 !important;
+  font-size: var(--type-tile-title) !important;
+  font-weight: 800 !important;
   color: var(--text-primary) !important;
-  letter-spacing: -0.01em !important;
-  line-height: 1.3 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.25 !important;
   margin: 0;
   text-transform: none !important;
   display: inline-flex;
@@ -402,12 +414,50 @@ body {
 .card-subtitle,
 .workout-stage-header-subtitle,
 .program-subheading {
-  font-size: 0.75rem !important;
-  color: var(--text-muted) !important;
-  line-height: 1.35 !important;
-  margin-top: 0.15rem !important;
-  font-weight: 400 !important;
+  font-size: var(--type-tile-subtitle) !important;
+  color: var(--text-secondary) !important;
+  line-height: 1.4 !important;
+  margin-top: 0.18rem !important;
+  font-weight: 500 !important;
   text-transform: none !important;
+}
+
+/* Standardized Eyebrow & Session Heading Classes */
+.section-eyebrow {
+  font-size: var(--type-section-label);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent-cyan);
+  margin-bottom: 0.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.session-heading {
+  font-size: var(--type-session-heading);
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  margin: 0.1rem 0;
+}
+
+.athlete-metric-lbl {
+  font-size: var(--type-metric-label);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.15rem;
+}
+
+.athlete-metric-val {
+  font-size: var(--type-metric-xl);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 /* Whoop 3-Rings Dashboard */
@@ -500,14 +550,15 @@ body {
 }
 
 .sub-strip-lbl {
-  font-size: 0.7rem;
+  font-size: var(--type-metric-label);
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
 }
 
 .sub-strip-val {
-  font-size: 0.85rem;
+  font-size: 0.92rem;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -527,15 +578,19 @@ body {
 }
 
 .stat-box-title {
-  font-size: 0.75rem;
+  font-size: var(--type-metric-label);
+  font-weight: 600;
   color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .stat-box-num {
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: var(--type-metric-lg);
+  font-weight: 800;
   color: var(--text-primary);
   margin-top: 0.2rem;
+  letter-spacing: -0.01em;
 }
 
 /* Workout Stage */
@@ -598,7 +653,7 @@ body {
 }
 
 .collapsed-summary-title {
-  font-size: 0.95rem;
+  font-size: var(--type-item-title);
   font-weight: 700;
   color: var(--text-primary);
   margin-right: 0.25rem;
@@ -651,7 +706,7 @@ body {
 .workout-stage-body {
   display: flex;
   flex-direction: column;
-  gap: 1.75rem;
+  gap: 1.5rem;
   width: 100%;
 }
 
@@ -747,26 +802,30 @@ body {
   align-items: flex-start;
   flex-wrap: wrap;
   gap: 1rem;
+  padding-top: 0.25rem;
 }
 
 .workout-title-area h2 {
-  font-size: 1.75rem;
+  font-size: var(--type-hero-heading);
   font-weight: 800;
   letter-spacing: -0.02em;
+  line-height: 1.25;
 }
 
 .workout-tags {
   display: flex;
   gap: 0.6rem;
   margin-top: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .tag {
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
   padding: 0.25rem 0.6rem;
   border-radius: 6px;
   text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 .tag-focus { background-color: rgba(6, 182, 212, 0.15); color: var(--accent-cyan); border: 1px solid var(--accent-cyan); }
 .tag-tss { background-color: rgba(245, 158, 11, 0.15); color: var(--accent-amber); border: 1px solid var(--accent-amber); }
@@ -777,20 +836,21 @@ body {
   background: rgba(6, 182, 212, 0.08);
   border-left: 4px solid var(--accent-cyan);
   border-radius: 0 var(--radius-md) var(--radius-md) 0;
-  padding: 1.25rem 1.5rem;
+  padding: 1.15rem 1.35rem;
   display: flex;
-  gap: 1rem;
+  gap: 0.9rem;
   align-items: flex-start;
 }
 
 .coach-icon {
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   line-height: 1;
 }
 
 .coach-text h4 {
-  font-size: 0.85rem;
+  font-size: var(--type-section-label);
   text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--accent-cyan);
   font-weight: 800;
   margin-bottom: 0.25rem;
@@ -798,7 +858,7 @@ body {
 
 .coach-text p {
   color: #cbd5e1;
-  font-size: 0.95rem;
+  font-size: var(--type-body);
   line-height: 1.55;
 }
 
@@ -1572,7 +1632,8 @@ canvas#intervalCanvas {
 }
 
 .program-stat-label {
-  font-size: 0.75rem;
+  font-size: var(--type-metric-label);
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -1581,12 +1642,13 @@ canvas#intervalCanvas {
 }
 
 .program-stat-value {
-  font-size: 1.25rem;
+  font-size: var(--type-metric-lg);
   font-weight: 800;
   color: var(--text-primary);
   display: flex;
   align-items: baseline;
   gap: 0.35rem;
+  letter-spacing: -0.01em;
 }
 
 .program-stat-sub {
@@ -1629,10 +1691,10 @@ canvas#intervalCanvas {
 }
 
 .workout-alternatives-title {
-  font-size: 0.8rem;
+  font-size: var(--type-section-label);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
   display: flex;
   align-items: center;
@@ -1692,8 +1754,10 @@ canvas#intervalCanvas {
 }
 
 .workout-option-badge {
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
@@ -1701,7 +1765,7 @@ canvas#intervalCanvas {
 }
 
 .workout-option-title {
-  font-size: 0.95rem;
+  font-size: var(--type-item-title);
   font-weight: 700;
   color: var(--text-primary);
   line-height: 1.3;
@@ -1727,7 +1791,7 @@ canvas#intervalCanvas {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
   padding-bottom: 0.85rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-wrap: wrap;
@@ -1818,16 +1882,18 @@ canvas#intervalCanvas {
 }
 
 .outdoor-stat-lbl {
-  font-size: 0.7rem;
+  font-size: var(--type-metric-label);
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .outdoor-stat-val {
-  font-size: 1.15rem;
+  font-size: var(--type-metric-lg);
   font-weight: 800;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .outdoor-stat-sub {
@@ -1840,10 +1906,10 @@ canvas#intervalCanvas {
 }
 
 .outdoor-tips-title {
-  font-size: 0.8rem;
+  font-size: var(--type-section-label);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
   margin-bottom: 0.65rem;
   display: flex;
@@ -1865,16 +1931,16 @@ canvas#intervalCanvas {
 }
 
 .outdoor-tip-heading {
-  font-size: 0.82rem;
+  font-size: 0.85rem;
   font-weight: 700;
   color: var(--accent-emerald);
   margin-bottom: 0.25rem;
 }
 
 .outdoor-tip-desc {
-  font-size: 0.75rem;
+  font-size: 0.78rem;
   color: var(--text-secondary);
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 /* Outdoor Route Map Card */
@@ -1902,10 +1968,10 @@ canvas#intervalCanvas {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  font-size: 0.85rem;
+  font-size: var(--type-section-label);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   color: var(--text-primary);
 }
 
@@ -2054,16 +2120,18 @@ canvas#intervalCanvas {
 }
 
 .debrief-metric-lbl {
-  font-size: 0.7rem;
+  font-size: var(--type-metric-label);
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .debrief-metric-val {
-  font-size: 1.15rem;
+  font-size: var(--type-metric-lg);
   font-weight: 800;
   color: var(--text-primary);
+  letter-spacing: -0.01em;
 }
 
 .debrief-metric-sub {
@@ -2102,13 +2170,13 @@ canvas#intervalCanvas {
 }
 
 .outlook-card-date {
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .outlook-card-title {
-  font-size: 1rem;
+  font-size: var(--type-item-title);
   font-weight: 700;
   color: var(--accent-cyan);
   line-height: 1.25;
@@ -2121,9 +2189,9 @@ canvas#intervalCanvas {
 }
 
 .outlook-card-desc {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
-  line-height: 1.4;
+  line-height: 1.45;
   margin-top: 0.25rem;
 }
 
@@ -2150,22 +2218,22 @@ canvas#intervalCanvas {
 }
 
 .protocol-title {
-  font-size: 0.82rem;
+  font-size: var(--type-section-label);
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
 }
 
 .protocol-val {
-  font-size: 1.25rem;
+  font-size: var(--type-metric-lg);
   font-weight: 800;
   margin: 0.15rem 0;
 }
 
 .protocol-desc {
-  font-size: 0.78rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
-  line-height: 1.4;
+  line-height: 1.45;
   margin: 0;
 }
 
@@ -2217,17 +2285,19 @@ canvas#intervalCanvas {
 }
 
 .upcoming-meta-label {
-  font-size: 0.7rem;
+  font-size: var(--type-metric-label);
+  font-weight: 600;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
 
 .upcoming-meta-val {
-  font-size: 1.15rem;
+  font-size: var(--type-metric-lg);
   font-weight: 800;
   color: var(--text-primary);
   margin-top: 0.15rem;
+  letter-spacing: -0.01em;
 }
 
 .taper-roadmap-wrap {
@@ -2468,8 +2538,18 @@ canvas#intervalCanvas {
     gap: 0.65rem;
   }
 
-  .card-header .card-title {
-    font-size: 0.92rem !important;
+  .card-header .card-title,
+  .workout-stage-header .card-title,
+  .card-title,
+  .program-heading {
+    font-size: 1.08rem !important;
+    font-weight: 800 !important;
+  }
+
+  .card-subtitle,
+  .workout-stage-header-subtitle,
+  .program-subheading {
+    font-size: 0.76rem !important;
   }
 
   /* Workout Stage Tile & Selector on Mobile */
@@ -2493,14 +2573,16 @@ canvas#intervalCanvas {
     gap: 0 !important;
   }
 
-  .workout-stage-header-icon {
-    width: 32px !important;
-    height: 32px !important;
+  .card-header-icon,
+  .workout-stage-header-icon,
+  .program-icon {
+    width: 34px !important;
+    height: 34px !important;
     font-size: 1.15rem !important;
   }
 
   .collapsed-summary-title {
-    font-size: 0.85rem !important;
+    font-size: 0.88rem !important;
   }
 
   .dashboard-toolbar {
@@ -2571,7 +2653,7 @@ canvas#intervalCanvas {
   }
 
   .workout-alternatives-title {
-    font-size: 0.78rem !important;
+    font-size: 0.74rem !important;
     word-break: break-word !important;
     line-height: 1.35 !important;
   }
@@ -2604,8 +2686,16 @@ canvas#intervalCanvas {
   }
 
   .workout-title-area h2 {
-    font-size: 1.35rem !important;
+    font-size: 1.22rem !important;
     word-break: break-word !important;
+  }
+
+  .session-heading {
+    font-size: 1.02rem !important;
+  }
+
+  .athlete-metric-val {
+    font-size: 1.38rem !important;
   }
 
   .workout-meta {

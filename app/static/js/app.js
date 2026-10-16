@@ -943,7 +943,9 @@ function setTrainingMode(mode) {
     if (tabModeOutdoor) tabModeOutdoor.className = "mode-tab active active-outdoor";
     if (indoorContainer) indoorContainer.style.display = "none";
     if (outdoorContainer) outdoorContainer.style.display = "block";
-    if (modeSubtext) modeSubtext.textContent = "AI match of your best prior Strava route for today's recovery";
+    if (modeSubtext) modeSubtext.textContent = "🌲 Strava GPS History & Elevation Profile Match";
+    const stageHeaderSubtitle = document.getElementById("stageHeaderSubtitle");
+    if (stageHeaderSubtitle) stageHeaderSubtitle.textContent = "AI match of your best prior Strava route for today's recovery";
 
     if (fuelingPanel && fuelingPanel.style.display !== "none") {
       if (state.currentOutdoorRide) {
@@ -967,7 +969,9 @@ function setTrainingMode(mode) {
     if (tabModeOutdoor) tabModeOutdoor.className = "mode-tab";
     if (indoorContainer) indoorContainer.style.display = "block";
     if (outdoorContainer) outdoorContainer.style.display = "none";
-    if (modeSubtext) modeSubtext.textContent = "Intervals scaled to Whoop recovery with 1-click Zwift export";
+    if (modeSubtext) modeSubtext.textContent = "⚡ Indoor ERG & Zwift Cloud Bridge";
+    const stageHeaderSubtitle = document.getElementById("stageHeaderSubtitle");
+    if (stageHeaderSubtitle) stageHeaderSubtitle.textContent = "Intervals scaled to Whoop recovery with 1-click Zwift export";
 
     if (fuelingPanel && fuelingPanel.style.display !== "none") {
       if (state.currentWorkout) {
@@ -1719,6 +1723,11 @@ function renderWorkout(w) {
   workoutFocus.textContent = w.focus_area || "Adaptive";
   workoutDurationBadge.textContent = `${w.duration_minutes} MIN`;
   workoutTssBadge.textContent = `~${w.estimated_tss} TSS`;
+
+  const activeEyebrow = document.getElementById("workoutActiveEyebrow");
+  if (activeEyebrow) {
+    activeEyebrow.textContent = w.badge ? `${w.badge.toUpperCase()} • ACTIVE PRESCRIPTION` : "⭐ ACTIVE PRESCRIPTION • COACH'S CHOICE";
+  }
 
   const xssBadge = document.getElementById("workoutXssBadge");
   const strainBreakdownBadge = document.getElementById("workoutStrainBreakdownBadge");
