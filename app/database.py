@@ -76,8 +76,13 @@ def get_db_connection() -> sqlite3.Connection:
     db_dir = os.path.dirname(active_path)
     if db_dir:
         os.makedirs(db_dir, exist_ok=True)
-    conn = sqlite3.connect(active_path)
+    conn = sqlite3.connect(active_path, timeout=10.0)
     conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA busy_timeout = 5000;")
+        conn.execute("PRAGMA foreign_keys = ON;")
+    except Exception:
+        pass
     return conn
 
 def _migrate_table_to_multiuser(cursor, table_name: str, create_v2_sql: str, copy_columns: str):
@@ -574,7 +579,7 @@ def create_or_get_google_user(email: str, name: str, picture: Optional[str] = No
         conn.close()
         return user
 
-    # 4. If usr_default was already claimed or reserved, create a new isolated user and copy default history
+    # 4. If usr_default was already claimed or locked to the owner, create a clean isolated user profile
     user_id = f"usr_{uuid.uuid4().hex[:12]}"
     cursor.execute("""
         INSERT INTO users (id, email, name, picture, google_id, last_login)
@@ -584,9 +589,6 @@ def create_or_get_google_user(email: str, name: str, picture: Optional[str] = No
     cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
     user = dict(cursor.fetchone())
     conn.close()
-
-    # Automatically copy default athlete settings and history to guarantee zero data loss
-    claim_or_copy_default_data_to_user(user_id)
     return user
 
 DEV_USER_PROFILES: Dict[str, Dict[str, Any]] = {

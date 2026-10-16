@@ -333,8 +333,10 @@ def select_workout_option(req: WorkoutSelectRequest):
         whoop_row = c.fetchone()
         conn.close()
         rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
+        from app.services.whoop_service import get_trailing_whoop_stats
+        whoop_trailing = get_trailing_whoop_stats(days=7)
         strava_trailing = get_strava_trailing_stats(days=7)
-        trailing_strain = float(strava_trailing.get("trailing_7d_strain_avg", 11.0))
+        trailing_strain = float(whoop_trailing.get("trailing_7d_strain_avg") or strava_trailing.get("trailing_7d_strain_avg") or 11.0)
         yesterday_tss = int(strava_trailing.get("yesterday_tss", 0))
 
         fueling = generate_fueling_plan(
@@ -409,8 +411,10 @@ def replace_with_custom_ride(req: ReplaceCustomRideRequest):
         whoop = get_mock_whoop_data()
         rec_score = int(whoop.get("recovery_score", 50))
         
+    from app.services.whoop_service import get_trailing_whoop_stats
+    whoop_trailing = get_trailing_whoop_stats(days=7)
     strava_trailing = get_strava_trailing_stats(days=7)
-    trailing_strain = float(strava_trailing.get("trailing_7d_strain_avg", 11.0))
+    trailing_strain = float(whoop_trailing.get("trailing_7d_strain_avg") or strava_trailing.get("trailing_7d_strain_avg") or 11.0)
     yesterday_tss = int(strava_trailing.get("yesterday_tss", 0))
 
     desc = req.description or ""
@@ -570,8 +574,10 @@ def get_custom_fueling_plan(req: FuelingPlanRequest):
     conn.close()
     
     rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
+    from app.services.whoop_service import get_trailing_whoop_stats
+    whoop_trailing = get_trailing_whoop_stats(days=7)
     strava_trailing = get_strava_trailing_stats(days=7)
-    trailing_strain = float(strava_trailing.get("trailing_7d_strain_avg", 11.0))
+    trailing_strain = float(whoop_trailing.get("trailing_7d_strain_avg") or strava_trailing.get("trailing_7d_strain_avg") or 11.0)
     yesterday_tss = int(strava_trailing.get("yesterday_tss", 0))
 
     plan = generate_fueling_plan(
@@ -826,8 +832,10 @@ def select_outdoor_option(req: OutdoorSelectRequest):
     whoop_row = c.fetchone()
     conn.close()
     rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
+    from app.services.whoop_service import get_trailing_whoop_stats
+    whoop_trailing = get_trailing_whoop_stats(days=7)
     strava_trailing = get_strava_trailing_stats(days=7)
-    trailing_strain = float(strava_trailing.get("trailing_7d_strain_avg", 11.0))
+    trailing_strain = float(whoop_trailing.get("trailing_7d_strain_avg") or strava_trailing.get("trailing_7d_strain_avg") or 11.0)
     yesterday_tss = int(strava_trailing.get("yesterday_tss", 0))
 
     outdoor_options = get_current_outdoor_options()

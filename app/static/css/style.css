@@ -45,6 +45,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding-top: max(1rem, calc(0.75rem + env(safe-area-inset-top, 0px)));
   padding-left: max(2rem, calc(1.5rem + env(safe-area-inset-left, 0px)));
   padding-right: max(2rem, calc(1.5rem + env(safe-area-inset-right, 0px)));
@@ -92,7 +94,8 @@ body {
 .nav-actions {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.55rem;
 }
 
 .badge-status {
@@ -103,6 +106,8 @@ body {
   border-radius: 9999px;
   font-size: 0.8rem;
   font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
   background-color: rgba(255, 255, 255, 0.05);
   border: 1px solid var(--border-color);
 }
@@ -243,7 +248,11 @@ body {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1.5rem;
-  align-items: start;
+  align-items: stretch;
+}
+
+.telemetry-grid > .card.collapsible-tile.collapsed {
+  align-self: start;
 }
 
 @media (max-width: 960px) {
@@ -397,14 +406,14 @@ body {
 
 /* Secondary Biometric Strip */
 .whoop-sub-strip {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem 0.85rem;
   background: rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.05);
   border-radius: var(--radius-md);
-  padding: 0.55rem 0.85rem;
-  margin-top: 0.25rem;
+  padding: 0.65rem 0.85rem;
+  margin-top: auto;
 }
 
 .sub-strip-item {
@@ -1126,6 +1135,7 @@ canvas#intervalCanvas {
 }
 
 .modal-body input[type="text"],
+.modal-body input[type="email"],
 .modal-body input[type="number"],
 .modal-body input[type="date"],
 .modal-body input[type="password"],
@@ -2273,13 +2283,13 @@ canvas#intervalCanvas {
   }
 
   .navbar {
-    padding-top: max(1.25rem, calc(0.65rem + env(safe-area-inset-top, 20px))) !important;
-    padding-left: max(1rem, env(safe-area-inset-left, 0px)) !important;
-    padding-right: max(1rem, env(safe-area-inset-right, 0px)) !important;
-    padding-bottom: 0.75rem !important;
+    padding-top: max(0.85rem, calc(0.45rem + env(safe-area-inset-top, 20px))) !important;
+    padding-left: max(0.85rem, env(safe-area-inset-left, 0px)) !important;
+    padding-right: max(0.85rem, env(safe-area-inset-right, 0px)) !important;
+    padding-bottom: 0.45rem !important;
     flex-direction: column;
     align-items: stretch;
-    gap: 0.65rem;
+    gap: 0.4rem;
     box-sizing: border-box !important;
   }
 
@@ -2600,11 +2610,62 @@ canvas#intervalCanvas {
     padding: 0.5rem 1rem;
   }
 
-  .modal-content {
-    width: 95vw;
-    max-height: 90vh;
-    padding: 1.25rem;
-    margin: 1rem auto;
+  .modal-dialog {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: calc(100dvh - env(safe-area-inset-top, 16px) - env(safe-area-inset-bottom, 16px) - 1.5rem) !important;
+    margin: 0.75rem auto !important;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--bg-secondary);
+  }
+
+  /* Prevent iOS Safari / PWA auto-zoom when focusing inputs */
+  input[type="text"],
+  input[type="email"],
+  input[type="number"],
+  input[type="date"],
+  input[type="password"],
+  select,
+  textarea,
+  .modal-body input[type="text"],
+  .modal-body input[type="email"],
+  .modal-body input[type="number"],
+  .modal-body input[type="date"],
+  .modal-body input[type="password"],
+  .modal-body select,
+  #inputCoachMessage,
+  #inputUserNote {
+    font-size: 16px !important;
+  }
+
+  .program-stats-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .program-stat-box {
+    grid-column: span 1 !important;
+  }
+
+  #coachCardMetricsStrip {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .banner-toast {
+    bottom: max(5.25rem, calc(4.5rem + env(safe-area-inset-bottom, 20px))) !important;
+    right: 1rem !important;
+    left: 1rem !important;
+    max-width: calc(100vw - 2rem) !important;
+  }
+
+  .version-footer {
+    padding-bottom: max(5rem, calc(4rem + env(safe-area-inset-bottom, 20px))) !important;
   }
 }
 
@@ -3325,7 +3386,7 @@ canvas#intervalCanvas {
   }
 
   .coach-chat-header {
-    padding-top: max(3.5rem, calc(1rem + env(safe-area-inset-top, 47px))) !important;
+    padding-top: max(0.9rem, calc(0.6rem + env(safe-area-inset-top, 0px))) !important;
     padding-left: max(0.95rem, env(safe-area-inset-left, 0px)) !important;
     padding-right: max(0.95rem, env(safe-area-inset-right, 0px)) !important;
     padding-bottom: 0.8rem !important;

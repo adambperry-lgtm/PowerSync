@@ -77,7 +77,7 @@ def compile_athlete_context() -> Dict[str, Any]:
 
     # Recent activities summary (last 5)
     recent_rides_summary = []
-    for a in strava.get("activities", [])[:5]:
+    for a in strava.get("recent_activities", strava.get("activities", []))[:5]:
         dist_mi = round(a.get("distance_meters", 0) / 1609.34, 1)
         dur_min = round(a.get("moving_time_sec", 0) / 60)
         recent_rides_summary.append({
@@ -93,6 +93,7 @@ def compile_athlete_context() -> Dict[str, Any]:
             "max_hr": a.get("max_heartrate", 0)
         })
 
+    sys_status = strain_systems.get("system_status", {})
     snapshot = {
         "local_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "athlete": {
@@ -111,7 +112,7 @@ def compile_athlete_context() -> Dict[str, Any]:
             "sleep_performance_pct": whoop.get("sleep_performance", 85),
             "sleep_duration_hours": whoop.get("sleep_duration_hours", 7.5),
             "day_strain_today": whoop.get("day_strain", 0.0),
-            "trailing_7d_strain_avg": whoop.get("trailing_strain", 11.0)
+            "trailing_7d_strain_avg": whoop.get("trailing_7d_strain_avg", whoop.get("trailing_strain", 11.0))
         },
         "strain_systems_3tier": {
             "trailing_7d_total_xss": strain_systems.get("trailing_7d", {}).get("total_xss", 0.0),
@@ -120,17 +121,17 @@ def compile_athlete_context() -> Dict[str, Any]:
             "trailing_7d_peak_xss": strain_systems.get("trailing_7d", {}).get("peak_xss", 0.0),
             "acute_48h_high_xss": strain_systems.get("acute_48h", {}).get("high_xss", 0.0),
             "acute_48h_peak_xss": strain_systems.get("acute_48h", {}).get("peak_xss", 0.0),
-            "glycolytic_fatigued": strain_systems.get("glycolytic_fatigued", False),
-            "neuromuscular_fatigued": strain_systems.get("neuromuscular_fatigued", False),
-            "directive": strain_systems.get("directive", "BALANCED_TRAINING"),
-            "directive_explanation": strain_systems.get("directive_explanation", "")
+            "glycolytic_fatigued": sys_status.get("high_glycolytic") in ("FATIGUED", "FRESHENING") or strain_systems.get("glycolytic_fatigued", False),
+            "neuromuscular_fatigued": sys_status.get("peak_neuromuscular") in ("FATIGUED", "FRESHENING") or strain_systems.get("neuromuscular_fatigued", False),
+            "directive": strain_systems.get("recommendation_directive", strain_systems.get("directive", "BALANCED_TRAINING")),
+            "directive_explanation": strain_systems.get("system_rationale", strain_systems.get("directive_explanation", ""))
         },
         "training_load_strava": {
             "trailing_7d_hours": weekly_stats.get("total_hours", 0.0),
             "trailing_7d_tss": weekly_stats.get("total_tss", 0),
-            "trailing_7d_distance_miles": weekly_stats.get("total_miles", 0.0),
+            "trailing_7d_distance_miles": weekly_stats.get("total_distance_miles", weekly_stats.get("total_miles", 0.0)),
             "weekly_tss_target": program.get("weekly_tss_target", 360),
-            "macrocycle_goal": program.get("title", "FTP_BUILD"),
+            "macrocycle_goal": program.get("goal_title", program.get("title", "FTP_BUILD")),
             "target_ftp": program.get("target_ftp", ftp + 15),
             "recent_rides": recent_rides_summary
         },

@@ -24,7 +24,7 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
         c.execute("""
             SELECT id, name, sport_type, start_date, moving_time_sec, distance_meters,
                    total_elevation_gain, average_watts, weighted_average_watts,
-                   average_heartrate, max_heartrate, suffer_score, kilojoules
+                   average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
             FROM strava_activities
             WHERE user_id = ?
             ORDER BY start_date DESC
@@ -47,7 +47,13 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
         if raw_str:
             try:
                 import ast
-                raw_dict = ast.literal_eval(raw_str) if isinstance(raw_str, str) and raw_str.startswith("{") else {}
+                if isinstance(raw_str, str) and raw_str.startswith("{"):
+                    try:
+                        raw_dict = json.loads(raw_str)
+                    except Exception:
+                        raw_dict = ast.literal_eval(raw_str)
+                else:
+                    raw_dict = {}
                 local_start = raw_dict.get("start_date_local", "")
                 if local_start:
                     act_date = local_start[:10]
@@ -924,7 +930,7 @@ def build_daily_review_and_outlook_local(
         "recovery_protocol": recovery_protocol,
         "strain_systems": strain_systems,
         "macrocycle_context": {
-            "goal_title": program.get("title", "Threshold & FTP Booster"),
+            "goal_title": program.get("goal_title", program.get("title", "Threshold & FTP Booster")),
             "phase": program.get("phase", "Build Phase"),
             "current_ftp": ftp,
             "target_ftp": program.get("target_ftp", ftp + 15),

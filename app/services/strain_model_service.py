@@ -51,7 +51,22 @@ def calculate_intervals_strain(
     sample_interval = 15 # Sample W'bal every 15s for visual curve
     t_total = 0
 
+    expanded_intervals = []
     for it in intervals:
+        if it.get("type") == "Repeats" or (it.get("repeat") and it.get("on_duration_sec")):
+            reps = int(it.get("repeat", 1))
+            on_dur = int(it.get("on_duration_sec", 60))
+            off_dur = int(it.get("off_duration_sec", 60))
+            on_pct = float(it.get("on_power_pct", 100.0))
+            off_pct = float(it.get("off_power_pct", 55.0))
+            for _ in range(reps):
+                expanded_intervals.append({"duration_sec": on_dur, "power_pct": on_pct})
+                if off_dur > 0:
+                    expanded_intervals.append({"duration_sec": off_dur, "power_pct": off_pct})
+        else:
+            expanded_intervals.append(it)
+
+    for it in expanded_intervals:
         dur = int(it.get("duration_sec", 60))
         # Support power either as absolute watts or percentage of FTP
         p_pct = it.get("power_pct")

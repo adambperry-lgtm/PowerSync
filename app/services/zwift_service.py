@@ -280,6 +280,8 @@ def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> st
 
     rough_xml = ET.tostring(workout_file, 'utf-8')
     reparsed = minidom.parseString(rough_xml)
+    return reparsed.toprettyxml(indent="  ")
+
 def generate_intervals_icu_text(workout_data: Dict[str, Any]) -> str:
     """
     Generates plain-text workout definition compatible with Intervals.icu.

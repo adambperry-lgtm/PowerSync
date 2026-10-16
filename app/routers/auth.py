@@ -55,12 +55,20 @@ def get_current_user_profile(request: Request):
     """Returns the authenticated athlete profile, session validity, and account connection status."""
     user = getattr(request.state, "user", None)
     if not user:
-        token = request.cookies.get("powersync_session")
-        if not token and "authorization" in request.headers:
+        candidate_tokens = []
+        if "authorization" in request.headers:
             auth_val = request.headers["authorization"]
             if auth_val.startswith("Bearer "):
-                token = auth_val[7:].strip()
-        user = get_user_by_session(token) if token else None
+                bt = auth_val[7:].strip()
+                if bt:
+                    candidate_tokens.append(bt)
+        cookie_tok = request.cookies.get("powersync_session")
+        if cookie_tok and cookie_tok not in candidate_tokens:
+            candidate_tokens.append(cookie_tok)
+        for tok in candidate_tokens:
+            user = get_user_by_session(tok)
+            if user:
+                break
         if not user:
             user = get_guest_user()
 
@@ -310,14 +318,16 @@ def email_login(request: Request, payload: EmailLoginPayload):
 
 @router.post("/logout")
 def logout(request: Request):
-    """Revokes active session token and clears the authentication cookie."""
-    token = request.cookies.get("powersync_session")
-    if not token and "authorization" in request.headers:
+    """Revokes active session tokens (cookie and Bearer) and clears the authentication cookie."""
+    cookie_token = request.cookies.get("powersync_session")
+    if cookie_token:
+        delete_session(cookie_token)
+    if "authorization" in request.headers:
         auth_val = request.headers["authorization"]
         if auth_val.startswith("Bearer "):
-            token = auth_val[7:].strip()
-    if token:
-        delete_session(token)
+            bearer_token = auth_val[7:].strip()
+            if bearer_token and bearer_token != cookie_token:
+                delete_session(bearer_token)
     res = JSONResponse({"success": True, "message": "Signed out successfully"})
     res.delete_cookie(key="powersync_session", path="/")
     return res
@@ -330,6 +340,12 @@ def claim_default_data(request: Request):
     """
     from app.database import claim_or_copy_default_data_to_user, get_current_user_id
     uid = get_current_user_id()
+    if uid == GUEST_USER_ID:
+        raise HTTPException(status_code=401, detail="Please sign in before importing athlete settings.")
+    locked_owner = get_primary_owner_email()
+    user = getattr(request.state, "user", None) or get_user_by_id(uid) or {}
+    if locked_owner and uid != DEFAULT_USER_ID and str(user.get("email", "")).strip().lower() != locked_owner:
+        raise HTTPException(status_code=403, detail=f"Default athlete data is restricted to the primary account owner ({locked_owner}).")
     res = claim_or_copy_default_data_to_user(uid)
     return res
 
@@ -468,7 +484,7 @@ def whoop_login(request: Request, client_id: Optional[str] = None, client_secret
     state = secrets.token_urlsafe(16)
     save_oauth_state(state, uid, "whoop")
 
-    url = get_whoop_auth_url(redirect_uri, state=state)
+    url = get_whoop_auth_url(redirect_uri, state=state, user_id=uid)
     return RedirectResponse(url)
 
 @router.get("/whoop/callback")
@@ -489,7 +505,7 @@ def whoop_callback(
 
     base_url = get_app_base_url(request)
     redirect_uri = f"{base_url}/api/auth/whoop/callback"
-    res = exchange_whoop_code(code, redirect_uri)
+    res = exchange_whoop_code(code, redirect_uri, user_id=uid)
     if res.get("success"):
         try:
             fetch_latest_whoop_metrics(user_id=uid)

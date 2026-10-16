@@ -118,7 +118,7 @@ def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = Non
                 moving_time_sec = excluded.moving_time_sec,
                 average_watts = excluded.average_watts,
                 weighted_average_watts = excluded.weighted_average_watts
-        """, (uid, act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, str(a)))
+        """, (uid, act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, json.dumps(a)))
         
         saved.append({
             "id": act_id,

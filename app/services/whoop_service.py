@@ -8,15 +8,17 @@ WHOOP_AUTH_URL = "https://api.prod.whoop.com/oauth/oauth2/auth"
 WHOOP_TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"
 WHOOP_API_BASE = "https://api.prod.whoop.com/developer/v2"
 
-def get_whoop_auth_url(redirect_uri: str, state: Optional[str] = None) -> str:
-    client_id = get_setting("whoop_client_id", "")
+def get_whoop_auth_url(redirect_uri: str, state: Optional[str] = None, user_id: Optional[str] = None) -> str:
+    uid = user_id or get_current_user_id()
+    client_id = get_setting("whoop_client_id", "", user_id=uid)
     scopes = "offline read:recovery read:cycles read:workout read:sleep read:profile"
     auth_state = state or secrets.token_urlsafe(16)
     return f"{WHOOP_AUTH_URL}?client_id={client_id}&redirect_uri={redirect_uri}&response_type=code&scope={scopes}&state={auth_state}"
 
-def exchange_whoop_code(code: str, redirect_uri: str) -> Dict[str, Any]:
-    client_id = str(get_setting("whoop_client_id", "") or "").strip()
-    client_secret = str(get_setting("whoop_client_secret", "") or "").strip()
+def exchange_whoop_code(code: str, redirect_uri: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+    uid = user_id or get_current_user_id()
+    client_id = str(get_setting("whoop_client_id", "", user_id=uid) or "").strip()
+    client_secret = str(get_setting("whoop_client_secret", "", user_id=uid) or "").strip()
     
     if not client_id:
         return {"success": False, "error": "Missing Whoop Client ID. Please configure it in Settings."}
@@ -43,21 +45,22 @@ def exchange_whoop_code(code: str, redirect_uri: str) -> Dict[str, Any]:
         )
         if res.status_code == 200:
             token_info = res.json()
-            set_setting("whoop_tokens", token_info)
+            set_setting("whoop_tokens", token_info, user_id=uid)
             return {"success": True, "token_info": token_info}
         return {"success": False, "error": f"Whoop returned HTTP {res.status_code}: {res.text}"}
     except Exception as e:
         return {"success": False, "error": f"Network error connecting to Whoop: {str(e)}"}
 
-def refresh_whoop_token() -> Optional[str]:
-    tokens = get_setting("whoop_tokens", {})
+def refresh_whoop_token(user_id: Optional[str] = None) -> Optional[str]:
+    uid = user_id or get_current_user_id()
+    tokens = get_setting("whoop_tokens", {}, user_id=uid)
     refresh_token = tokens.get("refresh_token")
     if not refresh_token:
         print("Whoop token refresh failed: No refresh_token found in stored tokens.")
         return None
         
-    client_id = get_setting("whoop_client_id", "").strip()
-    client_secret = get_setting("whoop_client_secret", "").strip()
+    client_id = str(get_setting("whoop_client_id", "", user_id=uid) or "").strip()
+    client_secret = str(get_setting("whoop_client_secret", "", user_id=uid) or "").strip()
     if not client_id or not client_secret or client_secret.startswith("{"):
         print("Whoop token refresh failed: Missing or invalid client_id/client_secret in settings.")
         return None
@@ -81,7 +84,7 @@ def refresh_whoop_token() -> Optional[str]:
             new_tokens = res.json()
             if "refresh_token" not in new_tokens and refresh_token:
                 new_tokens["refresh_token"] = refresh_token
-            set_setting("whoop_tokens", new_tokens)
+            set_setting("whoop_tokens", new_tokens, user_id=uid)
             print("Successfully refreshed Whoop access token!")
             return new_tokens.get("access_token")
         else:
@@ -180,7 +183,7 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
     try:
         rec_res = requests.get(f"{WHOOP_API_BASE}/recovery?limit=10", headers=headers, timeout=10)
         if rec_res.status_code == 401:
-            access_token = refresh_whoop_token()
+            access_token = refresh_whoop_token(user_id=uid)
             if access_token:
                 headers = {"Authorization": f"Bearer {access_token}"}
                 rec_res = requests.get(f"{WHOOP_API_BASE}/recovery?limit=10", headers=headers, timeout=10)
@@ -222,10 +225,12 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
 
     # Build index mappings
     rec_by_cycle = {r.get("cycle_id"): r for r in rec_records if r.get("cycle_id")}
+    sleep_by_cycle = {s.get("cycle_id"): s for s in sleep_records if s.get("cycle_id") and not s.get("nap")}
+    sleep_by_id = {s.get("id"): s for s in sleep_records if s.get("id")}
     sleep_by_date = {}
     for s in sleep_records:
         start_iso = s.get("start", "")
-        if start_iso:
+        if start_iso and not s.get("nap"):
             sleep_by_date[start_iso[:10]] = s
 
     # Persist all available trailing cycles and recoveries to SQLite
@@ -254,7 +259,7 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
         hrv_val = rec.get("score", {}).get("hrv_rmssd_milli") if rec else None
         rhr_val = rec.get("score", {}).get("resting_heart_rate") if rec else None
 
-        slp = sleep_by_date.get(cycle_date)
+        slp = sleep_by_cycle.get(cid) or (sleep_by_id.get(rec.get("sleep_id")) if rec else None) or sleep_by_date.get(cycle_date)
         sleep_perf = slp.get("score", {}).get("sleep_performance_percentage") if slp else None
         milli_in_bed = slp.get("score", {}).get("stage_summary", {}).get("total_in_bed_time_milli", 0) if slp else 0
         sleep_hrs = round(milli_in_bed / (1000.0 * 3600.0), 1) if milli_in_bed > 0 else None

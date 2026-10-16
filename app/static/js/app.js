@@ -2708,7 +2708,8 @@ if (stravaOAuthBtn) {
   stravaOAuthBtn.addEventListener("click", (e) => {
     e.preventDefault();
     showToast("Redirecting to Strava...");
-    window.location.href = "/api/auth/strava/login";
+    const tok = localStorage.getItem("powersync_token");
+    window.location.href = tok ? `/api/auth/strava/login?token=${encodeURIComponent(tok)}` : "/api/auth/strava/login";
   });
 }
 
@@ -2720,7 +2721,7 @@ if (btnDisconnectStrava) {
       await fetch("/api/auth/disconnect/strava", { method: "POST" });
       showToast("Strava disconnected");
       openSettingsModal();
-      fetchDashboardData();
+      loadDashboard();
     } catch (err) {
       showToast("Error disconnecting Strava");
     }
@@ -2732,7 +2733,8 @@ if (whoopOAuthBtn) {
   whoopOAuthBtn.addEventListener("click", (e) => {
     e.preventDefault();
     showToast("Redirecting to Whoop...");
-    window.location.href = "/api/auth/whoop/login";
+    const tok = localStorage.getItem("powersync_token");
+    window.location.href = tok ? `/api/auth/whoop/login?token=${encodeURIComponent(tok)}` : "/api/auth/whoop/login";
   });
 }
 
@@ -2744,7 +2746,7 @@ if (btnDisconnectWhoop) {
       await fetch("/api/auth/disconnect/whoop", { method: "POST" });
       showToast("Whoop disconnected");
       openSettingsModal();
-      fetchDashboardData();
+      loadDashboard();
     } catch (err) {
       showToast("Error disconnecting Whoop");
     }
@@ -3015,13 +3017,6 @@ document.querySelectorAll(".btn-wp-preset").forEach(btn => {
       }
     }
   });
-});
-
-// Window resize handling for responsive canvas
-window.addEventListener("resize", () => {
-  if (state.currentWorkout) {
-    drawWorkoutGraph(state.currentWorkout);
-  }
 });
 
 // Version & Changelog Modal Logic
@@ -3596,7 +3591,8 @@ const inputQuickPlanText = document.getElementById("inputQuickPlanText");
 const btnSubmitUpcomingPlan = document.getElementById("btnSubmitUpcomingPlan");
 
 if (btnOpenPlanBuilder) {
-  btnOpenPlanBuilder.addEventListener("click", () => {
+  btnOpenPlanBuilder.addEventListener("click", (e) => {
+    e.stopPropagation();
     if (modalUpcomingPlan) {
       modalUpcomingPlan.classList.add("open");
       modalUpcomingPlan.classList.add("active");
@@ -5230,8 +5226,22 @@ function initPullToReload() {
 
   function isModalOrDrawerOpen() {
     const activeModal = document.querySelector(".modal-overlay.open, .modal-overlay.active");
-    const chatDrawer = document.getElementById("chatSlider");
+    const chatDrawer = document.getElementById("coachChatDrawer") || document.getElementById("chatSlider");
     return Boolean(activeModal || (chatDrawer && chatDrawer.classList.contains("open")));
+  }
+
+  function hasScrolledAncestor(el) {
+    let node = el && el.nodeType === 1 ? el : (el ? el.parentElement : null);
+    while (node && node !== document.body && node !== document.documentElement) {
+      if (node.scrollTop > 0) return true;
+      const style = window.getComputedStyle(node);
+      const overflowY = style ? style.overflowY : "";
+      if ((overflowY === "auto" || overflowY === "scroll") && node.scrollHeight > node.clientHeight + 4) {
+        return true;
+      }
+      node = node.parentElement;
+    }
+    return false;
   }
 
   function getScrollTop() {
@@ -5243,8 +5253,8 @@ function initPullToReload() {
     // Allow anywhere on screen as long as page is at the top
     if (getScrollTop() > 5) return false;
     if (isModalOrDrawerOpen()) return false;
-    // Only skip text inputs so typing isn't interrupted
-    if (target && target.closest("input, textarea, select")) return false;
+    if (target && target.closest && target.closest("input, textarea, select, #coachChatDrawer, .modal-dialog, #outdoorLeafletMap, .leaflet-container")) return false;
+    if (hasScrolledAncestor(target)) return false;
 
     startY = y;
     startX = x;
@@ -5780,6 +5790,9 @@ async function checkAuthStatus() {
     ]);
     if (meRes.ok) {
       const user = await meRes.json();
+      if (user.is_guest && localStorage.getItem("powersync_token")) {
+        localStorage.removeItem("powersync_token");
+      }
       currentAthleteUser = user;
       renderUserNavPill(user);
     }

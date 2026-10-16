@@ -43,17 +43,27 @@ async def user_session_middleware(request, call_next):
     sets request.state.user, and binds CURRENT_USER_ID for complete data isolation.
     Unauthenticated visitors are safely bound to an isolated guest context.
     """
-    token = None
+    candidate_tokens = []
     if "authorization" in request.headers:
         auth_val = request.headers["authorization"]
         if auth_val.startswith("Bearer "):
-            token = auth_val[7:].strip()
-    if not token:
-        token = request.cookies.get("powersync_session")
+            bt = auth_val[7:].strip()
+            if bt:
+                candidate_tokens.append(bt)
+
+    cookie_tok = request.cookies.get("powersync_session")
+    if cookie_tok and cookie_tok not in candidate_tokens:
+        candidate_tokens.append(cookie_tok)
+
+    query_tok = request.query_params.get("token")
+    if query_tok and query_tok not in candidate_tokens:
+        candidate_tokens.append(query_tok)
 
     user = None
-    if token:
-        user = get_user_by_session(token)
+    for tok in candidate_tokens:
+        user = get_user_by_session(tok)
+        if user:
+            break
 
     if not user:
         user = get_guest_user()

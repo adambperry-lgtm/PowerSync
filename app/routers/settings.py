@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-from app.database import get_setting, set_setting, get_all_settings, get_primary_owner_email, set_primary_owner_email
+from app.database import get_setting, set_setting, get_all_settings, get_primary_owner_email, set_primary_owner_email, get_current_user_id, DEFAULT_USER_ID
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
@@ -64,7 +64,7 @@ def get_settings_endpoint():
         "athlete_max_hr": int(all_s.get("athlete_max_hr", 185)),
         "athlete_w_prime_kj": float(all_s.get("athlete_w_prime_kj", 20.0)),
         "athlete_peak_power_watts": int(all_s.get("athlete_peak_power_watts", 1050)),
-        "demo_mode": bool(all_s.get("demo_mode", True)),
+        "demo_mode": bool(all_s.get("demo_mode", not bool(all_s.get("whoop_tokens") or all_s.get("strava_tokens")))),
         "gemini_api_key_set": is_valid_secret(gemini_key),
         "gemini_api_key_masked": mask_secret(gemini_key),
         "google_maps_api_key_set": is_valid_secret(google_maps_key),
@@ -94,7 +94,10 @@ def get_settings_endpoint():
 @router.post("")
 def update_settings_endpoint(payload: SettingsUpdate):
     if payload.primary_owner_email is not None and payload.primary_owner_email.strip():
-        set_primary_owner_email(payload.primary_owner_email.strip())
+        existing_owner = get_primary_owner_email()
+        uid = get_current_user_id()
+        if not existing_owner or uid == DEFAULT_USER_ID:
+            set_primary_owner_email(payload.primary_owner_email.strip())
     if payload.google_client_id is not None and payload.google_client_id.strip():
         set_setting("google_client_id", payload.google_client_id.strip())
     if is_valid_secret(payload.google_client_secret):
