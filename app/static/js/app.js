@@ -1772,14 +1772,16 @@ function drawWorkoutGraph(workout) {
   // Handle high-DPI retina displays
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  const displayWidth = Math.max(Math.round(rect.width), 320);
+  const displayHeight = Math.max(Math.round(rect.height), 160);
+  canvas.width = displayWidth * dpr;
+  canvas.height = displayHeight * dpr;
 
   const ctx = canvas.getContext("2d");
   ctx.scale(dpr, dpr);
 
-  const w = rect.width;
-  const h = rect.height;
+  const w = displayWidth;
+  const h = displayHeight;
 
   ctx.clearRect(0, 0, w, h);
 

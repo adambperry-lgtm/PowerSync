@@ -22,6 +22,19 @@
   --radius-lg: 16px;
   --radius-md: 10px;
   --radius-sm: 6px;
+
+  /* Standardized Spacing & Elevation Tokens */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --z-header: 100;
+  --z-fab: 150;
+  --z-pull-reload: 180;
+  --z-drawer-backdrop: 250;
+  --z-drawer: 260;
+  --z-modal: 500;
+  --z-toast: 600;
 }
 
 * {
@@ -1095,15 +1108,50 @@ canvas#intervalCanvas {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  white-space: nowrap;
 }
 
 .recent-workouts-table td {
   padding: 0.9rem 0.75rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
 }
 
 .recent-workouts-table tr:hover td {
   background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* Responsive Grid Classes Replacing Hardcoded Inline Grids */
+.strain-tier-badges-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+}
+
+.athlete-zones-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+@media (max-width: 640px) {
+  .strain-tier-badges-grid,
+  .athlete-zones-preview-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Leaflet Map Stacking Boundary Encapsulation */
+#outdoorLeafletMap,
+.outdoor-map-viewport {
+  isolation: isolate;
+  contain: paint;
 }
 
 /* Modal */
@@ -1113,7 +1161,7 @@ canvas#intervalCanvas {
   inset: 0;
   background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(4px);
-  z-index: 200;
+  z-index: var(--z-modal);
   align-items: center;
   justify-content: center;
   padding-top: max(2.5rem, calc(1rem + env(safe-area-inset-top, 44px)));
@@ -1248,7 +1296,7 @@ canvas#intervalCanvas {
   color: var(--text-primary);
   font-size: 0.9rem;
   display: none;
-  z-index: 300;
+  z-index: var(--z-toast);
 }
 
 /* Version Tracker Footer */
@@ -2758,7 +2806,7 @@ canvas#intervalCanvas {
   position: fixed !important;
   bottom: max(1.75rem, calc(1rem + env(safe-area-inset-bottom, 20px))) !important;
   right: max(1.75rem, calc(1rem + env(safe-area-inset-right, 20px))) !important;
-  z-index: 200 !important;
+  z-index: var(--z-fab) !important;
   background: linear-gradient(135deg, #0e7490, #059669);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.2);
@@ -2812,7 +2860,7 @@ canvas#intervalCanvas {
   inset: 0;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(4px);
-  z-index: 240;
+  z-index: var(--z-drawer-backdrop);
   opacity: 0;
   transition: opacity 0.3s ease;
 }
@@ -2835,7 +2883,7 @@ canvas#intervalCanvas {
   backdrop-filter: blur(18px);
   border-left: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: -15px 0 50px rgba(0, 0, 0, 0.65);
-  z-index: 250;
+  z-index: var(--z-drawer);
   display: flex;
   flex-direction: column;
   transform: translateX(100%);
