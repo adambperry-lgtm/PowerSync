@@ -1295,8 +1295,14 @@ def get_scheduled_workout_for_date(date_str: str, user_id: Optional[str] = None)
         w["intervals"] = json.loads(w["intervals_json"])
     except Exception:
         w["intervals"] = []
-    w["badge"] = "💬 Coach Scheduled"
-    w["badge_color"] = "cyan"
+    import datetime
+    today_iso = datetime.date.today().isoformat()
+    if date_str == today_iso:
+        w["badge"] = "⭐ Coach's Choice"
+        w["badge_color"] = "emerald"
+    else:
+        w["badge"] = "💬 Coach Scheduled"
+        w["badge_color"] = "cyan"
     w["option_type"] = "coach_scheduled"
     return w
 

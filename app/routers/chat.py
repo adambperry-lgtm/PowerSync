@@ -158,11 +158,15 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             ]
             intervals = reconcile_workout_intervals(raw_intervals, duration, ftp=ftp)
 
+            today_iso = datetime.date.today().isoformat()
+            from app.database import save_scheduled_workout
+            from app.services.ai_coach import enrich_workout_strain
+
             workout_obj = {
-                "id": "workout_coach_prescribed",
+                "id": "workout_primary",
                 "option_type": "coach_chat",
-                "badge": "💬 Coach Custom",
-                "badge_color": "cyan",
+                "badge": "⭐ Coach's Choice",
+                "badge_color": "emerald",
                 "title": title,
                 "description": data.get("description") or f"Collaborative session crafted with AI Coach ({duration}m, ~{tss} TSS).",
                 "focus_area": focus,
@@ -174,12 +178,23 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             }
             workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+            workout_obj = enrich_workout_strain(workout_obj, ftp)
+
+            save_scheduled_workout(workout_obj, today_iso)
 
             workout_cache = get_current_workout_cache()
             options_cache = get_current_options_cache()
             workout_cache.clear()
             workout_cache.update(workout_obj)
-            options_cache["workout_coach_prescribed"] = workout_obj
+
+            remaining_options = [
+                opt for opt_id, opt in options_cache.items()
+                if opt_id not in ("workout_primary", "workout_coach_prescribed")
+            ]
+            options_cache.clear()
+            options_cache["workout_primary"] = workout_obj
+            for opt in remaining_options[:2]:
+                options_cache[opt["id"]] = opt
 
             # Calculate fueling plan
             uid = get_current_user_id()
@@ -214,7 +229,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             return {
                 "success": True,
                 "action_type": "apply_today_workout",
-                "message": f"Applied '{title}' as today's workout!",
+                "message": f"Applied '{title}' as Coach's Choice for Today's Training!",
                 "active_workout": workout_obj,
                 "options": list(options_cache.values()),
                 "fueling_plan": fueling
@@ -222,6 +237,8 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
 
         elif action_type == "schedule_workout":
             from app.services.zwift_service import generate_zwo_xml, generate_intervals_icu_text, push_to_intervals_icu, reconcile_workout_intervals
+            from app.database import save_scheduled_workout
+            from app.services.ai_coach import enrich_workout_strain
 
             target_date = data.get("target_date")
             today_str = datetime.date.today().isoformat()
@@ -242,10 +259,10 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             intervals = reconcile_workout_intervals(raw_intervals, duration, ftp=ftp)
 
             workout_obj = {
-                "id": "workout_coach_prescribed" if is_for_today else f"workout_scheduled_{target_date.replace('-', '')}",
+                "id": "workout_primary" if is_for_today else f"workout_scheduled_{target_date.replace('-', '')}",
                 "option_type": "coach_chat" if is_for_today else "coach_scheduled",
-                "badge": "🚀 Sent to Zwift" if is_for_today else "📅 Scheduled",
-                "badge_color": "cyan" if is_for_today else "blue",
+                "badge": "⭐ Coach's Choice" if is_for_today else "📅 Scheduled",
+                "badge_color": "emerald" if is_for_today else "blue",
                 "title": title,
                 "target_date": target_date,
                 "description": data.get("description") or f"Scheduled {focus} session for {target_date} ({duration}m, ~{tss} TSS).",
@@ -260,9 +277,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             }
             workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
-
-            from app.database import save_scheduled_workout
-            save_scheduled_workout(workout_obj, target_date)
+            workout_obj = enrich_workout_strain(workout_obj, ftp)
 
             athlete_id = get_setting("intervals_athlete_id", "")
             api_key = get_setting("intervals_icu_api_key", "")
@@ -276,14 +291,28 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             synced_zwift = bool(sync_result and sync_result.get("success"))
             workout_obj["synced_to_zwift"] = synced_zwift
             workout_obj["pushed_to_zwift"] = synced_zwift
+            if synced_zwift:
+                workout_obj["badge"] = "🚀 Sent to Zwift"
+                workout_obj["badge_color"] = "cyan"
 
+            save_scheduled_workout(workout_obj, target_date)
+
+            options_list = []
             if is_for_today:
                 from app.routers.workouts import get_current_workout_cache, get_current_options_cache
                 workout_cache = get_current_workout_cache()
                 options_cache = get_current_options_cache()
                 workout_cache.clear()
                 workout_cache.update(workout_obj)
-                options_cache["workout_coach_prescribed"] = workout_obj
+                remaining_options = [
+                    opt for opt_id, opt in options_cache.items()
+                    if opt_id not in ("workout_primary", "workout_coach_prescribed")
+                ]
+                options_cache.clear()
+                options_cache["workout_primary"] = workout_obj
+                for opt in remaining_options[:2]:
+                    options_cache[opt["id"]] = opt
+                options_list = list(options_cache.values())
 
             sync_msg = " & synced to Zwift calendar" if synced_zwift else " (ready to sync to Zwift)"
             return {
@@ -292,6 +321,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 "message": f"'{title}' scheduled for {target_date}{sync_msg}! 🚀",
                 "workout": workout_obj,
                 "active_workout": workout_obj if is_for_today else None,
+                "options": options_list if is_for_today else None,
                 "target_date": target_date,
                 "is_for_today": is_for_today,
                 "synced_to_zwift": synced_zwift

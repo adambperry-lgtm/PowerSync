@@ -279,8 +279,9 @@ def generate_workout(req: WorkoutGenerateRequest):
         (req.duration_min is not None and scheduled_target and req.duration_min > 0 and req.duration_min != scheduled_target.get("duration_minutes"))
     )
     if scheduled_target and not day_cfg.get("is_directive_rest"):
-        scheduled_target["badge"] = "💬 Coach Scheduled"
-        scheduled_target["badge_color"] = "cyan"
+        is_synced = bool(scheduled_target.get("synced_to_zwift") or scheduled_target.get("pushed_to_zwift"))
+        scheduled_target["badge"] = "🚀 Sent to Zwift" if is_synced else "⭐ Coach's Choice"
+        scheduled_target["badge_color"] = "cyan" if is_synced else "emerald"
         if not scheduled_target.get("zwo_content"):
             scheduled_target["zwo_content"] = generate_zwo_xml(scheduled_target, ftp)
         if not scheduled_target.get("intervals_icu_text"):
@@ -289,10 +290,12 @@ def generate_workout(req: WorkoutGenerateRequest):
         scheduled_target = enrich_workout_strain(scheduled_target, ftp)
         if not is_explicit_adaptation:
             bundle["primary"] = scheduled_target
-            bundle["all_options"] = [scheduled_target] + [o for o in bundle["all_options"] if o["id"] != scheduled_target["id"]]
+            bundle["all_options"] = [scheduled_target] + [
+                o for o in bundle["all_options"] if o.get("id") != "workout_primary" and o.get("id") != scheduled_target.get("id")
+            ]
         else:
             bundle["all_options"] = [bundle["primary"]] + [
-                o for o in bundle["all_options"] if o["id"] != bundle["primary"]["id"] and o["id"] != scheduled_target["id"]
+                o for o in bundle["all_options"] if o.get("id") != bundle["primary"].get("id") and o.get("id") != scheduled_target.get("id")
             ] + [scheduled_target]
 
     options_cache = get_current_options_cache()
@@ -714,15 +717,27 @@ def push_to_zwift_via_intervals(req: IntervalsPushRequest):
     ftp = int(get_setting("athlete_ftp", 250))
     result = push_to_intervals_icu(athlete_id, api_key, workout, target_date, ftp=ftp)
     if result.get("success"):
+        from app.database import save_scheduled_workout
         if workout:
             workout["pushed_to_zwift"] = True
             workout["synced_to_zwift"] = True
             workout["badge"] = "🚀 Sent to Zwift"
+            workout["badge_color"] = "cyan"
+            save_scheduled_workout(workout, target_date)
         if workout_cache:
             workout_cache["pushed_to_zwift"] = True
             workout_cache["synced_to_zwift"] = True
             workout_cache["badge"] = "🚀 Sent to Zwift"
+            workout_cache["badge_color"] = "cyan"
+        if options_cache:
+            for opt_id, opt in options_cache.items():
+                if opt_id == workout.get("id") or opt_id == "workout_primary":
+                    opt["pushed_to_zwift"] = True
+                    opt["synced_to_zwift"] = True
+                    opt["badge"] = "🚀 Sent to Zwift"
+                    opt["badge_color"] = "cyan"
         result["active_workout"] = workout
+        result["options"] = list(options_cache.values()) if options_cache else []
     return result
 
 @router.post("/outdoor-recommendation")

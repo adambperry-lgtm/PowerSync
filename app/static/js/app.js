@@ -1831,7 +1831,15 @@ function renderWorkout(w) {
 
   const activeEyebrow = document.getElementById("workoutActiveEyebrow");
   if (activeEyebrow) {
-    activeEyebrow.textContent = w.badge ? `${w.badge.toUpperCase()} • ACTIVE PRESCRIPTION` : "⭐ ACTIVE PRESCRIPTION • COACH'S CHOICE";
+    if (w.pushed_to_zwift || w.synced_to_zwift) {
+      activeEyebrow.textContent = "🚀 SENT TO ZWIFT • COACH'S CHOICE";
+    } else if (w.badge && w.badge.includes("Coach's Choice")) {
+      activeEyebrow.textContent = "⭐ ACTIVE PRESCRIPTION • COACH'S CHOICE";
+    } else if (w.badge) {
+      activeEyebrow.textContent = `${w.badge.toUpperCase()} • ACTIVE PRESCRIPTION`;
+    } else {
+      activeEyebrow.textContent = "⭐ ACTIVE PRESCRIPTION • COACH'S CHOICE";
+    }
   }
 
   const xssBadge = document.getElementById("workoutXssBadge");
@@ -2555,11 +2563,24 @@ btnPushZwift.addEventListener("click", async () => {
         state.currentWorkout.synced_to_zwift = true;
         state.currentWorkout.badge = "🚀 Sent to Zwift";
       }
+      if (result.options && result.options.length > 0) {
+        state.workoutOptions = result.options;
+      } else if (state.workoutOptions && state.workoutOptions.length > 0) {
+        const primOpt = state.workoutOptions.find(o => o.id === state.activeOptionId) || state.workoutOptions[0];
+        if (primOpt) {
+          primOpt.pushed_to_zwift = true;
+          primOpt.synced_to_zwift = true;
+          primOpt.badge = "🚀 Sent to Zwift";
+        }
+      }
       state.activeCoachView = "prescribed";
       showToast("🚀 Workout scheduled! Open Zwift — today's workout is ready on your home screen!");
       renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
       if (typeof renderWorkout === "function" && state.currentWorkout) {
         renderWorkout(state.currentWorkout);
+      }
+      if (typeof renderWorkoutOptions === "function" && state.workoutOptions) {
+        renderWorkoutOptions(state.workoutOptions, state.activeOptionId);
       }
     } else {
       showToast(`⚠️ ${result.error || 'Could not sync to Zwift.'}`);
