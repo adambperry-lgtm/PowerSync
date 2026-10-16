@@ -274,6 +274,70 @@ body {
   overflow: hidden;
 }
 
+/* ==========================================================================
+   Tile Top Gradient Accent Bars (Consistent Across All Primary Tiles)
+   ========================================================================== */
+.card::before,
+.workout-stage::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #06b6d4, #3b82f6, #10b981);
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* 1. Whoop Biometrics: Whoop Tri-Ring (Recovery Emerald -> Day Strain Cyan -> Sleep Purple) */
+#cardWhoop::before {
+  background: linear-gradient(90deg, #10b981 0%, #06b6d4 50%, #8b5cf6 100%);
+}
+
+/* 2. Strava Training Load: Strava Brand Orange -> Acute Load Cyan -> Freshness Emerald */
+#cardStrava::before {
+  background: linear-gradient(90deg, #fc5200 0%, #f97316 45%, #10b981 100%);
+}
+
+/* 3. AI Coach Directive: Google Gemini Cyan -> Intelligence Violet -> Target Emerald */
+#cardAiCoachToday::before {
+  background: linear-gradient(90deg, #06b6d4 0%, #8b5cf6 50%, #10b981 100%);
+}
+
+/* 4. Fitness Goal & Periodization: Macrocycle Violet -> Progression Cyan -> Target Emerald */
+.program-card::before,
+#cardProgram::before {
+  background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 50%, #10b981 100%);
+}
+
+/* 5. Upcoming Target Event & Taper: Event Amber/Gold -> Roadmap Cyan -> Race Emerald */
+.upcoming-plan-card::before,
+#cardUpcomingPlan::before {
+  background: linear-gradient(90deg, #f59e0b 0%, #fbbf24 40%, #06b6d4 100%);
+}
+
+/* 6. Today's Training Prescription: Zwift Orange -> Target Power Cyan -> Fueling Emerald */
+.workout-stage::before,
+#workoutStageSection::before {
+  background: linear-gradient(90deg, #fc6719 0%, #06b6d4 50%, #10b981 100%);
+}
+
+/* 7. AI Coach Daily Debrief: Deep Debrief Cyan -> Neurological Purple -> Recovery Protocol Pink */
+#cardCoachDebrief::before {
+  background: linear-gradient(90deg, #06b6d4 0%, #a855f7 50%, #ec4899 100%);
+}
+
+/* 8. Recent Workouts: Strava Activity Orange -> Workload Amber -> Duration Cyan */
+#cardRecentWorkouts::before {
+  background: linear-gradient(90deg, #fc5200 0%, #f59e0b 50%, #06b6d4 100%);
+}
+
+/* 9. Athlete Power Profile: CP Cyan -> Threshold Blue -> Anaerobic Battery Purple */
+#cardAthlete::before {
+  background: linear-gradient(90deg, #06b6d4 0%, #3b82f6 50%, #a855f7 100%);
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
@@ -471,17 +535,8 @@ body {
   flex-direction: column;
   gap: 1.5rem;
   position: relative;
+  overflow: hidden;
   transition: padding 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.workout-stage::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #fc6719, #06b6d4, #10b981);
 }
 
 /* ========================================================
@@ -1366,16 +1421,6 @@ canvas#intervalCanvas {
   position: relative;
   overflow: hidden;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
-}
-
-.program-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 3px;
-  background: linear-gradient(90deg, #8b5cf6, #06b6d4, #10b981);
 }
 
 .program-top-bar {
