@@ -120,7 +120,7 @@ def version_info():
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
-            "zwift": "Intervals.icu Cloud Bridge + .zwo",
+            "zwift": "Intervals.icu Cloud Bridge",
             "ai_coach": "Google Gemini 2.5 Flash",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
