@@ -116,9 +116,17 @@ def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = Non
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, id) DO UPDATE SET
                 name = excluded.name,
+                sport_type = excluded.sport_type,
                 moving_time_sec = excluded.moving_time_sec,
+                distance_meters = excluded.distance_meters,
+                total_elevation_gain = excluded.total_elevation_gain,
                 average_watts = excluded.average_watts,
-                weighted_average_watts = excluded.weighted_average_watts
+                weighted_average_watts = excluded.weighted_average_watts,
+                average_heartrate = excluded.average_heartrate,
+                max_heartrate = excluded.max_heartrate,
+                suffer_score = excluded.suffer_score,
+                kilojoules = excluded.kilojoules,
+                raw_json = excluded.raw_json
         """, (uid, act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, json.dumps(a)))
         
         saved.append({
