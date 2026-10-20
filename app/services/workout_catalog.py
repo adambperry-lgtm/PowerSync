@@ -765,14 +765,16 @@ def select_diverse_archetype(
     ftp: int = 250,
     plan_ctx: Optional[str] = None,
     user_id: Optional[str] = None,
-    forced_archetype_id: Optional[str] = None
+    forced_archetype_id: Optional[str] = None,
+    extra_history: Optional[List[str]] = None
 ) -> Dict[str, Any]:
     """
     Selects an archetype within the specified physiological zone that has NOT
     been completed or prescribed recently, preventing repetitive workouts.
     """
     builders = ZONE_ARCHETYPES.get(zone, ZONE_ARCHETYPES["sweet_spot"])
-    recent_history = get_recent_workout_history(user_id, limit=6)
+    db_history = get_recent_workout_history(user_id, limit=6)
+    recent_history = (list(extra_history) if extra_history else []) + db_history
 
     # If an explicit archetype was requested
     if forced_archetype_id:

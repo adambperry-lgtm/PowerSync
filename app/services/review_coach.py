@@ -239,6 +239,10 @@ def build_preference_aligned_outlook_days(
 
     recoveries = [day1_recovery, day2_recovery, day3_recovery]
     outlook_days = []
+    forecast_history: List[str] = []
+    uid = get_current_user_id()
+    from app.services.workout_catalog import select_diverse_archetype
+    from app.services.strain_model_service import calculate_intervals_strain
 
     for offset in [1, 2, 3]:
         target_date = today + datetime.timedelta(days=offset)
@@ -309,50 +313,52 @@ def build_preference_aligned_outlook_days(
         elif w_key == "sunday" or mode == "outdoor_or_long_indoor":
             dur = max(60, min(90, preferred_dur or 75))
             if rec_est >= 60:
-                est_tss = int(dur * 0.95)
-                est_xss = est_tss
-                low_x = int(est_xss * 0.85)
-                high_x = int(est_xss * 0.15)
+                selected = select_diverse_archetype("endurance_base", dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
+                forecast_history.insert(0, selected["title"].lower())
+                strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
                 item = {
                     "day_offset": offset,
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "Outdoor Endurance or Long Indoor Ride",
+                    "title": selected["title"],
                     "duration_min": dur,
-                    "estimated_tss": est_tss,
-                    "estimated_xss": est_xss,
-                    "low_xss": low_x,
-                    "high_xss": high_x,
-                    "peak_xss": 0,
-                    "focus_duration": "Rouleur (20:00 Focus)",
-                    "focus": "Aerobic Endurance",
+                    "estimated_tss": selected["estimated_tss"],
+                    "estimated_xss": int(strain.get("total_xss", selected["estimated_tss"])),
+                    "low_xss": int(strain.get("low_xss", 0)),
+                    "high_xss": int(strain.get("high_xss", 0)),
+                    "peak_xss": int(strain.get("peak_xss", 0)),
+                    "focus_duration": strain.get("focus_duration", "Endurance / Base (>1h Focus)"),
+                    "focus": selected["focus_area"],
                     "description": (
                         f"Expected Recovery: ~{rec_est}% (Prime). Sunday volume ride ({dur} min, outdoors if weather permits, or indoor endurance). "
-                        f"Features progressive wattage ramps to build endurance and contribute toward your weekly {program.get('weekly_tss_target', 360)} TSS target."
+                        f"{selected['ai_rationale']}"
                     )
                 }
             else:
                 dur = 60
+                selected = select_diverse_archetype("endurance_base", dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
+                forecast_history.insert(0, selected["title"].lower())
+                strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
                 item = {
                     "day_offset": offset,
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "Zone 2 Endurance",
+                    "title": selected["title"],
                     "duration_min": 60,
-                    "estimated_tss": 42,
-                    "estimated_xss": 42,
-                    "low_xss": 42,
-                    "high_xss": 0,
-                    "peak_xss": 0,
-                    "focus_duration": "Endurance / Century (>1h Focus)",
-                    "focus": "Aerobic Base",
+                    "estimated_tss": selected["estimated_tss"],
+                    "estimated_xss": int(strain.get("total_xss", selected["estimated_tss"])),
+                    "low_xss": int(strain.get("low_xss", 0)),
+                    "high_xss": int(strain.get("high_xss", 0)),
+                    "peak_xss": int(strain.get("peak_xss", 0)),
+                    "focus_duration": strain.get("focus_duration", "Endurance / Base (>1h Focus)"),
+                    "focus": selected["focus_area"],
                     "description": (
                         f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Steady 60-minute Zone 2 spin "
-                        f"(<{int(ftp * 0.68)}W, ~42 Low XSS) with progressive ramp warmup and cooldown."
+                        f"with progressive ramp warmup and cooldown. {selected['ai_rationale']}"
                     )
                 }
 
@@ -360,48 +366,51 @@ def build_preference_aligned_outlook_days(
         elif w_key in ["wednesday", "friday"] or mode == "outdoor_priority":
             dur = max(60, min(90, preferred_dur or 60))
             if rec_est >= 66:
-                est_tss = 65 if dur == 60 else 75
-                est_xss = 68 if dur == 60 else 78
-                low_x = 50 if dur == 60 else 58
-                high_x = 18 if dur == 60 else 20
+                selected = select_diverse_archetype("sweet_spot", dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
+                forecast_history.insert(0, selected["title"].lower())
+                strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
                 item = {
                     "day_offset": offset,
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "Sweet Spot Over-Unders",
+                    "title": selected["title"],
                     "duration_min": dur,
-                    "estimated_tss": est_tss,
-                    "estimated_xss": est_xss,
-                    "low_xss": low_x,
-                    "high_xss": high_x,
-                    "peak_xss": 0,
-                    "focus_duration": "Climber / Sweet Spot (45:00 Focus)",
-                    "focus": "Sweet Spot & Threshold",
+                    "estimated_tss": selected["estimated_tss"],
+                    "estimated_xss": int(strain.get("total_xss", selected["estimated_tss"])),
+                    "low_xss": int(strain.get("low_xss", 0)),
+                    "high_xss": int(strain.get("high_xss", 0)),
+                    "peak_xss": int(strain.get("peak_xss", 0)),
+                    "focus_duration": strain.get("focus_duration", "Climber / Sweet Spot (45:00 Focus)"),
+                    "focus": selected["focus_area"],
                     "description": (
                         f"Expected Recovery: ~{rec_est}% (Green). Prescribed {dur}+ min session consistent with your {day_name} preference (outdoors if weather permits, or indoor). "
-                        f"Features progressive wattage ramp warmup and structured Over/Under intervals ({int(ftp * 0.90)}W / {int(ftp * 1.05)}W) to build threshold power."
+                        f"{selected['ai_rationale']}"
                     )
                 }
             elif rec_est >= 45:
+                selected = select_diverse_archetype("tempo", dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
+                forecast_history.insert(0, selected["title"].lower())
+                strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
                 item = {
                     "day_offset": offset,
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": "Zone 2 Aerobic Foundation",
-                    "duration_min": 60,
-                    "estimated_tss": 46,
-                    "estimated_xss": 46,
-                    "low_xss": 44,
-                    "high_xss": 2,
-                    "peak_xss": 0,
-                    "focus_duration": "Endurance / Century (>1h Focus)",
-                    "focus": "Aerobic Base",
+                    "title": selected["title"],
+                    "duration_min": dur,
+                    "estimated_tss": selected["estimated_tss"],
+                    "estimated_xss": int(strain.get("total_xss", selected["estimated_tss"])),
+                    "low_xss": int(strain.get("low_xss", 0)),
+                    "high_xss": int(strain.get("high_xss", 0)),
+                    "peak_xss": int(strain.get("peak_xss", 0)),
+                    "focus_duration": strain.get("focus_duration", "Rouleur (20:00 Focus)"),
+                    "focus": selected["focus_area"],
                     "description": (
-                        f"Expected Recovery: ~{rec_est}% (Yellow). 60-min steady Zone 2 ride (outdoors if weather permits) with progressive ramp warmup and cooldown."
+                        f"Expected Recovery: ~{rec_est}% (Yellow). {dur}-min steady session consistent with your {day_name} preference. "
+                        f"{selected['ai_rationale']}"
                     )
                 }
             else:
@@ -450,26 +459,29 @@ def build_preference_aligned_outlook_days(
                     )
                 }
             else:
-                # High-efficiency 40-minute Over/Unders session
                 dur = min(45, max(35, preferred_dur or 40))
+                zone_pick = "sweet_spot" if rec_est >= 66 else "tempo"
+                selected = select_diverse_archetype(zone_pick, dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
+                forecast_history.insert(0, selected["title"].lower())
+                strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
                 item = {
                     "day_offset": offset,
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
                     "projected_zone": zone,
-                    "title": f"⚡ {dur}-Min Sweet Spot Over-Unders",
+                    "title": selected["title"],
                     "duration_min": dur,
-                    "estimated_tss": 45,
-                    "estimated_xss": 46,
-                    "low_xss": 34,
-                    "high_xss": 12,
-                    "peak_xss": 0,
-                    "focus_duration": "Climber / Sweet Spot (45:00 Focus)",
-                    "focus": "Sweet Spot & Threshold",
+                    "estimated_tss": selected["estimated_tss"],
+                    "estimated_xss": int(strain.get("total_xss", selected["estimated_tss"])),
+                    "low_xss": int(strain.get("low_xss", 0)),
+                    "high_xss": int(strain.get("high_xss", 0)),
+                    "peak_xss": int(strain.get("peak_xss", 0)),
+                    "focus_duration": strain.get("focus_duration", "Climber / Sweet Spot (45:00 Focus)"),
+                    "focus": selected["focus_area"],
                     "description": (
                         f"Expected Recovery: ~{rec_est}% (Ready). High-efficiency {dur}-minute indoor session respecting your 35–45 min weekday limit. "
-                        f"Includes a progressive wattage ramp warmup (45% -> 75% FTP), structured Over/Under threshold blocks ({int(ftp * 0.90)}W / {int(ftp * 1.05)}W), and progressive ramp cooldown."
+                        f"{selected['ai_rationale']}"
                     )
                 }
 
