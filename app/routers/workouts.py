@@ -210,12 +210,22 @@ def generate_workout(req: WorkoutGenerateRequest):
     wants_rest_note = bool(note_clean and any(k in note_clean for k in [
         "rest day", "take today off", "full rest", "skip today", "no ride", "day off"
     ]) and not any(k in note_clean for k in ["active", "spin", "flush"]))
-    has_explicit_override = bool(note_clean and not wants_rest_note)
+    from app.services.forecast_service import get_forecast_for_date
+    cur_date_iso = (tgt_dt or datetime.date.today()).isoformat()
+    forecast_entry = get_forecast_for_date(cur_date_iso, user_id=get_current_user_id())
+
+    has_duration_override = bool(
+        req.duration_min is not None and req.duration_min > 0 and
+        forecast_entry and req.duration_min != forecast_entry.get("duration_min")
+    )
+    has_explicit_override = bool((note_clean and not wants_rest_note) or has_duration_override)
 
     if wants_rest_note or (is_rest_day and not has_explicit_override and (req.duration_min is None or req.duration_min == 0)):
         target_dur = 0
     elif req.duration_min is not None and req.duration_min > 0:
         target_dur = req.duration_min
+    elif forecast_entry and forecast_entry.get("duration_min") is not None and not has_explicit_override:
+        target_dur = forecast_entry["duration_min"]
     else:
         pref_dur = day_cfg.get("preferred_duration_min", 45)
         target_dur = pref_dur if pref_dur > 0 else 45

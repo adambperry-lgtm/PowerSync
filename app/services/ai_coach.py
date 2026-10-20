@@ -469,6 +469,81 @@ def build_adaptive_workout_local(
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
             return enrich_workout_strain(workout_obj, ftp)
 
+    # 0E. FORECAST CONTINUITY INTEGRATION
+    # Check if there is an active 3-day forward forecast stored for this date
+    cur_date_iso = (target_date or datetime.date.today()).isoformat()
+    uid = get_current_user_id()
+    from app.services.forecast_service import get_forecast_for_date, is_forecast_valid_for_recovery
+    forecast = get_forecast_for_date(cur_date_iso, user_id=uid)
+    forecast_divergence_note = ""
+
+    if forecast and not has_explicit_override:
+        is_valid, validation_msg = is_forecast_valid_for_recovery(forecast, recovery_score)
+        if is_valid:
+            # The forecast assumptions hold true! Select the promised workout archetype and structure.
+            f_title = forecast.get("title") or "Endurance Session"
+            f_dur = int(forecast.get("duration_min") if forecast.get("duration_min") is not None else duration)
+            f_focus = forecast.get("focus_area") or forecast.get("focus") or "Structured Training"
+            f_tss = int(forecast.get("estimated_tss") or int(f_dur * 0.75))
+            f_intervals = list(forecast.get("intervals") or [])
+            f_rationale = forecast.get("ai_rationale") or forecast.get("description") or ""
+
+            # Check if forecast prescribed rest or active recovery
+            if f_dur == 0 or forecast.get("is_directive_rest") or forecast.get("is_default_rest"):
+                workout_obj = {
+                    "id": "workout_primary",
+                    "option_type": "rest",
+                    "badge": "⭐ Coach's Choice • Forecast Confirmed",
+                    "badge_color": "emerald",
+                    "title": f_title,
+                    "description": f"Forecast Confirmed for Whoop Recovery {recovery_score}%",
+                    "focus_area": f_focus,
+                    "duration_minutes": 0,
+                    "estimated_tss": 0,
+                    "ai_rationale": (
+                        f"Forecast Confirmed: Projected recovery was ~{forecast.get('projected_recovery', recovery_score)}%, "
+                        f"and actual Whoop recovery is {recovery_score}% ({validation_msg}). "
+                        f"Per your confirmed forecast: {f_rationale}"
+                    ),
+                    "intervals": []
+                }
+                workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
+                workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+                return enrich_workout_strain(workout_obj, ftp)
+
+            proj_rec = forecast.get("projected_recovery", recovery_score)
+            p_zone = forecast.get("projected_zone", "green")
+            badge_color = "emerald" if p_zone == "green" else ("amber" if p_zone == "yellow" else "rose")
+
+            continuity_desc = (
+                f"Forecast Confirmed: Projected recovery was ~{proj_rec}%, and actual Whoop recovery is {recovery_score}% ({validation_msg}). "
+                f"Executing the planned session from your forward forecast: {f_rationale}"
+            )
+
+            workout_obj = {
+                "id": "workout_primary",
+                "option_type": "primary",
+                "badge": "⭐ Coach's Choice • Forecast Confirmed",
+                "badge_color": badge_color,
+                "title": f_title,
+                "description": f"Forecast Confirmed for Whoop Recovery {recovery_score}%",
+                "focus_area": f_focus,
+                "duration_minutes": f_dur,
+                "estimated_tss": f_tss,
+                "ai_rationale": continuity_desc,
+                "intervals": f_intervals
+            }
+            workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
+            workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+            return enrich_workout_strain(workout_obj, ftp)
+        else:
+            # Assumptions diverged (e.g. forecast anticipated Green 75% but athlete woke up Red 28%)
+            forecast_divergence_note = (
+                f"⚡ Forecast Adapted: Morning Whoop recovery ({recovery_score}%) diverged from projected "
+                f"{forecast.get('projected_recovery')}% ({validation_msg}). "
+                f"Pivoting today's session from forecasted '{forecast.get('title')}' to align with your actual physiological readiness. "
+            )
+
     # 1. Whoop Red Zone (< 34%)
     if recovery_score < 34:
         title = "Zone 1 Active Flush & Restoration"
@@ -641,6 +716,11 @@ def build_adaptive_workout_local(
 
     badge_text = "⭐ Coach's Choice"
     badge_color = "cyan"
+    if forecast_divergence_note:
+        badge_text = "🔄 Adapted from Forecast"
+        badge_color = "amber"
+        ai_rationale = forecast_divergence_note + ai_rationale
+
     if active_plan and days_until is not None and days_until >= 4:
         badge_text = f"🎯 T-{days_until} Prep • Coach's Choice"
         ai_rationale = f"Target Event Horizon: '{active_plan.get('title')}' ({float(active_plan.get('distance_miles') or 50):.1f} mi) in {days_until} days. {ai_rationale}"

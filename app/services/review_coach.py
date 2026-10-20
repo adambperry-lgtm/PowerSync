@@ -137,6 +137,11 @@ def parse_athlete_feedback_for_outlook(note: str, today: datetime.date, ftp: int
                 "peak_xss": 0,
                 "focus": "Active Recovery or Rest",
                 "focus_duration": "Active Recovery / Base (>1h Focus)",
+                "intervals": [
+                    {"type": "Warmup", "duration_sec": 300, "power_low_pct": 45, "power_high_pct": 65, "cadence": 88, "name": "Gradual Warmup Ramp"},
+                    {"type": "SteadyState", "duration_sec": 1500, "power_pct": 65, "cadence": 90, "name": "Zone 2 Steady Aerobic Base"},
+                    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
+                ],
                 "description": f"Adapted to your note (\"{note}\"): High-intensity intervals removed. Gentle Zone 2 spin (<65% FTP, <{int(ftp * 0.65)}W, ~20 Low XSS) or optional rest day."
             }
         elif has_rest:
@@ -151,6 +156,7 @@ def parse_athlete_feedback_for_outlook(note: str, today: datetime.date, ftp: int
                 "peak_xss": 0,
                 "focus": "Rest & Recovery",
                 "focus_duration": "Rest & Recovery",
+                "intervals": [],
                 "description": f"Adapted to your note (\"{note}\"): Scheduled rest day. Focus on hydration, mobility, and restorative sleep."
             }
         elif has_z2:
@@ -165,6 +171,11 @@ def parse_athlete_feedback_for_outlook(note: str, today: datetime.date, ftp: int
                 "peak_xss": 0,
                 "focus": "Aerobic Base",
                 "focus_duration": "Endurance / Century (>1h Focus)",
+                "intervals": [
+                    {"type": "Warmup", "duration_sec": 300, "power_low_pct": 45, "power_high_pct": 65, "cadence": 88, "name": "Gradual Warmup Ramp"},
+                    {"type": "SteadyState", "duration_sec": 1500, "power_pct": 65, "cadence": 90, "name": "Zone 2 Steady Aerobic Base"},
+                    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
+                ],
                 "description": f"Adapted to your note (\"{note}\"): Steady Zone 2 endurance spin (<68% FTP, <{int(ftp * 0.68)}W) with progressive ramp warmup and cooldown."
             }
         elif has_fatigue:
@@ -179,6 +190,11 @@ def parse_athlete_feedback_for_outlook(note: str, today: datetime.date, ftp: int
                 "peak_xss": 0,
                 "focus": "Active Recovery",
                 "focus_duration": "Active Recovery (>1h Focus)",
+                "intervals": [
+                    {"type": "Warmup", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 50, "cadence": 85, "name": "Gentle Spin"},
+                    {"type": "SteadyState", "duration_sec": 1500, "power_pct": 50, "cadence": 88, "name": "Zone 1 Active Flush"},
+                    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 48, "power_high_pct": 38, "cadence": 80, "name": "Easy Spin Out"}
+                ],
                 "description": f"Adjusted for reported fatigue (\"{note}\"): Easy 35-minute recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or rest day to recover."
             }
 
@@ -263,8 +279,15 @@ def build_preference_aligned_outlook_days(
 
         # CASE 0: Directive-Mandated Rest / Easy Day (e.g. Thursday when Mon/Tue/Wed workouts were logged)
         if is_directive_rest:
+            desc = (
+                f"Expected Recovery: ~{max(78, rec_est)}% (Supercompensation). "
+                f"Per your forward directive, {day_name} is recommended as a full rest day or gentle active recovery spin "
+                f"(<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) to allow cellular supercompensation before Friday's ride."
+            )
             item = {
                 "day_offset": offset,
+                "target_date": target_date.isoformat(),
+                "date_iso": target_date.isoformat(),
                 "date_relative": date_relative,
                 "date_formatted": date_formatted,
                 "projected_recovery": max(78, rec_est),
@@ -279,17 +302,21 @@ def build_preference_aligned_outlook_days(
                 "focus_duration": "Rest & Recovery",
                 "focus": "Rest & Recovery",
                 "is_directive_rest": True,
-                "description": (
-                    f"Expected Recovery: ~{max(78, rec_est)}% (Supercompensation). "
-                    f"Per your forward directive, {day_name} is recommended as a full rest day or gentle active recovery spin "
-                    f"(<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) to allow cellular supercompensation before Friday's ride."
-                )
+                "intervals": [],
+                "ai_rationale": desc,
+                "description": desc
             }
 
         # CASE A: Dedicated Rest Day (e.g. Saturday)
         elif is_default_rest or mode == "rest_day":
+            desc = (
+                f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Dedicated weekly rest day consistent with your scheduling preferences. "
+                f"Focus on hydration, mobility, and restorative sleep before Sunday's longer endurance ride."
+            )
             item = {
                 "day_offset": offset,
+                "target_date": target_date.isoformat(),
+                "date_iso": target_date.isoformat(),
                 "date_relative": date_relative,
                 "date_formatted": date_formatted,
                 "projected_recovery": rec_est,
@@ -303,10 +330,10 @@ def build_preference_aligned_outlook_days(
                 "peak_xss": 0,
                 "focus_duration": "Rest & Recovery",
                 "focus": "Rest & Recovery",
-                "description": (
-                    f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Dedicated weekly rest day consistent with your scheduling preferences. "
-                    f"Focus on hydration, mobility, and restorative sleep before Sunday's longer endurance ride."
-                )
+                "is_default_rest": True,
+                "intervals": [],
+                "ai_rationale": desc,
+                "description": desc
             }
 
         # CASE B: Sunday (Outdoor or Long Indoor Ride)
@@ -316,8 +343,14 @@ def build_preference_aligned_outlook_days(
                 selected = select_diverse_archetype("endurance_base", dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
                 forecast_history.insert(0, selected["title"].lower())
                 strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% (Prime). Sunday volume ride ({dur} min, outdoors if weather permits, or indoor endurance). "
+                    f"{selected['ai_rationale']}"
+                )
                 item = {
                     "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
@@ -331,18 +364,23 @@ def build_preference_aligned_outlook_days(
                     "peak_xss": int(strain.get("peak_xss", 0)),
                     "focus_duration": strain.get("focus_duration", "Endurance / Base (>1h Focus)"),
                     "focus": selected["focus_area"],
-                    "description": (
-                        f"Expected Recovery: ~{rec_est}% (Prime). Sunday volume ride ({dur} min, outdoors if weather permits, or indoor endurance). "
-                        f"{selected['ai_rationale']}"
-                    )
+                    "intervals": selected.get("intervals", []),
+                    "ai_rationale": selected.get("ai_rationale", desc),
+                    "description": desc
                 }
             else:
                 dur = 60
                 selected = select_diverse_archetype("endurance_base", dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
                 forecast_history.insert(0, selected["title"].lower())
                 strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Steady 60-minute Zone 2 spin "
+                    f"with progressive ramp warmup and cooldown. {selected['ai_rationale']}"
+                )
                 item = {
                     "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
@@ -356,10 +394,9 @@ def build_preference_aligned_outlook_days(
                     "peak_xss": int(strain.get("peak_xss", 0)),
                     "focus_duration": strain.get("focus_duration", "Endurance / Base (>1h Focus)"),
                     "focus": selected["focus_area"],
-                    "description": (
-                        f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Steady 60-minute Zone 2 spin "
-                        f"with progressive ramp warmup and cooldown. {selected['ai_rationale']}"
-                    )
+                    "intervals": selected.get("intervals", []),
+                    "ai_rationale": selected.get("ai_rationale", desc),
+                    "description": desc
                 }
 
         # CASE C: Wednesday & Friday (60+ Minutes, Outdoor Priority if Weather Allows)
@@ -369,8 +406,14 @@ def build_preference_aligned_outlook_days(
                 selected = select_diverse_archetype("sweet_spot", dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
                 forecast_history.insert(0, selected["title"].lower())
                 strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% (Green). Prescribed {dur}+ min session consistent with your {day_name} preference (outdoors if weather permits, or indoor). "
+                    f"{selected['ai_rationale']}"
+                )
                 item = {
                     "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
@@ -384,17 +427,22 @@ def build_preference_aligned_outlook_days(
                     "peak_xss": int(strain.get("peak_xss", 0)),
                     "focus_duration": strain.get("focus_duration", "Climber / Sweet Spot (45:00 Focus)"),
                     "focus": selected["focus_area"],
-                    "description": (
-                        f"Expected Recovery: ~{rec_est}% (Green). Prescribed {dur}+ min session consistent with your {day_name} preference (outdoors if weather permits, or indoor). "
-                        f"{selected['ai_rationale']}"
-                    )
+                    "intervals": selected.get("intervals", []),
+                    "ai_rationale": selected.get("ai_rationale", desc),
+                    "description": desc
                 }
             elif rec_est >= 45:
                 selected = select_diverse_archetype("tempo", dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
                 forecast_history.insert(0, selected["title"].lower())
                 strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% (Yellow). {dur}-min steady session consistent with your {day_name} preference. "
+                    f"{selected['ai_rationale']}"
+                )
                 item = {
                     "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
@@ -408,14 +456,23 @@ def build_preference_aligned_outlook_days(
                     "peak_xss": int(strain.get("peak_xss", 0)),
                     "focus_duration": strain.get("focus_duration", "Rouleur (20:00 Focus)"),
                     "focus": selected["focus_area"],
-                    "description": (
-                        f"Expected Recovery: ~{rec_est}% (Yellow). {dur}-min steady session consistent with your {day_name} preference. "
-                        f"{selected['ai_rationale']}"
-                    )
+                    "intervals": selected.get("intervals", []),
+                    "ai_rationale": selected.get("ai_rationale", desc),
+                    "description": desc
                 }
             else:
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% (Red). Easy active recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or complete rest to allow full recovery."
+                )
+                rec_intervals = [
+                    {"type": "Warmup", "duration_sec": 300, "power_low_pct": 35, "power_high_pct": 45, "cadence": 85, "name": "Gentle Spin"},
+                    {"type": "SteadyState", "duration_sec": 2100, "power_pct": 48, "cadence": 88, "name": "Zone 1 Active Flush"},
+                    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 45, "power_high_pct": 35, "cadence": 80, "name": "Easy Spin Out"}
+                ]
                 item = {
                     "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
@@ -429,17 +486,28 @@ def build_preference_aligned_outlook_days(
                     "peak_xss": 0,
                     "focus_duration": "Active Recovery (>1h Focus)",
                     "focus": "Active Recovery",
-                    "description": (
-                        f"Expected Recovery: ~{rec_est}% (Red). Easy active recovery spin (<55% FTP, <{int(ftp * 0.55)}W) or complete rest to allow full recovery."
-                    )
+                    "intervals": rec_intervals,
+                    "ai_rationale": desc,
+                    "description": desc
                 }
 
         # CASE D: Monday, Tuesday, Thursday (35–45 Minutes ONLY, Secondary Rest Candidates)
         else:
             if rec_est < 50:
                 # Active flush or rest day candidate
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% ({'Red' if rec_est < 34 else 'Yellow'}). Consistent with your preference that one of Mon/Tue/Thu serves as an extra rest day: "
+                    f"35-min gentle spin (<55% FTP, <{int(ftp * 0.55)}W) or rest day to absorb recent training stress."
+                )
+                rec_intervals = [
+                    {"type": "Warmup", "duration_sec": 300, "power_low_pct": 35, "power_high_pct": 45, "cadence": 85, "name": "Gentle Spin"},
+                    {"type": "SteadyState", "duration_sec": 1500, "power_pct": 48, "cadence": 88, "name": "Zone 1 Active Flush"},
+                    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 45, "power_high_pct": 35, "cadence": 80, "name": "Easy Spin Out"}
+                ]
                 item = {
                     "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
@@ -453,10 +521,9 @@ def build_preference_aligned_outlook_days(
                     "peak_xss": 0,
                     "focus_duration": "Active Recovery (>1h Focus)",
                     "focus": "Active Recovery",
-                    "description": (
-                        f"Expected Recovery: ~{rec_est}% ({'Red' if rec_est < 34 else 'Yellow'}). Consistent with your preference that one of Mon/Tue/Thu serves as an extra rest day: "
-                        f"35-min gentle spin (<55% FTP, <{int(ftp * 0.55)}W) or rest day to absorb recent training stress."
-                    )
+                    "intervals": rec_intervals,
+                    "ai_rationale": desc,
+                    "description": desc
                 }
             else:
                 dur = min(45, max(35, preferred_dur or 40))
@@ -464,8 +531,14 @@ def build_preference_aligned_outlook_days(
                 selected = select_diverse_archetype(zone_pick, dur, ftp=ftp, user_id=uid, extra_history=forecast_history)
                 forecast_history.insert(0, selected["title"].lower())
                 strain = calculate_intervals_strain(selected["intervals"], ftp=ftp)
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% (Ready). High-efficiency {dur}-minute indoor session respecting your 35–45 min weekday limit. "
+                    f"{selected['ai_rationale']}"
+                )
                 item = {
                     "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
                     "date_relative": date_relative,
                     "date_formatted": date_formatted,
                     "projected_recovery": rec_est,
@@ -479,10 +552,9 @@ def build_preference_aligned_outlook_days(
                     "peak_xss": int(strain.get("peak_xss", 0)),
                     "focus_duration": strain.get("focus_duration", "Climber / Sweet Spot (45:00 Focus)"),
                     "focus": selected["focus_area"],
-                    "description": (
-                        f"Expected Recovery: ~{rec_est}% (Ready). High-efficiency {dur}-minute indoor session respecting your 35–45 min weekday limit. "
-                        f"{selected['ai_rationale']}"
-                    )
+                    "intervals": selected.get("intervals", []),
+                    "ai_rationale": selected.get("ai_rationale", desc),
+                    "description": desc
                 }
 
         # Check for athlete subjective debrief note overrides (e.g. "tomorrow will be zone 2 or a rest day")
@@ -498,9 +570,20 @@ def build_preference_aligned_outlook_days(
             item["focus"] = ovr["focus"]
             item["focus_duration"] = ovr["focus_duration"]
             item["description"] = ovr["description"]
+            item["ai_rationale"] = ovr["description"]
+            if "intervals" in ovr:
+                item["intervals"] = ovr["intervals"]
             item["is_athlete_adjusted"] = True
 
         outlook_days.append(item)
+
+    # Persist the generated 3-day forward forecast plan for workout selector integration
+    try:
+        from app.services.forecast_service import save_coach_forecast_plan
+        save_coach_forecast_plan(uid, outlook_days)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("Failed to save coach forecast plan: %s", e)
 
     return outlook_days
 
