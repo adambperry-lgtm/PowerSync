@@ -12,7 +12,7 @@
     document.documentElement.setAttribute("data-theme", "dark");
     document.documentElement.setAttribute("data-theme-mode", "dark");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=58">
+  <link rel="stylesheet" href="/static/css/style.css?v=59">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -1148,39 +1148,41 @@
         </div>
 
         <!-- 3-Tier Physiological Strain & W'bal Battery (Xert XSS Equivalent) -->
-        <div class="strain-system-debrief-card" id="debriefStrainSystemCard" style="margin:0.75rem 0;background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.25);border-radius:var(--radius-sm);padding:0.85rem;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-              <span style="font-size:1.15rem;">⚡</span>
-              <span style="font-weight:700;font-size:0.85rem;color:#c084fc;">3-Tier Physiological Strain &amp; W' Battery</span>
-              <span class="badge-status" id="debriefFocusDurationBadge" style="font-size:0.7rem;background:rgba(168,85,247,0.15);color:#c084fc;border-color:rgba(168,85,247,0.35);">Rouleur (20:00 Focus)</span>
+        <div class="strain-system-debrief-card" id="debriefStrainSystemCard">
+          <div class="strain-debrief-header">
+            <div class="strain-debrief-title-row">
+              <span class="strain-debrief-icon">⚡</span>
+              <span class="strain-debrief-title">3-Tier Physiological Strain &amp; W' Battery</span>
             </div>
-            <div style="font-size:0.82rem;font-weight:700;color:#fff;">
-              Total Strain: <span id="debriefTotalXssVal" style="color:#c084fc;font-size:1.05rem;">--</span> <span style="font-size:0.75rem;color:var(--text-muted);">XSS</span>
+            <div class="strain-debrief-meta-row">
+              <span class="badge-status strain-focus-badge" id="debriefFocusDurationBadge">Rouleur (20:00 Focus)</span>
+              <div class="strain-total-badge">
+                Total Strain: <span id="debriefTotalXssVal" class="strain-total-num">--</span> <span class="strain-total-unit">XSS</span>
+              </div>
             </div>
           </div>
 
           <!-- Strain Tier Breakdown Badges -->
           <div class="strain-tier-badges-grid">
-            <div style="background:rgba(6,182,212,0.08);border:1px solid rgba(6,182,212,0.2);border-radius:6px;padding:0.45rem 0.6rem;">
-              <div style="font-size:0.7rem;color:var(--accent-cyan);font-weight:600;text-transform:uppercase;">Low Strain (Aerobic)</div>
-              <div style="font-size:1.1rem;font-weight:800;color:#fff;" id="debriefLowXssVal">-- <span style="font-size:0.75rem;color:var(--text-muted);">XSS</span></div>
+            <div class="strain-tier-card strain-tier-low">
+              <div class="strain-tier-lbl">Low Strain (Aerobic)</div>
+              <div class="strain-tier-val" id="debriefLowXssVal">-- <span class="strain-tier-unit">XSS</span></div>
             </div>
-            <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:6px;padding:0.45rem 0.6rem;">
-              <div style="font-size:0.7rem;color:var(--accent-amber);font-weight:600;text-transform:uppercase;">High Strain (Glycolytic)</div>
-              <div style="font-size:1.1rem;font-weight:800;color:#fff;" id="debriefHighXssVal">-- <span style="font-size:0.75rem;color:var(--text-muted);">XSS</span></div>
+            <div class="strain-tier-card strain-tier-high">
+              <div class="strain-tier-lbl">High Strain (Glycolytic)</div>
+              <div class="strain-tier-val" id="debriefHighXssVal">-- <span class="strain-tier-unit">XSS</span></div>
             </div>
-            <div style="background:rgba(244,63,94,0.08);border:1px solid rgba(244,63,94,0.2);border-radius:6px;padding:0.45rem 0.6rem;">
-              <div style="font-size:0.7rem;color:var(--accent-rose);font-weight:600;text-transform:uppercase;">Peak Strain (Sprint)</div>
-              <div style="font-size:1.1rem;font-weight:800;color:#fff;" id="debriefPeakXssVal">-- <span style="font-size:0.75rem;color:var(--text-muted);">XSS</span></div>
+            <div class="strain-tier-card strain-tier-peak">
+              <div class="strain-tier-lbl">Peak Strain (Sprint)</div>
+              <div class="strain-tier-val" id="debriefPeakXssVal">-- <span class="strain-tier-unit">XSS</span></div>
             </div>
           </div>
 
           <!-- W'bal Battery Depletion Meter -->
-          <div>
-            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;margin-bottom:0.25rem;">
-              <span style="color:var(--text-secondary);">W' Anaerobic Battery (Min Remaining / Depletion)</span>
-              <span style="font-weight:700;color:#fff;" id="debriefBatteryLabel">100% Remaining (0% Depleted)</span>
+          <div class="battery-meter-container">
+            <div class="battery-meter-header">
+              <span class="battery-meter-title">W' Anaerobic Battery</span>
+              <span class="battery-meter-label" id="debriefBatteryLabel">100% Remaining (0% Depleted)</span>
             </div>
             <div class="w-bal-battery-meter">
               <div id="debriefBatteryFill" class="w-bal-battery-fill" style="width:100%;background:linear-gradient(90deg, #10b981, #06b6d4);"></div>
@@ -2159,6 +2161,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=103"></script>
+  <script src="/static/js/app.js?v=104"></script>
 </body>
 </html>

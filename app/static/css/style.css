@@ -2513,7 +2513,7 @@ canvas#intervalCanvas {
   /* Main Container on Mobile */
   .container,
   .main-content {
-    padding: 0.85rem 0.65rem !important;
+    padding: 0.85rem 0.65rem max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom, 24px))) 0.65rem !important;
     gap: 1.15rem !important;
     width: 100% !important;
     max-width: 100vw !important;
@@ -3773,11 +3773,159 @@ canvas#intervalCanvas {
 }
 
 .strain-system-debrief-card {
+  margin: 0.75rem 0;
+  background: rgba(168, 85, 247, 0.06);
+  border: 1px solid rgba(168, 85, 247, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.85rem;
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .strain-system-debrief-card:hover {
   border-color: rgba(168, 85, 247, 0.45);
+}
+
+.strain-debrief-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.strain-debrief-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.strain-debrief-icon {
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.strain-debrief-title {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #c084fc;
+  line-height: 1.3;
+}
+
+.strain-debrief-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.strain-focus-badge {
+  font-size: 0.72rem;
+  background: rgba(168, 85, 247, 0.15) !important;
+  color: #c084fc !important;
+  border: 1px solid rgba(168, 85, 247, 0.35) !important;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.strain-total-badge {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.strain-total-num {
+  color: #c084fc;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.strain-total-unit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+@media (min-width: 640px) {
+  .strain-debrief-header {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .strain-debrief-meta-row {
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+}
+
+.strain-tier-card {
+  border-radius: 6px;
+  padding: 0.45rem 0.6rem;
+}
+
+.strain-tier-low {
+  background: rgba(6, 182, 212, 0.08);
+  border: 1px solid rgba(6, 182, 212, 0.2);
+}
+
+.strain-tier-high {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.strain-tier-peak {
+  background: rgba(244, 63, 94, 0.08);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+}
+
+.strain-tier-lbl {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.strain-tier-low .strain-tier-lbl { color: var(--accent-cyan); }
+.strain-tier-high .strain-tier-lbl { color: var(--accent-amber); }
+.strain-tier-peak .strain-tier-lbl { color: var(--accent-rose); }
+
+.strain-tier-val {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #fff;
+}
+
+.strain-tier-unit {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.battery-meter-container {
+  margin-top: 0.4rem;
+}
+
+.battery-meter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.battery-meter-title {
+  color: var(--text-secondary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.battery-meter-label {
+  font-weight: 700;
+  color: #fff;
+  font-size: 0.78rem;
+  white-space: nowrap;
 }
 
 .w-bal-battery-meter {
