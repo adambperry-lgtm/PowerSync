@@ -114,9 +114,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.0.0",
-        "release_name": "Cloud 24/7 Architecture, 1-Click Integrations & Permanent Dark Mode",
-        "build_date": "2026-10-15",
+        "version": "2.2.0",
+        "release_name": "3-Day Forecast Integration, Anti-Repetition Engine & Real-Time Sync Resilience",
+        "build_date": "2026-10-20",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -125,6 +125,29 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.0",
+                "date": "2026-10-20",
+                "title": "3-Day Forecast Integration, Anti-Repetition Engine & Real-Time Sync Resilience",
+                "items": [
+                    "3-Day Forecast & Daily Workout Integration: Forward 3-day forecast plans are persisted in database storage. When morning recovery matches projected assumptions, the daily workout selector confirms and prescribes the exact promised session (⭐ Coach's Choice • Forecast Confirmed). If recovery drops into the red, the coach adaptively explains the physiological pivot.",
+                    "Dynamic Workout Catalog & Anti-Repetition Engine: Replaced static sweet spot over-unders with an extensive catalog of diverse archetypes across Sweet Spot, Threshold, VO2 Max, Tempo, and Endurance Base (Sustained Blocks, Criss-Cross Surges, Pyramid Power Density, Microbursts, Over-Unders). Anti-repetition history tracking prevents identical workouts on consecutive sessions (e.g. Wednesday vs. Friday).",
+                    "Auto-Syncing Strava & Completed Workout Protection: Added automatic live syncing for Strava activities on dashboard and workout load. Completed daily rides now transition Today's Training into 'Daily Target Achieved — Rest & Recovery' and prevent scheduled workouts from overwriting completed sessions.",
+                    "3-Tier Physiological Strain Engine (XSS & W'bal): Integrated Morton/Skiba Critical Power and W' anaerobic battery depletion modeling, partitioning mechanical and autonomic stress into Low (Aerobic), High (Glycolytic), and Peak (Sprint) strain tiers.",
+                    "Mobile Layout & iPhone PWA Polish: Redesigned the 3-Tier Strain card header to eliminate multi-line text squishing on mobile screens, cleaned up battery meter typography, and added bottom safe-area scroll clearance to prevent floating coach action buttons from obstructing debrief content.",
+                    "True Power-Based TSS & HR Telemetry: Fixed cardiovascular load calculation to derive true power-based Training Stress Score (TSS = (sec * NP * IF) / (FTP * 3600) * 100) and populate actual average/max heart rate from Strava streams."
+                ]
+            },
+            {
+                "version": "v2.1.0",
+                "date": "2026-10-16",
+                "title": "Multi-User Security Isolation, Unified Typography & Google OAuth",
+                "items": [
+                    "Full Multi-User Database Isolation: Scoped all settings, biometric histories, Strava activities, training plans, and forecast caches by user session ID with automatic data migration and dev-account switching.",
+                    "5-Level Typography & Card Accents: Coherent typographic hierarchy and gradient accent bars across all tiles.",
+                    "Natural Language Workout Customization: Direct chat instructions dynamically adapt workouts, recalculate TSS/XSS, and generate exportable .zwo / Intervals.icu workouts."
+                ]
+            },
             {
                 "version": "v2.0.0",
                 "date": "2026-10-15",
