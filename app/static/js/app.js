@@ -1831,14 +1831,21 @@ function renderWorkout(w) {
 
   const activeEyebrow = document.getElementById("workoutActiveEyebrow");
   if (activeEyebrow) {
-    if (w.pushed_to_zwift || w.synced_to_zwift) {
+    if (w.title && (w.title.includes("Daily Target Achieved") || w.badge && w.badge.includes("Strain Met"))) {
+      activeEyebrow.textContent = "✅ DAILY TARGET COMPLETED • REST & RECOVERY";
+      activeEyebrow.style.color = "#10b981";
+    } else if (w.pushed_to_zwift || w.synced_to_zwift) {
       activeEyebrow.textContent = "🚀 SENT TO ZWIFT • COACH'S CHOICE";
+      activeEyebrow.style.color = "";
     } else if (w.badge && w.badge.includes("Coach's Choice")) {
       activeEyebrow.textContent = "⭐ ACTIVE PRESCRIPTION • COACH'S CHOICE";
+      activeEyebrow.style.color = "";
     } else if (w.badge) {
       activeEyebrow.textContent = `${w.badge.toUpperCase()} • ACTIVE PRESCRIPTION`;
+      activeEyebrow.style.color = "";
     } else {
       activeEyebrow.textContent = "⭐ ACTIVE PRESCRIPTION • COACH'S CHOICE";
+      activeEyebrow.style.color = "";
     }
   }
 
@@ -2611,6 +2618,8 @@ document.getElementById("btnSyncStrava").addEventListener("click", async () => {
       throw new Error(`Server returned HTTP ${res.status}`);
     }
     await loadDashboard();
+    await loadWorkout(state.currentDuration, state.currentIntensity, "");
+    await loadDebrief();
     if (data.success && data.count > 0) {
       showToast(`✅ Synced ${data.count} Strava activities!`);
     } else if (data.success && data.count === 0) {
@@ -2645,6 +2654,8 @@ if (btnSyncWhoop) {
       if (data.success && data.metrics) {
         showToast(`✅ Whoop Synced! Recovery: ${data.metrics.recovery_score}%, Sleep: ${data.metrics.sleep_performance}%`);
         await loadDashboard();
+    await loadWorkout(state.currentDuration, state.currentIntensity, "");
+    await loadDebrief();
         await loadWorkout(state.currentDuration, state.currentIntensity, inputUserNote ? inputUserNote.value.trim() : "");
       } else if (data.auth_expired) {
         showToast("⚠️ Whoop session expired. Please re-authorize in Settings.");
@@ -3021,6 +3032,8 @@ btnSaveSettings.addEventListener("click", async () => {
     showToast("✅ Settings saved!");
     await checkCoachGeminiStatus();
     await loadDashboard();
+    await loadWorkout(state.currentDuration, state.currentIntensity, "");
+    await loadDebrief();
     await loadWorkout(state.currentDuration, state.currentIntensity, inputUserNote.value.trim());
   } catch (err) {
     showToast("⚠️ Failed to save settings.");

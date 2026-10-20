@@ -85,12 +85,31 @@ def get_dashboard_data(request: Request = None):
         whoop_connected = bool(whoop_tokens)
 
     # Strava Data: prioritize athlete's private strava_activities table records
-    from app.services.strava_service import get_strava_trailing_stats
+    from app.services.strava_service import get_strava_trailing_stats, fetch_recent_strava_activities
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
     rows = c.fetchall()
     conn.close()
+
+    # Auto-sync live Strava activities if athlete has connected tokens and no activity today (or 10m elapsed)
+    if strava_tokens:
+        has_today = any(dict(r).get("start_date", "").startswith(today_iso) for r in rows)
+        last_sync_key = "last_strava_sync_timestamp"
+        last_sync_time = float(get_setting(last_sync_key, 0.0, user_id=uid))
+        now_ts = datetime.datetime.now().timestamp()
+        if (not has_today) or (now_ts - last_sync_time > 600):
+            try:
+                synced = fetch_recent_strava_activities(limit=15, user_id=uid)
+                if synced:
+                    set_setting(last_sync_key, now_ts, user_id=uid)
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
+                    rows = c.fetchall()
+                    conn.close()
+            except Exception:
+                pass
 
     if rows:
         activities = [dict(r) for r in rows]

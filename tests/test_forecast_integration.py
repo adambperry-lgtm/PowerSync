@@ -192,6 +192,37 @@ class TestForecastIntegration(unittest.TestCase):
         fri_title = outlook[2]["title"]
         self.assertNotEqual(wed_title, fri_title, f"Wednesday ({wed_title}) and Friday ({fri_title}) should not be identical")
 
+    def test_completed_workout_today_not_overwritten_by_scheduled_target(self):
+        """When an athlete completes a workout today, Today's Training marks target achieved and is not overwritten by scheduled target."""
+        from app.routers.workouts import generate_workout, WorkoutGenerateRequest
+        from app.database import save_scheduled_workout, get_db_connection
+
+        today_iso = datetime.date.today().isoformat()
+        # 1. Workout was previously scheduled
+        save_scheduled_workout({
+            "title": "45-Min Sweet Spot Over-Unders",
+            "duration_minutes": 45,
+            "estimated_tss": 48,
+            "intervals": []
+        }, today_iso, user_id=self.user_a)
+
+        # 2. Athlete completed the ride on Strava today
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT OR REPLACE INTO strava_activities (user_id, id, name, sport_type, start_date, moving_time_sec, suffer_score, weighted_average_watts)
+            VALUES (?, 'test_act_done_today', 'Zwift - Intervals icu: PowerSync: 45-Min Sweet Spot Over-Unders', 'Ride', ?, 2750, 48, 222)
+        """, (self.user_a, f"{today_iso}T10:10:00Z"))
+        conn.commit()
+        conn.close()
+
+        # 3. Requesting today's workout
+        res = generate_workout(WorkoutGenerateRequest())
+        active = res.get("active_workout", {})
+        self.assertIn("Daily Target Achieved", active.get("title", ""))
+        self.assertEqual(active.get("option_type"), "recovery")
+        self.assertIn("Strain Met", active.get("badge", ""))
+
     def test_multi_user_forecast_isolation(self):
         """User A's forecast plan is strictly isolated from User B's."""
         set_current_user_context(self.user_a)

@@ -143,12 +143,14 @@ def build_adaptive_workout_local(
         return enrich_workout_strain(workout_obj, ftp)
 
     # 0B. Check if athlete already trained today or reached target daily strain
+    cur_eval_date = target_date or datetime.date.today()
+    is_eval_today = (cur_eval_date == datetime.date.today())
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
     has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and recovery_score <= 55)
     
-    if (has_substantial_ride or high_strain_reached) and not has_explicit_override:
+    if is_eval_today and (has_substantial_ride or high_strain_reached) and not has_explicit_override:
         act_name = today_acts[0].get("name", "training session") if today_acts else "an intense session"
         dur_note = f" ({today_moving_min}m)" if today_moving_min > 0 else ""
         title = "Daily Target Achieved — Rest & Recovery"
@@ -826,6 +828,8 @@ def build_workout_bundle(
     target_date: Optional[datetime.date] = None
 ) -> Dict[str, Any]:
     """Generates the primary prescribed workout and 2 tailored alternatives."""
+    cur_eval_date = target_date or datetime.date.today()
+    is_eval_today = (cur_eval_date == datetime.date.today())
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
     has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0
@@ -895,7 +899,7 @@ def build_workout_bundle(
             "all_options": [primary, alt_flush, alt_base]
         }
     
-    if (has_substantial_ride or high_strain_reached) and not (user_note and user_note.strip()):
+    if is_eval_today and (has_substantial_ride or high_strain_reached) and not (user_note and user_note.strip()):
         alt_rest = {
             "id": "workout_alt_rest",
             "option_type": "rest",

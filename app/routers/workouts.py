@@ -132,6 +132,22 @@ def generate_workout(req: WorkoutGenerateRequest):
     c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 10", (uid,))
     rows = c.fetchall()
     conn.close()
+
+    strava_tokens = get_setting("strava_tokens", None, user_id=uid)
+    today_iso_str = datetime.date.today().isoformat()
+    if strava_tokens and (not rows or not any(dict(r).get("start_date", "").startswith(today_iso_str) for r in rows)):
+        try:
+            from app.services.strava_service import fetch_recent_strava_activities
+            synced = fetch_recent_strava_activities(limit=10, user_id=uid)
+            if synced:
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 10", (uid,))
+                rows = c.fetchall()
+                conn.close()
+        except Exception:
+            pass
+
     if rows:
         recent_acts = [dict(r) for r in rows]
     else:
@@ -160,6 +176,11 @@ def generate_workout(req: WorkoutGenerateRequest):
                     today_activities.append(a)
             except Exception:
                 pass
+
+    today_acts = today_activities or []
+    today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
+    has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0
+    high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and rec_score <= 55)
 
     # Check recent intensity
     recent_high_intensity = False
@@ -298,7 +319,14 @@ def generate_workout(req: WorkoutGenerateRequest):
             scheduled_target["intervals_icu_text"] = generate_intervals_icu_text(scheduled_target)
         from app.services.ai_coach import enrich_workout_strain
         scheduled_target = enrich_workout_strain(scheduled_target, ftp)
-        if not is_explicit_adaptation:
+        if (has_substantial_ride or high_strain_reached) and target_iso == today_iso and not is_explicit_adaptation:
+            scheduled_target["badge"] = "✅ Completed on Zwift"
+            scheduled_target["badge_color"] = "emerald"
+            scheduled_target["is_completed"] = True
+            bundle["all_options"] = [bundle["primary"]] + [
+                o for o in bundle["all_options"] if o.get("id") != bundle["primary"].get("id") and o.get("id") != scheduled_target.get("id")
+            ] + [scheduled_target]
+        elif not is_explicit_adaptation:
             bundle["primary"] = scheduled_target
             bundle["all_options"] = [scheduled_target] + [
                 o for o in bundle["all_options"] if o.get("id") != "workout_primary" and o.get("id") != scheduled_target.get("id")
