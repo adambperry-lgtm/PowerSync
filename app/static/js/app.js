@@ -3433,7 +3433,11 @@ function renderDebrief(data) {
   if (debriefMetricTime) debriefMetricTime.textContent = assessment.moving_time_formatted || "0m";
   const debriefDistMi = assessment.distance_miles || (assessment.distance_km ? (assessment.distance_km * 0.621371).toFixed(1) : 0);
   if (debriefMetricDist) debriefMetricDist.textContent = `${debriefDistMi} mi logged`;
-  if (debriefMetricTss) debriefMetricTss.textContent = `${assessment.suffer_score || 0} TSS`;
+  const cardLoadTss = (assessment.calculated_tss !== undefined && assessment.calculated_tss !== null) ? assessment.calculated_tss : (assessment.suffer_score || 0);
+  if (debriefMetricTss) debriefMetricTss.textContent = `${cardLoadTss} TSS`;
+  if (debriefMetricHr) {
+    debriefMetricHr.textContent = (assessment.avg_hr && assessment.avg_hr > 0) ? `${assessment.avg_hr} bpm avg` : "-- bpm avg";
+  }
 
   // Update collapsed summary for debrief card
   const collapsedDebriefVerdict = document.getElementById("collapsedDebriefVerdict");
@@ -3441,7 +3445,7 @@ function renderDebrief(data) {
   const collapsedDebriefScore = document.getElementById("collapsedDebriefScore");
   if (collapsedDebriefScore) collapsedDebriefScore.textContent = `Score: ${assessment.compliance_score || 95}%`;
   const collapsedDebriefTss = document.getElementById("collapsedDebriefTss");
-  if (collapsedDebriefTss) collapsedDebriefTss.textContent = `${assessment.suffer_score || 0} TSS`;
+  if (collapsedDebriefTss) collapsedDebriefTss.textContent = `${cardLoadTss} TSS`;
 
   if (debriefAssessmentText) {
     const rawDebrief = assessment.ai_coach_insights || assessment.assessment_text || "";

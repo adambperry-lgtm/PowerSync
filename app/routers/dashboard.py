@@ -61,8 +61,8 @@ def get_dashboard_data(request: Request = None):
             "auth_expired": whoop_auth_expired,
             "recovery_score": int(row["recovery_score"]),
             "recovery_zone": "green" if row["recovery_score"] > 66 else ("yellow" if row["recovery_score"] >= 34 else "red"),
-            "hrv_rmssd": round(float(row["hrv_rmssd"]), 1),
-            "resting_heart_rate": int(row["resting_heart_rate"]),
+            "hrv_rmssd": round(float(row["hrv_rmssd"]), 1) if row["hrv_rmssd"] is not None else 40.0,
+            "resting_heart_rate": int(row["resting_heart_rate"]) if row["resting_heart_rate"] is not None else 60,
             "sleep_performance": int(row["sleep_performance"] or 85),
             "sleep_duration_hours": round(float(row["sleep_duration_hours"] or 7.5), 1),
             "day_strain": round(float(row["day_strain"] or 0.0), 1),
@@ -73,8 +73,8 @@ def get_dashboard_data(request: Request = None):
             "trailing_7d_high_strain_days": trailing_stats.get("trailing_7d_high_strain_count", 0),
             "trailing_strains": trailing_stats.get("trailing_strains", []),
             "trends": {
-                "hrv_vs_baseline": f"{round(float(row['hrv_rmssd']), 1)} ms",
-                "rhr_vs_baseline": f"{int(row['resting_heart_rate'])} bpm",
+                "hrv_vs_baseline": f"{round(float(row['hrv_rmssd']), 1)} ms" if row["hrv_rmssd"] is not None else "--",
+                "rhr_vs_baseline": f"{int(row['resting_heart_rate'])} bpm" if row["resting_heart_rate"] is not None else "--",
                 "sleep_consistency": "Synced Today" if is_today else f"Last: {row['date']}"
             }
         }

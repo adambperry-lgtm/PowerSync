@@ -536,8 +536,19 @@ def build_daily_review_and_outlook_local(
         act_suffer = int(analyzed_act.get("suffer_score") or 0)
         pct_ftp = round((act_watts / max(1, ftp)) * 100) if act_watts > 0 else 65
 
+        # Calculate True Coggan Power-based TSS (Training Stress Score)
+        if act_sec > 0 and act_watts > 0 and ftp > 0:
+            intensity_factor = act_watts / ftp
+            power_tss = round((act_sec * act_watts * intensity_factor) / (ftp * 3600.0) * 100)
+        else:
+            power_tss = 0
+
         from app.services.strain_model_service import calculate_activity_strain
         act_strain = calculate_activity_strain(analyzed_act, ftp=ftp)
+        total_xss = int(act_strain.get("total_xss", 0))
+
+        # True Training Stress: prioritize power-based TSS, fallback to suffer_score or total XSS
+        calculated_tss = power_tss if power_tss > 0 else (act_suffer if act_suffer > 0 else total_xss)
 
         # Determine activity date
         act_date_str = analyzed_act.get("start_date", "")[:10]
@@ -686,6 +697,8 @@ def build_daily_review_and_outlook_local(
             "pct_ftp": pct_ftp,
             "avg_hr": act_hr,
             "suffer_score": act_suffer,
+            "power_tss": power_tss,
+            "calculated_tss": calculated_tss,
             "compliance_score": compliance_score,
             "verdict": verdict,
             "verdict_badge": verdict_badge,
@@ -1079,8 +1092,13 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
             res = requests.post(url, json=payload, timeout=20)
             if res.status_code == 200:
                 data = res.json()
-                parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])
-                text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text") and not p.get("thought")]
+                candidates = data.get("candidates") or []
+                if not candidates:
+                    continue
+                first_cand = candidates[0] or {}
+                content = first_cand.get("content") or {}
+                parts = content.get("parts") or []
+                text_parts = [p.get("text", "") for p in parts if isinstance(p, dict) and p.get("text") and not p.get("thought")]
                 raw_text = "\n".join(text_parts).strip()
                 clean = raw_text.strip().replace("```json", "").replace("```", "").strip()
                 # 1. Try standard JSON parse
