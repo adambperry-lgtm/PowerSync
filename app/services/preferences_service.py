@@ -81,19 +81,33 @@ DEFAULT_COACHING_PREFERENCES: Dict[str, Any] = {
         "disallow_flat_z2_warmup": True
     },
     "interval_preferences": {
-        "favorite_styles": ["Over/Unders", "Sweet Spot Over-Unders", "Threshold"],
+        "favorite_styles": ["Sweet Spot", "Tempo", "VO2 Max", "Threshold", "Cadence Ladders"],
         "disliked_styles": ["Fixed Flat Zone 2 Warmup", "Fixed Flat Cooldown"],
-        "prefer_over_unders": True
+        "prefer_over_unders": False,
+        "dynamic_variety_enabled": True
     },
     "directives": [
         "Monday, Tuesday, Thursday: 35–45 minutes only.",
         "Wednesday & Friday: 60+ minutes (an hour or more), favor outdoor rides when weather permits.",
         "Saturday is a dedicated rest day; plus one of Mon/Tue/Thu as an additional rest day.",
         "Sunday: 60–90+ minutes (outdoor if weather permits, or longer indoor session).",
-        "Warmups & Cooldowns: ALWAYS progressive wattage ramps (e.g. 45% -> 75% FTP ramp up, 65% -> 40% FTP ramp down); never flat steady Zone 2 blocks.",
-        "Threshold & Sweet Spot: Strongly favor Over/Under blocks over continuous flat grinding."
+        "Warmups & Cooldowns: ALWAYS progressive wattage ramps (e.g. 45% -> 75% FTP ramp up, 65% -> 40% FTP ramp down); never flat steady Zone 2 blocks."
     ]
 }
+
+def clean_directives_list(directives: List[str]) -> List[str]:
+    """Filters out legacy directives that forced over-unders and normalizes formatting."""
+    cleaned = []
+    for d in directives:
+        if not d or not isinstance(d, str):
+            continue
+        text = d.replace("//", "/").strip()
+        # Remove old forced over-under directive
+        if "favor over/under" in text.lower() or "favor over-under" in text.lower():
+            continue
+        if text and text not in cleaned:
+            cleaned.append(text)
+    return cleaned
 
 def get_coaching_preferences() -> Dict[str, Any]:
     """Retrieves athlete coaching preferences from persistent SQLite storage with intelligent defaults."""
@@ -109,6 +123,13 @@ def get_coaching_preferences() -> Dict[str, Any]:
             merged[k] = {**merged[k], **v}
         else:
             merged[k] = v
+
+    # Clean legacy directives
+    if "directives" in merged and isinstance(merged["directives"], list):
+        merged["directives"] = clean_directives_list(merged["directives"])
+    if "interval_preferences" in merged and isinstance(merged["interval_preferences"], dict):
+        merged["interval_preferences"]["prefer_over_unders"] = False
+
     return merged
 
 def save_coaching_preferences(prefs: Dict[str, Any]) -> Dict[str, Any]:
@@ -116,9 +137,9 @@ def save_coaching_preferences(prefs: Dict[str, Any]) -> Dict[str, Any]:
     current = get_coaching_preferences()
     updated = {**current, **prefs}
     if "directives" in updated and isinstance(updated["directives"], list):
-        updated["directives"] = [
-            d.replace("//", "/").strip() for d in updated["directives"] if d and d.strip()
-        ]
+        updated["directives"] = clean_directives_list(updated["directives"])
+    if "interval_preferences" in updated and isinstance(updated["interval_preferences"], dict):
+        updated["interval_preferences"]["prefer_over_unders"] = False
     set_setting("coaching_preferences", updated)
     return updated
 

@@ -3,7 +3,8 @@ import requests
 import datetime
 from typing import Dict, Any, List, Optional
 from app.services.zwift_service import generate_zwo_xml, generate_intervals_icu_text
-from app.database import get_active_target_plan
+from app.database import get_active_target_plan, get_current_user_id
+from app.services.workout_catalog import select_diverse_archetype
 
 def enrich_workout_strain(workout: Dict[str, Any], ftp: int = 250) -> Dict[str, Any]:
     """
@@ -204,43 +205,30 @@ def build_adaptive_workout_local(
                 {"type": "Cooldown", "duration_sec": 240, "power_low_pct": 52, "power_high_pct": 38, "cadence": 82, "name": "Easy Spin Out"}
             ]
         elif any(k in note_clean for k in ["sweet spot", "sweetspot", "sst", "sub-threshold", "subthreshold"]):
-            title = f"{duration}-Min Sweet Spot Over-Unders"
-            focus_area = "Sweet Spot Over-Unders"
-            estimated_tss = int(duration * 0.82)
-            primer_sec = 180
-            valley_sec = 120
-            main_sec = max(480, (duration * 60) - w_sec - c_sec - primer_sec - valley_sec)
-            reps = max(2, main_sec // 240)
+            uid = get_current_user_id()
+            plan_note = f"T-{days_until} Event Prep" if (active_plan and days_until is not None) else None
+            selected = select_diverse_archetype("sweet_spot", duration, ftp=ftp, plan_ctx=plan_note, user_id=uid)
+            title = selected["title"]
+            focus_area = selected["focus_area"]
+            estimated_tss = selected["estimated_tss"]
             ai_rationale = (
-                f"Adapted to your instruction ('{user_note}'): Configured a {duration}-minute Sweet Spot Over-Unders workout "
-                f"(2m @ 95% FTP / {round(ftp * 0.95)}W, 2m @ 88% FTP / {round(ftp * 0.88)}W) for high aerobic density with controlled autonomic cost ({recovery_score}% Whoop recovery)."
+                f"Adapted to your instruction ('{user_note}'): Configured {title} "
+                f"({selected['ai_rationale']}) for high aerobic density with controlled autonomic cost ({recovery_score}% Whoop recovery)."
             )
-            intervals = [
-                {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
-                {"type": "SteadyState", "duration_sec": primer_sec, "power_pct": 88, "cadence": 92, "name": "Sweet Spot Primer"},
-                {"type": "SteadyState", "duration_sec": valley_sec, "power_pct": 55, "cadence": 85, "name": "Valley Spin"},
-                {"type": "Repeats", "repeat": reps, "on_duration_sec": 120, "off_duration_sec": 120, "on_power_pct": 95, "off_power_pct": 88, "cadence": 92, "cadence_rest": 88, "name": f"{reps}x Sweet Spot Over-Unders (2m @ 95% / 2m @ 88%)"},
-                {"type": "Cooldown", "duration_sec": c_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
-            ]
+            intervals = selected["intervals"]
         elif any(k in note_clean for k in ["over-under", "over under", "overunder", "threshold", "zone 4", "z4", "lactate", "ftp"]):
-            title = f"{duration}-Min Threshold Over-Unders"
-            focus_area = "Threshold Over-Unders"
-            estimated_tss = int(duration * 0.85)
-            primer_sec = 180
-            valley_sec = 120
-            main_sec = max(360, (duration * 60) - w_sec - c_sec - primer_sec - valley_sec)
-            reps = max(2, main_sec // 180)
+            uid = get_current_user_id()
+            plan_note = f"T-{days_until} Event Prep" if (active_plan and days_until is not None) else None
+            forced_id = "sst_over_under" if any(k in note_clean for k in ["over-under", "over under", "overunder"]) else None
+            selected = select_diverse_archetype("sweet_spot", duration, ftp=ftp, plan_ctx=plan_note, user_id=uid, forced_archetype_id=forced_id)
+            title = selected["title"]
+            focus_area = selected["focus_area"]
+            estimated_tss = selected["estimated_tss"]
             ai_rationale = (
-                f"Adapted to your instruction ('{user_note}'): Built a {duration}-minute Threshold Over-Unders session "
-                f"oscillating between 105% FTP ({round(ftp * 1.05)}W) and 90% FTP ({round(ftp * 0.90)}W) to maximize lactate clearance and raise your threshold ceiling."
+                f"Adapted to your instruction ('{user_note}'): Built {title} "
+                f"({selected['ai_rationale']}) to maximize lactate clearance and raise your threshold ceiling."
             )
-            intervals = [
-                {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
-                {"type": "SteadyState", "duration_sec": primer_sec, "power_pct": 90, "cadence": 92, "name": "Threshold Primer"},
-                {"type": "SteadyState", "duration_sec": valley_sec, "power_pct": 55, "cadence": 85, "name": "Recovery Spin"},
-                {"type": "Repeats", "repeat": reps, "on_duration_sec": 120, "off_duration_sec": 60, "on_power_pct": 105, "off_power_pct": 90, "cadence": 94, "cadence_rest": 88, "name": f"{reps}x Over-Under Blocks (2m @ 105% / 1m @ 90%)"},
-                {"type": "Cooldown", "duration_sec": c_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
-            ]
+            intervals = selected["intervals"]
         elif any(k in note_clean for k in ["vo2", "hiit", "microburst", "high intensity", "hard", "anaerobic", "sprint", "tabata", "zone 5", "z5", "intervals", "30/30", "40/20"]):
             if any(k in note_clean for k in ["microburst", "30/30", "40/20", "tabata", "sprint"]):
                 title = f"{duration}-Min High-Cadence Microbursts"
@@ -551,27 +539,19 @@ def build_adaptive_workout_local(
             estimated_tss = int(duration * 0.55)
 
         elif is_front_loaded_fresh:
-            title = "Tempo Cadence Ladders"
-            focus_area = "Tempo / Muscular Endurance"
+            uid = get_current_user_id()
+            plan_note = f"T-{days_until} Event Prep" if (active_plan and days_until is not None) else None
+            selected = select_diverse_archetype("tempo", duration, ftp=ftp, plan_ctx=plan_note, user_id=uid)
+            title = selected["title"]
+            focus_area = selected["focus_area"]
             ai_rationale = (
                 f"Whoop recovery is stable at {recovery_score}%. While your 7-day volume totals {recent_volume_hours:.1f} hrs ({total_tss} TSS), "
                 f"your heavy training was front-loaded earlier in the cycle. With yesterday being an easy recovery day ({yesterday_strain:.1f} strain, {yesterday_tss} TSS), "
                 f"acute residual fatigue has decayed (acute weighted load: {effective_tss} TSS). Your body has supercompensated, "
-                f"giving you the physiological green light for controlled Zone 3 tempo blocks (78–82% FTP) to build muscular endurance."
+                f"giving you the physiological green light for {title}: {selected['ai_rationale']}"
             )
-            warmup_sec = 360 if duration < 45 else 480
-            val_sec = 180 if duration < 45 else 240
-            fixed_sec = warmup_sec + val_sec + 300
-            work_sec = max(180, ((duration * 60) - fixed_sec) // 2)
-            cooldown_sec = (duration * 60) - warmup_sec - (work_sec * 2) - val_sec
-            intervals = [
-                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 50, "power_high_pct": 72, "cadence": 90, "name": "Warmup"},
-                {"type": "SteadyState", "duration_sec": work_sec, "power_pct": 80, "cadence": 92, "name": "Tempo Block 1"},
-                {"type": "SteadyState", "duration_sec": val_sec, "power_pct": 55, "cadence": 85, "name": "Recovery Valley"},
-                {"type": "SteadyState", "duration_sec": work_sec, "power_pct": 82, "cadence": 94, "name": "Tempo Block 2"},
-                {"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 70, "power_high_pct": 45, "cadence": 85, "name": "Cooldown"}
-            ]
-            estimated_tss = int(duration * 0.68)
+            intervals = selected["intervals"]
+            estimated_tss = selected["estimated_tss"]
 
         elif is_high_strain_load:
             title = "Zone 2 Steady Aerobic Maintenance"
@@ -596,26 +576,18 @@ def build_adaptive_workout_local(
             estimated_tss = int(duration * 0.55)
 
         else:
-            title = "Tempo Cadence Ladders"
-            focus_area = "Tempo / Muscular Endurance"
+            uid = get_current_user_id()
+            plan_note = f"T-{days_until} Event Prep" if (active_plan and days_until is not None) else None
+            selected = select_diverse_archetype("tempo", duration, ftp=ftp, plan_ctx=plan_ctx if 'plan_ctx' in locals() else plan_note, user_id=uid)
+            title = selected["title"]
+            focus_area = selected["focus_area"]
             strain_desc = f", weighted strain {effective_strain:.1f}" if effective_strain > 0 else ""
             ai_rationale = (
                 f"Whoop recovery is stable ({recovery_score}%) with moderate training fatigue ({recent_volume_hours:.1f} hrs{strain_desc}). "
-                f"Prescribed controlled Zone 3 tempo blocks (78-82% FTP) with varying cadences to maintain fitness while respecting recovery limits."
+                f"Prescribed {title}: {selected['ai_rationale']}"
             )
-            warmup_sec = 360 if duration < 45 else 480
-            val_sec = 180 if duration < 45 else 240
-            fixed_sec = warmup_sec + val_sec + 300
-            work_sec = max(180, ((duration * 60) - fixed_sec) // 2)
-            cooldown_sec = (duration * 60) - warmup_sec - (work_sec * 2) - val_sec
-            intervals = [
-                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 50, "power_high_pct": 72, "cadence": 90, "name": "Warmup"},
-                {"type": "SteadyState", "duration_sec": work_sec, "power_pct": 80, "cadence": 92, "name": "Tempo Block 1"},
-                {"type": "SteadyState", "duration_sec": val_sec, "power_pct": 55, "cadence": 85, "name": "Recovery Valley"},
-                {"type": "SteadyState", "duration_sec": work_sec, "power_pct": 82, "cadence": 94, "name": "Tempo Block 2"},
-                {"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 70, "power_high_pct": 45, "cadence": 85, "name": "Cooldown"}
-            ]
-            estimated_tss = int(duration * 0.68)
+            intervals = selected["intervals"]
+            estimated_tss = selected["estimated_tss"]
 
     # 3. Whoop Green Zone (> 66%) - Primed for adaptation!
     else:
@@ -628,88 +600,44 @@ def build_adaptive_workout_local(
         cooldown_sec = 240 if duration <= 40 else 300
 
         if is_yesterday_surge or chronic_heavy_strain or recent_high_intensity:
-            title = "Sweet Spot Over-Unders"
-            focus_area = "Sweet Spot Over-Unders"
+            uid = get_current_user_id()
+            plan_note = f"T-{days_until} Event Prep" if (active_plan and days_until is not None) else None
+            selected = select_diverse_archetype("sweet_spot", duration, ftp=ftp, plan_ctx=plan_note, user_id=uid)
+            title = selected["title"]
+            focus_area = selected["focus_area"]
             if is_yesterday_surge:
                 glycolytic_note = f" Additionally, your anaerobic battery incurred heavy glycolytic strain ({acute_high_xss:.1f} High XSS) in the last 48 hours." if has_glycolytic_surge else ""
                 ai_rationale = (
                     f"Strong morning recovery ({recovery_score}%, HRV {hrv_rmssd:.0f} ms), but yesterday was an intense session ({yesterday_tss} TSS, {yesterday_strain:.1f} Whoop strain).{glycolytic_note} "
-                    f"Because acute peripheral fatigue takes time to clear, today is dialed into Sweet Spot Over-Unders (oscillating between 95% and 88% FTP). "
-                    f"This drives mitochondrial density and lactate shuttling without autonomic overload."
+                    f"Because acute peripheral fatigue takes time to clear, today is dialed into {title}. {selected['ai_rationale']}"
                 )
             elif chronic_heavy_strain:
                 ai_rationale = (
                     f"Strong morning recovery ({recovery_score}%, HRV {hrv_rmssd:.0f} ms), but your recency-weighted Whoop strain is elevated at {recent_weighted_strain:.1f} ({trailing_7d_high_strain_count} peak days ≥14.0). "
-                    f"To balance high acute readiness against chronic systemic strain, today features Sweet Spot Over-Unders (95%/88% FTP) for maximum aerobic density without sympathetic burnout."
+                    f"To balance high acute readiness against chronic systemic strain, today features {title} for maximum aerobic density without sympathetic burnout. {selected['ai_rationale']}"
                 )
             else:
                 strain_note = f" (weighted strain: {recent_weighted_strain:.1f})" if recent_weighted_strain > 0 else ""
                 ai_rationale = (
                     f"You're in the green at {recovery_score}% recovery with strong HRV ({hrv_rmssd:.0f} ms){strain_note}. "
-                    f"Sweet Spot Over-Unders (oscillating 95% / 88% FTP) provide the optimal metabolic stimulus with manageable autonomic fatigue."
+                    f"Today's session ({title}) provides the optimal metabolic stimulus with manageable autonomic fatigue. {selected['ai_rationale']}"
                 )
-
-            primer_sec = 180
-            valley_sec = 120
-            fixed_sec = warmup_sec + cooldown_sec + primer_sec + valley_sec
-            main_sec = max(480, (duration * 60) - fixed_sec)
-            reps = max(2, main_sec // 240)
-            work_sec = reps * 240
-            leftover = (duration * 60) - (warmup_sec + primer_sec + valley_sec + work_sec + cooldown_sec)
-            if leftover > 0:
-                cooldown_sec += leftover
-
-            intervals = [
-                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
-                {"type": "SteadyState", "duration_sec": primer_sec, "power_pct": 88, "cadence": 92, "name": "Sweet Spot Primer"},
-                {"type": "SteadyState", "duration_sec": valley_sec, "power_pct": 55, "cadence": 85, "name": "Valley Spin"},
-                {
-                    "type": "Repeats",
-                    "repeat": reps,
-                    "on_duration_sec": 120,
-                    "off_duration_sec": 120,
-                    "on_power_pct": 95,
-                    "off_power_pct": 88,
-                    "cadence": 92,
-                    "cadence_rest": 88,
-                    "name": f"{reps}x Sweet Spot Over-Unders (2m @ 95% / 2m @ 88%)"
-                },
-                {"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
-            ]
-            estimated_tss = int(duration * 0.82)
+            intervals = selected["intervals"]
+            estimated_tss = selected["estimated_tss"]
         else:
-            title = "VO2 Max Microburst Intervals"
-            focus_area = "VO2 Max & High Aerobic"
+            uid = get_current_user_id()
+            plan_note = f"T-{days_until} Event Prep" if (active_plan and days_until is not None) else None
+            selected = select_diverse_archetype("vo2_max", duration, ftp=ftp, plan_ctx=plan_note, user_id=uid)
+            title = selected["title"]
+            focus_area = selected["focus_area"]
             strain_note = f" with well-managed acute load ({recent_weighted_strain:.1f} weighted strain)" if recent_weighted_strain > 0 else ""
             ai_rationale = (
                 f"Exceptional Whoop readiness today ({recovery_score}% Recovery, {sleep_score}% Sleep){strain_note}. "
                 f"Low acute fatigue makes this the ideal window for high-intensity work. "
-                f"Today's session targets VO2 Max (115% FTP) to raise your aerobic ceiling."
+                f"Today's session ({title}) targets {selected['focus_area']}: {selected['ai_rationale']}"
             )
-            fixed_sec = warmup_sec + cooldown_sec
-            main_sec = max(360, (duration * 60) - fixed_sec)
-            reps = max(2, main_sec // 360)
-            work_sec = reps * 360
-            leftover = (duration * 60) - (warmup_sec + work_sec + cooldown_sec)
-            if leftover > 0:
-                cooldown_sec += leftover
-
-            intervals = [
-                {"type": "Warmup", "duration_sec": warmup_sec, "power_low_pct": 45, "power_high_pct": 78, "cadence": 92, "name": "Gradual Wattage Ramp"},
-                {
-                    "type": "Repeats",
-                    "repeat": reps,
-                    "on_duration_sec": 180,
-                    "off_duration_sec": 180,
-                    "on_power_pct": 115,
-                    "off_power_pct": 50,
-                    "cadence": 98,
-                    "cadence_rest": 85,
-                    "name": f"{reps}x VO2 Max 3-min Blocks"
-                },
-                {"type": "Cooldown", "duration_sec": cooldown_sec, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
-            ]
-            estimated_tss = int(duration * 0.88)
+            intervals = selected["intervals"]
+            estimated_tss = selected["estimated_tss"]
 
     badge_text = "⭐ Coach's Choice"
     badge_color = "cyan"
@@ -741,33 +669,28 @@ def build_adaptive_workout_local(
 def build_alternative_endurance_workout(
     recovery_score: int,
     duration_min: int = 60,
-    ftp: int = 250
+    ftp: int = 250,
+    user_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Generates an aerobic base / lower-strain alternative."""
+    """Generates an aerobic base / lower-strain alternative using the dynamic archetype catalog."""
+    uid = user_id or get_current_user_id()
     dur = duration_min
-    title = "Zone 2 Steady Aerobic Foundation"
-    focus_area = "Zone 2 Base"
-    ai_rationale = (
-        f"Alternative Option: If you want a lower cardiac cost today, this steady Zone 2 session (65% FTP) "
-        f"builds capillary density and fat oxidation without digging into your recovery reserves."
-    )
-    intervals = [
-        {"type": "Warmup", "duration_sec": 480, "power_low_pct": 50, "power_high_pct": 62, "cadence": 88, "name": "Easy Spin Up"},
-        {"type": "SteadyState", "duration_sec": (dur - 13) * 60, "power_pct": 65, "cadence": 90, "name": "Zone 2 Aerobic Base"},
-        {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 62, "power_high_pct": 45, "cadence": 85, "name": "Smooth Spin Out"}
-    ]
+    selected = select_diverse_archetype("endurance_base", dur, ftp=ftp, user_id=uid)
     workout = {
         "id": "workout_alt_base",
         "option_type": "endurance",
         "badge": "🚴 Low-Strain Base",
         "badge_color": "emerald",
-        "title": title,
+        "title": selected["title"],
         "description": "Aerobic base alternative session",
-        "focus_area": focus_area,
+        "focus_area": selected["focus_area"],
         "duration_minutes": dur,
-        "estimated_tss": int(dur * 0.52),
-        "ai_rationale": ai_rationale,
-        "intervals": intervals
+        "estimated_tss": selected["estimated_tss"],
+        "ai_rationale": (
+            f"Alternative Option: If you want a lower cardiac cost today, this {selected['title']} "
+            f"builds capillary density and fat oxidation without digging into your recovery reserves."
+        ),
+        "intervals": selected["intervals"]
     }
     workout["zwo_content"] = generate_zwo_xml(workout, ftp)
     workout["intervals_icu_text"] = generate_intervals_icu_text(workout)
@@ -775,44 +698,25 @@ def build_alternative_endurance_workout(
 
 def build_alternative_express_workout(
     recovery_score: int,
-    ftp: int = 250
+    ftp: int = 250,
+    user_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Generates a time-crunched 35-min high-efficiency session."""
+    """Generates a time-crunched 35-min high-efficiency session using the dynamic archetype catalog."""
+    uid = user_id or get_current_user_id()
     dur = 35
-    title = "35-Min Microburst & Cadence Flush"
-    focus_area = "Time-Crunched High Efficiency"
-    ai_rationale = (
-        f"Alternative Option: Short on time? This 35-minute session uses quick 30-second cadence surges "
-        f"to stimulate motor unit recruitment and cardiovascular turnover in half the time."
-    )
-    intervals = [
-        {"type": "Warmup", "duration_sec": 360, "power_low_pct": 50, "power_high_pct": 75, "cadence": 90, "name": "Quick Warmup"},
-        {
-            "type": "Repeats",
-            "repeat": 8,
-            "on_duration_sec": 30,
-            "off_duration_sec": 90,
-            "on_power_pct": 110,
-            "off_power_pct": 55,
-            "cadence": 102,
-            "cadence_rest": 85,
-            "name": "8x 30s High Cadence Bursts"
-        },
-        {"type": "SteadyState", "duration_sec": 540, "power_pct": 68, "cadence": 92, "name": "Aerobic Bridge"},
-        {"type": "Cooldown", "duration_sec": 240, "power_low_pct": 60, "power_high_pct": 45, "cadence": 85, "name": "Fast Cooldown"}
-    ]
+    selected = select_diverse_archetype("express", dur, ftp=ftp, user_id=uid)
     workout = {
         "id": "workout_alt_express",
         "option_type": "express",
         "badge": "⏱️ Time-Crunched (35m)",
         "badge_color": "amber",
-        "title": title,
+        "title": selected["title"],
         "description": "Time-crunched alternative session",
-        "focus_area": focus_area,
+        "focus_area": selected["focus_area"],
         "duration_minutes": dur,
-        "estimated_tss": 36,
-        "ai_rationale": ai_rationale,
-        "intervals": intervals
+        "estimated_tss": selected["estimated_tss"],
+        "ai_rationale": f"Alternative Option: Short on time? {selected['ai_rationale']}",
+        "intervals": selected["intervals"]
     }
     workout["zwo_content"] = generate_zwo_xml(workout, ftp)
     workout["intervals_icu_text"] = generate_intervals_icu_text(workout)

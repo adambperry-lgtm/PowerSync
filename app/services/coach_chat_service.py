@@ -255,8 +255,9 @@ def build_system_prompt(snapshot: Dict[str, Any]) -> str:
         "- WARMUP & COOLDOWN RAMP INVARIANT (NO FLAT ZONE 2 BLOCKS):\n"
         "  * Adam explicitly dislikes flat steady Zone 2 warmups and cooldowns (e.g. 10m flat Z2, 6m flat Z2).\n"
         "  * ALWAYS prescribe progressive wattage ramps: progressive warmup ramp (45% -> 75% FTP over 6–8 min) and progressive cooldown ramp (65% -> 40% FTP over 4–5 min).\n"
-        "- INTERVAL STYLE PREFERENCE:\n"
-        "  * Adam strongly prefers Over/Unders (sweet spot / threshold over-unders, e.g. 2m @ 105% / 1m @ 90% FTP, or 2m @ 95% / 2m @ 88% FTP). Always favor Over/Unders for sweet spot and threshold work.\n"
+        "- INTERVAL STYLE VARIETY & PERIODIZATION:\n"
+        "  * Vary interval structures dynamically to drive progressive physiological adaptation without monotony: rotate across sustained blocks, stepped ladders, criss-cross surges, cadence ladders, pyramids, and over-unders.\n"
+        "  * Always calibrate interval intensity and volume to his active target plan and current recovery state.\n"
         "- PREFERENCES MEMORY & LEARNING:\n"
         "  * If Adam mentions a new preference, constraint, or rule in chat (e.g., 'Remember that I prefer...', 'From now on...', 'I like/hate...'), confirm warmly that you have remembered and permanently saved it to his PowerSync coaching engine."
     )
@@ -377,50 +378,26 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
         w_dur = 360 if dur <= 40 else 420
         c_dur = 240 if dur <= 40 else 300
 
-        # Build specific interval block structure
-        if any(k in msg for k in ["over-under", "over under", "overunder", "threshold"]):
-            focus = "Threshold Over-Unders"
-            title = f"{dur}-Min Threshold Over-Unders"
-            tss = round(dur * 0.82)
-            primer_dur = 180
-            spin_dur = 120
-            fixed_dur = w_dur + c_dur + primer_dur + spin_dur
-            main_dur = max(360, (dur * 60) - fixed_dur)
-            reps = max(2, main_dur // 180)
-            intervals = [
-                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
-                {"type": "SteadyState", "duration_sec": primer_dur, "power_pct": 90, "cadence": 92, "name": "Threshold Primer"},
-                {"type": "SteadyState", "duration_sec": spin_dur, "power_pct": 55, "cadence": 85, "name": "Recovery Spin"},
-                {"type": "Repeats", "repeat": reps, "on_duration_sec": 120, "off_duration_sec": 60, "on_power_pct": 105, "off_power_pct": 90, "cadence": 94, "name": f"{reps}x Over-Under Blocks (2m @ 105% / 1m @ 90%)"},
-                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
-            ]
+        # Build specific interval block structure using dynamic workout catalog
+        from app.services.workout_catalog import select_diverse_archetype
+        if any(k in msg for k in ["over-under", "over under", "overunder"]):
+            selected = select_diverse_archetype("sweet_spot", dur, ftp=ftp, forced_archetype_id="sst_over_under")
+            focus = selected["focus_area"]
+            title = selected["title"]
+            tss = selected["estimated_tss"]
+            intervals = selected["intervals"]
         elif any(k in msg for k in ["vo2", "microburst", "anaerobic", "tabata"]):
-            focus = "VO2 Max"
-            title = f"{dur}-Min VO2 Max High Intensity"
-            tss = round(dur * 0.95)
-            main_dur = max(360, (dur * 60) - w_dur - c_dur)
-            reps = max(2, main_dur // 360)
-            intervals = [
-                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 45, "power_high_pct": 78, "cadence": 88, "name": "Gradual Wattage Ramp"},
-                {"type": "Repeats", "repeat": reps, "on_duration_sec": 180, "off_duration_sec": 180, "on_power_pct": 115, "off_power_pct": 50, "cadence": 98, "name": f"{reps}x3m VO2 Max Intervals"},
-                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 65, "power_high_pct": 40, "cadence": 82, "name": "Progressive Cooldown Ramp"}
-            ]
-        elif any(k in msg for k in ["sweet spot", "sst", "density"]):
-            focus = "Sweet Spot Over-Unders"
-            title = f"{dur}-Min Sweet Spot Over-Unders"
-            tss = round(dur * 0.82)
-            primer_dur = 180
-            spin_dur = 120
-            fixed_dur = w_dur + c_dur + primer_dur + spin_dur
-            main_dur = max(480, (dur * 60) - fixed_dur)
-            reps = max(2, main_dur // 240)
-            intervals = [
-                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 45, "power_high_pct": 75, "cadence": 88, "name": "Gradual Wattage Ramp"},
-                {"type": "SteadyState", "duration_sec": primer_dur, "power_pct": 88, "cadence": 92, "name": "Sweet Spot Primer"},
-                {"type": "SteadyState", "duration_sec": spin_dur, "power_pct": 55, "cadence": 85, "name": "Valley Spin"},
-                {"type": "Repeats", "repeat": reps, "on_duration_sec": 120, "off_duration_sec": 120, "on_power_pct": 95, "off_power_pct": 88, "cadence": 92, "cadence_rest": 88, "name": f"{reps}x Sweet Spot Over-Unders (2m @ 95% / 2m @ 88%)"},
-                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 65, "power_high_pct": 40, "cadence": 80, "name": "Progressive Cooldown Ramp"}
-            ]
+            selected = select_diverse_archetype("vo2_max", dur, ftp=ftp)
+            focus = selected["focus_area"]
+            title = selected["title"]
+            tss = selected["estimated_tss"]
+            intervals = selected["intervals"]
+        elif any(k in msg for k in ["sweet spot", "sst", "density", "threshold"]):
+            selected = select_diverse_archetype("sweet_spot", dur, ftp=ftp)
+            focus = selected["focus_area"]
+            title = selected["title"]
+            tss = selected["estimated_tss"]
+            intervals = selected["intervals"]
         elif any(k in msg for k in ["recovery", "easy", "flush", "spin", "rest"]):
             focus = "Active Recovery"
             title = f"{dur}-Min Cadence Flush & Spin"
@@ -431,23 +408,17 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
                 {"type": "Cooldown", "duration_sec": 240, "power_low_pct": 52, "power_high_pct": 38, "cadence": 82, "name": "Gentle Spin Out"}
             ]
         elif any(k in msg for k in ["tempo", "pace", "steady"]):
-            focus = "Tempo"
-            title = f"{dur}-Min Aerobic Tempo Cruise"
-            tss = round(dur * 0.70)
-            intervals = [
-                {"type": "Warmup", "duration_sec": w_dur, "power_low_pct": 45, "power_high_pct": 72, "cadence": 88, "name": "Gradual Wattage Ramp"},
-                {"type": "SteadyState", "duration_sec": max(300, (dur * 60) - w_dur - c_dur), "power_pct": 80, "cadence": 90, "name": "Zone 3 Steady Tempo"},
-                {"type": "Cooldown", "duration_sec": c_dur, "power_low_pct": 65, "power_high_pct": 42, "cadence": 80, "name": "Progressive Cooldown Ramp"}
-            ]
+            selected = select_diverse_archetype("tempo", dur, ftp=ftp)
+            focus = selected["focus_area"]
+            title = selected["title"]
+            tss = selected["estimated_tss"]
+            intervals = selected["intervals"]
         else:
-            focus = "Aerobic Base"
-            title = f"{dur}-Min Zone 2 Aerobic Foundation"
-            tss = round(dur * 0.60)
-            intervals = [
-                {"type": "Warmup", "duration_sec": 360, "power_low_pct": 50, "power_high_pct": 65, "cadence": 88, "name": "Warmup"},
-                {"type": "SteadyState", "duration_sec": max(300, (dur * 60) - 660), "power_pct": 68, "cadence": 90, "name": "Zone 2 Endurance"},
-                {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 55, "power_high_pct": 42, "cadence": 82, "name": "Cooldown"}
-            ]
+            selected = select_diverse_archetype("endurance_base", dur, ftp=ftp)
+            focus = selected["focus_area"]
+            title = selected["title"]
+            tss = selected["estimated_tss"]
+            intervals = selected["intervals"]
 
         from app.services.zwift_service import reconcile_workout_intervals
         intervals = reconcile_workout_intervals(intervals, dur, ftp=ftp)

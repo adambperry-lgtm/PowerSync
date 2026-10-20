@@ -205,7 +205,7 @@ def build_preference_aligned_outlook_days(
       - Saturday: Dedicated weekly rest day (0 min)
       - Sunday: 60–90+ minutes (longer outdoor endurance or long indoor session)
       - Warmup/Cooldown: Progressive wattage ramps (never flat Zone 2 blocks)
-      - Threshold / Sweet Spot: Strongly favors Over/Under intervals
+      - Threshold / Sweet Spot: Diverse interval archetypes (sustained blocks, stepped ladders, criss-cross surges, pyramids, over-unders)
       - Dynamically adapts to subjective athlete notes (e.g. 'tomorrow will be zone 2 or a rest day')
     """
     from app.services.preferences_service import get_day_target_config, get_weekday_rest_quota_and_status
