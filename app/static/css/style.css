@@ -1315,6 +1315,50 @@ canvas#intervalCanvas {
   font-family: inherit !important;
 }
 
+/* Responsive Modal & Settings Form Grid */
+.settings-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-form-grid > * {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.settings-form-grid .grid-col-span-2 {
+  grid-column: span 2;
+}
+
+/* Ensure date input formatting on iOS Safari / WebKit stays contained */
+.modal-body input[type="date"],
+input[type="date"] {
+  min-width: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
+  color-scheme: dark;
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+}
+
+.modal-body input[type="date"]::-webkit-date-and-time-value,
+input[type="date"]::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.2em;
+}
+
+.modal-body input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.8);
+  margin-left: auto;
+}
+
 .modal-body input:focus,
 .modal-body select:focus {
   border-color: var(--accent-cyan) !important;
@@ -2802,6 +2846,26 @@ canvas#intervalCanvas {
     -webkit-overflow-scrolling: touch;
   }
 
+  .modal-body {
+    padding: 1.15rem 0.85rem !important;
+    gap: 1.15rem !important;
+  }
+
+  .settings-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem !important;
+  }
+
+  .settings-form-grid .grid-col-span-2 {
+    grid-column: span 1 !important;
+  }
+
+  .settings-form-grid > div {
+    width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
   .modal-header {
     position: sticky;
     top: 0;
@@ -2826,6 +2890,7 @@ canvas#intervalCanvas {
   #inputCoachMessage,
   #inputUserNote {
     font-size: 16px !important;
+    min-height: 40px !important;
   }
 
   .program-stats-grid {

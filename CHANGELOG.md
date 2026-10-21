@@ -5,6 +5,14 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.5] - 2026-10-21
+### Fixed
+- **Mobile Settings Modal Form Grid & Date Input Alignment**: Fixed an issue on mobile devices (e.g. iPhone Safari / PWA) where the Target Event Date input and adjacent fields in the Settings modal blew out past the right boundary of the cyan card container onto the modal backdrop.
+- **Responsive Layout Stacking**: Introduced `.settings-form-grid` which cleanly stacks fields to 1 column on screens $\le 768\text{px}$ and protects grid cells with `min-width: 0`, preventing WebKit intrinsic content sizing from expanding tracks past card boundaries.
+- **iOS Safari Native Date Picker Polish**: Added `appearance: none`, `color-scheme: dark`, and left-aligned text styling (`::-webkit-date-and-time-value`) for seamless native input presentation.
+
+---
+
 ## [2.2.4] - 2026-10-21
 ### Fixed
 - **Zwift ERG Target Wattage Precision Calibration**: Fixed an issue where interval target wattages on Zwift appeared 1-2 watts lower than in the PowerSync dashboard. Zwift's C++ ERG game engine integer-truncates floating-point power ratios (e.g. `(int)(275 * 0.89) = 244W` instead of `245W`, and `round(91.5%, 2) = 0.91 -> 250W` instead of `252W`). Calibrated `.zwo` export using target-watt centering (`_calculate_zwo_power`), guaranteeing 100% exact integer watt matching between PowerSync and Zwift ERG mode across all athlete FTPs.

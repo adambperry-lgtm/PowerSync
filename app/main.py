@@ -121,8 +121,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.4",
-        "release_name": "Zwift ERG Target Wattage Precision Calibration",
+        "version": "2.2.5",
+        "release_name": "Mobile Settings Form Layout & Date Input Alignment",
         "build_date": "2026-10-21",
         "services": {
             "whoop": "v2 REST API",
@@ -132,6 +132,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.5",
+                "date": "2026-10-21",
+                "title": "Mobile Settings Form Layout & Date Input Alignment",
+                "items": [
+                    "Resolved Settings Input Overflow & Misalignment: Fixed an issue where the Target Event Date input and adjacent form fields blew out past the right boundary of the cyan card container onto the modal backdrop on mobile screens.",
+                    "Mobile-Responsive Modal Form Grid: Implemented dedicated .settings-form-grid with full-width stacking on mobile screens (<= 768px) and min-width: 0 protection on grid cells to eliminate horizontal clipping.",
+                    "Native iOS Date Input Styling: Applied appearance: none, color-scheme: dark, and left-aligned date formatting (::-webkit-date-and-time-value) for seamless native rendering on iOS Safari and PWA."
+                ]
+            },
             {
                 "version": "v2.2.4",
                 "date": "2026-10-21",
