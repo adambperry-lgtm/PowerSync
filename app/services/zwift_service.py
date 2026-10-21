@@ -4,6 +4,7 @@ import requests
 import datetime
 import copy
 from typing import Dict, Any, List, Optional
+from app.database import get_athlete_date
 
 def _format_intervals_dur(sec: int) -> str:
     sec = int(sec)
@@ -340,7 +341,7 @@ def push_to_intervals_icu(athlete_id: str, api_key: str, workout_data: Dict[str,
     if "•" in api_key or "\u2022" in api_key:
         return {"success": False, "error": "Intervals.icu API Key contains placeholder mask characters. Please re-enter your valid API Key in Settings."}
         
-    today = datetime.date.today()
+    today = get_athlete_date()
     if not target_date:
         target_date = today.isoformat()
     

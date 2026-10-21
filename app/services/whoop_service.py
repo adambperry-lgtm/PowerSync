@@ -2,7 +2,7 @@ import requests
 import datetime
 import secrets
 from typing import Dict, Any, Optional
-from app.database import get_setting, set_setting, get_db_connection, get_current_user_id
+from app.database import get_setting, set_setting, get_db_connection, get_current_user_id, get_athlete_date
 
 WHOOP_AUTH_URL = "https://api.prod.whoop.com/oauth/oauth2/auth"
 WHOOP_TOKEN_URL = "https://api.prod.whoop.com/oauth/oauth2/token"
@@ -99,7 +99,7 @@ def get_trailing_whoop_stats(days: int = 7, user_id: Optional[str] = None) -> Di
     Excludes today's incomplete/morning cycle to accurately measure trailing physiological load.
     """
     uid = user_id or get_current_user_id()
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
@@ -234,7 +234,7 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
             sleep_by_date[start_iso[:10]] = s
 
     # Persist all available trailing cycles and recoveries to SQLite
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     conn = get_db_connection()
     c = conn.cursor()
 

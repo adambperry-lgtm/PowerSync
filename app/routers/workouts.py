@@ -6,7 +6,7 @@ import uuid
 import datetime
 import re
 
-from app.database import get_setting, get_db_connection, set_setting, get_current_user_id
+from app.database import get_setting, get_db_connection, set_setting, get_current_user_id, get_athlete_date
 from app.services.ai_coach import build_workout_bundle
 from app.services.program_service import get_current_program
 from app.services.zwift_service import generate_zwo_xml, generate_intervals_icu_text, push_to_intervals_icu
@@ -134,7 +134,7 @@ def generate_workout(req: WorkoutGenerateRequest):
     conn.close()
 
     strava_tokens = get_setting("strava_tokens", None, user_id=uid)
-    today_iso_str = datetime.date.today().isoformat()
+    today_iso_str = get_athlete_date().isoformat()
     if strava_tokens and (not rows or not any(dict(r).get("start_date", "").startswith(today_iso_str) for r in rows)):
         try:
             from app.services.strava_service import fetch_recent_strava_activities
@@ -161,7 +161,7 @@ def generate_workout(req: WorkoutGenerateRequest):
     vol_hours = round(total_sec / 3600.0, 1)
 
     # Detect activities completed today
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     now_utc = datetime.datetime.now(datetime.timezone.utc)
     today_activities = []
     for a in recent_acts:
@@ -232,7 +232,7 @@ def generate_workout(req: WorkoutGenerateRequest):
         "rest day", "take today off", "full rest", "skip today", "no ride", "day off"
     ]) and not any(k in note_clean for k in ["active", "spin", "flush"]))
     from app.services.forecast_service import get_forecast_for_date
-    cur_date_iso = (tgt_dt or datetime.date.today()).isoformat()
+    cur_date_iso = (tgt_dt or get_athlete_date()).isoformat()
     forecast_entry = get_forecast_for_date(cur_date_iso, user_id=get_current_user_id())
 
     has_duration_override = bool(
@@ -446,7 +446,7 @@ def select_workout_option(req: WorkoutSelectRequest):
 
 @router.get("/current")
 def get_current_workout():
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     from app.database import get_scheduled_workout_for_date
     scheduled = get_scheduled_workout_for_date(today_iso)
     workout_cache = get_current_workout_cache()
@@ -471,7 +471,7 @@ def get_current_workout():
 def get_scheduled_workouts_endpoint():
     """Returns all workouts scheduled for today and upcoming dates."""
     from app.database import get_upcoming_scheduled_workouts
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     workouts = get_upcoming_scheduled_workouts(today_iso)
     return {
         "success": True,
@@ -751,7 +751,7 @@ def push_to_zwift_via_intervals(req: IntervalsPushRequest):
         gen = generate_workout(WorkoutGenerateRequest(duration_min=60))
         workout = gen["active_workout"]
         
-    target_date = req.target_date or datetime.date.today().isoformat()
+    target_date = req.target_date or get_athlete_date().isoformat()
     ftp = int(get_setting("athlete_ftp", 250))
     result = push_to_intervals_icu(athlete_id, api_key, workout, target_date, ftp=ftp)
     if result.get("success"):
@@ -824,7 +824,7 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
     total_sec = sum(a.get("moving_time_sec", 0) for a in recent_acts)
     vol_hours = round(total_sec / 3600.0, 1)
 
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     now_utc = datetime.datetime.now(datetime.timezone.utc)
     today_activities = []
     for a in recent_acts:

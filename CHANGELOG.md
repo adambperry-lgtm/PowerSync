@@ -5,6 +5,14 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.1] - 2026-10-20
+### Fixed
+- **Athlete Timezone Continuity & Evening UTC Offset Normalization**: Fixed an issue where cloud servers executing in UTC (00:00+ UTC, or after 8:00 PM EDT) flipped calendar days prematurely, causing today's sessions to be evaluated as "Yesterday" and projecting the 3-day forecast starting from Day +2 (e.g. Oct 22 instead of Oct 21).
+- **Client Timezone Auto-Discovery & Context Binding**: Added automatic browser client timezone discovery via an `X-Timezone` HTTP header interceptor (`Intl.DateTimeFormat().resolvedOptions().timeZone`), bound to request lifecycle contextvars and stored in athlete settings.
+- **Unified Local Timezone Utility**: Replaced all naive `datetime.date.today()` calls across all routers, services, and strain analyzers with timezone-aware `get_athlete_date()` and `get_athlete_now()`. Set `ENV TZ=America/New_York` in container definition.
+
+---
+
 ## [2.2.0] - 2026-10-20
 ### Added
 - **3-Day Forecast & Daily Workout Integration**: Forward 3-day forecast plans are persisted in database storage (`coach_forecast_plan`). When morning recovery matches projected assumptions, the daily workout selector confirms and prescribes the exact promised session (`⭐ Coach's Choice • Forecast Confirmed`). If recovery drops into the red, the coach adaptively explains the physiological pivot.

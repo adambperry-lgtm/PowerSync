@@ -1,6 +1,6 @@
 import datetime
 from typing import Dict, Any, List, Optional
-from app.database import get_setting, set_setting
+from app.database import get_setting, set_setting, get_athlete_date
 
 DEFAULT_COACHING_PREFERENCES: Dict[str, Any] = {
     "weekly_schedule": {
@@ -172,7 +172,7 @@ def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) 
     Determines if remaining candidate days (e.g. Thursday) are mandated to be rest/easy days.
     """
     import re
-    today = ref_date or datetime.date.today()
+    today = ref_date or get_athlete_date()
     monday = today - datetime.timedelta(days=today.weekday())
     sunday_prior = monday - datetime.timedelta(days=1)
 
@@ -319,7 +319,7 @@ def get_day_target_config(target_date: Optional[datetime.date] = None, ref_date:
     Returns the target duration range, mode (indoor vs outdoor), and physiological focus
     for a given date based on the athlete's weekly scheduling preferences.
     """
-    d = target_date or datetime.date.today()
+    d = target_date or get_athlete_date()
     weekday_keys = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
     w_key = weekday_keys[d.weekday()]
 
@@ -329,7 +329,7 @@ def get_day_target_config(target_date: Optional[datetime.date] = None, ref_date:
     intervals = prefs.get("interval_preferences", DEFAULT_COACHING_PREFERENCES["interval_preferences"])
 
     # Check weekly rest directive quota from the perspective of today's completed workouts
-    eval_date = ref_date or (d if d <= datetime.date.today() else datetime.date.today())
+    eval_date = ref_date or (d if d <= get_athlete_date() else get_athlete_date())
     status = get_weekday_rest_quota_and_status(ref_date=eval_date)
     is_directive_rest = (w_key in status.get("must_rest_days", []))
 

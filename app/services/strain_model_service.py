@@ -1,7 +1,7 @@
 import math
 import datetime
 from typing import Dict, Any, List, Optional
-from app.database import get_setting, get_db_connection, get_current_user_id
+from app.database import get_setting, get_db_connection, get_current_user_id, get_athlete_date
 
 # ============================================================================
 # 3-Tier Physiological Strain Engine (Xert XSS / Skiba W'bal Equivalent)
@@ -272,7 +272,7 @@ def calculate_trailing_strain_systems(
         from app.services.mock_data import get_mock_strava_activities
         activities = get_mock_strava_activities()
         
-    today = datetime.date.today()
+    today = get_athlete_date()
     
     daily_strains = {}
     for i in range(1, days + 1):

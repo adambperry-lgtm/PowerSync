@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-from app.database import get_setting, set_setting, get_current_user_id
+from app.database import get_setting, set_setting, get_current_user_id, get_athlete_date
 from app.services.coach_chat_service import handle_coach_chat, compile_athlete_context, get_gemini_api_key
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -158,7 +158,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             ]
             intervals = reconcile_workout_intervals(raw_intervals, duration, ftp=ftp)
 
-            today_iso = datetime.date.today().isoformat()
+            today_iso = get_athlete_date().isoformat()
             from app.database import save_scheduled_workout
             from app.services.ai_coach import enrich_workout_strain
 
@@ -241,9 +241,9 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             from app.services.ai_coach import enrich_workout_strain
 
             target_date = data.get("target_date")
-            today_str = datetime.date.today().isoformat()
+            today_str = get_athlete_date().isoformat()
             if not target_date or target_date == "tomorrow":
-                target_date = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+                target_date = (get_athlete_date() + datetime.timedelta(days=1)).isoformat()
             is_for_today = (target_date == today_str)
 
             ftp = _clean_int(get_setting("athlete_ftp", 250), 250)
@@ -333,7 +333,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
 
             target_date = data.get("target_date")
             if not target_date:
-                target_date = (datetime.date.today() + datetime.timedelta(days=1)).isoformat()
+                target_date = (get_athlete_date() + datetime.timedelta(days=1)).isoformat()
 
             plan_dict = {
                 "title": data.get("title") or "Planned Ride",

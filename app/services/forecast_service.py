@@ -7,7 +7,7 @@ the workout selector honors and prescribes the exact forecasted workout.
 
 import datetime
 from typing import Dict, Any, List, Optional, Tuple
-from app.database import get_setting, set_setting, get_current_user_id
+from app.database import get_setting, set_setting, get_current_user_id, get_athlete_date
 
 def save_coach_forecast_plan(user_id: Optional[str], outlook_days: List[Dict[str, Any]]) -> None:
     """
@@ -46,7 +46,7 @@ def save_coach_forecast_plan(user_id: Optional[str], outlook_days: List[Dict[str
         }
 
     # Prune past dates older than 7 days
-    today = datetime.date.today()
+    today = get_athlete_date()
     cutoff_iso = (today - datetime.timedelta(days=7)).isoformat()
     pruned_plan = {k: v for k, v in current_plan.items() if k >= cutoff_iso}
 

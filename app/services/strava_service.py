@@ -2,7 +2,7 @@ import json
 import requests
 import datetime
 from typing import Dict, Any, List, Optional
-from app.database import get_setting, set_setting, get_db_connection, get_current_user_id
+from app.database import get_setting, set_setting, get_db_connection, get_current_user_id, get_athlete_date
 
 STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
@@ -173,7 +173,7 @@ def get_strava_trailing_stats(activities: Optional[List[Dict[str, Any]]] = None,
         from app.services.mock_data import get_mock_weekly_stats
         return get_mock_weekly_stats()
 
-    today = datetime.date.today()
+    today = get_athlete_date()
 
     # Build calendar day slots for the last `days` completed days (days ago: 1 to 7)
     daily_buckets = {}

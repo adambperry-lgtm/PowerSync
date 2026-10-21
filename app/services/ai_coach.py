@@ -3,7 +3,7 @@ import requests
 import datetime
 from typing import Dict, Any, List, Optional
 from app.services.zwift_service import generate_zwo_xml, generate_intervals_icu_text
-from app.database import get_active_target_plan, get_current_user_id
+from app.database import get_active_target_plan, get_current_user_id, get_athlete_date
 from app.services.workout_catalog import select_diverse_archetype
 
 def enrich_workout_strain(workout: Dict[str, Any], ftp: int = 250) -> Dict[str, Any]:
@@ -143,8 +143,8 @@ def build_adaptive_workout_local(
         return enrich_workout_strain(workout_obj, ftp)
 
     # 0B. Check if athlete already trained today or reached target daily strain
-    cur_eval_date = target_date or datetime.date.today()
-    is_eval_today = (cur_eval_date == datetime.date.today())
+    cur_eval_date = target_date or get_athlete_date()
+    is_eval_today = (cur_eval_date == get_athlete_date())
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
     has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0
@@ -473,7 +473,7 @@ def build_adaptive_workout_local(
 
     # 0E. FORECAST CONTINUITY INTEGRATION
     # Check if there is an active 3-day forward forecast stored for this date
-    cur_date_iso = (target_date or datetime.date.today()).isoformat()
+    cur_date_iso = (target_date or get_athlete_date()).isoformat()
     uid = get_current_user_id()
     from app.services.forecast_service import get_forecast_for_date, is_forecast_valid_for_recovery
     forecast = get_forecast_for_date(cur_date_iso, user_id=uid)
@@ -828,8 +828,8 @@ def build_workout_bundle(
     target_date: Optional[datetime.date] = None
 ) -> Dict[str, Any]:
     """Generates the primary prescribed workout and 2 tailored alternatives."""
-    cur_eval_date = target_date or datetime.date.today()
-    is_eval_today = (cur_eval_date == datetime.date.today())
+    cur_eval_date = target_date or get_athlete_date()
+    is_eval_today = (cur_eval_date == get_athlete_date())
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
     has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0

@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import (
     init_db, get_user_by_session, get_guest_user, get_default_athlete_user,
-    set_current_user_context, reset_current_user_context
+    set_current_user_context, reset_current_user_context,
+    set_current_timezone_context, reset_current_timezone_context
 )
 from app.routers import dashboard, workouts, settings, auth, review, plans, chat
 
@@ -70,9 +71,15 @@ async def user_session_middleware(request, call_next):
 
     request.state.user = user
     ctx_token = set_current_user_context(user["id"])
+
+    req_tz = request.headers.get("x-timezone") or request.query_params.get("timezone")
+    tz_token = set_current_timezone_context(req_tz.strip()) if (req_tz and req_tz.strip()) else None
+
     try:
         response = await call_next(request)
     finally:
+        if tz_token:
+            reset_current_timezone_context(tz_token)
         reset_current_user_context(ctx_token)
 
     return response
@@ -114,8 +121,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.0",
-        "release_name": "3-Day Forecast Integration, Anti-Repetition Engine & Real-Time Sync Resilience",
+        "version": "2.2.1",
+        "release_name": "Athlete Timezone Continuity & Evening UTC Offset Normalization",
         "build_date": "2026-10-20",
         "services": {
             "whoop": "v2 REST API",
@@ -125,6 +132,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.1",
+                "date": "2026-10-20",
+                "title": "Athlete Timezone Continuity & Evening UTC Offset Normalization",
+                "items": [
+                    "Athlete Timezone Continuity: Fixed premature calendar rollover on UTC cloud servers (00:00+ UTC / 8:00 PM+ EDT) so evening workouts are correctly evaluated as Today rather than Yesterday.",
+                    "3-Day Forward Outlook Alignment: Synced forecast generator to local athlete time so Tomorrow consistently points to the immediate next calendar day (Day +1).",
+                    "Client Timezone Auto-Discovery: Intercepts browser IANA timezone (X-Timezone header) and binds request context to athlete's local clock."
+                ]
+            },
             {
                 "version": "v2.2.0",
                 "date": "2026-10-20",

@@ -2,7 +2,8 @@ FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=8000
+    PORT=8000 \
+    TZ=America/New_York
 
 WORKDIR /app
 

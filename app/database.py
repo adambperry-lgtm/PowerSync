@@ -4,12 +4,15 @@ import os
 import datetime
 import secrets
 import uuid
+import zoneinfo
 from typing import Dict, Any, Optional, List
 from contextvars import ContextVar
 
 DEFAULT_USER_ID = "usr_default"
 GUEST_USER_ID = "usr_guest"
+DEFAULT_TIMEZONE = "America/New_York"
 CURRENT_USER_ID: ContextVar[str] = ContextVar("CURRENT_USER_ID", default=DEFAULT_USER_ID)
+CURRENT_USER_TIMEZONE: ContextVar[str] = ContextVar("CURRENT_USER_TIMEZONE", default=DEFAULT_TIMEZONE)
 
 def get_current_user_id() -> str:
     """Returns the current active user ID from contextvars, or the default user."""
@@ -22,6 +25,50 @@ def set_current_user_context(user_id: str):
 def reset_current_user_context(token):
     """Resets the contextvar token back to its previous state."""
     CURRENT_USER_ID.reset(token)
+
+def set_current_timezone_context(tz_name: str):
+    """Sets the active user timezone context for the current request lifecycle."""
+    return CURRENT_USER_TIMEZONE.set(tz_name)
+
+def reset_current_timezone_context(token):
+    """Resets the timezone contextvar token back to its previous state."""
+    CURRENT_USER_TIMEZONE.reset(token)
+
+def get_athlete_timezone_name(user_id: Optional[str] = None) -> str:
+    """Resolves the active athlete IANA timezone name."""
+    ctx_tz = CURRENT_USER_TIMEZONE.get()
+    if ctx_tz and ctx_tz != DEFAULT_TIMEZONE:
+        return ctx_tz
+
+    uid = user_id or get_current_user_id()
+    try:
+        saved_tz = get_setting("athlete_timezone", default=None, user_id=uid)
+        if saved_tz and isinstance(saved_tz, str) and saved_tz.strip():
+            return saved_tz.strip()
+    except Exception:
+        pass
+
+    env_tz = os.environ.get("TZ") or os.environ.get("ATHLETE_TIMEZONE")
+    if env_tz and env_tz.strip():
+        return env_tz.strip()
+
+    return ctx_tz or DEFAULT_TIMEZONE
+
+def get_athlete_timezone(user_id: Optional[str] = None) -> zoneinfo.ZoneInfo:
+    """Returns ZoneInfo object for athlete, falling back safely to America/New_York."""
+    tz_name = get_athlete_timezone_name(user_id)
+    try:
+        return zoneinfo.ZoneInfo(tz_name)
+    except Exception:
+        return zoneinfo.ZoneInfo(DEFAULT_TIMEZONE)
+
+def get_athlete_now(user_id: Optional[str] = None) -> datetime.datetime:
+    """Returns the current timezone-aware datetime for the athlete."""
+    return datetime.datetime.now(get_athlete_timezone(user_id))
+
+def get_athlete_date(user_id: Optional[str] = None) -> datetime.date:
+    """Returns the current calendar date in the athlete's local timezone."""
+    return get_athlete_now(user_id).date()
 
 def get_db_path() -> str:
     # 1. Explicit DATABASE_PATH override

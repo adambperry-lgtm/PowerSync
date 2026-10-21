@@ -1,6 +1,6 @@
 import datetime
 from typing import Dict, Any, List, Optional
-from app.database import get_setting, set_setting, get_db_connection
+from app.database import get_setting, set_setting, get_db_connection, get_athlete_date
 
 DEFAULT_GOALS = {
     "FTP_BUILD": {
@@ -67,7 +67,7 @@ def get_current_program(
         strava_weekly_xss = strava_weekly_tss
     
     # Dates
-    today = datetime.date.today()
+    today = get_athlete_date()
     start_date_str = get_setting("program_start_date")
     if not start_date_str:
         # Default start 3 weeks ago

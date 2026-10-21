@@ -6,6 +6,7 @@ from app.database import get_setting, set_setting, get_all_settings, get_primary
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 class SettingsUpdate(BaseModel):
+    athlete_timezone: Optional[str] = None
     athlete_ftp: Optional[int] = None
     athlete_max_hr: Optional[int] = None
     athlete_w_prime_kj: Optional[float] = None
@@ -60,6 +61,7 @@ def get_settings_endpoint():
     google_secret = all_s.get("google_client_secret", "")
 
     return {
+        "athlete_timezone": str(all_s.get("athlete_timezone", "America/New_York")),
         "athlete_ftp": int(all_s.get("athlete_ftp", 250)),
         "athlete_max_hr": int(all_s.get("athlete_max_hr", 185)),
         "athlete_w_prime_kj": float(all_s.get("athlete_w_prime_kj", 20.0)),
@@ -104,6 +106,8 @@ def update_settings_endpoint(payload: SettingsUpdate):
         set_setting("google_client_secret", payload.google_client_secret.strip())
     if payload.theme_mode is not None and payload.theme_mode.strip() in ("dark", "light", "system"):
         set_setting("theme_mode", payload.theme_mode.strip())
+    if payload.athlete_timezone is not None and payload.athlete_timezone.strip():
+        set_setting("athlete_timezone", payload.athlete_timezone.strip())
     if payload.athlete_ftp is not None:
         set_setting("athlete_ftp", payload.athlete_ftp)
     if payload.athlete_max_hr is not None:

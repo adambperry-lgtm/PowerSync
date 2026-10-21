@@ -4,25 +4,35 @@ if (typeof window !== "undefined") {
     document.documentElement.classList.add("is-standalone-app");
   }
 
-  // Intercept fetch to automatically attach Authorization header if token exists in localStorage
+  // Intercept fetch to automatically attach Authorization header and athlete X-Timezone
   const originalFetch = window.fetch;
+  const clientTz = (typeof Intl !== "undefined" && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : "America/New_York";
   window.fetch = async function(...args) {
     let [resource, config] = args;
     const token = localStorage.getItem("powersync_token");
-    if (token && typeof resource === "string" && (resource.startsWith("/api") || resource.startsWith("/"))) {
+    if (typeof resource === "string" && (resource.startsWith("/api") || resource.startsWith("/"))) {
       config = config || {};
       config.headers = config.headers || {};
       if (config.headers instanceof Headers) {
-        if (!config.headers.has("Authorization")) {
+        if (token && !config.headers.has("Authorization")) {
           config.headers.set("Authorization", `Bearer ${token}`);
         }
+        if (clientTz && !config.headers.has("X-Timezone")) {
+          config.headers.set("X-Timezone", clientTz);
+        }
       } else if (Array.isArray(config.headers)) {
-        if (!config.headers.some(([k]) => k.toLowerCase() === "authorization")) {
+        if (token && !config.headers.some(([k]) => k.toLowerCase() === "authorization")) {
           config.headers.push(["Authorization", `Bearer ${token}`]);
         }
+        if (clientTz && !config.headers.some(([k]) => k.toLowerCase() === "x-timezone")) {
+          config.headers.push(["X-Timezone", clientTz]);
+        }
       } else {
-        if (!config.headers["Authorization"] && !config.headers["authorization"]) {
+        if (token && !config.headers["Authorization"] && !config.headers["authorization"]) {
           config.headers["Authorization"] = `Bearer ${token}`;
+        }
+        if (clientTz && !config.headers["X-Timezone"] && !config.headers["x-timezone"]) {
+          config.headers["X-Timezone"] = clientTz;
         }
       }
     }
@@ -6396,6 +6406,15 @@ async function bootApp() {
   }
 
   await checkAuthStatus();
+  if (clientTz) {
+    try {
+      fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ athlete_timezone: clientTz })
+      }).catch(() => {});
+    } catch (_) {}
+  }
   await loadVersionInfo();
   await loadDashboard();
   await checkCoachGeminiStatus();

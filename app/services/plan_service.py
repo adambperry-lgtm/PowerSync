@@ -5,6 +5,7 @@ import xml.etree.ElementTree as ET
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.database import (
+    get_athlete_date,
     get_setting,
     get_db_connection,
     save_target_plan as db_save_target_plan,
@@ -130,7 +131,7 @@ def parse_plan_description(text: str, default_date: Optional[str] = None) -> Dic
     Extracts distance, target date, elevation, intensity, and estimates duration & TSS.
     """
     clean_text = text.strip()
-    today = datetime.date.today()
+    today = get_athlete_date()
     lower = clean_text.lower()
     
     # 0. Check duration in text first
@@ -391,7 +392,7 @@ def compute_taper_leadup_schedule(
     Computes a daily training roadmap from today up through the event day,
     showing how each day is specifically calibrated for the upcoming ride.
     """
-    today = datetime.date.today()
+    today = get_athlete_date()
     target_date_str = target_plan.get("target_date", "")
     try:
         target_dt = datetime.date.fromisoformat(target_date_str[:10])

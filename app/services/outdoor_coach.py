@@ -3,7 +3,7 @@ import math
 import json
 import ast
 from typing import Dict, Any, List, Optional
-from app.database import get_db_connection, get_setting, get_current_user_id
+from app.database import get_db_connection, get_setting, get_current_user_id, get_athlete_date
 from app.services.mock_data import get_mock_strava_activities
 
 def decode_polyline(polyline_str: str) -> List[List[float]]:
@@ -151,7 +151,7 @@ def format_relative_date(date_str: str) -> str:
     try:
         clean = date_str[:10]
         dt = datetime.date.fromisoformat(clean)
-        today = datetime.date.today()
+        today = get_athlete_date()
         delta = (today - dt).days
         formatted = dt.strftime("%b %-d, %Y")
         if delta == 0:
@@ -417,7 +417,7 @@ def build_outdoor_ride_recommendation(
             "id": "outdoor_example",
             "name": "Rolling Endurance Loop",
             "sport_type": "Ride",
-            "start_date": datetime.date.today().isoformat(),
+            "start_date": get_athlete_date().isoformat(),
             "date_relative": "Example Route",
             "moving_time_min": 60,
             "moving_time_formatted": "1h 00m",

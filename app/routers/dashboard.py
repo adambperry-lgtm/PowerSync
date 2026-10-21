@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 import datetime
-from app.database import get_setting, get_db_connection, get_current_user_id, get_user_by_id
+from app.database import get_setting, get_db_connection, get_current_user_id, get_user_by_id, get_athlete_date
 from app.services.mock_data import get_mock_whoop_data, get_mock_strava_activities, get_mock_weekly_stats
 from app.services.program_service import get_current_program
 
@@ -29,7 +29,7 @@ def get_dashboard_data(request: Request = None):
     intervals_athlete_id = get_setting("intervals_athlete_id", "")
     
     # Whoop Data: prioritize athlete's private whoop_metrics table records
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     whoop_auth_expired = False
     
     conn = get_db_connection()

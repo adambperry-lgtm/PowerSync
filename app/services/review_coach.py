@@ -3,7 +3,7 @@ import math
 import json
 import requests
 from typing import Dict, Any, List, Optional
-from app.database import get_db_connection, get_setting, set_setting, get_active_target_plan, get_current_user_id
+from app.database import get_db_connection, get_setting, set_setting, get_active_target_plan, get_current_user_id, get_athlete_date
 from app.services.mock_data import get_mock_whoop_data, get_mock_strava_activities
 from app.services.program_service import get_current_program
 from app.services.strava_service import get_strava_trailing_stats
@@ -37,7 +37,7 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
     if not activities:
         activities = get_mock_strava_activities()
 
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     
     today_activities = []
     for a in activities:
@@ -602,7 +602,7 @@ def build_daily_review_and_outlook_local(
     and a forward-looking 3-day training outlook based on acute fatigue decay.
     Accurately distinguishes sessions completed today vs. yesterday/earlier.
     """
-    today = datetime.date.today()
+    today = get_athlete_date()
     today_iso = today.isoformat()
     yesterday_iso = (today - datetime.timedelta(days=1)).isoformat()
     
@@ -1070,7 +1070,7 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
     today_acts = act_info.get("today_activities", [])
     latest_act = act_info.get("latest_activity")
     
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date().isoformat()
     if custom_prompt and custom_prompt.strip():
         set_setting("latest_debrief_athlete_note", custom_prompt.strip())
         set_setting("latest_debrief_athlete_note_date", today_iso)
