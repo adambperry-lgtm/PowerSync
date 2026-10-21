@@ -5,6 +5,13 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.2] - 2026-10-21
+### Fixed
+- **Automated Morning Whoop Refresh & Continuous Biometric Heartbeat**: Fixed an issue where morning Whoop recovery scores stopped auto-refreshing when opening the app. Added 15-minute recency sync tracking (`last_whoop_sync_timestamp`), unfinalized recovery auto-sync (re-syncs if morning sleep/recovery is missing or zero), and integrated automatic sync across Dashboard, Workout generation, and client boot.
+- **Explicit Multi-User Whoop Token Isolation**: Fixed missing user ID scoping in `dashboard.py` and `workouts.py` to ensure connected Whoop tokens consistently resolve for the active athlete.
+
+---
+
 ## [2.2.1] - 2026-10-20
 ### Fixed
 - **Athlete Timezone Continuity & Evening UTC Offset Normalization**: Fixed an issue where cloud servers executing in UTC (00:00+ UTC, or after 8:00 PM EDT) flipped calendar days prematurely, causing today's sessions to be evaluated as "Yesterday" and projecting the 3-day forecast starting from Day +2 (e.g. Oct 22 instead of Oct 21).

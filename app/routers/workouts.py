@@ -102,18 +102,39 @@ def get_current_outdoor_cache() -> Dict[str, Any]:
 @router.post("/generate")
 def generate_workout(req: WorkoutGenerateRequest):
     demo_mode = get_setting("demo_mode", False)
-    ftp = int(get_setting("athlete_ftp", 250))
-    whoop_tokens = get_setting("whoop_tokens", None)
+    uid = get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    whoop_tokens = get_setting("whoop_tokens", None, user_id=uid)
     
     # Retrieve latest recovery metrics
-    uid = get_current_user_id()
     today_strain = 0.0
-    # Whoop metrics: prioritize athlete's private whoop_metrics table records
+    today_iso = get_athlete_date().isoformat()
+
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
     row = c.fetchone()
     conn.close()
+
+    # Auto-sync live Whoop if connected and today's record missing or >15m elapsed
+    if whoop_tokens:
+        last_whoop_sync_key = "last_whoop_sync_timestamp"
+        last_whoop_sync = float(get_setting(last_whoop_sync_key, 0.0, user_id=uid) or 0.0)
+        now_ts = datetime.datetime.now().timestamp()
+        if (not row) or (row["date"] != today_iso) or (not row["recovery_score"] or row["recovery_score"] <= 0) or (now_ts - last_whoop_sync > 900):
+            try:
+                from app.services.whoop_service import fetch_latest_whoop_metrics
+                s_res = fetch_latest_whoop_metrics(user_id=uid)
+                if s_res.get("success"):
+                    set_setting(last_whoop_sync_key, now_ts, user_id=uid)
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+                    row = c.fetchone()
+                    conn.close()
+            except Exception:
+                pass
+
     if row:
         whoop = {
             "recovery_score": int(row["recovery_score"]),

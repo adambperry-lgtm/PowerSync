@@ -15,6 +15,22 @@ class TestForecastIntegration(unittest.TestCase):
         self.user_a = "user_forecast_test_a"
         self.user_b = "user_forecast_test_b"
         set_current_user_context(self.user_a)
+        self._cleanup()
+
+    def tearDown(self):
+        self._cleanup()
+
+    def _cleanup(self):
+        from app.database import get_db_connection
+        conn = get_db_connection()
+        c = conn.cursor()
+        test_users = (self.user_a, self.user_b)
+        c.execute("DELETE FROM strava_activities WHERE user_id IN (?, ?)", test_users)
+        c.execute("DELETE FROM whoop_metrics WHERE user_id IN (?, ?)", test_users)
+        c.execute("DELETE FROM workouts WHERE user_id IN (?, ?)", test_users)
+        c.execute("DELETE FROM settings WHERE user_id IN (?, ?)", test_users)
+        conn.commit()
+        conn.close()
 
     def test_forecast_persisted_and_retrieved(self):
         """Verify that build_preference_aligned_outlook_days persists forecast with intervals."""

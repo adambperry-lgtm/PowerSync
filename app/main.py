@@ -121,9 +121,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.1",
-        "release_name": "Athlete Timezone Continuity & Evening UTC Offset Normalization",
-        "build_date": "2026-10-20",
+        "version": "2.2.2",
+        "release_name": "Automated Morning Whoop Sync & Continuous Biometric Heartbeat",
+        "build_date": "2026-10-21",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -132,6 +132,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.2",
+                "date": "2026-10-21",
+                "title": "Automated Morning Whoop Sync & Continuous Biometric Heartbeat",
+                "items": [
+                    "Automated Morning Whoop Refresh: Morning recovery, sleep performance, and day strain auto-refresh seamlessly upon opening the app or pulling to reload.",
+                    "15-Minute Recency Sync: Added timestamp staleness tracking to continuously poll live Whoop metrics without requiring manual button taps.",
+                    "Unfinalized Recovery Auto-Fetch: If today's recovery was recorded prior to morning wake-up scoring, PowerSync automatically fetches final scored recovery.",
+                    "Multi-User Token Resolution: Scoped all Whoop credential lookups directly to the active athlete session."
+                ]
+            },
             {
                 "version": "v2.2.1",
                 "date": "2026-10-20",

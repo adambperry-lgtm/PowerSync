@@ -195,6 +195,27 @@ async function loadDashboard() {
     renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
     loadDebrief();
     updateCoachChatTelemetryChips();
+
+    // Auto-sync Whoop if connected and today's metrics are missing or not marked as today
+    if (data.integrations && data.integrations.whoop && data.integrations.whoop.connected && data.whoop && !data.whoop.is_today && !state.hasAttemptedMorningWhoopSync) {
+      state.hasAttemptedMorningWhoopSync = true;
+      try {
+        const syncRes = await fetch("/api/auth/sync/whoop", { method: "POST" });
+        if (syncRes.ok) {
+          const freshRes = await fetch("/api/dashboard");
+          if (freshRes.ok) {
+            const freshData = await freshRes.json();
+            if (freshData.whoop) {
+              state.whoop = freshData.whoop;
+              renderWhoop(freshData.whoop);
+              updateCoachChatTelemetryChips();
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.warn("Background morning Whoop sync error:", syncErr);
+      }
+    }
   } catch (err) {
     console.error("Failed to load dashboard:", err);
   }

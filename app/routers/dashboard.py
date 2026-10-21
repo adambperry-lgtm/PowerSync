@@ -15,18 +15,18 @@ def get_dashboard_data(request: Request = None):
     if not current_user:
         current_user = get_user_by_id(uid) or {}
     
-    whoop_tokens = get_setting("whoop_tokens", None)
-    strava_tokens = get_setting("strava_tokens", None)
+    whoop_tokens = get_setting("whoop_tokens", None, user_id=uid)
+    strava_tokens = get_setting("strava_tokens", None, user_id=uid)
     
     # If athlete has connected real tokens, demo_mode is always False
-    demo_mode_setting = get_setting("demo_mode", False)
+    demo_mode_setting = get_setting("demo_mode", False, user_id=uid)
     demo_mode = False if (whoop_tokens or strava_tokens) else bool(demo_mode_setting)
     
-    ftp = get_setting("athlete_ftp", 250)
-    max_hr = get_setting("athlete_max_hr", 185)
-    gemini_key = get_setting("gemini_api_key", "")
-    intervals_icu_key = get_setting("intervals_icu_api_key", "")
-    intervals_athlete_id = get_setting("intervals_athlete_id", "")
+    ftp = get_setting("athlete_ftp", 250, user_id=uid)
+    max_hr = get_setting("athlete_max_hr", 185, user_id=uid)
+    gemini_key = get_setting("gemini_api_key", "", user_id=uid)
+    intervals_icu_key = get_setting("intervals_icu_api_key", "", user_id=uid)
+    intervals_athlete_id = get_setting("intervals_athlete_id", "", user_id=uid)
     
     # Whoop Data: prioritize athlete's private whoop_metrics table records
     today_iso = get_athlete_date().isoformat()
@@ -38,18 +38,38 @@ def get_dashboard_data(request: Request = None):
     row = c.fetchone()
     conn.close()
 
-    # If user has connected live Whoop tokens and today's metric is missing, attempt live sync
-    if whoop_tokens and (not row or row["date"] != today_iso):
-        from app.services.whoop_service import fetch_latest_whoop_metrics
-        sync_res = fetch_latest_whoop_metrics(user_id=uid)
-        if sync_res.get("success"):
-            conn = get_db_connection()
-            c = conn.cursor()
-            c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
-            row = c.fetchone()
-            conn.close()
-        elif sync_res.get("auth_expired"):
-            whoop_auth_expired = True
+    # Auto-sync live Whoop metrics if:
+    # 1. Athlete has connected Whoop tokens AND:
+    # 2. No record exists for today OR today's recovery is unfinalized (missing/0) OR
+    # 3. More than 15 minutes have elapsed since last sync
+    last_whoop_sync_key = "last_whoop_sync_timestamp"
+    last_whoop_sync_time = float(get_setting(last_whoop_sync_key, 0.0, user_id=uid) or 0.0)
+    now_ts = datetime.datetime.now().timestamp()
+
+    needs_whoop_sync = False
+    if whoop_tokens:
+        if not row or row["date"] != today_iso:
+            needs_whoop_sync = True
+        elif not row["recovery_score"] or row["recovery_score"] <= 0:
+            needs_whoop_sync = True
+        elif (now_ts - last_whoop_sync_time) > 900:  # 15 minutes
+            needs_whoop_sync = True
+
+    if needs_whoop_sync:
+        try:
+            from app.services.whoop_service import fetch_latest_whoop_metrics
+            sync_res = fetch_latest_whoop_metrics(user_id=uid)
+            if sync_res.get("success"):
+                set_setting(last_whoop_sync_key, now_ts, user_id=uid)
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+                row = c.fetchone()
+                conn.close()
+            elif sync_res.get("auth_expired"):
+                whoop_auth_expired = True
+        except Exception as e:
+            print(f"[PowerSync] Whoop auto-sync error in dashboard: {e}")
 
     if row:
         from app.services.whoop_service import get_trailing_whoop_stats
