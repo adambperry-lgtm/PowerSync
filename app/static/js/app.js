@@ -92,8 +92,8 @@ const workoutDurationBadge = document.getElementById("workoutDurationBadge");
 const workoutTssBadge = document.getElementById("workoutTssBadge");
 const workoutRationale = document.getElementById("workoutRationale");
 const intervalCanvas = document.getElementById("intervalCanvas");
-const inputUserNote = document.getElementById("inputUserNote");
-const btnRegenerateWorkout = document.getElementById("btnRegenerateWorkout");
+const inputUserNote = null;
+const btnRegenerateWorkout = null;
 const btnPushZwift = document.getElementById("btnPushZwift");
 const durPillGroup = document.getElementById("durPillGroup");
 const intensityPillGroup = document.getElementById("intensityPillGroup");
@@ -2474,7 +2474,7 @@ durPillGroup.addEventListener("click", (e) => {
     state.selectedIntervalIndex = null;
     syncDurationPills(dur);
     state.activeOptionId = "workout_primary";
-    loadWorkout(state.currentDuration, state.currentIntensity, inputUserNote.value.trim());
+    loadWorkout(state.currentDuration, state.currentIntensity);
   }
 });
 
@@ -2484,7 +2484,7 @@ intensityPillGroup.addEventListener("click", (e) => {
     intensityPillGroup.querySelectorAll(".btn-pill").forEach(b => b.classList.remove("active"));
     e.target.classList.add("active");
     state.currentIntensity = parseInt(e.target.dataset.intensity, 10);
-    loadWorkout(state.currentDuration, state.currentIntensity, inputUserNote.value.trim());
+    loadWorkout(state.currentDuration, state.currentIntensity);
   }
 });
 
@@ -2555,32 +2555,7 @@ if (inputOutdoorUserNote && btnRegenerateOutdoor) {
   });
 }
 
-// Regenerate / Adapt Workout Button
-btnRegenerateWorkout.addEventListener("click", async () => {
-  const origText = btnRegenerateWorkout.textContent;
-  btnRegenerateWorkout.textContent = "⏳ Adapting...";
-  btnRegenerateWorkout.disabled = true;
-  try {
-    state.activeOptionId = "workout_primary";
-    const noteVal = inputUserNote ? inputUserNote.value.trim() : "";
-    await loadWorkout(state.currentDuration, state.currentIntensity, noteVal);
-    if (!noteVal && state.currentWorkout) {
-      showToast(`✨ Workout refreshed: ${state.currentWorkout.title} (${state.currentWorkout.duration_minutes}m)`);
-    }
-  } finally {
-    btnRegenerateWorkout.textContent = origText;
-    btnRegenerateWorkout.disabled = false;
-  }
-});
 
-if (inputUserNote && btnRegenerateWorkout) {
-  inputUserNote.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      btnRegenerateWorkout.click();
-    }
-  });
-}
 
 // Send to Zwift (Apple TV via Intervals.icu)
 btnPushZwift.addEventListener("click", async () => {
@@ -2685,9 +2660,8 @@ if (btnSyncWhoop) {
       if (data.success && data.metrics) {
         showToast(`✅ Whoop Synced! Recovery: ${data.metrics.recovery_score}%, Sleep: ${data.metrics.sleep_performance}%`);
         await loadDashboard();
-    await loadWorkout(state.currentDuration, state.currentIntensity, "");
-    await loadDebrief();
-        await loadWorkout(state.currentDuration, state.currentIntensity, inputUserNote ? inputUserNote.value.trim() : "");
+        await loadWorkout(state.currentDuration, state.currentIntensity);
+        await loadDebrief();
       } else if (data.auth_expired) {
         showToast("⚠️ Whoop session expired. Please re-authorize in Settings.");
         openSettingsModal();
@@ -3063,9 +3037,8 @@ btnSaveSettings.addEventListener("click", async () => {
     showToast("✅ Settings saved!");
     await checkCoachGeminiStatus();
     await loadDashboard();
-    await loadWorkout(state.currentDuration, state.currentIntensity, "");
+    await loadWorkout(state.currentDuration, state.currentIntensity);
     await loadDebrief();
-    await loadWorkout(state.currentDuration, state.currentIntensity, inputUserNote.value.trim());
   } catch (err) {
     showToast("⚠️ Failed to save settings.");
   }
@@ -4572,11 +4545,11 @@ if (inputInlineGpxUpload) {
               svg_path: data.svg_path
             };
             if (chipAttachedRoute) chipAttachedRoute.style.display = "inline-flex";
-            if (lblAttachedRouteName) lblAttachedRouteName.textContent = `${data.title} (${data.distance_miles} mi)`;
-            if (inputUserNote && !inputUserNote.value) {
-              inputUserNote.value = `Custom ride: ${data.title} (${data.distance_miles} mi, ${data.elevation_gain_ft} ft climbing)`;
-            }
-            showToast(`📍 Route attached: ${data.title} (${data.distance_miles} mi). Click 'Adapt / Plan Ride' to apply!`);
+            if (lblAttachedRouteName) lblAttachedRouteName.textContent = `${data.title} (${data.distance_miles} mi, ${data.elevation_gain_ft} ft)`;
+            
+            showToast(`🗺️ Applying route plan: ${data.title}...`);
+            await loadWorkout(null, state.currentIntensity);
+            showToast(`✅ Route loaded: ${data.title} (${data.distance_miles} mi, ${data.elevation_gain_ft} ft elev)`);
           } else {
             showToast(`⚠️ Could not parse GPX: ${data.error || "Invalid file"}`);
           }
@@ -4591,20 +4564,12 @@ if (inputInlineGpxUpload) {
 }
 
 if (btnRemoveAttachedRoute) {
-  btnRemoveAttachedRoute.addEventListener("click", () => {
+  btnRemoveAttachedRoute.addEventListener("click", async () => {
     state.attachedRoute = null;
     if (chipAttachedRoute) chipAttachedRoute.style.display = "none";
     if (inputInlineGpxUpload) inputInlineGpxUpload.value = "";
-    showToast("Route unlinked.");
-  });
-}
-
-if (inputUserNote) {
-  inputUserNote.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      loadWorkout(state.currentDuration, state.currentIntensity, inputUserNote.value.trim());
-    }
+    showToast("Route unlinked. Restoring prescribed workout...");
+    await loadWorkout(state.currentDuration, state.currentIntensity);
   });
 }
 

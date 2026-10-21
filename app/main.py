@@ -121,8 +121,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.2",
-        "release_name": "Automated Morning Whoop Sync & Continuous Biometric Heartbeat",
+        "version": "2.2.3",
+        "release_name": "Dedicated Route Uploader & Conversational Coach Chat Alignment",
         "build_date": "2026-10-21",
         "services": {
             "whoop": "v2 REST API",
@@ -132,6 +132,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.3",
+                "date": "2026-10-21",
+                "title": "Dedicated Route Uploader & Conversational Coach Chat Alignment",
+                "items": [
+                    "Removed Legacy Adapt/Plan Ride Text Box: Eliminated the confusing text input and button that previously reran keyword-matching heuristics instead of targeted interval edits.",
+                    "Direct GPX Route Uploader: Converted the workout controls into a streamlined 1-click GPX route uploader (🗺️ Upload Route (.gpx)) that immediately loads route elevation, distance, and pacing targets.",
+                    "Conversational Coach Chat Alignment: Unified all custom interval tweaks and workout modifications into the Gemini AI Coach Chat with direct 1-click workout application."
+                ]
+            },
             {
                 "version": "v2.2.2",
                 "date": "2026-10-21",

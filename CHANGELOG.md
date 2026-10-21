@@ -5,6 +5,14 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.3] - 2026-10-21
+### Changed
+- **Direct GPX Route Uploader**: Converted the workout controls bar below the profile canvas into a dedicated, clean Route Uploader (`🗺️ Upload Route (.gpx)`). Uploading a `.gpx` file immediately parses distance and elevation and applies the route pacing plan directly to the workout stage without requiring a manual regeneration click.
+- **Removed Legacy 'Adapt / Plan Ride' Text Input**: Removed the legacy text box and button that triggered coarse keyword pattern matching instead of nuanced interval editing.
+- **Conversational Coach Chat Alignment**: Unified all natural language interval modifications (e.g. extending surges, custom step durations, rest valley adjustments) into the Gemini AI Coach Chat (`💬 Edit in Coach Chat`), which accurately contextualizes existing intervals and provides 1-click workout updates.
+
+---
+
 ## [2.2.2] - 2026-10-21
 ### Fixed
 - **Automated Morning Whoop Refresh & Continuous Biometric Heartbeat**: Fixed an issue where morning Whoop recovery scores stopped auto-refreshing when opening the app. Added 15-minute recency sync tracking (`last_whoop_sync_timestamp`), unfinalized recovery auto-sync (re-syncs if morning sleep/recovery is missing or zero), and integrated automatic sync across Dashboard, Workout generation, and client boot.
