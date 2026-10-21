@@ -121,8 +121,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.5",
-        "release_name": "Mobile Settings Form Layout & Date Input Alignment",
+        "version": "2.2.6",
+        "release_name": "Forecasted Workout Preview & Interactive Interval Breakdown",
         "build_date": "2026-10-21",
         "services": {
             "whoop": "v2 REST API",
@@ -132,6 +132,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.6",
+                "date": "2026-10-21",
+                "title": "Forecasted Workout Preview & Interactive Interval Breakdown",
+                "items": [
+                    "Clickable 3-Day Forecast Cards: Athletes can now click on any day card in the 3-day forward training forecast to launch an interactive, high-fidelity Workout Preview Modal.",
+                    "Full-Color Canvas Profile & Wattage Telemetry: Dynamically visualizes the forecasted session's interval sequence, progressive ramp warmup, work intervals, recovery spin valleys, and cooldown, scaled to athlete FTP with 100% FTP threshold reference line.",
+                    "Structured Step-by-Step Interval Breakdown: Detailed list displaying every interval repetition, target power (% FTP & exact Watts), target cadence (RPM), and duration.",
+                    "1-Click Target Day Zwift Sync & Coach Chat: Direct 'Push to Zwift for This Day' button enables staging future rides directly to Apple TV / Zwift, plus 1-click 'Edit in Coach Chat' alignment."
+                ]
+            },
             {
                 "version": "v2.2.5",
                 "date": "2026-10-21",

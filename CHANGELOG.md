@@ -5,6 +5,15 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.6] - 2026-10-21
+### Added
+- **Clickable 3-Day Forecast Workout Previews**: Clicking on any forecast day card in the 3-day forward training forecast launches a high-fidelity Workout Preview Modal displaying the full session preview, projected readiness score, duration, and target strain metrics.
+- **Dynamic Interval Canvas Profile**: Embeds an interactive, high-DPI interval profile canvas within the modal, color-coding progressive ramp warmups, work intervals, recovery valleys, and cooldown ramps according to physiological power zones, with 100% FTP threshold line reference and exact target watts.
+- **Structured Step-by-Step Interval Breakdown**: Displays every step of the workout with interval name, duration (minutes and seconds), power target (% FTP and calculated Watts based on athlete FTP), and recommended cadence (RPM).
+- **Target Date Zwift Sync & Coach Chat Integration**: Added a 1-click `🚀 Push to Zwift for This Day` button to stage upcoming rides directly to Zwift/Intervals.icu ahead of time, plus a `💬 Edit in Coach Chat` shortcut with pre-populated prompt.
+
+---
+
 ## [2.2.5] - 2026-10-21
 ### Fixed
 - **Mobile Settings Modal Form Grid & Date Input Alignment**: Fixed an issue on mobile devices (e.g. iPhone Safari / PWA) where the Target Event Date input and adjacent fields in the Settings modal blew out past the right boundary of the cyan card container onto the modal backdrop.

@@ -50,6 +50,7 @@ class OutdoorSelectRequest(BaseModel):
 
 class IntervalsPushRequest(BaseModel):
     target_date: Optional[str] = None
+    workout: Optional[Dict[str, Any]] = None
 
 class ReplaceCustomRideRequest(BaseModel):
     description: Optional[str] = ""
@@ -768,7 +769,7 @@ def push_to_zwift_via_intervals(req: IntervalsPushRequest):
         
     workout_cache = get_current_workout_cache()
     options_cache = get_current_options_cache()
-    workout = workout_cache or options_cache.get("workout_primary")
+    workout = req.workout or workout_cache or options_cache.get("workout_primary")
     if not workout:
         gen = generate_workout(WorkoutGenerateRequest(duration_min=60))
         workout = gen["active_workout"]

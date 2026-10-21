@@ -3517,7 +3517,8 @@ function renderDebrief(data) {
 
   const outlookCardsGrid = document.getElementById("outlookCardsGrid");
   if (outlookCardsGrid && Array.isArray(outlook)) {
-    outlookCardsGrid.innerHTML = outlook.map(item => {
+    state.cachedOutlook = outlook;
+    outlookCardsGrid.innerHTML = outlook.map((item, idx) => {
       let zoneColor = "#10b981";
       let zoneBg = "rgba(16, 185, 129, 0.1)";
       if (item.projected_zone === "yellow") {
@@ -3565,7 +3566,7 @@ function renderDebrief(data) {
         : '';
 
       return `
-        <div class="outlook-card" ${cardStyle}>
+        <div class="outlook-card" data-forecast-idx="${idx}" ${cardStyle} role="button" tabindex="0" title="Click to preview workout & intervals for ${item.date_relative}">
           <div class="outlook-card-header">
             <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.4rem;">
               <span class="outlook-card-date">${item.date_relative} • ${item.date_formatted}</span>
@@ -3585,9 +3586,28 @@ function renderDebrief(data) {
             ${zwiftTag}
           </div>
           <div class="outlook-card-desc">${item.description}</div>
+          <div class="outlook-preview-hint">
+            <span>🔍 Preview workout &amp; intervals</span>
+            <span style="font-size:0.85rem;">&rarr;</span>
+          </div>
         </div>
       `;
     }).join("");
+
+    outlookCardsGrid.querySelectorAll(".outlook-card").forEach(card => {
+      card.addEventListener("click", () => {
+        const idx = parseInt(card.getAttribute("data-forecast-idx"), 10);
+        if (!isNaN(idx) && state.cachedOutlook && state.cachedOutlook[idx]) {
+          openForecastModal(state.cachedOutlook[idx]);
+        }
+      });
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          card.click();
+        }
+      });
+    });
   }
 
   // 3. Recovery Protocol
@@ -3688,6 +3708,477 @@ if (inputDebriefUserNote) {
       triggerDebriefAnalysis(note);
     }
   });
+}
+
+// ============================================================================
+// FORECAST WORKOUT PREVIEW MODAL
+// ============================================================================
+const modalForecastPreview = document.getElementById("modalForecastPreview");
+const btnCloseForecastModal = document.getElementById("btnCloseForecastModal");
+const btnCancelForecastModal = document.getElementById("btnCancelForecastModal");
+
+if (btnCloseForecastModal) {
+  btnCloseForecastModal.addEventListener("click", () => {
+    if (modalForecastPreview) modalForecastPreview.classList.remove("open", "active");
+  });
+}
+if (btnCancelForecastModal) {
+  btnCancelForecastModal.addEventListener("click", () => {
+    if (modalForecastPreview) modalForecastPreview.classList.remove("open", "active");
+  });
+}
+if (modalForecastPreview) {
+  modalForecastPreview.addEventListener("click", (e) => {
+    if (e.target === modalForecastPreview) {
+      modalForecastPreview.classList.remove("open", "active");
+    }
+  });
+}
+
+function openForecastModal(item) {
+  if (!item) return;
+  const modal = document.getElementById("modalForecastPreview");
+  if (!modal) return;
+
+  const titleEl = document.getElementById("forecastModalTitle");
+  const subEl = document.getElementById("forecastModalSubtitle");
+  const nameEl = document.getElementById("forecastModalWorkoutName");
+  const badgeEl = document.getElementById("forecastModalBadgeType");
+  const focusTagEl = document.getElementById("forecastModalFocusTag");
+  const recPillEl = document.getElementById("forecastModalRecoveryPill");
+  const recSubEl = document.getElementById("forecastModalRecoverySub");
+
+  if (titleEl) titleEl.textContent = `Forecast Preview: ${item.date_relative || 'Upcoming Ride'}`;
+  if (subEl) subEl.textContent = `${item.date_relative || ''} • ${item.date_formatted || ''}`;
+  if (nameEl) nameEl.textContent = item.title || "Scheduled Ride";
+  
+  if (focusTagEl) {
+    focusTagEl.textContent = item.focus || "Structured Workout";
+  }
+
+  if (badgeEl) {
+    if (item.is_athlete_adjusted) {
+      badgeEl.textContent = "✍️ Athlete Note";
+      badgeEl.style.color = "#a78bfa";
+      badgeEl.style.borderColor = "rgba(167,139,250,0.4)";
+      badgeEl.style.background = "rgba(167,139,250,0.12)";
+    } else if (item.is_directive_rest) {
+      badgeEl.textContent = "📋 Schedule Directive";
+      badgeEl.style.color = "#10b981";
+      badgeEl.style.borderColor = "rgba(16,185,129,0.4)";
+      badgeEl.style.background = "rgba(16,185,129,0.12)";
+    } else if (item.is_coach_scheduled) {
+      badgeEl.textContent = "💬 Coach Scheduled";
+      badgeEl.style.color = "var(--accent-cyan)";
+      badgeEl.style.borderColor = "rgba(6,182,212,0.4)";
+      badgeEl.style.background = "rgba(6,182,212,0.12)";
+    } else {
+      badgeEl.textContent = "⭐ Coach Forecast";
+      badgeEl.style.color = "var(--accent-cyan)";
+      badgeEl.style.borderColor = "rgba(6,182,212,0.3)";
+      badgeEl.style.background = "rgba(6,182,212,0.08)";
+    }
+  }
+
+  // Recovery & Zone
+  let zoneColor = "#10b981";
+  let zoneBg = "rgba(16, 185, 129, 0.15)";
+  const z = (item.projected_zone || "").toLowerCase();
+  if (z === "yellow") {
+    zoneColor = "#f59e0b";
+    zoneBg = "rgba(245, 158, 11, 0.15)";
+  } else if (z === "red") {
+    zoneColor = "#f43f5e";
+    zoneBg = "rgba(244, 63, 94, 0.15)";
+  }
+
+  if (recPillEl) {
+    recPillEl.textContent = `⚡ ~${item.projected_recovery}% ${(item.projected_zone || '').toUpperCase()}`;
+    recPillEl.style.color = zoneColor;
+    recPillEl.style.borderColor = `${zoneColor}50`;
+    recPillEl.style.background = zoneBg;
+  }
+  if (recSubEl) {
+    recSubEl.textContent = `Projected Readiness for ${item.date_relative || 'Day'}`;
+  }
+
+  // Quick Metrics
+  const durEl = document.getElementById("forecastModalDur");
+  const xssEl = document.getElementById("forecastModalXss");
+  const tssEl = document.getElementById("forecastModalTss");
+  const focusDurEl = document.getElementById("forecastModalFocusDur");
+  const graphDurEl = document.getElementById("forecastModalGraphDuration");
+  const ftpLineLbl = document.getElementById("forecastModalFtpLineLbl");
+
+  if (durEl) durEl.textContent = `${item.duration_min || 0} min`;
+  if (xssEl) xssEl.textContent = item.estimated_xss ? `~${item.estimated_xss} XSS` : `${item.estimated_tss || 0} TSS`;
+  if (tssEl) tssEl.textContent = `${item.estimated_tss || 0} TSS`;
+  if (focusDurEl) focusDurEl.textContent = item.focus_duration || "Endurance Base";
+  if (graphDurEl) graphDurEl.textContent = `• ${item.duration_min || 0}:00 Total`;
+  if (ftpLineLbl) ftpLineLbl.textContent = `-- 100% FTP (${state.ftp || 250}W)`;
+
+  // Coach Rationale
+  const rationaleEl = document.getElementById("forecastModalRationale");
+  if (rationaleEl) {
+    rationaleEl.textContent = item.ai_rationale || item.description || "Adaptive workout prescribed to build aerobic fitness and match weekly periodization.";
+  }
+
+  // Open the Modal first so canvas has dimensions in DOM
+  modal.classList.add("open", "active");
+
+  // Render Canvas with requestAnimationFrame to ensure accurate canvas width
+  requestAnimationFrame(() => {
+    drawForecastCanvas(item);
+  });
+
+  // Render Step-by-Step Intervals Table
+  renderForecastSteps(item);
+
+  // Zwift Button Setup
+  const btnPushZwift = document.getElementById("btnForecastPushZwift");
+  if (btnPushZwift) {
+    const isRest = (item.duration_min === 0) || item.is_directive_rest || (item.title && item.title.toLowerCase().includes("rest"));
+    if (isRest) {
+      btnPushZwift.style.display = "none";
+    } else {
+      btnPushZwift.style.display = "inline-flex";
+      btnPushZwift.onclick = async () => {
+        btnPushZwift.textContent = "⏳ Sending to Zwift...";
+        btnPushZwift.disabled = true;
+        try {
+          const payload = {
+            target_date: item.target_date || item.date_iso,
+            workout: {
+              title: item.title,
+              duration_minutes: item.duration_min,
+              estimated_tss: item.estimated_tss,
+              focus_area: item.focus,
+              description: item.description,
+              intervals: item.intervals || []
+            }
+          };
+          const res = await fetch("/api/workouts/push-intervals-icu", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+          const result = await res.json();
+          if (result.success) {
+            btnPushZwift.textContent = "✅ Synced to Zwift!";
+            showToast(`🚀 "${item.title}" successfully synced to Zwift for ${item.date_formatted}!`);
+            setTimeout(() => {
+              btnPushZwift.textContent = "🚀 Push to Zwift for This Day";
+              btnPushZwift.disabled = false;
+            }, 3000);
+          } else {
+            showToast(result.error || "Failed to push to Zwift.");
+            btnPushZwift.textContent = "🚀 Push to Zwift for This Day";
+            btnPushZwift.disabled = false;
+          }
+        } catch (err) {
+          showToast("⚠️ Network error syncing to Zwift.");
+          btnPushZwift.textContent = "🚀 Push to Zwift for This Day";
+          btnPushZwift.disabled = false;
+        }
+      };
+    }
+  }
+
+  // Discuss in Coach Chat Button Setup
+  const btnDiscuss = document.getElementById("btnForecastDiscussCoach");
+  if (btnDiscuss) {
+    btnDiscuss.onclick = () => {
+      modal.classList.remove("open", "active");
+      const coachDrawer = document.getElementById("coachChatDrawer");
+      const backdrop = document.getElementById("coachChatBackdrop");
+      if (coachDrawer) coachDrawer.classList.add("open");
+      if (backdrop) backdrop.classList.add("open");
+      const input = document.getElementById("inputCoachMessage");
+      if (input) {
+        input.value = `Can you explain the plan for ${item.date_relative}'s ${item.title} (${item.duration_min}m)? What should my target pacing and nutrition strategy be?`;
+        input.focus();
+      }
+    };
+  }
+}
+
+function drawForecastCanvas(item) {
+  const canvas = document.getElementById("forecastIntervalCanvas");
+  if (!canvas) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const displayWidth = Math.max(Math.round(rect.width), 300);
+  const displayHeight = Math.max(Math.round(rect.height), 150);
+  canvas.width = displayWidth * dpr;
+  canvas.height = displayHeight * dpr;
+
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const w = displayWidth;
+  const h = displayHeight;
+
+  ctx.clearRect(0, 0, w, h);
+
+  const rawIntervals = (item && item.intervals) || [];
+  const flattened = [];
+
+  for (const seg of rawIntervals) {
+    const t = (seg.type || "").toLowerCase();
+    if (t === "repeats" || t === "intervalblock" || t === "intervals") {
+      const reps = seg.repeat || 1;
+      for (let r = 0; r < reps; r++) {
+        flattened.push({
+          duration_sec: seg.on_duration_sec,
+          power_pct: seg.on_power_pct,
+          cadence: seg.cadence || 92,
+          name: `${seg.name || "Work"} (Rep ${r + 1}/${reps})`,
+          type: "interval"
+        });
+        flattened.push({
+          duration_sec: seg.off_duration_sec,
+          power_pct: seg.off_power_pct,
+          cadence: seg.cadence_rest || 85,
+          name: "Rest Valley",
+          type: "rest"
+        });
+      }
+    } else if (t === "warmup") {
+      flattened.push({
+        duration_sec: seg.duration_sec,
+        power_low_pct: seg.power_low_pct || 45,
+        power_high_pct: seg.power_high_pct || 75,
+        cadence: seg.cadence || 88,
+        type: "ramp",
+        name: seg.name || "Warmup Ramp"
+      });
+    } else if (t === "cooldown") {
+      flattened.push({
+        duration_sec: seg.duration_sec,
+        power_low_pct: seg.power_low_pct || 65,
+        power_high_pct: seg.power_high_pct || 40,
+        cadence: seg.cadence || 82,
+        type: "ramp",
+        name: seg.name || "Cooldown Ramp"
+      });
+    } else {
+      flattened.push({
+        duration_sec: seg.duration_sec,
+        power_pct: seg.power_pct || 65,
+        cadence: seg.cadence || 90,
+        type: "steady",
+        name: seg.name || "Steady"
+      });
+    }
+  }
+
+  if (flattened.length === 0) {
+    ctx.fillStyle = "rgba(16, 185, 129, 0.08)";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#10b981";
+    ctx.font = "bold 13px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("🛋️ Rest Day Directive • Rest & Recovery", w / 2, h / 2 - 8);
+    ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
+    ctx.font = "11px sans-serif";
+    ctx.fillText("Off-the-bike recovery or gentle flush spin (<55% FTP) to support supercompensation.", w / 2, h / 2 + 14);
+    ctx.textAlign = "left";
+    return;
+  }
+
+  const totalSec = flattened.reduce((sum, s) => sum + (s.duration_sec || 0), 0) || 2700;
+  const maxPowerPct = 125;
+  const bottomPadding = 12;
+  const topPadding = 18;
+  const chartHeight = h - bottomPadding - topPadding;
+  const athleteFtp = state.ftp || 250;
+
+  // Draw 100% FTP line
+  const ftpY = h - bottomPadding - (100 / maxPowerPct) * chartHeight;
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(0, ftpY);
+  ctx.lineTo(w, ftpY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
+  ctx.font = "10px sans-serif";
+  ctx.fillText(`100% FTP (${athleteFtp}W)`, 6, ftpY - 4);
+
+  let currentX = 0;
+  for (let i = 0; i < flattened.length; i++) {
+    const seg = flattened[i];
+    const segW = (seg.duration_sec / totalSec) * w;
+
+    if (seg.type === "ramp") {
+      const avgPct = (seg.power_low_pct + seg.power_high_pct) / 2;
+      const zone = getPowerZone(avgPct);
+      const startH = (seg.power_low_pct / maxPowerPct) * chartHeight;
+      const endH = (seg.power_high_pct / maxPowerPct) * chartHeight;
+
+      const yStart = h - bottomPadding - startH;
+      const yEnd = h - bottomPadding - endH;
+
+      ctx.beginPath();
+      ctx.moveTo(currentX, h - bottomPadding);
+      ctx.lineTo(currentX, yStart);
+      ctx.lineTo(currentX + segW, yEnd);
+      ctx.lineTo(currentX + segW, h - bottomPadding);
+      ctx.closePath();
+
+      const grad = ctx.createLinearGradient(0, Math.min(yStart, yEnd), 0, h - bottomPadding);
+      grad.addColorStop(0, zone.color);
+      grad.addColorStop(1, `${zone.color}35`);
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      ctx.strokeStyle = zone.color;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else {
+      const pct = seg.power_pct || 65;
+      const zone = getPowerZone(pct);
+      const segH = Math.min((pct / maxPowerPct) * chartHeight, chartHeight + 10);
+      const y = h - bottomPadding - segH;
+
+      const grad = ctx.createLinearGradient(0, y, 0, h - bottomPadding);
+      grad.addColorStop(0, zone.color);
+      grad.addColorStop(1, `${zone.color}35`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(currentX, y, segW, segH);
+
+      ctx.strokeStyle = zone.color;
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(currentX, y, segW, segH);
+
+      if (segW > 38) {
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 10px sans-serif";
+        ctx.textAlign = "center";
+        const watts = Math.round(athleteFtp * (pct / 100));
+        ctx.fillText(`${watts}W`, currentX + segW / 2, y + 14);
+        ctx.textAlign = "left";
+      }
+    }
+
+    currentX += segW;
+  }
+}
+
+function renderForecastSteps(item) {
+  const container = document.getElementById("forecastStepsList");
+  const countBadge = document.getElementById("forecastStepsCountBadge");
+  if (!container) return;
+
+  const rawIntervals = (item && item.intervals) || [];
+  if (rawIntervals.length === 0) {
+    if (countBadge) countBadge.textContent = "Rest Day";
+    container.innerHTML = `
+      <div style="font-size:0.78rem;color:var(--text-muted);padding:0.75rem;text-align:center;">
+        🛋️ No structured intervals scheduled for this day (Rest / Recovery).
+      </div>
+    `;
+    return;
+  }
+
+  const flattened = [];
+  for (const seg of rawIntervals) {
+    const t = (seg.type || "").toLowerCase();
+    if (t === "repeats" || t === "intervalblock" || t === "intervals") {
+      const reps = seg.repeat || 1;
+      for (let r = 0; r < reps; r++) {
+        flattened.push({
+          duration_sec: seg.on_duration_sec,
+          power_pct: seg.on_power_pct,
+          cadence: seg.cadence || 92,
+          name: `${seg.name || "Work Interval"} (Rep ${r + 1}/${reps})`,
+          is_ramp: false
+        });
+        flattened.push({
+          duration_sec: seg.off_duration_sec,
+          power_pct: seg.off_power_pct,
+          cadence: seg.cadence_rest || 85,
+          name: "Rest Valley",
+          is_ramp: false
+        });
+      }
+    } else if (t === "warmup") {
+      flattened.push({
+        duration_sec: seg.duration_sec,
+        power_low_pct: seg.power_low_pct || 45,
+        power_high_pct: seg.power_high_pct || 75,
+        cadence: seg.cadence || 88,
+        name: seg.name || "Progressive Warmup Ramp",
+        is_ramp: true
+      });
+    } else if (t === "cooldown") {
+      flattened.push({
+        duration_sec: seg.duration_sec,
+        power_low_pct: seg.power_low_pct || 65,
+        power_high_pct: seg.power_high_pct || 40,
+        cadence: seg.cadence || 82,
+        name: seg.name || "Progressive Cooldown Ramp",
+        is_ramp: true
+      });
+    } else {
+      flattened.push({
+        duration_sec: seg.duration_sec,
+        power_pct: seg.power_pct || 65,
+        cadence: seg.cadence || 90,
+        name: seg.name || "Steady Endurance",
+        is_ramp: false
+      });
+    }
+  }
+
+  if (countBadge) {
+    countBadge.textContent = `${flattened.length} Steps • ${item.duration_min || 0}m`;
+  }
+
+  const athleteFtp = state.ftp || 250;
+  container.innerHTML = flattened.map((step, idx) => {
+    let zoneClass = "zone-z2";
+    let powerDisplay = "";
+    const avgPct = step.is_ramp ? Math.round((step.power_low_pct + step.power_high_pct) / 2) : step.power_pct;
+    const zone = getPowerZone(avgPct);
+
+    if (avgPct < 55) zoneClass = "zone-z1";
+    else if (avgPct <= 75) zoneClass = "zone-z2";
+    else if (avgPct <= 87) zoneClass = "zone-z3";
+    else if (avgPct <= 93) zoneClass = "zone-ss";
+    else if (avgPct <= 105) zoneClass = "zone-z4";
+    else if (avgPct <= 120) zoneClass = "zone-z5";
+    else zoneClass = "zone-z6";
+
+    if (step.is_ramp) {
+      const lowW = Math.round(athleteFtp * (step.power_low_pct / 100));
+      const highW = Math.round(athleteFtp * (step.power_high_pct / 100));
+      powerDisplay = `${lowW}W &rarr; ${highW}W (${step.power_low_pct}% &rarr; ${step.power_high_pct}%)`;
+    } else {
+      const watts = Math.round(athleteFtp * (step.power_pct / 100));
+      powerDisplay = `<b>${watts}W</b> (${step.power_pct}% FTP)`;
+    }
+
+    const durMins = formatTime(step.duration_sec);
+
+    return `
+      <div class="forecast-step-row ${zoneClass}">
+        <div style="display:flex;align-items:center;gap:0.45rem;min-width:0;flex:1;">
+          <span style="font-size:0.68rem;color:var(--text-muted);font-weight:700;min-width:18px;">#${idx + 1}</span>
+          <div style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+            <div style="font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${step.name}</div>
+            <div style="font-size:0.68rem;color:${zone.color};font-weight:600;">${zone.short} • ⏱️ ${durMins}</div>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-size:0.75rem;color:#fff;">${powerDisplay}</div>
+          <div style="font-size:0.68rem;color:var(--text-muted);">${step.cadence || 90} RPM</div>
+        </div>
+      </div>
+    `;
+  }).join("");
 }
 
 // ============================================================================

@@ -2199,13 +2199,58 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
-  transition: transform 0.2s ease, border-color 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  position: relative;
 }
 
 .outlook-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(6, 182, 212, 0.3);
+  border-color: var(--accent-cyan) !important;
+  box-shadow: 0 6px 22px rgba(6, 182, 212, 0.15) !important;
 }
+
+.outlook-card:active {
+  transform: translateY(0);
+}
+
+.outlook-preview-hint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 0.55rem;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  font-size: 0.72rem;
+  color: var(--accent-cyan);
+  font-weight: 600;
+  transition: color 0.15s ease;
+}
+
+.outlook-card:hover .outlook-preview-hint {
+  color: #38bdf8;
+}
+
+/* Forecast Step Row */
+.forecast-step-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.45rem 0.65rem;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  font-size: 0.76rem;
+  border-left: 3.5px solid transparent;
+  gap: 0.5rem;
+}
+
+.forecast-step-row.zone-z1 { border-left-color: #64748b; }
+.forecast-step-row.zone-z2 { border-left-color: #38bdf8; }
+.forecast-step-row.zone-z3 { border-left-color: #10b981; }
+.forecast-step-row.zone-ss { border-left-color: #f59e0b; }
+.forecast-step-row.zone-z4 { border-left-color: #ea580c; }
+.forecast-step-row.zone-z5 { border-left-color: #f43f5e; }
+.forecast-step-row.zone-z6 { border-left-color: #a855f7; }
 
 .outlook-card-header {
   display: flex;

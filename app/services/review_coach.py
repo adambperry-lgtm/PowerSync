@@ -912,6 +912,11 @@ def build_daily_review_and_outlook_local(
                 item["focus_duration"] = f_dur
                 item["projected_recovery"] = 84
                 item["projected_zone"] = "green"
+                item["intervals"] = [
+                    {"type": "Warmup", "duration_sec": 600, "power_low_pct": 50, "power_high_pct": 75, "cadence": 88, "name": "Event Warmup Ramp"},
+                    {"type": "SteadyState", "duration_sec": max(1200, (p_dur - 15) * 60), "power_pct": 72 if p_type == "Endurance" else (82 if "Tempo" in p_type else 88), "cadence": 88, "name": f"Event Pacing: {p_title}"},
+                    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 65, "power_high_pct": 45, "cadence": 80, "name": "Event Cooldown"}
+                ]
                 item["description"] = (
                     f"TARGET EVENT DAY: {p_title} ({p_dist:.1f} mi, est. {est_xss} XSS / {p_tss} TSS). "
                     f"Target pacing: {p_type} ({f_dur}). Fuel with 60–80g carbs/hr and maintain consistent electrolyte hydration."
@@ -929,6 +934,16 @@ def build_daily_review_and_outlook_local(
                 item["focus_duration"] = "Sprinter / Neuromuscular (0:20 Focus)"
                 item["projected_recovery"] = 78
                 item["projected_zone"] = "green"
+                item["intervals"] = [
+                    {"type": "Warmup", "duration_sec": 480, "power_low_pct": 45, "power_high_pct": 70, "cadence": 88, "name": "Progressive Warmup"},
+                    {"type": "Interval", "duration_sec": 30, "power_pct": 115, "cadence": 105, "name": "Neural Opener 1"},
+                    {"type": "SteadyState", "duration_sec": 150, "power_pct": 55, "cadence": 85, "name": "Spin Easy"},
+                    {"type": "Interval", "duration_sec": 30, "power_pct": 115, "cadence": 105, "name": "Neural Opener 2"},
+                    {"type": "SteadyState", "duration_sec": 150, "power_pct": 55, "cadence": 85, "name": "Spin Easy"},
+                    {"type": "Interval", "duration_sec": 30, "power_pct": 115, "cadence": 105, "name": "Neural Opener 3"},
+                    {"type": "SteadyState", "duration_sec": 150, "power_pct": 55, "cadence": 85, "name": "Spin Easy"},
+                    {"type": "Cooldown", "duration_sec": 360, "power_low_pct": 65, "power_high_pct": 40, "cadence": 85, "name": "Cooling Spin"}
+                ]
                 item["description"] = (
                     f"T-1 Primer: 30-min easy spin with 3x 30s cadence openers (~22 XSS). "
                     f"Wakes up motor unit firing while sparing glycogen for tomorrow's {p_dist:.1f} mi ride."
@@ -946,6 +961,11 @@ def build_daily_review_and_outlook_local(
                 item["focus_duration"] = "Active Flush / Base (>1h Focus)"
                 item["projected_recovery"] = 70
                 item["projected_zone"] = "green"
+                item["intervals"] = [
+                    {"type": "Warmup", "duration_sec": 300, "power_low_pct": 35, "power_high_pct": 45, "cadence": 85, "name": "Gentle Spin"},
+                    {"type": "SteadyState", "duration_sec": 1500, "power_pct": 48, "cadence": 88, "name": "Zone 1 Active Flush"},
+                    {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 45, "power_high_pct": 35, "cadence": 80, "name": "Easy Spin Out"}
+                ]
                 item["description"] = (
                     f"T-2 Primer: Gentle Zone 1 spin (<55% FTP, ~20 Low XSS) to promote recovery before {p_title}."
                 )
@@ -1005,6 +1025,8 @@ def build_daily_review_and_outlook_local(
             item["focus_duration"] = f_dur
             item["is_coach_scheduled"] = True
             item["scheduled_workout_id"] = scheduled_w.get("id")
+            if scheduled_w.get("intervals"):
+                item["intervals"] = scheduled_w.get("intervals")
             item["description"] = f"Coach-Scheduled: {w_desc} Calibrated for your {ftp}W FTP and synced to Zwift/Intervals.icu."
 
     # 3. RECOVERY PROTOCOL FOR TONIGHT
