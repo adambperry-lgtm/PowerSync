@@ -304,13 +304,13 @@ def generate_workout(req: WorkoutGenerateRequest):
         for w in bundle["all_options"]:
             for interval in w.get("intervals", []):
                 if "power_pct" in interval:
-                    interval["power_pct"] = max(40, int(interval["power_pct"] * multiplier))
+                    interval["power_pct"] = max(40, round(interval["power_pct"] * multiplier))
                 if "on_power_pct" in interval:
-                    interval["on_power_pct"] = max(45, int(interval["on_power_pct"] * multiplier))
+                    interval["on_power_pct"] = max(45, round(interval["on_power_pct"] * multiplier))
                 if "power_low_pct" in interval:
-                    interval["power_low_pct"] = max(35, int(interval["power_low_pct"] * multiplier))
+                    interval["power_low_pct"] = max(35, round(interval["power_low_pct"] * multiplier))
                 if "power_high_pct" in interval:
-                    interval["power_high_pct"] = max(45, int(interval["power_high_pct"] * multiplier))
+                    interval["power_high_pct"] = max(45, round(interval["power_high_pct"] * multiplier))
             if w.get("estimated_tss", 0) > 0:
                 base_tss = w.get("base_estimated_tss") or w["estimated_tss"]
                 w["base_estimated_tss"] = base_tss
@@ -756,8 +756,9 @@ def download_zwo_file():
 
 @router.post("/push-intervals-icu")
 def push_to_zwift_via_intervals(req: IntervalsPushRequest):
-    athlete_id = get_setting("intervals_athlete_id", "")
-    api_key = get_setting("intervals_icu_api_key", "")
+    uid = get_current_user_id()
+    athlete_id = get_setting("intervals_athlete_id", "", user_id=uid)
+    api_key = get_setting("intervals_icu_api_key", "", user_id=uid)
     
     if not athlete_id or not api_key or "•" in api_key or "\u2022" in api_key:
         return {
@@ -773,7 +774,7 @@ def push_to_zwift_via_intervals(req: IntervalsPushRequest):
         workout = gen["active_workout"]
         
     target_date = req.target_date or get_athlete_date().isoformat()
-    ftp = int(get_setting("athlete_ftp", 250))
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
     result = push_to_intervals_icu(athlete_id, api_key, workout, target_date, ftp=ftp)
     if result.get("success"):
         from app.database import save_scheduled_workout

@@ -5,6 +5,13 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.4] - 2026-10-21
+### Fixed
+- **Zwift ERG Target Wattage Precision Calibration**: Fixed an issue where interval target wattages on Zwift appeared 1-2 watts lower than in the PowerSync dashboard. Zwift's C++ ERG game engine integer-truncates floating-point power ratios (e.g. `(int)(275 * 0.89) = 244W` instead of `245W`, and `round(91.5%, 2) = 0.91 -> 250W` instead of `252W`). Calibrated `.zwo` export using target-watt centering (`_calculate_zwo_power`), guaranteeing 100% exact integer watt matching between PowerSync and Zwift ERG mode across all athlete FTPs.
+- **User-Scoped Intervals.icu Sync**: Added explicit `user_id` scoping in `push_to_zwift_via_intervals` to ensure the active athlete's exact FTP and API credentials are used for calendar synchronization.
+
+---
+
 ## [2.2.3] - 2026-10-21
 ### Changed
 - **Direct GPX Route Uploader**: Converted the workout controls bar below the profile canvas into a dedicated, clean Route Uploader (`🗺️ Upload Route (.gpx)`). Uploading a `.gpx` file immediately parses distance and elevation and applies the route pacing plan directly to the workout stage without requiring a manual regeneration click.

@@ -177,6 +177,28 @@ def reconcile_workout_intervals(intervals: List[Dict[str, Any]], target_duration
 
     return reconciled
 
+def _calculate_zwo_power(power_pct: float, athlete_ftp: int = 250, explicit_watts: Optional[float] = None) -> float:
+    """
+    Calculates the exact Power ratio for Zwift .zwo XML.
+    
+    Zwift's ERG workout engine computes integer target watts by truncating:
+        target_watts = static_cast<int>(athlete_ftp * Power)
+    
+    In PowerSync, athletes see:
+        display_watts = round(athlete_ftp * (power_pct / 100.0))
+        
+    To guarantee Zwift computes the exact same integer target_watts without
+    being 1-2 watts lower due to float truncation or IEEE 754 under-representation:
+    We target (display_watts + 0.15) / athlete_ftp with 4 decimal places of precision.
+    """
+    if not athlete_ftp or athlete_ftp <= 0:
+        return round(float(power_pct) / 100.0, 4)
+    if explicit_watts is not None and explicit_watts > 0:
+        target_watts = round(float(explicit_watts))
+    else:
+        target_watts = round(float(athlete_ftp) * (float(power_pct) / 100.0))
+    return round((target_watts + 0.15) / float(athlete_ftp), 4)
+
 def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> str:
     """
     Generates a Zwift .zwo XML file string from structured workout intervals.
@@ -214,8 +236,8 @@ def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> st
         duration = int(item.get("duration_sec", 300))
         
         if seg_type == "warmup":
-            p_low = round(float(item.get("power_low_pct", 50)) / 100.0, 2)
-            p_high = round(float(item.get("power_high_pct", 75)) / 100.0, 2)
+            p_low = _calculate_zwo_power(item.get("power_low_pct", 50), athlete_ftp, item.get("low_watts"))
+            p_high = _calculate_zwo_power(item.get("power_high_pct", 75), athlete_ftp, item.get("high_watts"))
             elem = ET.SubElement(workout, "Warmup", {
                 "Duration": str(duration),
                 "PowerLow": str(p_low),
@@ -225,8 +247,8 @@ def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> st
                 elem.set("Cadence", str(item["cadence"]))
                 
         elif seg_type == "cooldown":
-            p_low = round(float(item.get("power_low_pct", 75)) / 100.0, 2)
-            p_high = round(float(item.get("power_high_pct", 45)) / 100.0, 2)
+            p_low = _calculate_zwo_power(item.get("power_low_pct", 75), athlete_ftp, item.get("low_watts"))
+            p_high = _calculate_zwo_power(item.get("power_high_pct", 45), athlete_ftp, item.get("high_watts"))
             elem = ET.SubElement(workout, "Cooldown", {
                 "Duration": str(duration),
                 "PowerLow": str(p_low),
@@ -239,8 +261,8 @@ def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> st
             repeat = int(item.get("repeat", 3))
             on_dur = int(item.get("on_duration_sec", 180))
             off_dur = int(item.get("off_duration_sec", 120))
-            on_p = round(float(item.get("on_power_pct", 95)) / 100.0, 2)
-            off_p = round(float(item.get("off_power_pct", 55)) / 100.0, 2)
+            on_p = _calculate_zwo_power(item.get("on_power_pct", 95), athlete_ftp, item.get("on_watts"))
+            off_p = _calculate_zwo_power(item.get("off_power_pct", 55), athlete_ftp, item.get("off_watts"))
             elem = ET.SubElement(workout, "IntervalsT", {
                 "Repeat": str(repeat),
                 "OnDuration": str(on_dur),
@@ -254,8 +276,8 @@ def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> st
                 elem.set("CadenceRest", str(item["cadence_rest"]))
                 
         elif seg_type == "ramp":
-            p_low = round(float(item.get("power_low_pct", 60)) / 100.0, 2)
-            p_high = round(float(item.get("power_high_pct", 90)) / 100.0, 2)
+            p_low = _calculate_zwo_power(item.get("power_low_pct", 60), athlete_ftp, item.get("low_watts"))
+            p_high = _calculate_zwo_power(item.get("power_high_pct", 90), athlete_ftp, item.get("high_watts"))
             elem = ET.SubElement(workout, "Ramp", {
                 "Duration": str(duration),
                 "PowerLow": str(p_low),
@@ -265,7 +287,7 @@ def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> st
                 elem.set("Cadence", str(item["cadence"]))
                 
         else: # steadystate / recovery
-            power = round(float(item.get("power_pct", 65)) / 100.0, 2)
+            power = _calculate_zwo_power(item.get("power_pct", 65), athlete_ftp, item.get("power_watts") or item.get("target_watts"))
             elem = ET.SubElement(workout, "SteadyState", {
                 "Duration": str(duration),
                 "Power": str(power)

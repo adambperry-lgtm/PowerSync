@@ -121,17 +121,27 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.3",
-        "release_name": "Dedicated Route Uploader & Conversational Coach Chat Alignment",
+        "version": "2.2.4",
+        "release_name": "Zwift ERG Target Wattage Precision Calibration",
         "build_date": "2026-10-21",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
             "zwift": "Intervals.icu Cloud Bridge",
-            "ai_coach": "Google Gemini 2.5 Flash",
+            "ai_coach":"Google Gemini 2.5 Flash",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.4",
+                "date": "2026-10-21",
+                "title": "Zwift ERG Target Wattage Precision Calibration",
+                "items": [
+                    "Eliminated 1-2 Watt Truncation Drop: Fixed an issue where Zwift's C++ ERG game engine integer-truncated floating-point power ratios from .zwo files, causing targets in Zwift to appear 1-2W lower than in PowerSync.",
+                    "Exact-Watt Centering Calibration: Calibrated .zwo power ratio export with high-precision centering ((target_watts + 0.15) / ftp) to guarantee 100% exact integer watt matching across all athlete FTPs.",
+                    "User-Scoped Sync Lookups: Scoped Intervals.icu credentials and athlete FTP directly to user session in push endpoint."
+                ]
+            },
             {
                 "version": "v2.2.3",
                 "date": "2026-10-21",
