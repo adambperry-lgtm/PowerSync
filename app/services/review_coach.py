@@ -1119,7 +1119,7 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
                     base_review["today_assessment"]["ai_coach_insights"] = clean_insights
                 if custom_prompt and "Athlete Note:" not in base_review["today_assessment"]["assessment_text"]:
                     base_review["today_assessment"]["assessment_text"] += f"\n\nAthlete Note: '{custom_prompt}' — accounted for in fatigue decay and forward outlook modeling."
-            if enhanced_assessment.get("tomorrow_guidance"):
+            if enhanced_assessment and enhanced_assessment.get("tomorrow_guidance"):
                 clean_guidance = str(enhanced_assessment["tomorrow_guidance"]).strip()
                 if len(clean_guidance) > 10 and not clean_guidance.startswith("{"):
                     orig_desc = base_review["outlook_days"][0]["description"]
