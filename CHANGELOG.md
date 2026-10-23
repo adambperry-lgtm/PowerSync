@@ -5,6 +5,17 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.7] - 2026-10-23
+### Added
+- **Collective Multi-Workout Daily Assessment**: When an athlete logs multiple rides in a single calendar day (e.g. main Sweet Spot session followed by a post-ride cooldown spin, or morning commute + evening intervals), the AI Coach assessment automatically groups and evaluates all sessions collectively rather than evaluating only the most recent cooldown spin.
+- **Coggan 4th-Power Normalized Power Aggregation**: Implemented 4th-power weighting ($\left(\sum NP_i^4 t_i / \sum t_i\right)^{1/4}$) across multi-session training days to preserve the physiological intensity of the primary workout rather than dragging average power down to cooldown recovery levels.
+- **Additive Training Load Summation**: Sums power-based TSS, suffer score, distance, elevation gain, and 3-tier XSS (Low, High, Peak strain) across all daily sessions for true aggregate systemic strain and accurate forward fatigue decay modeling.
+- **Primary Effort Target Compliance**: Identifies primary vs secondary/cooldown sessions so compliance scoring and verdicts evaluate fidelity against the prescribed workout target zone, ensuring athletes are rewarded with high execution scores (e.g. "Execution Bullseye") rather than penalized for spinning easy to clear lactate.
+- **Session Breakdown UI Badges**: Added responsive session pills directly beneath the Daily Debrief heading displaying individual workout duration, watts, and TSS for each session completed.
+- **Collective LLM Coach Prompting**: Updated Google Gemini 2.5 Flash coach prompt with detailed session-by-session telemetry and strict directives to assess the day's training collectively, explicitly recognizing active recovery flushes.
+
+---
+
 ## [2.2.6] - 2026-10-21
 ### Added
 - **Clickable 3-Day Forecast Workout Previews**: Clicking on any forecast day card in the 3-day forward training forecast launches a high-fidelity Workout Preview Modal displaying the full session preview, projected readiness score, duration, and target strain metrics.

@@ -9,9 +9,34 @@ from app.services.program_service import get_current_program
 from app.services.strava_service import get_strava_trailing_stats
 from app.services.whoop_service import get_trailing_whoop_stats
 
+def get_activity_date_str(a: Optional[Dict[str, Any]]) -> str:
+    """Extracts local calendar date YYYY-MM-DD from an activity dictionary."""
+    if not a or not isinstance(a, dict):
+        return ""
+    raw_str = a.get("raw_json")
+    if raw_str:
+        try:
+            import ast
+            if isinstance(raw_str, str) and raw_str.startswith("{"):
+                try:
+                    raw_dict = json.loads(raw_str)
+                except Exception:
+                    raw_dict = ast.literal_eval(raw_str)
+            elif isinstance(raw_str, dict):
+                raw_dict = raw_str
+            else:
+                raw_dict = {}
+            local_start = raw_dict.get("start_date_local", "")
+            if local_start:
+                return str(local_start)[:10]
+        except Exception:
+            pass
+    start_date = a.get("start_date") or a.get("date") or ""
+    return str(start_date)[:10]
+
 def get_today_and_recent_activities() -> Dict[str, Any]:
     """
-    Identifies activities completed today (or in the last 24h),
+    Identifies activities completed today (or groups activities for the evaluated day),
     and falls back to recent activities if none completed today.
     """
     strava_tokens = get_setting("strava_tokens", None)
@@ -41,32 +66,26 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
     
     today_activities = []
     for a in activities:
-        # Determine the activity's local or calendar date
-        act_date = a.get("start_date", "")[:10]
-        raw_str = a.get("raw_json")
-        if raw_str:
-            try:
-                import ast
-                if isinstance(raw_str, str) and raw_str.startswith("{"):
-                    try:
-                        raw_dict = json.loads(raw_str)
-                    except Exception:
-                        raw_dict = ast.literal_eval(raw_str)
-                else:
-                    raw_dict = {}
-                local_start = raw_dict.get("start_date_local", "")
-                if local_start:
-                    act_date = local_start[:10]
-            except Exception:
-                pass
-        
+        act_date = get_activity_date_str(a)
         if act_date == today_iso:
             today_activities.append(a)
 
     latest_activity = activities[0] if activities else None
 
+    # Identify all activities for the evaluated day:
+    # If athlete trained today, group all today's workouts collectively.
+    # If athlete did not train today but trained recently, group all workouts matching latest_activity's date.
+    if today_activities:
+        day_activities = today_activities
+    elif latest_activity:
+        latest_date = get_activity_date_str(latest_activity)
+        day_activities = [a for a in activities if get_activity_date_str(a) == latest_date]
+    else:
+        day_activities = []
+
     return {
         "today_activities": today_activities,
+        "day_activities": day_activities,
         "has_trained_today": len(today_activities) > 0,
         "latest_activity": latest_activity,
         "all_recent": activities[:5]
@@ -595,12 +614,14 @@ def build_daily_review_and_outlook_local(
     program: Dict[str, Any],
     ftp: int = 250,
     max_hr: int = 185,
-    custom_prompt: str = ""
+    custom_prompt: str = "",
+    day_acts: Optional[List[Dict[str, Any]]] = None
 ) -> Dict[str, Any]:
     """
     Generates a deep physiological Debrief of completed workouts
     and a forward-looking 3-day training outlook based on acute fatigue decay.
-    Accurately distinguishes sessions completed today vs. yesterday/earlier.
+    Accurately distinguishes sessions completed today vs. yesterday/earlier,
+    and aggregates multiple workouts on the same day collectively.
     """
     today = get_athlete_date()
     today_iso = today.isoformat()
@@ -617,47 +638,159 @@ def build_daily_review_and_outlook_local(
     load_profile = trailing_strava.get("load_profile", "Evenly Distributed")
     
     has_trained_today = len(today_acts) > 0
-    analyzed_act = today_acts[0] if has_trained_today else latest_act
+
+    # Resolve all sessions completed on the evaluated day
+    if day_acts is not None:
+        evaluated_acts = list(day_acts)
+    elif has_trained_today:
+        evaluated_acts = list(today_acts)
+    elif latest_act:
+        evaluated_acts = [latest_act]
+    else:
+        evaluated_acts = []
     
-    # 1. EVALUATION OF COMPLETED SESSION
-    if analyzed_act:
-        act_name = analyzed_act.get("name", "Ride")
-        act_sec = analyzed_act.get("moving_time_sec", 0)
-        act_min = act_sec // 60
-        act_dist_km = round(analyzed_act.get("distance_meters", 0) / 1000.0, 1)
-        act_elev_m = int(analyzed_act.get("total_elevation_gain", 0))
-        act_watts = round(analyzed_act.get("weighted_average_watts") or analyzed_act.get("average_watts") or 0.0)
-        act_hr = round(analyzed_act.get("average_heartrate") or 0)
-        act_suffer = int(analyzed_act.get("suffer_score") or 0)
-        pct_ftp = round((act_watts / max(1, ftp)) * 100) if act_watts > 0 else 65
-
-        # Calculate True Coggan Power-based TSS (Training Stress Score)
-        if act_sec > 0 and act_watts > 0 and ftp > 0:
-            intensity_factor = act_watts / ftp
-            power_tss = round((act_sec * act_watts * intensity_factor) / (ftp * 3600.0) * 100)
-        else:
-            power_tss = 0
-
+    # 1. EVALUATION OF COMPLETED SESSION(S)
+    if evaluated_acts:
         from app.services.strain_model_service import calculate_activity_strain
-        act_strain = calculate_activity_strain(analyzed_act, ftp=ftp)
-        total_xss = int(act_strain.get("total_xss", 0))
 
-        # True Training Stress: prioritize power-based TSS, fallback to suffer_score or total XSS
-        calculated_tss = power_tss if power_tss > 0 else (act_suffer if act_suffer > 0 else total_xss)
+        # Sort chronologically so session 1 is first effort of the day
+        sorted_acts = sorted(evaluated_acts, key=lambda a: a.get("start_date") or "")
+
+        # Identify primary session (highest work / suffer score / moving time)
+        primary_act = max(
+            evaluated_acts,
+            key=lambda a: (
+                (a.get("kilojoules") or 0)
+                or (int(a.get("moving_time_sec", 0) or 0) * float(a.get("weighted_average_watts") or a.get("average_watts") or 0.0))
+                or int(a.get("suffer_score") or 0)
+                or int(a.get("moving_time_sec", 0) or 0)
+            )
+        )
+
+        # Collective duration, distance, elevation, suffer score
+        act_sec = sum(int(a.get("moving_time_sec", 0) or 0) for a in evaluated_acts)
+        act_min = act_sec // 60
+        act_dist_km = round(sum(float(a.get("distance_meters", 0) or 0) for a in evaluated_acts) / 1000.0, 1)
+        act_elev_m = sum(int(a.get("total_elevation_gain", 0) or 0) for a in evaluated_acts)
+        act_suffer = sum(int(a.get("suffer_score") or 0) for a in evaluated_acts)
+
+        # Coggan 4th-power normalized power across all sessions
+        total_weighted_p4 = 0.0
+        total_p_dur = 0
+        for a in evaluated_acts:
+            dur = int(a.get("moving_time_sec", 0) or 0)
+            w = float(a.get("weighted_average_watts") or a.get("average_watts") or 0.0)
+            if dur > 0 and w > 0:
+                total_weighted_p4 += dur * (w ** 4)
+                total_p_dur += dur
+        if total_p_dur > 0 and total_weighted_p4 > 0:
+            act_watts = round((total_weighted_p4 / total_p_dur) ** 0.25)
+        else:
+            act_watts = round(primary_act.get("weighted_average_watts") or primary_act.get("average_watts") or 0.0)
+
+        # Time-weighted average Heart Rate across all sessions
+        total_hr_dur = 0
+        total_hr_weighted = 0.0
+        for a in evaluated_acts:
+            dur = int(a.get("moving_time_sec", 0) or 0)
+            hr = float(a.get("average_heartrate") or 0.0)
+            if dur > 0 and hr > 0:
+                total_hr_weighted += dur * hr
+                total_hr_dur += dur
+        if total_hr_dur > 0:
+            act_hr = round(total_hr_weighted / total_hr_dur)
+        else:
+            act_hr = round(primary_act.get("average_heartrate") or 0)
+
+        pct_ftp = round((act_watts / max(1, ftp)) * 100) if act_watts > 0 else 65
+        primary_watts = round(primary_act.get("weighted_average_watts") or primary_act.get("average_watts") or 0.0)
+        primary_pct_ftp = round((primary_watts / max(1, ftp)) * 100) if primary_watts > 0 else 65
+
+        # Individual session breakdown and cumulative 3-tier strain
+        sessions_list = []
+        total_power_tss = 0
+        total_calculated_tss = 0
+        total_low_xss = 0.0
+        total_high_xss = 0.0
+        total_peak_xss = 0.0
+        total_xss = 0.0
+        min_w_bal_pct = 100.0
+
+        for a in sorted_acts:
+            s_sec = int(a.get("moving_time_sec", 0) or 0)
+            s_min = s_sec // 60
+            s_watts = round(a.get("weighted_average_watts") or a.get("average_watts") or 0.0)
+            s_hr = round(a.get("average_heartrate") or 0)
+            s_dist_km = round(float(a.get("distance_meters", 0) or 0) / 1000.0, 1)
+            s_elev_m = int(a.get("total_elevation_gain", 0) or 0)
+            s_suffer = int(a.get("suffer_score") or 0)
+
+            if s_sec > 0 and s_watts > 0 and ftp > 0:
+                s_if = s_watts / ftp
+                s_p_tss = round((s_sec * s_watts * s_if) / (ftp * 3600.0) * 100)
+            else:
+                s_p_tss = 0
+
+            s_strain = calculate_activity_strain(a, ftp=ftp)
+            s_tot_xss = float(s_strain.get("total_xss", 0.0))
+            s_calc_tss = s_p_tss if s_p_tss > 0 else (s_suffer if s_suffer > 0 else int(s_tot_xss))
+
+            total_power_tss += s_p_tss
+            total_calculated_tss += s_calc_tss
+            total_low_xss += float(s_strain.get("low_xss", 0.0))
+            total_high_xss += float(s_strain.get("high_xss", 0.0))
+            total_peak_xss += float(s_strain.get("peak_xss", 0.0))
+            total_xss += s_tot_xss
+            if float(s_strain.get("min_w_bal_pct", 100.0)) < min_w_bal_pct:
+                min_w_bal_pct = float(s_strain.get("min_w_bal_pct", 100.0))
+
+            sessions_list.append({
+                "id": a.get("id"),
+                "name": a.get("name", "Ride"),
+                "is_primary": (a is primary_act),
+                "moving_time_sec": s_sec,
+                "moving_time_min": s_min,
+                "moving_time_formatted": f"{s_min // 60}h {s_min % 60}m" if s_min >= 60 else f"{s_min}m",
+                "distance_km": s_dist_km,
+                "distance_miles": round(s_dist_km * 0.621371, 1),
+                "elevation_m": s_elev_m,
+                "elevation_ft": int(s_elev_m * 3.28084),
+                "weighted_watts": s_watts,
+                "avg_hr": s_hr,
+                "suffer_score": s_suffer,
+                "tss": s_calc_tss,
+                "pct_ftp": round((s_watts / max(1, ftp)) * 100) if s_watts > 0 else 0,
+                "total_xss": round(s_tot_xss, 1),
+                "focus_duration": s_strain.get("focus_duration", "Endurance")
+            })
+
+        power_tss = total_power_tss
+        calculated_tss = total_calculated_tss
+
+        # Composite strain data object
+        primary_strain = calculate_activity_strain(primary_act, ftp=ftp)
+        act_strain = {
+            "low_xss": round(total_low_xss, 1),
+            "high_xss": round(total_high_xss, 1),
+            "peak_xss": round(total_peak_xss, 1),
+            "total_xss": round(total_xss, 1),
+            "min_w_bal_pct": round(min_w_bal_pct, 1),
+            "battery_depleted_pct": round(100.0 - min_w_bal_pct, 1),
+            "focus_duration": primary_strain.get("focus_duration", "Endurance / Century (>1h Focus)")
+        }
+
+        # Activity Title
+        if len(evaluated_acts) > 1:
+            other_names = [a.get("name", "Ride") for a in sorted_acts if a is not primary_act]
+            if len(sorted_acts) == 2:
+                act_name = f"2 Sessions: {primary_act.get('name', 'Main Ride')} + {other_names[0]}"
+            else:
+                act_name = f"{len(sorted_acts)} Sessions: {primary_act.get('name', 'Main Ride')} (+{len(other_names)} more)"
+        else:
+            act_name = evaluated_acts[0].get("name", "Ride")
 
         # Determine activity date
-        act_date_str = analyzed_act.get("start_date", "")[:10]
-        raw_str = analyzed_act.get("raw_json")
-        if raw_str:
-            try:
-                import ast
-                raw_dict = ast.literal_eval(raw_str) if isinstance(raw_str, str) and raw_str.startswith("{") else {}
-                local_start = raw_dict.get("start_date_local", "")
-                if local_start:
-                    act_date_str = local_start[:10]
-            except Exception:
-                pass
-
+        act_date_str = get_activity_date_str(primary_act or evaluated_acts[0])
         is_today = (act_date_str == today_iso)
         is_yesterday = (act_date_str == yesterday_iso)
         
@@ -700,81 +833,148 @@ def build_daily_review_and_outlook_local(
             target_pct_ftp = 90
             target_zone_name = "Sweet Spot / VO2 Max"
 
-        power_diff = act_watts - int(ftp * (target_pct_ftp / 100.0))
-        diff_pct = abs(pct_ftp - target_pct_ftp)
+        # Pacing diff: evaluate against primary effort (or combined) so cooldown doesn't penalize
+        diff_pct_primary = abs(primary_pct_ftp - target_pct_ftp)
+        diff_pct_combined = abs(pct_ftp - target_pct_ftp)
+        diff_pct = min(diff_pct_primary, diff_pct_combined)
         compliance_score = max(55, min(99, 100 - int(diff_pct * 1.5)))
+
+        is_multi = len(evaluated_acts) > 1
 
         if diff_pct <= 8:
             verdict = "Execution Bullseye"
             verdict_badge = "🎯 Target Mastered"
             verdict_color = "emerald"
-            if is_today:
-                assessment_text = (
-                    f"Outstanding discipline during today's '{act_name}' ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP). "
-                    f"You matched your {workout_recovery}% Whoop recovery by holding power within your target "
-                    f"{target_zone_name} ceiling ({workout_strain:.1f} Whoop day strain). Your average heart rate ({act_hr} bpm) "
-                    f"indicates clean aerobic effort without excessive strain."
-                )
-            elif is_yesterday:
-                assessment_text = (
-                    f"Outstanding pacing discipline during yesterday's '{act_name}' ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP). "
-                    f"You executed to your {workout_recovery}% Whoop recovery baseline, logging {act_suffer} TSS and "
-                    f"{workout_strain:.1f} day strain within your target {target_zone_name}. This balanced aerobic stimulus "
-                    f"protected recovery, keeping today's readiness at {today_recovery}% ({today_strain:.1f} strain today)."
-                )
+            if is_multi:
+                if is_today:
+                    assessment_text = (
+                        f"Outstanding multi-session execution today across {len(evaluated_acts)} workouts ({act_min}m combined, "
+                        f"{act_watts}W combined NP, {calculated_tss} TSS). Your primary effort '{primary_act.get('name')}' nailed your target "
+                        f"({primary_pct_ftp}% FTP, {primary_watts}W) aligning with your {workout_recovery}% Whoop recovery, "
+                        f"followed by an active recovery flush to clear lactate without adding cardiac fatigue ({act_hr} bpm avg). "
+                        f"Both sessions collectively built quality aerobic stimulus ({workout_strain:.1f} Whoop strain)."
+                    )
+                elif is_yesterday:
+                    assessment_text = (
+                        f"Outstanding multi-session execution yesterday across {len(evaluated_acts)} workouts ({act_min}m combined, "
+                        f"{act_watts}W combined NP, {calculated_tss} TSS). Your primary session '{primary_act.get('name')}' locked onto your "
+                        f"{target_zone_name} target ({primary_pct_ftp}% FTP, {primary_watts}W), followed by a dedicated cooldown spin. "
+                        f"Logging {calculated_tss} TSS and {workout_strain:.1f} strain on {workout_recovery}% recovery protected systemic fatigue, "
+                        f"keeping today's readiness at {today_recovery}%."
+                    )
+                else:
+                    assessment_text = (
+                        f"Disciplined multi-session training across {len(evaluated_acts)} workouts from {relative_day_label} "
+                        f"({act_min}m combined, {act_watts}W combined NP, {calculated_tss} TSS, {workout_strain:.1f} Whoop strain). "
+                        f"Today's recovery sits at {today_recovery}%."
+                    )
             else:
-                assessment_text = (
-                    f"Disciplined pacing in '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP, "
-                    f"{workout_strain:.1f} strain on {workout_recovery}% recovery). Today's recovery sits at {today_recovery}%."
-                )
-        elif pct_ftp > target_pct_ftp + 8:
+                if is_today:
+                    assessment_text = (
+                        f"Outstanding discipline during today's '{act_name}' ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP). "
+                        f"You matched your {workout_recovery}% Whoop recovery by holding power within your target "
+                        f"{target_zone_name} ceiling ({workout_strain:.1f} Whoop day strain). Your average heart rate ({act_hr} bpm) "
+                        f"indicates clean aerobic effort without excessive strain."
+                    )
+                elif is_yesterday:
+                    assessment_text = (
+                        f"Outstanding pacing discipline during yesterday's '{act_name}' ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP). "
+                        f"You executed to your {workout_recovery}% Whoop recovery baseline, logging {calculated_tss} TSS and "
+                        f"{workout_strain:.1f} day strain within your target {target_zone_name}. This balanced aerobic stimulus "
+                        f"protected recovery, keeping today's readiness at {today_recovery}% ({today_strain:.1f} strain today)."
+                    )
+                else:
+                    assessment_text = (
+                        f"Disciplined pacing in '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP, "
+                        f"{workout_strain:.1f} strain on {workout_recovery}% recovery). Today's recovery sits at {today_recovery}%."
+                    )
+        elif primary_pct_ftp > target_pct_ftp + 8:
             verdict = "Intensity Overreach"
             verdict_badge = "⚠️ Exceeded Target Zone"
             verdict_color = "amber"
-            if is_today:
-                assessment_text = (
-                    f"In today's session '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP), power was pushed {diff_pct}% "
-                    f"above your prescribed {target_zone_name} target. While cardiovascular stimulus was strong "
-                    f"({act_suffer} TSS logged, {workout_strain:.1f} Whoop strain), digging into anaerobic and sweet-spot reserves "
-                    f"on a {workout_recovery}% recovery day shifts your acute fatigue load upward. "
-                    f"Prioritize hydration and sleep tonight to ensure tomorrow's adaptation."
-                )
-            elif is_yesterday:
-                assessment_text = (
-                    f"In yesterday's session '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP), power was pushed {diff_pct}% "
-                    f"above your prescribed {target_zone_name} target. You logged {act_suffer} TSS and accumulated a heavy "
-                    f"{workout_strain:.1f} Whoop day strain against a {workout_recovery}% recovery baseline. Digging into anaerobic "
-                    f"and sweet-spot reserves yesterday is the primary driver of today's recovery dip to {today_recovery}% "
-                    f"(with {today_strain:.1f} Whoop strain accumulated so far today). With today serving as an absorption day, "
-                    f"prioritize restorative sleep tonight to clear residual glycogen debt and unlock tomorrow's rebound."
-                )
+            if is_multi:
+                if is_today:
+                    assessment_text = (
+                        f"Across today's {len(evaluated_acts)} sessions ({act_min}m combined, {calculated_tss} TSS), the primary effort "
+                        f"'{primary_act.get('name')}' pushed power ({primary_pct_ftp}% FTP, {primary_watts}W) above your prescribed "
+                        f"{target_zone_name} target. While following with a cooldown spin aided metabolic clearing, accumulating {workout_strain:.1f} "
+                        f"Whoop strain on {workout_recovery}% recovery elevates acute fatigue. Prioritize recovery tonight."
+                    )
+                elif is_yesterday:
+                    assessment_text = (
+                        f"In yesterday's {len(evaluated_acts)} sessions ({act_min}m combined, {calculated_tss} TSS), your primary effort "
+                        f"'{primary_act.get('name')}' pushed power ({primary_pct_ftp}% FTP, {primary_watts}W) above your {target_zone_name} "
+                        f"target. Even with a cooldown spin, {workout_strain:.1f} Whoop strain on {workout_recovery}% recovery drove today's "
+                        f"recovery dip to {today_recovery}%. Today serves as an absorption day to clear fatigue."
+                    )
+                else:
+                    assessment_text = (
+                        f"High-intensity multi-session load from {relative_day_label} ({act_min}m, {calculated_tss} TSS, {workout_strain:.1f} strain). "
+                        f"Today's recovery sits at {today_recovery}%."
+                    )
             else:
-                assessment_text = (
-                    f"In '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W, {pct_ftp}% FTP), power was pushed {diff_pct}% "
-                    f"above your prescribed {target_zone_name} target ({act_suffer} TSS logged, {workout_strain:.1f} Whoop strain on "
-                    f"{workout_recovery}% recovery). Today's recovery sits at {today_recovery}% with {today_strain:.1f} daytime strain."
-                )
+                if is_today:
+                    assessment_text = (
+                        f"In today's session '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP), power was pushed {diff_pct}% "
+                        f"above your prescribed {target_zone_name} target. While cardiovascular stimulus was strong "
+                        f"({calculated_tss} TSS logged, {workout_strain:.1f} Whoop strain), digging into anaerobic and sweet-spot reserves "
+                        f"on a {workout_recovery}% recovery day shifts your acute fatigue load upward. "
+                        f"Prioritize hydration and sleep tonight to ensure tomorrow's adaptation."
+                    )
+                elif is_yesterday:
+                    assessment_text = (
+                        f"In yesterday's session '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP), power was pushed {diff_pct}% "
+                        f"above your prescribed {target_zone_name} target. You logged {calculated_tss} TSS and accumulated a heavy "
+                        f"{workout_strain:.1f} Whoop day strain against a {workout_recovery}% recovery baseline. Digging into anaerobic "
+                        f"and sweet-spot reserves yesterday is the primary driver of today's recovery dip to {today_recovery}% "
+                        f"(with {today_strain:.1f} Whoop strain accumulated so far today). With today serving as an absorption day, "
+                        f"prioritize restorative sleep tonight to clear residual glycogen debt and unlock tomorrow's rebound."
+                    )
+                else:
+                    assessment_text = (
+                        f"In '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W, {pct_ftp}% FTP), power was pushed {diff_pct}% "
+                        f"above your prescribed {target_zone_name} target ({calculated_tss} TSS logged, {workout_strain:.1f} Whoop strain on "
+                        f"{workout_recovery}% recovery). Today's recovery sits at {today_recovery}% with {today_strain:.1f} daytime strain."
+                    )
         else:
             verdict = "Conservative Pacing"
             verdict_badge = "🛡️ Recovery Preserved"
             verdict_color = "cyan"
-            if is_today:
-                assessment_text = (
-                    f"Controlled session in today's '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP). "
-                    f"You kept cardiac stress low ({act_hr} bpm), absorbing an easy active recovery stimulus "
-                    f"({workout_strain:.1f} Whoop day strain). Your energy reserves remain well-protected for upcoming training."
-                )
-            elif is_yesterday:
-                assessment_text = (
-                    f"Controlled session during yesterday's '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP, "
-                    f"{workout_strain:.1f} day strain). You kept cardiac stress low ({act_hr} bpm), preserving energy "
-                    f"and supporting today's recovery ({today_recovery}%)."
-                )
+            if is_multi:
+                if is_today:
+                    assessment_text = (
+                        f"Controlled volume across today's {len(evaluated_acts)} sessions ({act_min}m combined, {calculated_tss} TSS, {act_hr} bpm avg). "
+                        f"Both '{primary_act.get('name')}' and your additional spin kept physiological stress conservative ({workout_strain:.1f} Whoop strain), "
+                        f"preserving energy reserves for high-intensity work ahead."
+                    )
+                elif is_yesterday:
+                    assessment_text = (
+                        f"Controlled volume across yesterday's {len(evaluated_acts)} sessions ({act_min}m combined, {calculated_tss} TSS). "
+                        f"Cardiac stress remained modest ({act_hr} bpm avg), supporting today's recovery rebound to {today_recovery}%."
+                    )
+                else:
+                    assessment_text = (
+                        f"Conservative multi-session volume from {relative_day_label} ({act_min}m combined, {calculated_tss} TSS). "
+                        f"Today's recovery sits at {today_recovery}%."
+                    )
             else:
-                assessment_text = (
-                    f"Controlled session in '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W, {pct_ftp}% FTP, "
-                    f"{workout_strain:.1f} strain on {workout_recovery}% recovery). Today's recovery sits at {today_recovery}%."
-                )
+                if is_today:
+                    assessment_text = (
+                        f"Controlled session in today's '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP). "
+                        f"You kept cardiac stress low ({act_hr} bpm), absorbing an easy active recovery stimulus "
+                        f"({workout_strain:.1f} Whoop day strain). Your energy reserves remain well-protected for upcoming training."
+                    )
+                elif is_yesterday:
+                    assessment_text = (
+                        f"Controlled session during yesterday's '{act_name}' ({act_min}m, {act_watts}W, {pct_ftp}% FTP, "
+                        f"{workout_strain:.1f} day strain). You kept cardiac stress low ({act_hr} bpm), preserving energy "
+                        f"and supporting today's recovery ({today_recovery}%)."
+                    )
+                else:
+                    assessment_text = (
+                        f"Controlled session in '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W, {pct_ftp}% FTP, "
+                        f"{workout_strain:.1f} strain on {workout_recovery}% recovery). Today's recovery sits at {today_recovery}%."
+                    )
 
         session_summary = {
             "title": act_name,
@@ -813,7 +1013,9 @@ def build_daily_review_and_outlook_local(
             "min_w_bal_pct": act_strain.get("min_w_bal_pct", 100.0),
             "battery_depleted_pct": act_strain.get("battery_depleted_pct", 0.0),
             "focus_duration": act_strain.get("focus_duration", "Endurance / Century (>1h Focus)"),
-            "strain_data": act_strain
+            "strain_data": act_strain,
+            "sessions": sessions_list,
+            "sessions_count": len(evaluated_acts)
         }
     else:
         is_today = True
@@ -1090,6 +1292,7 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
     
     act_info = get_today_and_recent_activities()
     today_acts = act_info.get("today_activities", [])
+    day_acts = act_info.get("day_activities", today_acts)
     latest_act = act_info.get("latest_activity")
     
     today_iso = get_athlete_date().isoformat()
@@ -1112,7 +1315,8 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
         program=program,
         ftp=ftp,
         max_hr=max_hr,
-        custom_prompt=custom_prompt
+        custom_prompt=custom_prompt,
+        day_acts=day_acts
     )
     base_review["athlete_note"] = custom_prompt
     
@@ -1178,17 +1382,38 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
         "Sun: 60-90+ min endurance"
     ]))
     
+    sessions_list = sess.get("sessions") or []
+    if len(sessions_list) > 1:
+        sessions_breakdown = "Breakdown of ALL sessions completed on this day:\n"
+        for idx, s in enumerate(sessions_list, 1):
+            role_label = "Primary Workout" if s.get("is_primary") else "Cooldown / Recovery Spin"
+            sessions_breakdown += (
+                f"  {idx}. '{s.get('name')}' ({role_label}): {s.get('moving_time_formatted')}, "
+                f"{s.get('weighted_watts')}W ({s.get('pct_ftp')}% FTP), {s.get('avg_hr')} bpm avg, {s.get('tss')} TSS.\n"
+            )
+        eff_tss = sess.get('calculated_tss') if sess.get('calculated_tss') is not None else sess.get('suffer_score', 0)
+        sessions_breakdown += (
+            f"Collective Daily Totals: {sess.get('moving_time_formatted')}, {sess.get('weighted_watts')}W Combined NP, "
+            f"{eff_tss} Total TSS, {sess.get('total_xss')} Total XSS.\n"
+            f"CRITICAL INSTRUCTION FOR MULTI-WORKOUT DAYS: Review ALL sessions of the day collectively. "
+            f"Do NOT focus solely on the cooldown spin. Give the athlete full credit for executing their primary workout effort while "
+            f"acknowledging the cooldown spin as active recovery / lactate flush."
+        )
+    else:
+        eff_tss = sess.get('calculated_tss') if sess.get('calculated_tss') is not None else sess.get('suffer_score', 0)
+        sessions_breakdown = f"Session Metrics: {sess.get('moving_time_formatted')}, {sess.get('weighted_watts')}W ({sess.get('pct_ftp')}% FTP), {eff_tss} TSS."
+
     prompt = (
         f"You are PowerSync's elite cycling sports-science coach. Provide a concise, qualitative debrief for the athlete.\n"
         f"Athlete FTP: {review_data['macrocycle_context']['current_ftp']}W.\n"
         f"Athlete Permanent Schedule & Workout Preferences: {directives_summary}\n"
         f"Timeline & Data: {temporal_context}\n"
-        f"Session Metrics: {sess.get('moving_time_formatted')}, {sess.get('weighted_watts')}W ({sess.get('pct_ftp')}% FTP), {sess.get('suffer_score')} TSS.\n"
+        f"{sessions_breakdown}\n"
         f"Physiological Strain Breakdown: {sess.get('total_xss', 0)} Total XSS ({sess.get('low_strain_xss', 0)} Low / {sess.get('high_strain_xss', 0)} High / {sess.get('peak_strain_xss', 0)} Peak), W' Anaerobic Battery Depleted: {sess.get('battery_depleted_pct', 0)}%, Focus Duration: {sess.get('focus_duration', 'Endurance')}.\n"
         f"Target Zone was: {sess.get('target_zone')}. Compliance verdict: {sess.get('verdict')}.\n"
         f"Tomorrow outlook: {review_data['outlook_days'][0]['title']} (est. {review_data['outlook_days'][0].get('estimated_xss', 50)} XSS, Focus: {review_data['outlook_days'][0].get('focus_duration', 'Sweet Spot')}, {review_data['outlook_days'][0]['focus']}).\n"
         f"Mandatory: All advice and tomorrow guidance MUST strictly respect the athlete's workout and schedule preferences.\n"
-        f"Format response as strict JSON: {{\"insights\": \"1-2 paragraphs assessing session against recovery and explaining fatigue state, under 150 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\"}}"
+        f"Format response as strict JSON: {{\"insights\": \"1-2 paragraphs assessing all sessions of the day collectively against recovery and explaining fatigue state, under 150 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\"}}"
     )
     if custom_prompt:
         prompt += f"\nAthlete note: '{custom_prompt}'"

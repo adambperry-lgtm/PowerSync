@@ -841,7 +841,7 @@ def seed_dev_user_profile(user_id: str, profile: Dict[str, Any]):
         set_setting(k, v, user_id=user_id)
 
     # Whoop metrics: seed today + 6 trailing days
-    today = datetime.date.today()
+    today = get_athlete_date()
     whoop = profile.get("whoop", {})
     base_rec = whoop.get("recovery_score", 75)
     base_hrv = whoop.get("hrv_rmssd", 55.0)
@@ -880,7 +880,12 @@ def seed_dev_user_profile(user_id: str, profile: Dict[str, Any]):
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, id) DO UPDATE SET
-                name = excluded.name, average_watts = excluded.average_watts, weighted_average_watts = excluded.weighted_average_watts
+                start_date = excluded.start_date,
+                name = excluded.name,
+                average_watts = excluded.average_watts,
+                weighted_average_watts = excluded.weighted_average_watts,
+                suffer_score = excluded.suffer_score,
+                kilojoules = excluded.kilojoules
         """, (
             user_id, act["id"], act["name"], act["sport_type"], act_date,
             act["moving_time_sec"] + 300, act["moving_time_sec"],

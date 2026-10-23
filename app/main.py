@@ -121,9 +121,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.6",
-        "release_name": "Forecasted Workout Preview & Interactive Interval Breakdown",
-        "build_date": "2026-10-21",
+        "version": "2.2.7",
+        "release_name": "Multi-Workout Collective Daily Assessment & Coggan Power Integration",
+        "build_date": "2026-10-23",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -132,6 +132,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.7",
+                "date": "2026-10-23",
+                "title": "Multi-Workout Collective Daily Assessment & Coggan Power Integration",
+                "items": [
+                    "Collective Multi-Workout Debrief: AI Coach now aggregates all sessions completed on a single day (e.g. main ride + cooldown spin) collectively instead of assessing only the most recent spin.",
+                    "Coggan 4th-Power NP Aggregation: Combined daily normalized power is calculated via 4th-power weighting to preserve primary workout intensity rather than dragging averages down to cooldown levels.",
+                    "Primary Effort Target Fidelity: Pacing compliance scores evaluate the primary workout's target zone alignment, crediting the athlete for hitting targets while acknowledging cooldowns as active recovery / lactate clearing.",
+                    "Session Breakdown Badges: Daily Debrief header surfaces individual session pills detailing duration, power, and TSS for every ride completed."
+                ]
+            },
             {
                 "version": "v2.2.6",
                 "date": "2026-10-21",

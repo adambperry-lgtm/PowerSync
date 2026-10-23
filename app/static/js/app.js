@@ -3395,26 +3395,47 @@ function renderDebrief(data) {
   const debriefMetricHr = document.getElementById("debriefMetricHr");
   const debriefAssessmentText = document.getElementById("debriefAssessmentText");
 
+  const isMultiSession = assessment.sessions && assessment.sessions.length > 1;
+
   if (debriefActivityMeta) {
-    if (assessment.is_today) {
-      debriefActivityMeta.textContent = "EVALUATION OF COMPLETED SESSION TODAY";
-    } else if (assessment.is_yesterday) {
-      debriefActivityMeta.textContent = `EVALUATION OF YESTERDAY'S SESSION (${assessment.date || "OCT 11"})`;
+    if (isMultiSession) {
+      const sessCount = `${assessment.sessions.length} SESSIONS`;
+      if (assessment.is_today) {
+        debriefActivityMeta.textContent = `COLLECTIVE EVALUATION OF ${sessCount} TODAY`;
+      } else if (assessment.is_yesterday) {
+        debriefActivityMeta.textContent = `COLLECTIVE EVALUATION OF ${sessCount} YESTERDAY (${assessment.date || "OCT 11"})`;
+      } else {
+        debriefActivityMeta.textContent = `COLLECTIVE EVALUATION OF ${sessCount} (${assessment.date || "PREVIOUS"})`;
+      }
     } else {
-      debriefActivityMeta.textContent = `EVALUATION OF RECENT SESSION (${assessment.date || "PREVIOUS"})`;
+      if (assessment.is_today) {
+        debriefActivityMeta.textContent = "EVALUATION OF COMPLETED SESSION TODAY";
+      } else if (assessment.is_yesterday) {
+        debriefActivityMeta.textContent = `EVALUATION OF YESTERDAY'S SESSION (${assessment.date || "OCT 11"})`;
+      } else {
+        debriefActivityMeta.textContent = `EVALUATION OF RECENT SESSION (${assessment.date || "PREVIOUS"})`;
+      }
     }
   }
 
   const tabDebriefToday = document.getElementById("tabDebriefToday");
   if (tabDebriefToday) {
-    tabDebriefToday.innerHTML = assessment.is_today
-      ? "🎯 Today's Debrief"
-      : (assessment.is_yesterday ? "🎯 Yesterday's Debrief" : "🎯 Recent Debrief");
+    if (isMultiSession) {
+      tabDebriefToday.innerHTML = assessment.is_today
+        ? "🎯 Today's Sessions"
+        : (assessment.is_yesterday ? "🎯 Yesterday's Sessions" : "🎯 Recent Sessions");
+    } else {
+      tabDebriefToday.innerHTML = assessment.is_today
+        ? "🎯 Today's Debrief"
+        : (assessment.is_yesterday ? "🎯 Yesterday's Debrief" : "🎯 Recent Debrief");
+    }
   }
 
   const debriefSubtitle = document.getElementById("debriefSubtitle");
   if (debriefSubtitle) {
-    if (assessment.is_yesterday) {
+    if (isMultiSession) {
+      debriefSubtitle.textContent = `Collectively assessing all ${assessment.sessions.length} sessions completed on ${assessment.relative_day_label || "this day"}`;
+    } else if (assessment.is_yesterday) {
       debriefSubtitle.textContent = `Assessing yesterday's session (${assessment.date}) and how it shaped today's recovery`;
     } else {
       debriefSubtitle.textContent = "Assessing completed sessions against prescriptions, goals, and recovery decay";
@@ -3423,6 +3444,27 @@ function renderDebrief(data) {
 
   if (debriefActivityTitle) {
     debriefActivityTitle.textContent = assessment.title || "Rest / Recovery Day";
+  }
+
+  const debriefSessionsBreakdown = document.getElementById("debriefSessionsBreakdown");
+  if (debriefSessionsBreakdown) {
+    if (isMultiSession) {
+      debriefSessionsBreakdown.style.display = "flex";
+      debriefSessionsBreakdown.innerHTML = assessment.sessions.map((s) => {
+        const isPrimary = s.is_primary;
+        const badgeBg = isPrimary ? "rgba(16, 185, 129, 0.15)" : "rgba(56, 189, 248, 0.12)";
+        const borderCol = isPrimary ? "rgba(16, 185, 129, 0.4)" : "rgba(56, 189, 248, 0.3)";
+        const icon = isPrimary ? "⚡" : "🌀";
+        const role = isPrimary ? "Primary Workout" : "Cooldown / Flush";
+        return `<span style="font-size:0.75rem;padding:0.25rem 0.55rem;border-radius:6px;background:${badgeBg};border:1px solid ${borderCol};color:#f1f5f9;display:inline-flex;align-items:center;gap:0.35rem;">` +
+          `<span>${icon} <strong>${s.name}</strong> <span style="color:var(--text-muted);">(${role})</span></span>` +
+          `<span style="color:var(--text-muted);margin-left:0.2rem;">• ${s.moving_time_formatted} • ${s.weighted_watts}W • ${s.tss} TSS</span>` +
+        `</span>`;
+      }).join("");
+    } else {
+      debriefSessionsBreakdown.style.display = "none";
+      debriefSessionsBreakdown.innerHTML = "";
+    }
   }
   if (debriefVerdictBadge) {
     debriefVerdictBadge.textContent = assessment.verdict_badge || "🎯 Target Mastered";
