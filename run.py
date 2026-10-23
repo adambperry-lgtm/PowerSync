@@ -1,4 +1,4 @@
-# PowerSync Platform Runner - v2.2.0
+# PowerSync Platform Runner - v2.2.7
 import os
 import uvicorn
 
