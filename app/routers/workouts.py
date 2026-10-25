@@ -115,6 +115,9 @@ def generate_workout(req: WorkoutGenerateRequest):
     c = conn.cursor()
     c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
     row = c.fetchone()
+    if not row and uid == "usr_guest":
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
+        row = c.fetchone()
     conn.close()
 
     # Auto-sync live Whoop if connected and today's record missing or >15m elapsed

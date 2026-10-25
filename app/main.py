@@ -121,9 +121,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.7",
-        "release_name": "Multi-Workout Collective Daily Assessment & Coggan Power Integration",
-        "build_date": "2026-10-23",
+        "version": "2.2.8",
+        "release_name": "Automatic Whoop Biometric Sync & Session Persistence",
+        "build_date": "2026-10-25",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -132,6 +132,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.8",
+                "date": "2026-10-25",
+                "title": "Automatic Whoop Biometric Sync & Session Persistence",
+                "items": [
+                    "Whoop Auto-Sync on Dashboard Load: Automatically checks and fetches the athlete's latest Whoop metrics in the background upon opening the app and at 15-minute intervals.",
+                    "Persistent Biometric Storage: Synced Whoop biometrics (Recovery %, Sleep %, HRV, RHR, Strain) are permanently stored in SQLite and retained across browser exits, tab closes, and mobile PWA sessions until overwritten by the next sync.",
+                    "Accurate Physiological Date Resolution: Whoop recovery records are correctly aligned to the athlete's wake-up calendar day in their local timezone, eliminating false 'Yesterday' labels and unnecessary re-sync prompts.",
+                    "Zero-Data-Loss Session Bridge: Personal single-owner instances automatically establish persistent sessions and provide seamless credential/biometric fallbacks so unauthenticated visits never revert to empty mock data."
+                ]
+            },
             {
                 "version": "v2.2.7",
                 "date": "2026-10-23",

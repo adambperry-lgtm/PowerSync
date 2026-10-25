@@ -36,7 +36,14 @@ def get_dashboard_data(request: Request = None):
     c = conn.cursor()
     c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
     row = c.fetchone()
+    if not row and uid == "usr_guest":
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
+        row = c.fetchone()
     conn.close()
+
+    whoop_tokens = get_setting("whoop_tokens", {}, user_id=uid)
+    if not whoop_tokens and uid == "usr_guest":
+        whoop_tokens = get_setting("whoop_tokens", {}, user_id="usr_default")
 
     # Auto-sync live Whoop metrics if:
     # 1. Athlete has connected Whoop tokens AND:
@@ -44,6 +51,8 @@ def get_dashboard_data(request: Request = None):
     # 3. More than 15 minutes have elapsed since last sync
     last_whoop_sync_key = "last_whoop_sync_timestamp"
     last_whoop_sync_time = float(get_setting(last_whoop_sync_key, 0.0, user_id=uid) or 0.0)
+    if not last_whoop_sync_time and uid == "usr_guest":
+        last_whoop_sync_time = float(get_setting(last_whoop_sync_key, 0.0, user_id="usr_default") or 0.0)
     now_ts = datetime.datetime.now().timestamp()
 
     needs_whoop_sync = False
@@ -61,10 +70,15 @@ def get_dashboard_data(request: Request = None):
             sync_res = fetch_latest_whoop_metrics(user_id=uid)
             if sync_res.get("success"):
                 set_setting(last_whoop_sync_key, now_ts, user_id=uid)
+                if uid == "usr_guest":
+                    set_setting(last_whoop_sync_key, now_ts, user_id="usr_default")
                 conn = get_db_connection()
                 c = conn.cursor()
                 c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
                 row = c.fetchone()
+                if not row and uid == "usr_guest":
+                    c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
+                    row = c.fetchone()
                 conn.close()
             elif sync_res.get("auth_expired"):
                 whoop_auth_expired = True
@@ -110,7 +124,14 @@ def get_dashboard_data(request: Request = None):
     c = conn.cursor()
     c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
     rows = c.fetchall()
+    if not rows and uid == "usr_guest":
+        c.execute("SELECT * FROM strava_activities WHERE user_id = 'usr_default' ORDER BY start_date DESC LIMIT 30")
+        rows = c.fetchall()
     conn.close()
+
+    strava_tokens = get_setting("strava_tokens", {}, user_id=uid)
+    if not strava_tokens and uid == "usr_guest":
+        strava_tokens = get_setting("strava_tokens", {}, user_id="usr_default")
 
     # Auto-sync live Strava activities if athlete has connected tokens and no activity today (or 10m elapsed)
     if strava_tokens:
@@ -127,6 +148,9 @@ def get_dashboard_data(request: Request = None):
                     c = conn.cursor()
                     c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30", (uid,))
                     rows = c.fetchall()
+                    if not rows and uid == "usr_guest":
+                        c.execute("SELECT * FROM strava_activities WHERE user_id = 'usr_default' ORDER BY start_date DESC LIMIT 30")
+                        rows = c.fetchall()
                     conn.close()
             except Exception:
                 pass

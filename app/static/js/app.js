@@ -196,24 +196,31 @@ async function loadDashboard() {
     loadDebrief();
     updateCoachChatTelemetryChips();
 
-    // Auto-sync Whoop if connected and today's metrics are missing or not marked as today
-    if (data.integrations && data.integrations.whoop && data.integrations.whoop.connected && data.whoop && !data.whoop.is_today && !state.hasAttemptedMorningWhoopSync) {
-      state.hasAttemptedMorningWhoopSync = true;
-      try {
-        const syncRes = await fetch("/api/auth/sync/whoop", { method: "POST" });
-        if (syncRes.ok) {
-          const freshRes = await fetch("/api/dashboard");
-          if (freshRes.ok) {
-            const freshData = await freshRes.json();
-            if (freshData.whoop) {
+    // Auto-sync Whoop if connected and today's metrics are missing or >15m elapsed
+    if (data.integrations && data.integrations.whoop && data.integrations.whoop.connected) {
+      const needsSync = !data.whoop || !data.whoop.is_today || (Date.now() - (state.lastWhoopAutoSyncTime || 0)) > 900000;
+      if (needsSync && !state.isAutoSyncingWhoop) {
+        state.isAutoSyncingWhoop = true;
+        state.lastWhoopAutoSyncTime = Date.now();
+        fetch("/api/auth/sync/whoop", { method: "POST" })
+          .then(r => r.ok ? r.json() : null)
+          .then(syncData => {
+            state.isAutoSyncingWhoop = false;
+            if (syncData && syncData.success) {
+              return fetch("/api/dashboard").then(r => r.json());
+            }
+          })
+          .then(freshData => {
+            if (freshData && freshData.whoop) {
               state.whoop = freshData.whoop;
               renderWhoop(freshData.whoop);
               updateCoachChatTelemetryChips();
             }
-          }
-        }
-      } catch (syncErr) {
-        console.warn("Background morning Whoop sync error:", syncErr);
+          })
+          .catch(syncErr => {
+            state.isAutoSyncingWhoop = false;
+            console.warn("Background Whoop sync error:", syncErr);
+          });
       }
     }
   } catch (err) {
@@ -355,11 +362,13 @@ function renderWhoop(whoop) {
       whoopDateBadge.style.background = "rgba(16, 185, 129, 0.15)";
       whoopDateBadge.style.color = "#10b981";
       whoopDateBadge.onclick = null;
+      whoopDateBadge.title = "Synced Today with Whoop.";
     } else if (whoop.date) {
-      whoopDateBadge.textContent = `${whoop.date} (Yesterday)`;
-      whoopDateBadge.style.background = "rgba(245, 158, 11, 0.15)";
-      whoopDateBadge.style.color = "#f59e0b";
-      whoopDateBadge.title = "Displaying last recorded metrics. Click Sync Whoop or re-authenticate to pull today's data.";
+      whoopDateBadge.textContent = `${whoop.date} (Synced)`;
+      whoopDateBadge.style.background = "rgba(16, 185, 129, 0.15)";
+      whoopDateBadge.style.color = "#10b981";
+      whoopDateBadge.title = "Displaying latest synced Whoop biometrics.";
+      whoopDateBadge.onclick = null;
     }
   }
 }
@@ -6563,20 +6572,32 @@ async function checkAuthStatus() {
       fetch("/api/auth/google/status").catch(() => null),
       fetch("/api/auth/owner-status").catch(() => null)
     ]);
-    if (meRes.ok) {
-      const user = await meRes.json();
-      if (user.is_guest && localStorage.getItem("powersync_token")) {
-        localStorage.removeItem("powersync_token");
-      }
-      currentAthleteUser = user;
-      renderUserNavPill(user);
+    if (ownerRes && ownerRes.ok) {
+      primaryOwnerInfo = await ownerRes.json();
     }
     if (googleRes && googleRes.ok) {
       const gData = await googleRes.json();
       isGoogleOauthConfigured = !!gData.configured;
     }
-    if (ownerRes && ownerRes.ok) {
-      primaryOwnerInfo = await ownerRes.json();
+    if (meRes.ok) {
+      let user = await meRes.json();
+      // If user is guest and instance has not locked owner email, automatically establish primary athlete session
+      if (user.is_guest && (!primaryOwnerInfo || !primaryOwnerInfo.is_locked)) {
+        try {
+          const autoRes = await fetch("/api/auth/primary-login", { method: "POST" });
+          if (autoRes.ok) {
+            const autoData = await autoRes.json();
+            if (autoData.session_token) {
+              localStorage.setItem("powersync_token", autoData.session_token);
+            }
+            user = autoData.user;
+          }
+        } catch (autoErr) {
+          console.warn("Auto primary athlete session establishment note:", autoErr);
+        }
+      }
+      currentAthleteUser = user;
+      renderUserNavPill(user);
     }
     renderAuthModalContent(currentAthleteUser);
   } catch (e) {

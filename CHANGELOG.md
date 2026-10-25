@@ -5,6 +5,16 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.8] - 2026-10-25
+### Added & Fixed
+- **Whoop Auto-Sync on Dashboard Load**: Automatically syncs and updates the athlete's latest Whoop recovery, sleep, and strain metrics in the background upon opening the dashboard and at 15-minute intervals. Eliminates the need for manual button clicks.
+- **Permanent Biometric Storage & Persistence**: Biometrics from Whoop (Recovery %, Sleep Performance %, HRV, RHR, Day Strain) are stored in SQLite and retained across browser exits, tab closes, device restarts, and mobile PWA sessions until overwritten by the next sync.
+- **Accurate Physiological Date & Timezone Resolution**: Correctly aligns Whoop recovery and sleep records to the athlete's local calendar day using their configured timezone and wake-up timestamps, resolving false "Yesterday" badges and perpetual re-sync prompts.
+- **Single-Owner Session Persistence**: Personal deployments automatically establish persistent 30-day authenticated sessions and provide seamless biometric fallbacks for unauthenticated visits, preventing the app from reverting to guest demo mode or dropping connected integrations.
+- **OAuth Session Continuity**: Whoop and Strava OAuth callbacks now issue persistent 30-day session cookies and tokens, ensuring browser redirects immediately transition into authenticated sessions.
+
+---
+
 ## [2.2.7] - 2026-10-23
 ### Added
 - **Collective Multi-Workout Daily Assessment**: When an athlete logs multiple rides in a single calendar day (e.g. main Sweet Spot session followed by a post-ride cooldown spin, or morning commute + evening intervals), the AI Coach assessment automatically groups and evaluates all sessions collectively rather than evaluating only the most recent cooldown spin.

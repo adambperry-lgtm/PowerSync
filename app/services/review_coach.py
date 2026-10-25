@@ -103,6 +103,14 @@ def get_whoop_for_date(target_date_str: str) -> Optional[Dict[str, Any]]:
         WHERE user_id = ? AND date = ?
     """, (uid, target_date_str))
     row = c.fetchone()
+    if not row and uid == "usr_guest":
+        c.execute("""
+            SELECT date, recovery_score, hrv_rmssd, resting_heart_rate,
+                   sleep_performance, sleep_duration_hours, day_strain
+            FROM whoop_metrics
+            WHERE user_id = 'usr_default' AND date = ?
+        """, (target_date_str,))
+        row = c.fetchone()
     conn.close()
     if row:
         return dict(row)

@@ -451,7 +451,7 @@ def strava_login(request: Request, client_id: Optional[str] = None, client_secre
     return RedirectResponse(url)
 
 @router.get("/strava/callback")
-def strava_callback(code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+def strava_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
     if error:
         return {"error": f"Strava authorization was cancelled or denied: {error}"}
     if not code:
@@ -466,7 +466,18 @@ def strava_callback(code: Optional[str] = None, state: Optional[str] = None, err
             fetch_recent_strava_activities(20, user_id=uid)
         except Exception as e:
             print(f"[PowerSync] Note: Background Strava pre-fetch error: {e}")
-        return RedirectResponse("/?strava_connected=1", status_code=302)
+        session_token = create_session(uid, days_valid=30)
+        response = RedirectResponse(f"/?strava_connected=1&session_token={session_token}", status_code=302)
+        response.set_cookie(
+            key="powersync_session",
+            value=session_token,
+            max_age=30 * 86400,
+            httponly=True,
+            samesite="lax",
+            secure=is_production_req(request),
+            path="/"
+        )
+        return response
     return {"error": res.get("error", "Failed to authenticate with Strava")}
 
 @router.get("/whoop/login")
@@ -511,7 +522,18 @@ def whoop_callback(
             fetch_latest_whoop_metrics(user_id=uid)
         except Exception as e:
             print(f"[PowerSync] Note: Background Whoop pre-fetch error: {e}")
-        return RedirectResponse("/?whoop_connected=1", status_code=302)
+        session_token = create_session(uid, days_valid=30)
+        response = RedirectResponse(f"/?whoop_connected=1&session_token={session_token}", status_code=302)
+        response.set_cookie(
+            key="powersync_session",
+            value=session_token,
+            max_age=30 * 86400,
+            httponly=True,
+            samesite="lax",
+            secure=is_production_req(request),
+            path="/"
+        )
+        return response
     return {"error": res.get("error", "Failed to authenticate with Whoop")}
 
 @router.post("/sync/strava")
@@ -540,6 +562,11 @@ def sync_whoop():
     metrics = fetch_latest_whoop_metrics(user_id=uid)
     if metrics.get("error"):
         return {"success": False, "error": metrics.get("error"), "auth_expired": metrics.get("auth_expired", False)}
+    import time
+    now_ts = time.time()
+    set_setting("last_whoop_sync_timestamp", now_ts, user_id=uid)
+    if uid == "usr_guest":
+        set_setting("last_whoop_sync_timestamp", now_ts, user_id="usr_default")
     return {"success": True, "metrics": metrics}
 
 @router.post("/disconnect/{service}")

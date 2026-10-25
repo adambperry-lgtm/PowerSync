@@ -202,6 +202,9 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             c = conn.cursor()
             c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
             whoop_row = c.fetchone()
+            if not whoop_row and uid == "usr_guest":
+                c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
+                whoop_row = c.fetchone()
             conn.close()
             rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
             from app.services.whoop_service import get_trailing_whoop_stats
