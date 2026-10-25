@@ -569,6 +569,30 @@ def sync_whoop():
         set_setting("last_whoop_sync_timestamp", now_ts, user_id="usr_default")
     return {"success": True, "metrics": metrics}
 
+@router.get("/debug/whoop")
+def debug_whoop():
+    uid = get_current_user_id()
+    tokens = get_setting("whoop_tokens", {}, user_id=uid)
+    if not tokens and uid == "usr_guest":
+        tokens = get_setting("whoop_tokens", {}, user_id="usr_default")
+    access_token = tokens.get("access_token") if isinstance(tokens, dict) else None
+    if not access_token:
+        return {"error": "no access token"}
+    headers = {"Authorization": f"Bearer {access_token}"}
+    import requests
+    from app.services.whoop_service import WHOOP_API_BASE
+    c_res = requests.get(f"{WHOOP_API_BASE}/cycle?limit=5", headers=headers, timeout=10)
+    r_res = requests.get(f"{WHOOP_API_BASE}/recovery?limit=5", headers=headers, timeout=10)
+    s_res = requests.get(f"{WHOOP_API_BASE}/activity/sleep?limit=5", headers=headers, timeout=10)
+    return {
+        "cycle_status": c_res.status_code,
+        "cycles": c_res.json() if c_res.status_code == 200 else c_res.text,
+        "recovery_status": r_res.status_code,
+        "recoveries": r_res.json() if r_res.status_code == 200 else r_res.text,
+        "sleep_status": s_res.status_code,
+        "sleeps": s_res.json() if s_res.status_code == 200 else s_res.text
+    }
+
 @router.post("/disconnect/{service}")
 def disconnect_service(service: str):
     uid = get_current_user_id()
