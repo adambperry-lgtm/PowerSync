@@ -266,6 +266,7 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
     today_iso = get_athlete_date(user_id=uid).isoformat()
 
     # Build index mappings
+    rec_by_cycle = {r.get("cycle_id"): r for r in rec_records if r.get("cycle_id")}
     sleep_by_id = {s.get("id"): s for s in sleep_records if s.get("id")}
     sleep_by_cycle = {s.get("cycle_id"): s for s in sleep_records if s.get("cycle_id") and not s.get("nap")}
     cycle_by_id = {c.get("id"): c for c in cycle_records if c.get("id")}
@@ -286,29 +287,48 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
         return daily_records[d]
 
     # Map cycles (strain)
+    # cycle_records is in descending order (index 0 is current day, index 1 is yesterday, etc.)
     for idx, cycle in enumerate(cycle_records):
+        cid = cycle.get("id")
         strain = round(float(cycle.get("score", {}).get("strain", 0.0) or 0.0), 1)
-        # If it is the latest cycle (idx == 0) and (end is None or started today/yesterday evening):
-        if idx == 0 and (cycle.get("end") is None or parse_whoop_iso_date(cycle.get("start"), tz) == today_iso):
-            cycle_date = today_iso
-        else:
-            cycle_date = parse_whoop_iso_date(cycle.get("end") or cycle.get("start"), tz)
+        
+        # Primary date: (today - idx days)
+        cycle_date = (get_athlete_date(user_id=uid) - datetime.timedelta(days=idx)).isoformat()
+        
+        # Cross-reference with matching recovery if available
+        rec = rec_by_cycle.get(cid)
+        if rec and rec.get("created_at"):
+            parsed_rec_date = parse_whoop_iso_date(rec.get("created_at"), tz)
+            if parsed_rec_date:
+                if idx == 0:
+                    cycle_date = today_iso
+                elif parsed_rec_date != today_iso:
+                    cycle_date = parsed_rec_date
+
         if cycle_date:
-            get_or_create_day(cycle_date)["day_strain"] = strain
+            day_entry = get_or_create_day(cycle_date)
+            if idx == 0 or day_entry["day_strain"] is None:
+                day_entry["day_strain"] = strain
 
     # Map sleeps
-    for slp in sleep_records:
+    for idx, slp in enumerate(sleep_records):
         if slp.get("nap"):
             continue
         perf = slp.get("score", {}).get("sleep_performance_percentage")
         milli = slp.get("score", {}).get("stage_summary", {}).get("total_in_bed_time_milli", 0) or 0
         hrs = round(milli / (1000.0 * 3600.0), 1) if milli > 0 else None
         wake_date = parse_whoop_iso_date(slp.get("end") or slp.get("start"), tz)
-        if wake_date:
-            day_entry = get_or_create_day(wake_date)
+        if idx == 0:
+            today_entry = get_or_create_day(today_iso)
             if perf is not None:
-                day_entry["sleep_performance"] = int(perf)
+                today_entry["sleep_performance"] = int(perf)
             if hrs is not None:
+                today_entry["sleep_duration_hours"] = hrs
+        if wake_date and wake_date != today_iso:
+            day_entry = get_or_create_day(wake_date)
+            if day_entry["sleep_performance"] is None and perf is not None:
+                day_entry["sleep_performance"] = int(perf)
+            if day_entry["sleep_duration_hours"] is None and hrs is not None:
                 day_entry["sleep_duration_hours"] = hrs
 
     # Map recoveries
@@ -345,20 +365,20 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
                 if s_milli > 0:
                     today_entry["sleep_duration_hours"] = round(s_milli / (1000.0 * 3600.0), 1)
 
-        if rec_date:
+        if rec_date and rec_date != today_iso:
             day_entry = get_or_create_day(rec_date)
-            if rec_score is not None:
+            if day_entry["recovery_score"] is None and rec_score is not None:
                 day_entry["recovery_score"] = int(rec_score)
-            if hrv_val is not None:
+            if day_entry["hrv_rmssd"] is None and hrv_val is not None:
                 day_entry["hrv_rmssd"] = round(float(hrv_val), 1)
-            if rhr_val is not None:
+            if day_entry["resting_heart_rate"] is None and rhr_val is not None:
                 day_entry["resting_heart_rate"] = int(rhr_val)
             if slp:
                 s_perf = slp.get("score", {}).get("sleep_performance_percentage")
                 s_milli = slp.get("score", {}).get("stage_summary", {}).get("total_in_bed_time_milli", 0) or 0
-                if s_perf is not None:
+                if day_entry["sleep_performance"] is None and s_perf is not None:
                     day_entry["sleep_performance"] = int(s_perf)
-                if s_milli > 0:
+                if day_entry["sleep_duration_hours"] is None and s_milli > 0:
                     day_entry["sleep_duration_hours"] = round(s_milli / (1000.0 * 3600.0), 1)
 
     # Persist all assembled days to SQLite
@@ -401,11 +421,17 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
     for u in target_users:
         set_setting("last_whoop_sync_timestamp", now_ts, user_id=u)
 
-    # Read back latest row
+    # Read back latest row (prioritizing today's record)
     conn = get_db_connection()
     c = conn.cursor()
-    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? AND date = ?", (uid, today_iso))
     latest_row = c.fetchone()
+    if not latest_row:
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+        latest_row = c.fetchone()
+    if not latest_row and uid == GUEST_USER_ID:
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? AND date = ?", (DEFAULT_USER_ID, today_iso))
+        latest_row = c.fetchone()
     if not latest_row and uid == GUEST_USER_ID:
         c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (DEFAULT_USER_ID,))
         latest_row = c.fetchone()

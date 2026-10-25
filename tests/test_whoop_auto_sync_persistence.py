@@ -98,10 +98,18 @@ class TestWhoopAutoSyncAndPersistence(unittest.TestCase):
             "records": [
                 {
                     "id": 99901,
-                    "start": f"{yesterday_iso}T23:30:00.000Z",
+                    "start": f"{today_iso}T04:44:21.090Z",
                     "end": None, # in progress cycle for today
                     "score": {
-                        "strain": 11.5
+                        "strain": 17.7
+                    }
+                },
+                {
+                    "id": 99900,
+                    "start": f"{yesterday_iso}T03:03:25.450Z",
+                    "end": f"{today_iso}T04:44:21.090Z", # ended early morning today
+                    "score": {
+                        "strain": 4.5
                     }
                 }
             ]
@@ -128,7 +136,7 @@ class TestWhoopAutoSyncAndPersistence(unittest.TestCase):
         self.assertEqual(res.get("resting_heart_rate"), 51)
         self.assertEqual(res.get("sleep_performance"), 91)
         self.assertEqual(res.get("sleep_duration_hours"), 8.0)
-        self.assertEqual(res.get("day_strain"), 11.5)
+        self.assertEqual(res.get("day_strain"), 17.7)
 
         # Verify persisted in SQLite for both DEFAULT_USER_ID and GUEST_USER_ID
         conn = get_db_connection()
@@ -137,7 +145,13 @@ class TestWhoopAutoSyncAndPersistence(unittest.TestCase):
         row_def = c.fetchone()
         self.assertIsNotNone(row_def)
         self.assertEqual(int(row_def["recovery_score"]), 82)
-        self.assertEqual(float(row_def["day_strain"]), 11.5)
+        self.assertEqual(float(row_def["day_strain"]), 17.7)
+
+        # Verify yesterday's strain is 4.5, not overwritten by today's or overwriting today's
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? AND date = ?", (DEFAULT_USER_ID, yesterday_iso))
+        row_yest = c.fetchone()
+        self.assertIsNotNone(row_yest)
+        self.assertEqual(float(row_yest["day_strain"]), 4.5)
 
         c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? AND date = ?", (GUEST_USER_ID, today_iso))
         row_guest = c.fetchone()
@@ -157,6 +171,7 @@ class TestWhoopAutoSyncAndPersistence(unittest.TestCase):
         self.assertTrue(whoop["is_today"])
         self.assertEqual(whoop["date"], today_iso)
         self.assertEqual(whoop["recovery_score"], 82)
+        self.assertEqual(whoop["day_strain"], 17.7)
         self.assertEqual(whoop["recovery_zone"], "green")
         self.assertTrue(dash["integrations"]["whoop"]["connected"])
 
@@ -166,7 +181,7 @@ class TestWhoopAutoSyncAndPersistence(unittest.TestCase):
         self.assertIn("whoop", dash_guest)
         # Must return the athlete's real persisted metrics, NOT mock data
         self.assertEqual(dash_guest["whoop"]["recovery_score"], 82)
-        self.assertEqual(dash_guest["whoop"]["day_strain"], 11.5)
+        self.assertEqual(dash_guest["whoop"]["day_strain"], 17.7)
         self.assertTrue(dash_guest["integrations"]["whoop"]["connected"])
 
     def test_03_oauth_callback_sets_persistent_session_cookie(self):

@@ -61,7 +61,7 @@ def get_dashboard_data(request: Request = None):
             needs_whoop_sync = True
         elif not row["recovery_score"] or row["recovery_score"] <= 0:
             needs_whoop_sync = True
-        elif (now_ts - last_whoop_sync_time) > 900:  # 15 minutes
+        elif (now_ts - last_whoop_sync_time) > 120:  # 2 minutes auto-sync window
             needs_whoop_sync = True
 
     if needs_whoop_sync:

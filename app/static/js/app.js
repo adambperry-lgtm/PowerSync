@@ -196,9 +196,9 @@ async function loadDashboard() {
     loadDebrief();
     updateCoachChatTelemetryChips();
 
-    // Auto-sync Whoop if connected and today's metrics are missing or >15m elapsed
+    // Auto-sync Whoop if connected and today's metrics are missing or >60s elapsed
     if (data.integrations && data.integrations.whoop && data.integrations.whoop.connected) {
-      const needsSync = !data.whoop || !data.whoop.is_today || (Date.now() - (state.lastWhoopAutoSyncTime || 0)) > 900000;
+      const needsSync = !data.whoop || !data.whoop.is_today || (Date.now() - (state.lastWhoopAutoSyncTime || 0)) > 60000;
       if (needsSync && !state.isAutoSyncingWhoop) {
         state.isAutoSyncingWhoop = true;
         state.lastWhoopAutoSyncTime = Date.now();
@@ -6985,4 +6985,20 @@ if (document.readyState === "loading") {
 } else {
   bootApp();
 }
+
+// Auto-sync biometrics when athlete switches back into PowerSync (e.g. from Whoop app)
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") {
+    const now = Date.now();
+    if ((now - (state.lastWhoopAutoSyncTime || 0)) > 60000) {
+      loadDashboard();
+    }
+  }
+});
+window.addEventListener("focus", () => {
+  const now = Date.now();
+  if ((now - (state.lastWhoopAutoSyncTime || 0)) > 60000) {
+    loadDashboard();
+  }
+});
 
