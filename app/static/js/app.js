@@ -3269,54 +3269,114 @@ const btnCloseChangelog = document.getElementById("btnCloseChangelog");
 const changelogList = document.getElementById("changelogList");
 const footerVersionBadge = document.getElementById("footerVersionBadge");
 
-async function loadVersionInfo() {
+let isVersionLoading = false;
+let versionDataLoaded = false;
+
+async function loadVersionInfo(force = false) {
+  if (versionDataLoaded && !force && changelogList && changelogList.querySelector(".changelog-entry")) {
+    return;
+  }
+  if (isVersionLoading) return;
+
+  if (changelogList && (!changelogList.querySelector(".changelog-entry") || force)) {
+    changelogList.innerHTML = `
+      <div style="text-align:center;padding:2.5rem 1rem;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+        <div style="width:26px;height:26px;border:3px solid rgba(6,182,212,0.2);border-top-color:var(--accent-cyan,#06b6d4);border-radius:50%;animation:pullSpinnerRotate 0.8s linear infinite;"></div>
+        <span style="font-size:0.875rem;">Loading release notes & changelog...</span>
+      </div>
+    `;
+  }
+
+  isVersionLoading = true;
   try {
-    const res = await fetch("/api/version");
+    const res = await fetch(`/api/version?_t=${Date.now()}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    if (footerVersionBadge) {
+    if (footerVersionBadge && data.version) {
       footerVersionBadge.textContent = `v${data.version}`;
     }
-    if (changelogList && data.changelog) {
+    if (changelogList && Array.isArray(data.changelog) && data.changelog.length > 0) {
       changelogList.innerHTML = data.changelog.map(entry => `
         <div class="changelog-entry">
           <div class="changelog-header">
-            <span class="changelog-ver">${entry.version}</span>
-            <span class="changelog-date">${entry.date}</span>
+            <span class="changelog-ver">${entry.version || ""}</span>
+            <span class="changelog-date">${entry.date || ""}</span>
           </div>
-          <div class="changelog-title">${entry.title}</div>
+          <div class="changelog-title">${entry.title || ""}</div>
           <ul class="changelog-items">
-            ${entry.items.map(item => `<li>${item}</li>`).join("")}
+            ${(entry.items || []).map(item => `<li>${item}</li>`).join("")}
           </ul>
         </div>
       `).join("");
+      versionDataLoaded = true;
+    } else if (changelogList) {
+      changelogList.innerHTML = `
+        <div style="text-align:center;padding:2.5rem 1rem;color:var(--text-muted);">
+          No release notes available at this time.
+        </div>
+      `;
     }
   } catch (err) {
     console.error("Failed to load version info:", err);
+    if (changelogList && (!changelogList.querySelector(".changelog-entry") || force)) {
+      changelogList.innerHTML = `
+        <div style="text-align:center;padding:2.5rem 1rem;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+          <span style="color:#ef4444;font-size:0.875rem;">⚠️ Unable to load release notes right now.</span>
+          <button type="button" class="btn btn-sm btn-secondary" id="btnRetryChangelog" style="font-size:0.8rem;padding:0.35rem 0.85rem;cursor:pointer;">
+            Retry
+          </button>
+        </div>
+      `;
+      const btnRetry = document.getElementById("btnRetryChangelog");
+      if (btnRetry) {
+        btnRetry.addEventListener("click", () => loadVersionInfo(true));
+      }
+    }
+  } finally {
+    isVersionLoading = false;
   }
 }
 
+function openChangelogModal() {
+  if (!changelogModal) return;
+  changelogModal.classList.add("open", "active");
+  loadVersionInfo();
+}
+
+function closeChangelogModal() {
+  if (!changelogModal) return;
+  changelogModal.classList.remove("open", "active");
+}
+
+window.openChangelogModal = openChangelogModal;
+window.closeChangelogModal = closeChangelogModal;
+window.loadVersionInfo = loadVersionInfo;
+
 if (btnOpenChangelog) {
-  btnOpenChangelog.addEventListener("click", () => {
-    if (changelogModal) changelogModal.classList.add("open");
+  btnOpenChangelog.addEventListener("click", (e) => {
+    e.preventDefault();
+    openChangelogModal();
   });
 }
 if (footerVersionBadge) {
   footerVersionBadge.style.cursor = "pointer";
   footerVersionBadge.title = "Click to view Release Notes";
-  footerVersionBadge.addEventListener("click", () => {
-    if (changelogModal) changelogModal.classList.add("open");
+  footerVersionBadge.addEventListener("click", (e) => {
+    e.preventDefault();
+    openChangelogModal();
   });
 }
 if (btnCloseChangelog) {
-  btnCloseChangelog.addEventListener("click", () => {
-    if (changelogModal) changelogModal.classList.remove("open");
+  btnCloseChangelog.addEventListener("click", (e) => {
+    e.preventDefault();
+    closeChangelogModal();
   });
 }
 
 // Close modals when clicking backdrop or pressing ESC
 if (changelogModal) {
   changelogModal.addEventListener("click", (e) => {
-    if (e.target === changelogModal) changelogModal.classList.remove("open");
+    if (e.target === changelogModal) closeChangelogModal();
   });
 }
 if (settingsModal) {
@@ -3326,7 +3386,7 @@ if (settingsModal) {
 }
 window.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
-    if (changelogModal) changelogModal.classList.remove("open");
+    closeChangelogModal();
     closeSettingsModal();
   }
 });
