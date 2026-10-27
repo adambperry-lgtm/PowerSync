@@ -1,4 +1,6 @@
 // Standalone web app detection (PWA on iOS / Android)
+const clientTz = (typeof Intl !== "undefined" && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : "America/New_York";
+
 if (typeof window !== "undefined") {
   if ((window.navigator && window.navigator.standalone) || (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)) {
     document.documentElement.classList.add("is-standalone-app");
@@ -6,7 +8,6 @@ if (typeof window !== "undefined") {
 
   // Intercept fetch to automatically attach Authorization header and athlete X-Timezone
   const originalFetch = window.fetch;
-  const clientTz = (typeof Intl !== "undefined" && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : "America/New_York";
   window.fetch = async function(...args) {
     let [resource, config] = args;
     const token = localStorage.getItem("powersync_token");
@@ -6967,9 +6968,14 @@ if (btnCopyGoogleRedirect) {
 
 // Initial boot
 async function bootApp() {
-  initThemeSystem();
-  initPullToReload();
-  initAllCollapsibleTiles();
+  try {
+    initThemeSystem();
+    initPullToReload();
+    initAllCollapsibleTiles();
+  } catch (e) {
+    console.warn("Init UI error:", e);
+  }
+
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has("reload")) {
     try {
@@ -6996,28 +7002,50 @@ async function bootApp() {
     try {
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (_) {}
-    await fetch("/api/settings", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ demo_mode: false }) });
+    await fetch("/api/settings", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ demo_mode: false }) }).catch(() => {});
   } else if (urlParams.get("whoop_connected")) {
     showToast("🎉 Whoop connected successfully!");
     try {
       window.history.replaceState({}, document.title, window.location.pathname);
     } catch (_) {}
-    await fetch("/api/settings", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ demo_mode: false }) });
+    await fetch("/api/settings", { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({ demo_mode: false }) }).catch(() => {});
   }
 
-  await checkAuthStatus();
-  if (clientTz) {
-    try {
+  try {
+    await checkAuthStatus();
+  } catch (e) {
+    console.warn("Auth check error in bootApp:", e);
+  }
+
+  try {
+    const tzToSync = (typeof clientTz !== "undefined" && clientTz) ? clientTz : ((typeof Intl !== "undefined" && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : null);
+    if (tzToSync) {
       fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ athlete_timezone: clientTz })
+        body: JSON.stringify({ athlete_timezone: tzToSync })
       }).catch(() => {});
-    } catch (_) {}
+    }
+  } catch (_) {}
+
+  try {
+    await loadVersionInfo();
+  } catch (e) {
+    console.warn("Version load error in bootApp:", e);
   }
-  await loadVersionInfo();
-  await loadDashboard();
-  await checkCoachGeminiStatus();
+
+  try {
+    await loadDashboard();
+  } catch (e) {
+    console.warn("Dashboard load error in bootApp:", e);
+  }
+
+  try {
+    await checkCoachGeminiStatus();
+  } catch (e) {
+    console.warn("Gemini check error in bootApp:", e);
+  }
+
   try {
     const sRes = await fetch("/api/settings");
     const s = await sRes.json();
@@ -7035,9 +7063,23 @@ async function bootApp() {
     console.warn("Failed to load settings in bootApp:", err);
   }
 
-  await loadUpcomingPlan();
-  await loadWorkout(null, 0, "");
-  await loadDebrief();
+  try {
+    await loadUpcomingPlan();
+  } catch (e) {
+    console.warn("Upcoming plan load error in bootApp:", e);
+  }
+
+  try {
+    await loadWorkout(null, 0, "");
+  } catch (e) {
+    console.error("Workout generation error in bootApp:", e);
+  }
+
+  try {
+    await loadDebrief();
+  } catch (e) {
+    console.warn("Debrief load error in bootApp:", e);
+  }
 }
 
 if (document.readyState === "loading") {
