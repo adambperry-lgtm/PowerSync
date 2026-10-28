@@ -140,5 +140,47 @@ class TestEveningWorkoutTimezone(unittest.TestCase):
             # Duration must be active session (e.g. 45 or 35 mins), not 20m flush or rest
             self.assertGreaterEqual(active_w.get("duration_minutes", 0), 30)
 
+    def test_migration_of_existing_utc_activities(self):
+        """
+        Verify that migrate_strava_activities_to_local_time successfully updates
+        legacy rows stored with UTC start_dates (e.g. 2026-10-28T01:11:10Z) to local ISO (2026-10-27T21:11:10).
+        """
+        from app.database import migrate_strava_activities_to_local_time
+        today = get_athlete_date(self.user_id)
+        yesterday = today - datetime.timedelta(days=1)
+        today_iso = today.isoformat()
+        yesterday_iso = yesterday.isoformat()
+
+        utc_str = f"{today_iso}T01:11:10Z"
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec,
+                distance_meters, total_elevation_gain, average_watts,
+                weighted_average_watts, average_heartrate, max_heartrate,
+                suffer_score, kilojoules, raw_json
+            ) VALUES (?, 'legacy_utc_01', 'Zwift - Evening Ride', 'VirtualRide', ?, 2850, 25000, 200, 180, 186, 130, 150, 50, 500, ?)
+        """, (
+            self.user_id,
+            utc_str,
+            json.dumps({"id": "legacy_utc_01", "start_date": utc_str})
+        ))
+        conn.commit()
+
+        # Run migration
+        migrate_strava_activities_to_local_time()
+
+        # Query back
+        c.execute("SELECT start_date FROM strava_activities WHERE user_id = ? AND id = 'legacy_utc_01'", (self.user_id,))
+        migrated_row = c.fetchone()
+        conn.close()
+
+        self.assertIsNotNone(migrated_row)
+        self.assertTrue(
+            migrated_row["start_date"].startswith(yesterday_iso),
+            f"Migrated timestamp {migrated_row['start_date']} should start with {yesterday_iso}"
+        )
+
 if __name__ == "__main__":
     unittest.main()

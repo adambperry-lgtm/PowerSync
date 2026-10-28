@@ -2,7 +2,7 @@ import json
 import requests
 import datetime
 from typing import Dict, Any, List, Optional
-from app.database import get_setting, set_setting, get_db_connection, get_current_user_id, get_athlete_date
+from app.database import get_setting, set_setting, get_db_connection, get_current_user_id, get_athlete_date, resolve_strava_local_start
 
 STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
@@ -58,56 +58,6 @@ def refresh_strava_token(user_id: Optional[str] = None) -> Optional[str]:
         set_setting("strava_tokens", new_tokens, user_id=uid)
         return new_tokens.get("access_token")
     return None
-
-def resolve_strava_local_start(a: Dict[str, Any], user_id: Optional[str] = None) -> str:
-    """
-    Returns the local ISO start datetime (YYYY-MM-DDTHH:MM:SS) in athlete's timezone.
-    Prefers start_date_local from Strava payload/raw_json, or converts start_date (UTC)
-    to athlete's configured timezone.
-    """
-    if not isinstance(a, dict):
-        return ""
-
-    # Check if raw_json is nested inside a
-    raw_str = a.get("raw_json")
-    if raw_str:
-        try:
-            import json, ast
-            if isinstance(raw_str, str) and raw_str.startswith("{"):
-                try:
-                    raw_dict = json.loads(raw_str)
-                except Exception:
-                    raw_dict = ast.literal_eval(raw_str)
-            elif isinstance(raw_str, dict):
-                raw_dict = raw_str
-            else:
-                raw_dict = {}
-            if isinstance(raw_dict, dict) and raw_dict.get("start_date_local"):
-                return str(raw_dict["start_date_local"]).rstrip("Z")
-        except Exception:
-            pass
-
-    local_start = a.get("start_date_local")
-    if local_start:
-        return str(local_start).rstrip("Z")
-
-    utc_start = a.get("start_date") or a.get("date")
-    if utc_start:
-        start_str = str(utc_start)
-        if "Z" in start_str or "+" in start_str or ("-" in start_str[10:]):
-            try:
-                from app.database import get_athlete_timezone
-                athlete_tz = get_athlete_timezone(user_id or a.get("user_id"))
-                clean_utc = start_str.replace("Z", "+00:00")
-                dt_utc = datetime.datetime.fromisoformat(clean_utc)
-                if dt_utc.tzinfo is None:
-                    dt_utc = dt_utc.replace(tzinfo=datetime.timezone.utc)
-                dt_local = dt_utc.astimezone(athlete_tz)
-                return dt_local.strftime("%Y-%m-%dT%H:%M:%S")
-            except Exception:
-                pass
-        return start_str
-    return ""
 
 def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     uid = user_id or get_current_user_id()
@@ -165,6 +115,7 @@ def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = Non
                 average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(user_id, id) DO UPDATE SET
+                start_date = excluded.start_date,
                 name = excluded.name,
                 sport_type = excluded.sport_type,
                 moving_time_sec = excluded.moving_time_sec,

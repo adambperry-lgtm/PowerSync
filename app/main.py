@@ -121,8 +121,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.9",
-        "release_name": "Evening Workout Timezone Alignment & Daily Training Slate Fix",
+        "version": "2.2.10",
+        "release_name": "Evening Workout Timezone Migration & Training Slate Unification",
         "build_date": "2026-10-28",
         "services": {
             "whoop": "v2 REST API",
@@ -132,6 +132,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.10",
+                "date": "2026-10-28",
+                "title": "Evening Workout Timezone Migration & Training Slate Unification",
+                "items": [
+                    "Zero-Dependency Database Migration: Decoupled timestamp migration from the Strava service to ensure all legacy UTC-stored Strava rides in SQLite are reliably migrated to the athlete's local ISO time on startup without circular import blocks.",
+                    "Strava Resync Local Start Preservation: Updated conflict resolution during Strava re-syncs to update start_date with local timestamps, ensuring Zwift evening sessions stay properly anchored to the night they occurred.",
+                    "Robust VirtualRide Timezone Handling: Enhanced resolve_strava_local_start to accurately transform UTC timestamps for virtual indoor rides (which lack physical GPS coordinates) directly into the athlete's local time zone (America/New_York).",
+                    "Clean Morning Training Slate: Guaranteed that yesterday evening rides do not populate today's completed workouts, unlocking fresh tailored workouts based on 95% Whoop recovery."
+                ]
+            },
             {
                 "version": "v2.2.9",
                 "date": "2026-10-28",

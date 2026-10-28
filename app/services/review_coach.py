@@ -33,7 +33,7 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
         conn = get_db_connection()
         c = conn.cursor()
         c.execute("""
-            SELECT id, name, sport_type, start_date, moving_time_sec, distance_meters,
+            SELECT user_id, id, name, sport_type, start_date, moving_time_sec, distance_meters,
                    total_elevation_gain, average_watts, weighted_average_watts,
                    average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
             FROM strava_activities
@@ -48,11 +48,12 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
     if not activities:
         activities = get_mock_strava_activities()
 
-    today_iso = get_athlete_date().isoformat()
+    uid = get_current_user_id()
+    today_iso = get_athlete_date(uid).isoformat()
     
     today_activities = []
     for a in activities:
-        act_date = get_activity_date_str(a)
+        act_date = get_activity_date_str(a, user_id=uid)
         if act_date == today_iso:
             today_activities.append(a)
 
@@ -64,8 +65,8 @@ def get_today_and_recent_activities() -> Dict[str, Any]:
     if today_activities:
         day_activities = today_activities
     elif latest_activity:
-        latest_date = get_activity_date_str(latest_activity)
-        day_activities = [a for a in activities if get_activity_date_str(a) == latest_date]
+        latest_date = get_activity_date_str(latest_activity, user_id=uid)
+        day_activities = [a for a in activities if get_activity_date_str(a, user_id=uid) == latest_date]
     else:
         day_activities = []
 

@@ -5,6 +5,15 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.10] - 2026-10-28
+### Added & Fixed
+- **Zero-Dependency Database Migration**: Resolved circular import between `database.py` and `strava_service.py` during app startup, guaranteeing that SQLite migrations execute on startup and convert all historical UTC Strava activity timestamps to local time.
+- **Strava Re-sync Local Start Update**: Fixed `ON CONFLICT` clause in `fetch_recent_strava_activities` to update `start_date`, ensuring re-syncing Strava records always syncs and preserves local timestamps.
+- **VirtualRide Timezone Normalization**: Enhanced timestamp resolution to reliably convert Strava UTC start times for Zwift virtual rides into the athlete's local time zone (`America/New_York`), preventing evening rides from rolling over to the next morning.
+- **Clean Daily Training Slate Guarantee**: Ensured yesterday evening workouts are excluded from today's completed activities, unlocking fresh prescriptions for 95% Whoop recovery.
+
+---
+
 ## [2.2.9] - 2026-10-28
 ### Added & Fixed
 - **Evening Workout Timezone Alignment**: Strava activities recorded during evening hours (e.g. 9:00 PM – 10:00 PM) are now mapped directly to the athlete's local calendar date using `start_date_local` and timezone conversion, preventing UTC timestamps from rolling evening workouts into the following morning.
