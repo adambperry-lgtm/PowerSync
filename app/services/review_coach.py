@@ -9,28 +9,14 @@ from app.services.program_service import get_current_program
 from app.services.strava_service import get_strava_trailing_stats
 from app.services.whoop_service import get_trailing_whoop_stats
 
-def get_activity_date_str(a: Optional[Dict[str, Any]]) -> str:
+def get_activity_date_str(a: Optional[Dict[str, Any]], user_id: Optional[str] = None) -> str:
     """Extracts local calendar date YYYY-MM-DD from an activity dictionary."""
     if not a or not isinstance(a, dict):
         return ""
-    raw_str = a.get("raw_json")
-    if raw_str:
-        try:
-            import ast
-            if isinstance(raw_str, str) and raw_str.startswith("{"):
-                try:
-                    raw_dict = json.loads(raw_str)
-                except Exception:
-                    raw_dict = ast.literal_eval(raw_str)
-            elif isinstance(raw_str, dict):
-                raw_dict = raw_str
-            else:
-                raw_dict = {}
-            local_start = raw_dict.get("start_date_local", "")
-            if local_start:
-                return str(local_start)[:10]
-        except Exception:
-            pass
+    from app.services.strava_service import resolve_strava_local_start
+    local_start = resolve_strava_local_start(a, user_id=user_id or a.get("user_id"))
+    if local_start:
+        return str(local_start)[:10]
     start_date = a.get("start_date") or a.get("date") or ""
     return str(start_date)[:10]
 

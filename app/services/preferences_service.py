@@ -222,9 +222,12 @@ def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) 
         from app.services.mock_data import get_mock_strava_activities
         activities = get_mock_strava_activities()
 
+    from app.services.strava_service import resolve_strava_local_start
     acts_by_date = {}
     for a in activities:
-        d_str = a.get("start_date", "")[:10]
+        act_uid = a.get("user_id") if isinstance(a, dict) else None
+        local_s = resolve_strava_local_start(a, user_id=act_uid) or a.get("start_date", "")
+        d_str = local_s[:10]
         if d_str:
             acts_by_date.setdefault(d_str, []).append(a)
 

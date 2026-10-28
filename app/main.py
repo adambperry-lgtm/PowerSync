@@ -121,9 +121,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.8",
-        "release_name": "Automatic Whoop Biometric Sync & Session Persistence",
-        "build_date": "2026-10-25",
+        "version": "2.2.9",
+        "release_name": "Evening Workout Timezone Alignment & Daily Training Slate Fix",
+        "build_date": "2026-10-28",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -132,6 +132,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.2.9",
+                "date": "2026-10-28",
+                "title": "Evening Workout Timezone Alignment & Clean Daily Slate",
+                "items": [
+                    "Local Start Time Resolution: Strava activities recorded in evening hours (e.g. 9-10 PM) are accurately mapped to the athlete's local calendar date rather than rolling over into the next day via UTC timestamps.",
+                    "Clean Morning Training Slate: Resolved issue where yesterday evening's ride caused the AI Coach to mistakenly assume today's workout was already completed, wrongly prescribing 'Daily Target Achieved — Rest & Recovery'.",
+                    "Eliminated Rolling Window Heuristics: Removed legacy 20-hour window logic in workout generator that conflated prior night rides with today's training session, aligning workout prescription directly with the athlete's local calendar day and fresh Whoop recovery.",
+                    "Automated Historical Strava Migration: Added automatic database migration converting existing UTC-stored Strava timestamps to athlete local time on startup."
+                ]
+            },
             {
                 "version": "v2.2.8",
                 "date": "2026-10-25",

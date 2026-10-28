@@ -186,21 +186,13 @@ def generate_workout(req: WorkoutGenerateRequest):
     vol_hours = round(total_sec / 3600.0, 1)
 
     # Detect activities completed today
-    today_iso = get_athlete_date().isoformat()
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    today_iso = get_athlete_date(uid).isoformat()
+    from app.services.review_coach import get_activity_date_str
     today_activities = []
     for a in recent_acts:
-        start_str = a.get("start_date", "")
-        if start_str.startswith(today_iso):
+        act_date_str = get_activity_date_str(a, user_id=uid)
+        if act_date_str == today_iso:
             today_activities.append(a)
-        else:
-            try:
-                clean_ts = start_str.replace("Z", "+00:00")
-                act_dt = datetime.datetime.fromisoformat(clean_ts)
-                if (now_utc - act_dt).total_seconds() < 20 * 3600:
-                    today_activities.append(a)
-            except Exception:
-                pass
 
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
@@ -850,21 +842,13 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
     total_sec = sum(a.get("moving_time_sec", 0) for a in recent_acts)
     vol_hours = round(total_sec / 3600.0, 1)
 
-    today_iso = get_athlete_date().isoformat()
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    today_iso = get_athlete_date(uid).isoformat()
+    from app.services.review_coach import get_activity_date_str
     today_activities = []
     for a in recent_acts:
-        start_str = a.get("start_date", "")
-        if start_str.startswith(today_iso):
+        act_date_str = get_activity_date_str(a, user_id=uid)
+        if act_date_str == today_iso:
             today_activities.append(a)
-        else:
-            try:
-                clean_ts = start_str.replace("Z", "+00:00")
-                act_dt = datetime.datetime.fromisoformat(clean_ts)
-                if (now_utc - act_dt).total_seconds() < 20 * 3600:
-                    today_activities.append(a)
-            except Exception:
-                pass
 
     recent_high_intensity = False
     for a in recent_acts[:3]:

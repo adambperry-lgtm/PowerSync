@@ -279,8 +279,11 @@ def calculate_trailing_strain_systems(
         d_str = (today - datetime.timedelta(days=i)).isoformat()
         daily_strains[d_str] = {"low": 0.0, "high": 0.0, "peak": 0.0, "total": 0.0}
         
+    from app.services.strava_service import resolve_strava_local_start
     for act in activities:
-        s_date = (act.get("start_date") or "")[:10]
+        act_uid = act.get("user_id") if isinstance(act, dict) else None
+        local_s = resolve_strava_local_start(act, user_id=act_uid) or act.get("start_date") or ""
+        s_date = local_s[:10]
         if s_date in daily_strains:
             st = calculate_activity_strain(act, ftp=cp)
             daily_strains[s_date]["low"] += st["low_xss"]

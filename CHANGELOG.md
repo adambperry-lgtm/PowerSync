@@ -5,6 +5,15 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.2.9] - 2026-10-28
+### Added & Fixed
+- **Evening Workout Timezone Alignment**: Strava activities recorded during evening hours (e.g. 9:00 PM – 10:00 PM) are now mapped directly to the athlete's local calendar date using `start_date_local` and timezone conversion, preventing UTC timestamps from rolling evening workouts into the following morning.
+- **Clean Daily Training Slate**: Resolved bug where yesterday evening's workout led the AI Coach to assume today's training was already completed, incorrectly locking "Today's Training" into "Daily Target Achieved — Rest & Recovery".
+- **Eliminated Rolling 20-Hour Window**: Removed the legacy 20-hour window heuristic in the workout generator that conflated prior night rides with today's training session, ensuring workout prescriptions strictly reflect the current calendar day and morning Whoop recovery.
+- **Automated Database Local Timestamp Migration**: Automatically updates all existing Strava activity records in SQLite to the athlete's local ISO start times upon startup.
+
+---
+
 ## [2.2.8] - 2026-10-25
 ### Added & Fixed
 - **Whoop Auto-Sync on Dashboard Load**: Automatically syncs and updates the athlete's latest Whoop recovery, sleep, and strain metrics in the background upon opening the dashboard and at 15-minute intervals. Eliminates the need for manual button clicks.

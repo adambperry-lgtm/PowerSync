@@ -59,6 +59,56 @@ def refresh_strava_token(user_id: Optional[str] = None) -> Optional[str]:
         return new_tokens.get("access_token")
     return None
 
+def resolve_strava_local_start(a: Dict[str, Any], user_id: Optional[str] = None) -> str:
+    """
+    Returns the local ISO start datetime (YYYY-MM-DDTHH:MM:SS) in athlete's timezone.
+    Prefers start_date_local from Strava payload/raw_json, or converts start_date (UTC)
+    to athlete's configured timezone.
+    """
+    if not isinstance(a, dict):
+        return ""
+
+    # Check if raw_json is nested inside a
+    raw_str = a.get("raw_json")
+    if raw_str:
+        try:
+            import json, ast
+            if isinstance(raw_str, str) and raw_str.startswith("{"):
+                try:
+                    raw_dict = json.loads(raw_str)
+                except Exception:
+                    raw_dict = ast.literal_eval(raw_str)
+            elif isinstance(raw_str, dict):
+                raw_dict = raw_str
+            else:
+                raw_dict = {}
+            if isinstance(raw_dict, dict) and raw_dict.get("start_date_local"):
+                return str(raw_dict["start_date_local"]).rstrip("Z")
+        except Exception:
+            pass
+
+    local_start = a.get("start_date_local")
+    if local_start:
+        return str(local_start).rstrip("Z")
+
+    utc_start = a.get("start_date") or a.get("date")
+    if utc_start:
+        start_str = str(utc_start)
+        if "Z" in start_str or "+" in start_str or ("-" in start_str[10:]):
+            try:
+                from app.database import get_athlete_timezone
+                athlete_tz = get_athlete_timezone(user_id or a.get("user_id"))
+                clean_utc = start_str.replace("Z", "+00:00")
+                dt_utc = datetime.datetime.fromisoformat(clean_utc)
+                if dt_utc.tzinfo is None:
+                    dt_utc = dt_utc.replace(tzinfo=datetime.timezone.utc)
+                dt_local = dt_utc.astimezone(athlete_tz)
+                return dt_local.strftime("%Y-%m-%dT%H:%M:%S")
+            except Exception:
+                pass
+        return start_str
+    return ""
+
 def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     uid = user_id or get_current_user_id()
     tokens = get_setting("strava_tokens", {}, user_id=uid)
@@ -97,7 +147,7 @@ def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = Non
         act_id = str(a.get("id"))
         name = a.get("name", "Activity")
         sport = a.get("type", "Ride")
-        start_date = a.get("start_date", "")
+        start_date = resolve_strava_local_start(a, user_id=uid) or a.get("start_date", "")
         moving_time = a.get("moving_time", 0)
         dist = a.get("distance", 0.0)
         elev = a.get("total_elevation_gain", 0.0)
@@ -191,7 +241,7 @@ def get_strava_trailing_stats(activities: Optional[List[Dict[str, Any]]] = None,
 
     # Aggregate completed activities into their corresponding calendar days
     for act in activities:
-        s_date = act.get("start_date", "")
+        s_date = resolve_strava_local_start(act, user_id=user_id) or act.get("start_date", "")
         if not s_date:
             continue
         date_key = s_date[:10]

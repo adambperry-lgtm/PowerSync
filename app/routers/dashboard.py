@@ -169,8 +169,12 @@ def get_dashboard_data(request: Request = None):
 
     # Enrich all activities with 3-tier physiological strain and battery depletion
     enriched_activities = []
+    from app.services.strava_service import resolve_strava_local_start
     for act in activities:
         act_copy = dict(act)
+        local_start = resolve_strava_local_start(act_copy, user_id=uid)
+        if local_start:
+            act_copy["start_date"] = local_start
         act_strain = calculate_activity_strain(act_copy, ftp=ftp)
         act_copy["total_xss"] = act_strain.get("total_xss", 0.0)
         act_copy["low_xss"] = act_strain.get("low_xss", 0.0)

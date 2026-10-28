@@ -415,6 +415,34 @@ def init_db():
     conn.commit()
     conn.close()
 
+    # Automatically migrate any UTC-stored Strava timestamps to athlete's local time
+    migrate_strava_activities_to_local_time()
+
+def migrate_strava_activities_to_local_time():
+    """Migrates any existing strava_activities stored with UTC timestamps to the athlete's local time."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    try:
+        c.execute("SELECT user_id, id, start_date, raw_json FROM strava_activities")
+        rows = c.fetchall()
+        from app.services.strava_service import resolve_strava_local_start
+        for r in rows:
+            uid = r["user_id"]
+            act_id = r["id"]
+            current_start = r["start_date"]
+            payload = dict(r)
+            new_start = resolve_strava_local_start(payload, user_id=uid)
+            if new_start and new_start != current_start:
+                c.execute(
+                    "UPDATE strava_activities SET start_date = ? WHERE user_id = ? AND id = ?",
+                    (new_start, uid, act_id)
+                )
+        conn.commit()
+    except Exception as e:
+        print(f"Error during strava_activities local time migration: {e}")
+    finally:
+        conn.close()
+
 ENV_FALLBACK_ALIASES = {
     "athlete_ftp": ["ATHLETE_FTP", "FTP"],
     "athlete_max_hr": ["ATHLETE_MAX_HR", "MAX_HR"],
