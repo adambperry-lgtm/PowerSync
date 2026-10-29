@@ -5680,7 +5680,7 @@ function formatCoachMarkdown(text) {
   return html;
 }
 
-function appendCoachChatMessage(role, text, actionData = null) {
+function appendCoachChatMessage(role, text, actionData = null, executedTools = null) {
   if (!coachChatMessages) return;
   const msgDiv = document.createElement("div");
   msgDiv.className = `chat-msg chat-msg-${role === "user" ? "user" : "coach"}`;
@@ -5695,7 +5695,23 @@ function appendCoachChatMessage(role, text, actionData = null) {
   if (role === "user") {
     content.textContent = text;
   } else {
-    content.innerHTML = formatCoachMarkdown(text);
+    let toolsHtml = "";
+    if (executedTools && Array.isArray(executedTools) && executedTools.length > 0) {
+      toolsHtml = `
+        <div class="chat-tools-container" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.75rem;">
+          ${executedTools.map(t => {
+            const summary = t.summary || 'Inspected Strava telemetry';
+            return `
+              <div class="chat-tool-pill" title="Gemini Function Call: ${t.name || 'tool'}">
+                <span class="chat-tool-icon">⚡</span>
+                <span class="chat-tool-label">${summary}</span>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+    }
+    content.innerHTML = toolsHtml + formatCoachMarkdown(text);
   }
 
   // Render Action Proposal Card if present
@@ -5909,14 +5925,14 @@ async function sendCoachMessage(text) {
     removeCoachTypingIndicator();
 
     if (data.success && data.reply) {
-      appendCoachChatMessage("coach", data.reply, data.proposed_action);
+      appendCoachChatMessage("coach", data.reply, data.proposed_action, data.executed_tools);
       coachChatHistory.push({ role: "model", text: data.reply });
 
       const subtitle = document.getElementById("coachChatSubtitle");
       if (subtitle) {
         if (data.provider === "gemini") {
-          subtitle.textContent = "Google Gemini • Live Telemetry";
-          subtitle.title = `Model: ${data.model || "Gemini"} • Live Telemetry active`;
+          subtitle.textContent = "Google Gemini • Strava & Whoop Tools";
+          subtitle.title = `Model: ${data.model || "Gemini 3 Flash"} • Live Strava & Whoop function calling enabled`;
           subtitle.style.color = "var(--accent-cyan)";
         } else {
           subtitle.textContent = "Sports-Science Telemetry • Built-in Rules";

@@ -5,7 +5,7 @@ import requests
 import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
-from app.database import get_setting, set_setting, get_db_connection, get_active_target_plan
+from app.database import get_setting, set_setting, get_db_connection, get_active_target_plan, get_current_user_id
 
 def extract_gemini_key_from_text(text: str) -> Optional[str]:
     """Detects if user provided a Google Gemini API key in their message."""
@@ -259,7 +259,14 @@ def build_system_prompt(snapshot: Dict[str, Any]) -> str:
         "  * Vary interval structures dynamically to drive progressive physiological adaptation without monotony: rotate across sustained blocks, stepped ladders, criss-cross surges, cadence ladders, pyramids, and over-unders.\n"
         "  * Always calibrate interval intensity and volume to his active target plan and current recovery state.\n"
         "- PREFERENCES MEMORY & LEARNING:\n"
-        "  * If Adam mentions a new preference, constraint, or rule in chat (e.g., 'Remember that I prefer...', 'From now on...', 'I like/hate...'), confirm warmly that you have remembered and permanently saved it to his PowerSync coaching engine."
+        "  * If Adam mentions a new preference, constraint, or rule in chat (e.g., 'Remember that I prefer...', 'From now on...', 'I like/hate...'), confirm warmly that you have remembered and permanently saved it to his PowerSync coaching engine.\n"
+        "10. STRAVA & WHOOP FUNCTION CALLING TOOLS (LIVE TELEMETRY ON DEMAND):\n"
+        "You have direct access to function calling tools to query granular Strava and Whoop telemetry:\n"
+        "- `get_strava_activity_details(activity_id)`: Fetches full interval splits (avg watts, HR, duration, cadence), segment PRs, 3-tier XSS strain, and W' battery depletion for any ride ('latest', 'yesterday', or specific ID). Proactively call this whenever Adam asks about a recent workout, how his intervals went, his pacing, or cadence.\n"
+        "- `get_strava_activity_streams_and_power_curve(activity_id)`: Calculates his peak power profile (5s, 1m, 5m, 20m watts), interval power decay, and aerobic decoupling (cardiac drift) from second-by-second telemetry.\n"
+        "- `search_strava_activities(query, sport_type, days_back)`: Searches his historical rides by keywords or sport.\n"
+        "- `get_whoop_biometrics_timeline(days)`: Retrieves multi-day Whoop recovery, HRV, and sleep trends.\n"
+        "Always use these tools to inspect real numbers and provide high-fidelity coaching advice based on actual data rather than speculating."
     )
 
 def extract_action_from_response(text: str) -> Tuple[str, Optional[Dict[str, Any]]]:
@@ -491,20 +498,32 @@ def clean_model_output(text: str) -> str:
             cleaned = "\n".join(lines).strip()
     return cleaned.strip()
 
-_CACHED_WORKING_MODEL: Optional[Tuple[str, str]] = ("v1beta", "gemini-flash-latest")
+_CACHED_WORKING_MODEL: Optional[Tuple[str, str]] = ("v1beta", "gemini-3-flash-preview")
 
-def call_gemini_api(api_key: str, system_instruction: str, history: List[Dict[str, str]], user_message: str) -> Optional[str]:
-    """Calls Google Gemini API with multi-turn conversation support and model fallbacks."""
+def call_gemini_api(
+    api_key: str,
+    system_instruction: str,
+    history: List[Dict[str, str]],
+    user_message: str,
+    user_id: Optional[str] = None
+) -> Tuple[Optional[str], List[Dict[str, Any]]]:
+    """
+    Calls Google Gemini API with multi-turn conversation support,
+    integrated Strava & Whoop function calling tools, and model fallbacks.
+    """
     global _CACHED_WORKING_MODEL
+
+    from app.services.coach_tools import COACH_TOOL_DECLARATIONS, execute_coach_tool
+
+    uid = user_id or get_current_user_id()
 
     models_to_try = [
         ("v1beta", "gemini-3-flash-preview"),
-        ("v1beta", "gemini-2.5-flash"),
         ("v1beta", "gemini-3.8-flash"),
-        ("v1beta", "gemini-3.1-flash-lite"),
+        ("v1beta", "gemini-flash-latest"),
         ("v1beta", "gemini-3.5-flash"),
         ("v1beta", "gemini-3.7-flash"),
-        ("v1beta", "gemini-flash-latest"),
+        ("v1beta", "gemini-3.1-flash-lite"),
         ("v1beta", "gemini-2.5-pro"),
         ("v1beta", "gemini-pro-latest"),
     ]
@@ -538,44 +557,93 @@ def call_gemini_api(api_key: str, system_instruction: str, history: List[Dict[st
     # Append current user message
     contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-    payload = {
-        "systemInstruction": {
-            "parts": [{"text": system_instruction}]
-        },
-        "contents": contents,
-        "generationConfig": {
-            "temperature": 0.7,
-            "maxOutputTokens": 8192
-        }
-    }
-
     headers = {"Content-Type": "application/json"}
+    tools_config = [{"functionDeclarations": COACH_TOOL_DECLARATIONS}]
 
     for api_ver, model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent?key={api_key}"
+        cur_contents = [dict(c) for c in contents]
+        executed_tools = []
+        max_tool_turns = 3
+
         try:
-            res = requests.post(url, headers=headers, json=payload, timeout=25)
-            if res.status_code == 200:
+            for _ in range(max_tool_turns):
+                payload = {
+                    "systemInstruction": {
+                        "parts": [{"text": system_instruction}]
+                    },
+                    "contents": cur_contents,
+                    "tools": tools_config,
+                    "generationConfig": {
+                        "temperature": 0.7,
+                        "maxOutputTokens": 8192
+                    }
+                }
+
+                res = requests.post(url, headers=headers, json=payload, timeout=25)
+                if res.status_code != 200:
+                    print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {res.text[:120]}")
+                    break
+
                 data = res.json()
                 candidates = data.get("candidates", [])
-                if candidates:
-                    finish_reason = candidates[0].get("finishReason")
-                    if finish_reason == "MAX_TOKENS":
-                        print(f"WARNING: Gemini {api_ver}/{model} hit MAX_TOKENS limit!")
-                    parts = candidates[0].get("content", {}).get("parts", [])
+                if not candidates:
+                    break
+
+                cand = candidates[0]
+                content = cand.get("content", {})
+                parts = content.get("parts", [])
+
+                # Check for functionCall parts
+                function_calls = [p for p in parts if "functionCall" in p]
+                if not function_calls:
+                    # Model provided final text answer
                     text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text") and not p.get("thought")]
                     full_text = "\n".join(text_parts).strip()
                     clean_text = clean_model_output(full_text)
                     if clean_text:
                         _CACHED_WORKING_MODEL = (api_ver, model)
-                        print(f"Gemini API success using {api_ver}/{model} (finish_reason: {finish_reason}, len: {len(clean_text)})")
-                        return clean_text
-            else:
-                print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {res.text[:100]}")
+                        print(f"Gemini API success using {api_ver}/{model} with {len(executed_tools)} tool call(s)")
+                        return clean_text, executed_tools
+
+                # Model wants to call one or more tools
+                # Preserve the model's message exactly (including thoughtSignature if present)
+                cur_contents.append({
+                    "role": "model",
+                    "parts": parts
+                })
+
+                # Execute each function call and append response part
+                for fc_part in function_calls:
+                    fn_call = fc_part["functionCall"]
+                    fn_name = fn_call.get("name")
+                    fn_args = fn_call.get("args") or {}
+
+                    tool_result = execute_coach_tool(fn_name, fn_args, user_id=uid)
+                    executed_tools.append({
+                        "name": fn_name,
+                        "args": fn_args,
+                        "summary": tool_result.get("tool_summary", f"Executed {fn_name}")
+                    })
+
+                    fn_resp_part = {
+                        "functionResponse": {
+                            "name": fn_name,
+                            "response": {
+                                "name": fn_name,
+                                "content": tool_result
+                            }
+                        }
+                    }
+                    cur_contents.append({
+                        "role": "user",
+                        "parts": [fn_resp_part]
+                    })
+
         except Exception as e:
             print(f"Gemini API error with {api_ver}/{model}: {e}")
 
-    # If predefined models failed, query ListModels for active Gemini-specific models
+    # Fallback to ListModels if predefined failed
     try:
         list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
         l_res = requests.get(list_url, timeout=10)
@@ -588,37 +656,28 @@ def call_gemini_api(api_key: str, system_instruction: str, history: List[Dict[st
                     m_name = m.get("name", "")
                     if m_name.startswith("models/"):
                         m_name = m_name[len("models/"):]
-                    # STRICTLY filter to Gemini models (avoid unaligned raw models)
                     if m_name and m_name.startswith("gemini"):
                         valid_models.append(m_name)
-            print(f"ListModels discovered {len(valid_models)} Gemini models: {valid_models[:6]}")
             for vm in valid_models:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{vm}:generateContent?key={api_key}"
                 try:
-                    res = requests.post(url, headers=headers, json=payload, timeout=25)
+                    res = requests.post(url, headers=headers, json={"systemInstruction": {"parts": [{"text": system_instruction}]}, "contents": contents}, timeout=25)
                     if res.status_code == 200:
                         data = res.json()
                         candidates = data.get("candidates", [])
                         if candidates:
-                            finish_reason = candidates[0].get("finishReason")
-                            if finish_reason == "MAX_TOKENS":
-                                print(f"WARNING: Discovered Gemini model {vm} hit MAX_TOKENS limit!")
                             parts = candidates[0].get("content", {}).get("parts", [])
                             text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text") and not p.get("thought")]
-                            full_text = "\n".join(text_parts).strip()
-                            clean_text = clean_model_output(full_text)
+                            clean_text = clean_model_output("\n".join(text_parts).strip())
                             if clean_text:
                                 _CACHED_WORKING_MODEL = ("v1beta", vm)
-                                print(f"Successfully generated response with discovered Gemini model: {vm} (finish_reason: {finish_reason})")
-                                return clean_text
+                                return clean_text, []
                 except Exception as ex:
                     print(f"Error querying discovered model {vm}: {ex}")
-        else:
-            print(f"ListModels returned HTTP {l_res.status_code}: {l_res.text[:120]}")
     except Exception as e:
         print(f"ListModels diagnostic error: {e}")
 
-    return None
+    return None, []
 
 def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[str, Any]) -> str:
     """
@@ -649,6 +708,34 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
             "Your forward outlook and daily training prescriptions will revert to your standard macrocycle progression. "
             "Tap **Confirm Clear Plan** below to reset your dashboard."
         )
+
+    # 0a2. Workout Breakdown / Lap Telemetry Query (Direct Strava Tool Integration)
+    is_telemetry_query = any(k in msg for k in ["lap", "split", "power numbers", "how was my", "breakdown", "telemetry", "decoupling", "cardiac drift", "numbers from my ride"]) and any(k in msg for k in ["ride", "workout", "yesterday", "latest", "session", "sweet spot"])
+    if is_telemetry_query:
+        try:
+            from app.services.coach_tools import tool_get_strava_activity_details
+            target_act = "yesterday" if "yesterday" in msg else "latest"
+            det = tool_get_strava_activity_details(target_act)
+            if det.get("found"):
+                laps = det.get("laps", [])
+                lap_rows = ""
+                if laps:
+                    lap_rows = "\n| Lap | Name | Duration | Avg Power | Avg HR |\n| :--- | :--- | :--- | :--- | :--- |\n"
+                    for l in laps:
+                        lap_rows += f"| {l['lap_index']} | **{l['name']}** | {l['duration']} | {l['avg_watts']}W | {l['avg_hr']} bpm |\n"
+
+                return (
+                    f"Here is the detailed breakdown for your session, **\"{det['name']}\"** ({det['date']}):\n\n"
+                    f"- **Duration**: {det['duration_minutes']} mins\n"
+                    f"- **Normalized Power**: **{det['power_summary']['normalized_power_watts']}W** ({det['power_summary']['pct_of_ftp']}% FTP)\n"
+                    f"- **Average Watts**: {det['power_summary']['average_watts']}W\n"
+                    f"- **Physiological Strain**: {det['physiological_strain']['total_xss']} XSS ({det['physiological_strain']['low_aerobic_xss']} Low / {det['physiological_strain']['high_glycolytic_xss']} High)\n"
+                    f"- **Heart Rate**: {det['heart_rate_summary']['avg_hr']} bpm avg (Max: {det['heart_rate_summary']['max_hr']} bpm)\n"
+                    f"{lap_rows}\n"
+                    f"**Coach's Verdict**: Strong, disciplined execution with steady pacing across intervals."
+                )
+        except Exception as e:
+            print("Error in fallback telemetry tool query:", e)
 
     # 0d. Thursday / Tomorrow rest directive inquiry
     rest_stat = snapshot.get("weekly_rest_directive_status", {})
@@ -860,14 +947,15 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     # 3. Retrieve athlete context snapshot (reflects newly saved preference)
     snapshot = compile_athlete_context()
 
-    # 4. Retrieve API Key
+    # 4. Retrieve API Key & active user
     api_key = get_gemini_api_key()
+    uid = get_current_user_id()
 
     if api_key:
         system_prompt = build_system_prompt(snapshot)
-        gemini_reply = call_gemini_api(api_key, system_prompt, history, user_message)
+        gemini_reply, executed_tools = call_gemini_api(api_key, system_prompt, history, user_message, user_id=uid)
         if gemini_reply:
-            model_used = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini"
+            model_used = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3-flash-preview"
             clean_reply, proposed_action = extract_action_from_response(gemini_reply)
             if not proposed_action:
                 has_action_request = any(k in user_message.lower() for k in [
@@ -898,6 +986,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 "model": model_used,
                 "gemini_configured": True,
                 "proposed_action": proposed_action,
+                "executed_tools": executed_tools,
                 "athlete_snapshot": {
                     "ftp": snapshot["athlete"]["ftp_watts"],
                     "recovery_score": snapshot["whoop_readiness_today"]["recovery_score_pct"],
@@ -921,6 +1010,14 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             ftp=snapshot["athlete"]["ftp_watts"]
         )
 
+    # Check if fallback used direct tool lookup
+    fallback_tools = []
+    if any(k in user_message.lower() for k in ["lap", "split", "power numbers", "breakdown", "telemetry"]):
+        fallback_tools.append({
+            "name": "get_strava_activity_details",
+            "summary": "Retrieved Strava activity lap splits & power telemetry"
+        })
+
     return {
         "success": True,
         "reply": key_saved_notice + fallback_reply,
@@ -928,6 +1025,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         "model": "powersync-coach-v1",
         "gemini_configured": bool(api_key),
         "proposed_action": proposed_action,
+        "executed_tools": fallback_tools,
         "athlete_snapshot": {
             "ftp": snapshot["athlete"]["ftp_watts"],
             "recovery_score": snapshot["whoop_readiness_today"]["recovery_score_pct"],

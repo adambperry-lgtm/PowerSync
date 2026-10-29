@@ -44,16 +44,18 @@ def get_chat_status():
 
     suggested = [
         f"🎯 How should I tackle today's {workout} with my {rec}% recovery?",
-        "📅 I have a 50-mile ride this Sunday with 3,000 ft climbing",
-        "🥪 What is my ideal carbohydrate & hydration fueling plan?",
-        "🔮 Analyze my weekly TSS & XSS pacing toward my goal"
+        "📊 Breakdown my interval laps and power on my latest ride",
+        "⚡ What was my peak 5-minute power and cardiac drift yesterday?",
+        "🔍 Search my recent sweet spot workouts and compare my normalized power",
+        "🥪 What is my ideal carbohydrate & hydration fueling plan?"
     ]
 
     return {
         "success": True,
         "gemini_configured": bool(key),
         "gemini_model": model_name if key else None,
-        "gemini_status_text": f"Connected ({model_name})" if key else "Not connected",
+        "gemini_status_text": f"Connected ({model_name} • Strava & Whoop Tools)" if key else "Not connected",
+        "tools_enabled": bool(key),
         "athlete_ftp": snapshot["athlete"]["ftp_watts"],
         "recovery_score": rec,
         "active_workout": workout,
@@ -71,7 +73,7 @@ def test_gemini_connection_endpoint(payload: Optional[TestConnectionPayload] = N
         return {"success": False, "message": "No valid Gemini API key found to test."}
 
     from app.services.coach_chat_service import call_gemini_api
-    reply = call_gemini_api(key, "You are a cycling coach.", [], "Ping test")
+    reply, _ = call_gemini_api(key, "You are a cycling coach.", [], "Ping test")
     if reply:
         from app.services.coach_chat_service import _CACHED_WORKING_MODEL
         model = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3-flash-preview"

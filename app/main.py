@@ -121,17 +121,29 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.2.10",
-        "release_name": "Evening Workout Timezone Migration & Training Slate Unification",
-        "build_date": "2026-10-28",
+        "version": "2.3.0",
+        "release_name": "Gemini Function Calling & Strava/Whoop Tool Calling Engine",
+        "build_date": "2026-10-29",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
             "zwift": "Intervals.icu Cloud Bridge",
-            "ai_coach":"Google Gemini 2.5 Flash",
+            "ai_coach":"Google Gemini 3 Flash / 3.8 Flash (Tool Calling)",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.3.0",
+                "date": "2026-10-29",
+                "title": "Google Gemini Function Calling & Live Strava/Whoop Tool Engine",
+                "items": [
+                    "Gemini Tool Calling Loop: Integrated native function declarations with Google Gemini (gemini-3-flash-preview / gemini-3.8-flash) enabling the AI Coach to dynamically execute tools to query real Strava telemetry on demand.",
+                    "Granular Strava Lap & Split Telemetry: Added get_strava_activity_details tool to retrieve detailed lap breakdowns, work vs rest intervals, cadence, and 3-tier XSS strain for any ride ('latest', 'yesterday', or specific ID).",
+                    "Power Curve & Aerobic Decoupling: Added get_strava_activity_streams_and_power_curve tool calculating peak power sliding windows (5s, 1m, 5m, 20m) and heart rate cardiac drift percentage.",
+                    "Activity Search & Whoop Correlation: Added search_strava_activities and get_whoop_biometrics_timeline tools enabling historical workout comparison and physiological recovery correlation.",
+                    "Interactive Chat Tool Badges: Visualized tool execution chips in the Coach Chat modal showing the athlete exactly what telemetry the coach analyzed."
+                ]
+            },
             {
                 "version": "v2.2.10",
                 "date": "2026-10-28",

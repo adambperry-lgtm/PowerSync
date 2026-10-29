@@ -45,10 +45,11 @@ def save_coach_forecast_plan(user_id: Optional[str], outlook_days: List[Dict[str
             "updated_at": datetime.datetime.now().isoformat()
         }
 
-    # Prune past dates older than 7 days
+    # Prune historical dates older than 30 days (while keeping newly saved outlook dates)
     today = get_athlete_date()
-    cutoff_iso = (today - datetime.timedelta(days=7)).isoformat()
-    pruned_plan = {k: v for k, v in current_plan.items() if k >= cutoff_iso}
+    cutoff_iso = (today - datetime.timedelta(days=30)).isoformat()
+    newly_saved_dates = {item.get("date_iso") or str(item.get("target_date", ""))[:10] for item in outlook_days}
+    pruned_plan = {k: v for k, v in current_plan.items() if k >= cutoff_iso or k in newly_saved_dates}
 
     set_setting("coach_forecast_plan", pruned_plan, user_id=uid)
 

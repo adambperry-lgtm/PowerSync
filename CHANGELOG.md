@@ -5,6 +5,17 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.3.0] - 2026-10-29
+### Added & Fixed
+- **Google Gemini Function Calling & Live Tool Engine**: Enabled native tool calling (`tools=[...]`) inside the PowerSync Coach Chat. Google Gemini models dynamically invoke backend tools to inspect live Strava and Whoop metrics with zero guesswork.
+- **Granular Strava Lap & Split Telemetry**: Added `get_strava_activity_details` tool to inspect workout interval laps, average/normalized watts, cadence, and 3-tier XSS strain (Low, High, Peak) for any ride (`latest`, `yesterday`, or numeric ID).
+- **Peak Power Curve & Aerobic Decoupling**: Added `get_strava_activity_streams_and_power_curve` tool calculating sliding window peak wattage (5s, 15s, 1m, 5m, 20m) and heart rate aerobic decoupling (cardiac drift) from second-by-second activity streams.
+- **Historical Workout Search**: Added `search_strava_activities` tool allowing natural query matching (e.g. "my sweet spot rides", "climbing workouts") across the athlete's Strava database.
+- **Multi-Day Whoop Recovery Correlation**: Added `get_whoop_biometrics_timeline` tool retrieving multi-day Whoop recovery, HRV, resting heart rate, sleep performance, and strain trends.
+- **Interactive UI Tool Execution Badges**: Rendered animated tool badges in the Coach Chat window showing the athlete the exact tool invoked and telemetry analyzed.
+
+---
+
 ## [2.2.10] - 2026-10-28
 ### Added & Fixed
 - **Zero-Dependency Database Migration**: Resolved circular import between `database.py` and `strava_service.py` during app startup, guaranteeing that SQLite migrations execute on startup and convert all historical UTC Strava activity timestamps to local time.
