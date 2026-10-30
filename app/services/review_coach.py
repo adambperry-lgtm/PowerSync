@@ -273,6 +273,9 @@ def build_preference_aligned_outlook_days(
     uid = get_current_user_id()
     from app.services.workout_catalog import select_diverse_archetype
     from app.services.strain_model_service import calculate_intervals_strain
+    from app.services.forecast_service import get_athlete_planned_sessions
+    planned_sessions = get_athlete_planned_sessions(uid)
+    active_target_plan = get_active_target_plan(uid)
 
     for offset in [1, 2, 3]:
         target_date = today + datetime.timedelta(days=offset)
@@ -570,6 +573,52 @@ def build_preference_aligned_outlook_days(
                     "ai_rationale": selected.get("ai_rationale", desc),
                     "description": desc
                 }
+
+        # Check for athlete Coach Chat planned sessions or active target plans
+        tgt_iso = target_date.isoformat()
+        chat_plan = planned_sessions.get(tgt_iso)
+        if not chat_plan and active_target_plan and active_target_plan.get("target_date") == tgt_iso:
+            chat_plan = {
+                "title": active_target_plan.get("title", "Target Event Ride"),
+                "duration_min": int(active_target_plan.get("estimated_duration_min") or 120),
+                "estimated_tss": int(active_target_plan.get("estimated_tss") or 100),
+                "estimated_xss": int(active_target_plan.get("estimated_tss") or 100),
+                "focus_area": active_target_plan.get("intensity_type", "Target Race / Fondo"),
+                "focus_duration": "Target Event",
+                "description": active_target_plan.get("description", f"Target event: {active_target_plan.get('title')}"),
+                "is_rest": False
+            }
+
+        if chat_plan:
+            is_chat_rest = bool(
+                chat_plan.get("is_rest") or
+                any(k in str(chat_plan.get("title", "")).lower() for k in ["rest", "day off", "off day", "skip", "take off"])
+            )
+            chat_dur = 0 if is_chat_rest else int(chat_plan.get("duration_min") or chat_plan.get("duration_minutes") or 45)
+            chat_tss = 0 if is_chat_rest else int(chat_plan.get("estimated_tss") or 50)
+            chat_xss = 0 if is_chat_rest else int(chat_plan.get("estimated_xss") or chat_tss)
+
+            item["title"] = chat_plan.get("title") or item["title"]
+            item["duration_min"] = chat_dur
+            item["estimated_tss"] = chat_tss
+            item["estimated_xss"] = chat_xss
+            item["low_xss"] = chat_xss if is_chat_rest or chat_tss < 40 else int(chat_xss * 0.7)
+            item["high_xss"] = 0 if is_chat_rest or chat_tss < 40 else int(chat_xss * 0.3)
+            item["peak_xss"] = 0
+            item["focus"] = "Rest & Recovery" if is_chat_rest else (chat_plan.get("focus_area") or chat_plan.get("intensity_type") or item["focus"])
+            item["focus_duration"] = "Rest & Recovery" if is_chat_rest else (chat_plan.get("focus_duration") or "Coach Chat Plan")
+            item["description"] = f"🎯 Planned in Coach Chat: {chat_plan.get('description') or chat_plan.get('title')}"
+            item["ai_rationale"] = item["description"]
+            item["intervals"] = [] if is_chat_rest else (chat_plan.get("intervals") or item.get("intervals", []))
+            item["is_coach_scheduled"] = True
+            item["is_athlete_adjusted"] = True
+
+            # Adjust recovery projection for subsequent days based on this planned load
+            if offset < 3:
+                if chat_tss >= 80 or chat_dur >= 75:
+                    recoveries[offset] = max(38, recoveries[offset] - 16)
+                elif is_chat_rest:
+                    recoveries[offset] = min(88, recoveries[offset] + 12)
 
         # Check for athlete subjective debrief note overrides (e.g. "tomorrow will be zone 2 or a rest day")
         if offset in feedback_overrides:

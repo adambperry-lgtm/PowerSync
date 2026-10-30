@@ -79,3 +79,57 @@ def is_forecast_valid_for_recovery(forecast: Dict[str, Any], actual_recovery: in
         return True, f"Recovery within tolerance ({actual_recovery}% actual vs {projected_recovery}% projected)"
 
     return False, f"Recovery shifted from {projected_zone.upper()} ({projected_recovery}%) to {actual_zone.upper()} ({actual_recovery}%)"
+
+def save_athlete_planned_session(date_iso: str, plan_data: Dict[str, Any], user_id: Optional[str] = None) -> None:
+    """
+    Saves an athlete's upcoming planned session (communicated via Coach Chat or target plans)
+    keyed by date_iso (YYYY-MM-DD) in athlete settings.
+    """
+    uid = user_id or get_current_user_id()
+    plans = get_setting("coach_upcoming_plans", {}, user_id=uid)
+    if not isinstance(plans, dict):
+        plans = {}
+
+    title_str = str(plan_data.get("title") or "Planned Session").strip()
+    is_rest = bool(
+        plan_data.get("is_rest") or
+        any(k in title_str.lower() for k in ["rest", "day off", "off day", "skip", "take off"])
+    )
+    dur = 0 if is_rest else int(plan_data.get("duration_minutes") or plan_data.get("duration_min") or plan_data.get("estimated_duration_min") or 45)
+    tss = 0 if is_rest else int(plan_data.get("estimated_tss") or 50)
+    xss = 0 if is_rest else int(plan_data.get("estimated_xss") or tss)
+
+    plans[date_iso] = {
+        "date_iso": date_iso,
+        "title": title_str,
+        "duration_min": dur,
+        "estimated_tss": tss,
+        "estimated_xss": xss,
+        "focus_area": "Rest & Recovery" if is_rest else (plan_data.get("focus_area") or plan_data.get("intensity_type") or "Structured Training"),
+        "focus_duration": "Rest & Recovery" if is_rest else (plan_data.get("focus_duration") or "Coach Chat Plan"),
+        "description": plan_data.get("description") or f"Planned in Coach Chat for {date_iso}",
+        "intervals": [] if is_rest else (plan_data.get("intervals") or []),
+        "distance_miles": 0.0 if is_rest else float(plan_data.get("distance_miles") or 0.0),
+        "elevation_gain_ft": 0.0 if is_rest else float(plan_data.get("elevation_gain_ft") or 0.0),
+        "is_rest": is_rest,
+        "updated_at": datetime.datetime.now().isoformat()
+    }
+    set_setting("coach_upcoming_plans", plans, user_id=uid)
+
+def get_athlete_planned_sessions(user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Retrieves all upcoming sessions planned via Coach Chat or target planning."""
+    uid = user_id or get_current_user_id()
+    plans = get_setting("coach_upcoming_plans", {}, user_id=uid)
+    return plans if isinstance(plans, dict) else {}
+
+def clear_athlete_planned_session(date_iso: Optional[str] = None, user_id: Optional[str] = None) -> None:
+    """Clears a planned session for a specific date, or all plans if date_iso is None."""
+    uid = user_id or get_current_user_id()
+    if not date_iso:
+        set_setting("coach_upcoming_plans", {}, user_id=uid)
+        return
+    plans = get_setting("coach_upcoming_plans", {}, user_id=uid)
+    if isinstance(plans, dict) and date_iso in plans:
+        del plans[date_iso]
+        set_setting("coach_upcoming_plans", plans, user_id=uid)
+

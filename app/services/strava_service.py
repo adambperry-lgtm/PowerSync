@@ -93,6 +93,24 @@ def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = Non
     c = conn.cursor()
     
     saved = []
+    # Auto-calibrate athlete timezone from Strava activity if not yet explicitly customized
+    if activities:
+        current_saved_tz = get_setting("athlete_timezone", default=None, user_id=uid)
+        if not current_saved_tz:
+            for act in activities:
+                raw_tz = act.get("timezone")
+                if raw_tz and isinstance(raw_tz, str) and ")" in raw_tz:
+                    tz_candidate = raw_tz.split(")")[-1].strip()
+                    try:
+                        import zoneinfo
+                        zoneinfo.ZoneInfo(tz_candidate)
+                        set_setting("athlete_timezone", tz_candidate, user_id=uid)
+                        if uid == "usr_guest":
+                            set_setting("athlete_timezone", tz_candidate, user_id="usr_default")
+                        break
+                    except Exception:
+                        pass
+
     for a in activities:
         act_id = str(a.get("id"))
         name = a.get("name", "Activity")

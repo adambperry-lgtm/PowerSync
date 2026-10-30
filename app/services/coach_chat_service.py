@@ -974,6 +974,16 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                     ftp=snapshot["athlete"]["ftp_watts"]
                 )
 
+            # Auto-persist planned upcoming sessions into coach forecast overrides
+            if proposed_action:
+                act_type = proposed_action.get("action_type")
+                t_date = proposed_action.get("target_date")
+                from app.services.forecast_service import save_athlete_planned_session, clear_athlete_planned_session
+                if act_type in ("schedule_workout", "schedule_upcoming_plan") and t_date:
+                    save_athlete_planned_session(t_date, proposed_action, user_id=uid)
+                elif act_type == "clear_upcoming_plan":
+                    clear_athlete_planned_session(user_id=uid)
+
             # Prepend learned notice if Gemini didn't mention saving it
             reply_text = clean_reply
             if learned_notice and not any(w in clean_reply.lower() for w in ["saved", "remembered", "profile", "coaching directives"]):
@@ -1009,6 +1019,16 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             int(proposed_action["duration_minutes"]),
             ftp=snapshot["athlete"]["ftp_watts"]
         )
+
+    # Auto-persist planned upcoming sessions into coach forecast overrides
+    if proposed_action:
+        act_type = proposed_action.get("action_type")
+        t_date = proposed_action.get("target_date")
+        from app.services.forecast_service import save_athlete_planned_session, clear_athlete_planned_session
+        if act_type in ("schedule_workout", "schedule_upcoming_plan") and t_date:
+            save_athlete_planned_session(t_date, proposed_action, user_id=uid)
+        elif act_type == "clear_upcoming_plan":
+            clear_athlete_planned_session(user_id=uid)
 
     # Check if fallback used direct tool lookup
     fallback_tools = []

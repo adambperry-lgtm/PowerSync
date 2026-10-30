@@ -182,5 +182,45 @@ class TestEveningWorkoutTimezone(unittest.TestCase):
             f"Migrated timestamp {migrated_row['start_date']} should start with {yesterday_iso}"
         )
 
+    def test_single_quoted_raw_json_and_no_z_migration(self):
+        """
+        Verify that migrate_strava_activities_to_local_time handles rows where
+        start_date has no 'Z' and raw_json has Python single-quoted dict repr.
+        """
+        from app.database import migrate_strava_activities_to_local_time
+        today = get_athlete_date(self.user_id)
+        yesterday = today - datetime.timedelta(days=1)
+        today_iso = today.isoformat()
+        yesterday_iso = yesterday.isoformat()
+
+        # Database has 2026-10-28T01:11:10 (no Z) and raw_json with single quotes
+        start_no_z = f"{today_iso}T01:11:10"
+        single_quote_raw = f"{{'name': 'Late Ride', 'start_date': '{today_iso}T01:11:10Z', 'start_date_local': '{yesterday_iso}T21:11:10Z', 'utc_offset': -14400.0}}"
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec,
+                distance_meters, total_elevation_gain, average_watts,
+                weighted_average_watts, average_heartrate, max_heartrate,
+                suffer_score, kilojoules, raw_json
+            ) VALUES (?, 'legacy_single_quote_01', 'Late Ride', 'VirtualRide', ?, 2850, 25000, 200, 180, 186, 130, 150, 50, 500, ?)
+        """, (self.user_id, start_no_z, single_quote_raw))
+        conn.commit()
+
+        # Run migration
+        migrate_strava_activities_to_local_time()
+
+        c.execute("SELECT start_date FROM strava_activities WHERE user_id = ? AND id = 'legacy_single_quote_01'", (self.user_id,))
+        migrated = c.fetchone()
+        conn.close()
+
+        self.assertIsNotNone(migrated)
+        self.assertTrue(
+            migrated["start_date"].startswith(yesterday_iso),
+            f"Expected {migrated['start_date']} to be migrated to {yesterday_iso}"
+        )
+
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,8 @@ import datetime
 import secrets
 import uuid
 import zoneinfo
+import re
+import ast
 from typing import Dict, Any, Optional, List
 from contextvars import ContextVar
 
@@ -37,7 +39,7 @@ def reset_current_timezone_context(token):
 def get_athlete_timezone_name(user_id: Optional[str] = None) -> str:
     """Resolves the active athlete IANA timezone name."""
     ctx_tz = CURRENT_USER_TIMEZONE.get()
-    if ctx_tz and ctx_tz != DEFAULT_TIMEZONE:
+    if ctx_tz and ctx_tz != DEFAULT_TIMEZONE and ctx_tz not in ("UTC", "Etc/UTC"):
         return ctx_tz
 
     uid = user_id or get_current_user_id()
@@ -48,11 +50,18 @@ def get_athlete_timezone_name(user_id: Optional[str] = None) -> str:
     except Exception:
         pass
 
-    env_tz = os.environ.get("TZ") or os.environ.get("ATHLETE_TIMEZONE")
+    env_tz = os.environ.get("ATHLETE_TIMEZONE")
     if env_tz and env_tz.strip():
         return env_tz.strip()
 
-    return ctx_tz or DEFAULT_TIMEZONE
+    container_tz = os.environ.get("TZ")
+    if container_tz and container_tz.strip() and container_tz.strip() not in ("UTC", "Etc/UTC"):
+        return container_tz.strip()
+
+    if ctx_tz and ctx_tz not in ("UTC", "Etc/UTC"):
+        return ctx_tz
+
+    return DEFAULT_TIMEZONE
 
 def get_athlete_timezone(user_id: Optional[str] = None) -> zoneinfo.ZoneInfo:
     """Returns ZoneInfo object for athlete, falling back safely to America/New_York."""
@@ -69,8 +78,9 @@ def get_athlete_now(user_id: Optional[str] = None) -> datetime.datetime:
 def resolve_strava_local_start(a: Any, user_id: Optional[str] = None) -> str:
     """
     Returns the local ISO start datetime (YYYY-MM-DDTHH:MM:SS) in athlete's timezone.
-    Guarantees conversion of Strava UTC start_date to athlete's local timezone,
-    preventing evening workouts from rolling over into the following calendar date.
+    Guarantees that workouts recorded in local evening hours (e.g. 9-10 PM) are attributed
+    to the correct calendar day rather than rolling over into the next day via UTC timestamps.
+    Prioritizes Strava's true start_date_local, then utc_offset, then athlete timezone conversion.
     """
     if a is None:
         return ""
@@ -81,10 +91,34 @@ def resolve_strava_local_start(a: Any, user_id: Optional[str] = None) -> str:
     else:
         return ""
 
-    athlete_tz = get_athlete_timezone(user_id or a_dict.get("user_id"))
+    # 1. Directly check start_date_local on top-level object
+    local_start = a_dict.get("start_date_local")
+    if local_start and isinstance(local_start, str):
+        cleaned = local_start.strip().rstrip("Z")
+        if len(cleaned) >= 19 and "T" in cleaned[:19]:
+            return cleaned[:19]
 
-    # 1. First check if raw_json contains the original Strava UTC start_date or start_date_local
+    # 2. Check raw_json for start_date_local (robust to both valid JSON and Python repr strings)
     raw_str = a_dict.get("raw_json")
+    if raw_str:
+        m = re.search(r'[\"\']start_date_local[\"\']\s*:\s*[\"\']([^\"\']+)[\"\']', str(raw_str))
+        if m and m.group(1):
+            cleaned = m.group(1).strip().rstrip("Z")
+            if len(cleaned) >= 19 and "T" in cleaned[:19]:
+                return cleaned[:19]
+
+    # 3. Check utc_offset
+    utc_offset = a_dict.get("utc_offset")
+    if utc_offset is None and raw_str:
+        m_offset = re.search(r'[\"\']utc_offset[\"\']\s*:\s*(-?\d+(?:\.\d+)?)', str(raw_str))
+        if m_offset:
+            try:
+                utc_offset = float(m_offset.group(1))
+            except Exception:
+                pass
+
+    # 4. Fallback to UTC start_date converted via utc_offset or athlete timezone
+    raw_dict = {}
     if raw_str:
         try:
             if isinstance(raw_str, str) and raw_str.strip().startswith("{"):
@@ -94,46 +128,34 @@ def resolve_strava_local_start(a: Any, user_id: Optional[str] = None) -> str:
                     raw_dict = ast.literal_eval(raw_str)
             elif isinstance(raw_str, dict):
                 raw_dict = raw_str
-            else:
-                raw_dict = {}
-
-            # Prioritize converting Strava's true UTC start_date to athlete's local timezone
-            utc_candidate = raw_dict.get("start_date")
-            if utc_candidate and isinstance(utc_candidate, str) and ("Z" in utc_candidate or "+" in utc_candidate):
-                clean_utc = utc_candidate.replace("Z", "+00:00")
-                dt_utc = datetime.datetime.fromisoformat(clean_utc)
-                if dt_utc.tzinfo is None:
-                    dt_utc = dt_utc.replace(tzinfo=datetime.timezone.utc)
-                dt_local = dt_utc.astimezone(athlete_tz)
-                return dt_local.strftime("%Y-%m-%dT%H:%M:%S")
-
-            # Secondary fallback to start_date_local
-            if raw_dict.get("start_date_local"):
-                local_cand = str(raw_dict["start_date_local"]).rstrip("Z")
-                return local_cand[:19]
         except Exception:
             pass
 
-    # 2. Check top-level start_date
-    start_val = a_dict.get("start_date") or a_dict.get("date")
-    if start_val and isinstance(start_val, str):
-        start_str = start_val.strip()
+    athlete_tz = get_athlete_timezone(user_id or a_dict.get("user_id"))
+    start_cand = (
+        (raw_dict.get("start_date") if isinstance(raw_dict, dict) else None)
+        or a_dict.get("start_date")
+        or a_dict.get("date")
+    )
+    if start_cand and isinstance(start_cand, str):
+        start_str = start_cand.strip()
         if "Z" in start_str or "+" in start_str or ("-" in start_str[10:]):
             try:
                 clean_utc = start_str.replace("Z", "+00:00")
                 dt_utc = datetime.datetime.fromisoformat(clean_utc)
                 if dt_utc.tzinfo is None:
                     dt_utc = dt_utc.replace(tzinfo=datetime.timezone.utc)
+                if utc_offset is not None:
+                    try:
+                        dt_local = dt_utc + datetime.timedelta(seconds=float(utc_offset))
+                        return dt_local.strftime("%Y-%m-%dT%H:%M:%S")
+                    except Exception:
+                        pass
                 dt_local = dt_utc.astimezone(athlete_tz)
                 return dt_local.strftime("%Y-%m-%dT%H:%M:%S")
             except Exception:
                 pass
         return start_str[:19]
-
-    # 3. Check start_date_local
-    local_start = a_dict.get("start_date_local")
-    if local_start:
-        return str(local_start).rstrip("Z")[:19]
 
     return ""
 

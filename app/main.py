@@ -121,8 +121,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.3.0",
-        "release_name": "Gemini Function Calling & Strava/Whoop Tool Calling Engine",
+        "version": "2.3.1",
+        "release_name": "Coach Chat 3-Day Forecast Dynamic Adjustment & Evening Workout Timezone Resolution",
         "build_date": "2026-10-29",
         "services": {
             "whoop": "v2 REST API",
@@ -132,6 +132,18 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.3.1",
+                "date": "2026-10-29",
+                "title": "Coach Chat 3-Day Forecast Dynamic Adjustment & Evening Workout Timezone Resolution",
+                "items": [
+                    "Dynamic 3-Day Forecast Chat Adjustment: Discussing upcoming rides or schedule changes in Coach Chat (e.g. 50-mile Saturday group ride, tomorrow threshold over-unders, or Friday rest day) automatically adapts the 3-day forward forecast outlook cards and interval breakdowns with '💬 Coach Scheduled' badges and fatigue decay modeling.",
+                    "Upcoming Plan Persistence: Staged and confirmed Coach Chat plans are permanently stored in coach_upcoming_plans and seamlessly override future forecast day archetypes while preserving athlete weekly preferences.",
+                    "Strava True start_date_local Prioritization: Enhanced resolve_strava_local_start to prioritize Strava's true start_date_local and utc_offset over generic UTC server conversions, ensuring evening rides (9-10 PM) stay permanently anchored to the evening date they occurred.",
+                    "Morning Training Slate Physiological Guardrail: Prevented workouts from falsely blocking morning training when Whoop daytime strain is 0.0 with green recovery, ensuring 95% recovery slates receive their proper prescribed session.",
+                    "Auto-Timezone Calibration: Automatically extracts athlete timezone from synced Strava activities if unconfigured."
+                ]
+            },
             {
                 "version": "v2.3.0",
                 "date": "2026-10-29",

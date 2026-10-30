@@ -301,6 +301,8 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 workout_obj["badge_color"] = "cyan"
 
             save_scheduled_workout(workout_obj, target_date)
+            from app.services.forecast_service import save_athlete_planned_session
+            save_athlete_planned_session(target_date, workout_obj, user_id=uid)
 
             options_list = []
             if is_for_today:
@@ -351,6 +353,8 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 "description": data.get("description") or "Scheduled via AI Coach chat consultation"
             }
             plan_id = save_target_plan(plan_dict)
+            from app.services.forecast_service import save_athlete_planned_session
+            save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id=uid)
             active = get_active_target_plan()
             ftp = _clean_int(get_setting("athlete_ftp", 250), 250)
             schedule = compute_taper_leadup_schedule(active, current_ftp=ftp) if active else []
@@ -366,6 +370,8 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
         elif action_type == "clear_upcoming_plan":
             from app.database import clear_active_target_plans
             clear_active_target_plans()
+            from app.services.forecast_service import clear_athlete_planned_session
+            clear_athlete_planned_session(user_id=uid)
             return {
                 "success": True,
                 "action_type": "clear_upcoming_plan",
