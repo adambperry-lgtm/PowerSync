@@ -133,6 +133,17 @@ def version_info():
         },
         "changelog": [
             {
+                "version": "v2.3.2",
+                "date": "2026-10-30",
+                "title": "Multi-Day Weekend Forecast Sync, Instant UI Refresh & Training Slate Safeguard",
+                "items": [
+                    "Multi-Day Weekend Directives: Coach Chat and forecast service simultaneously extract multi-clause weekend plans (e.g. '50 miles tomorrow and resting sunday'), correctly splitting athlete intent from complaint clauses and staging distinct workouts for both days.",
+                    "3-Day Forecast UI Reactive Refresh: Instantly updates the 3-day forecast in the DOM as soon as plans are discussed or confirmed, prioritizing '💬 Coach Scheduled' badges over generic athlete notes.",
+                    "Slate Protection Against Taper Hijacking: Casual weekend rides no longer truncate or overwrite today's Friday prescribed session into a 30-minute pre-event neuromuscular primer.",
+                    "Universal Strain Corroboration: Unified daytime cardiovascular strain checking across all workout endpoints to guarantee fresh 0.0 strain morning baselines receive their prescribed workouts without false rest day locks."
+                ]
+            },
+            {
                 "version": "v2.3.1",
                 "date": "2026-10-29",
                 "title": "Coach Chat 3-Day Forecast Dynamic Adjustment & Evening Workout Timezone Resolution",

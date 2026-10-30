@@ -5,6 +5,25 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.3.2] - 2026-10-30
+### Added & Fixed
+- **Multi-Day Weekend Chat Directives & Multi-Clause Intent Parsing**: Enhanced Coach Chat and forecast service to parse multi-day weekend directives simultaneously (e.g. "50 miles tomorrow and resting sunday"). Robust regex boundary parsing separates athlete intent from complaint clauses ("but it still has..."), staging distinct plans for both Saturday and Sunday in a single message.
+- **3-Day Forecast UI Reactive Refresh & Badges**: Prioritized `💬 Coach Scheduled` badges over generic athlete notes in the 3-day forecast outlook. Automatically reloads the forecast in the DOM immediately upon chat plan confirmation and drawer close without requiring manual browser reloads.
+- **T-1 Race Taper Leadup Protection**: Isolated pre-race leadup tapers so casual upcoming weekend rides or group rides do not hijack or truncate today's prescribed Friday session into a 30-minute neuromuscular primer.
+- **Universal Daytime Strain Corroboration**: Unified `has_substantial_ride` across all workout endpoints (`workouts.py`, `outdoor_coach.py`, `ai_coach.py`), guaranteeing that fresh morning 0.0 strain baselines (such as 95% Whoop recovery) are never erroneously locked out into "Daily Target Achieved — Rest & Recovery" by evening workouts or uncorroborated activity records.
+
+---
+
+## [2.3.1] - 2026-10-29
+### Added & Fixed
+- **Coach Chat 3-Day Forecast Dynamic Adjustment**: Discussing upcoming rides or schedule changes in Coach Chat (e.g. 50-mile Saturday ride, tomorrow threshold over-unders, or Friday rest day) automatically adapts the 3-day forward forecast outlook cards and interval breakdowns with '💬 Coach Scheduled' badges and fatigue decay modeling.
+- **Upcoming Plan Persistence**: Staged and confirmed Coach Chat plans are permanently stored in `coach_upcoming_plans` and seamlessly override future forecast day archetypes while preserving athlete weekly preferences.
+- **Strava True start_date_local Prioritization**: Enhanced `resolve_strava_local_start` to prioritize Strava's true `start_date_local` and `utc_offset` over generic UTC server conversions, ensuring evening rides (9-10 PM) stay permanently anchored to the evening date they occurred.
+- **Morning Training Slate Physiological Guardrail**: Prevented workouts from falsely blocking morning training when Whoop daytime strain is 0.0 with green recovery, ensuring 95% recovery slates receive their proper prescribed session.
+- **Auto-Timezone Calibration**: Automatically extracts athlete timezone from synced Strava activities if unconfigured.
+
+---
+
 ## [2.3.0] - 2026-10-29
 ### Added & Fixed
 - **Google Gemini Function Calling & Live Tool Engine**: Enabled native tool calling (`tools=[...]`) inside the PowerSync Coach Chat. Google Gemini models dynamically invoke backend tools to inspect live Strava and Whoop metrics with zero guesswork.

@@ -93,7 +93,7 @@ def save_athlete_planned_session(date_iso: str, plan_data: Dict[str, Any], user_
     title_str = str(plan_data.get("title") or "Planned Session").strip()
     is_rest = bool(
         plan_data.get("is_rest") or
-        any(k in title_str.lower() for k in ["rest", "day off", "off day", "skip", "take off"])
+        any(k in title_str.lower() for k in ["rest", "day off", "off day", "skip", "take off", "no ride"])
     )
     dur = 0 if is_rest else int(plan_data.get("duration_minutes") or plan_data.get("duration_min") or plan_data.get("estimated_duration_min") or 45)
     tss = 0 if is_rest else int(plan_data.get("estimated_tss") or 50)
@@ -101,7 +101,7 @@ def save_athlete_planned_session(date_iso: str, plan_data: Dict[str, Any], user_
 
     plans[date_iso] = {
         "date_iso": date_iso,
-        "title": title_str,
+        "title": "Rest & Recovery" if is_rest else title_str,
         "duration_min": dur,
         "estimated_tss": tss,
         "estimated_xss": xss,
@@ -115,11 +115,17 @@ def save_athlete_planned_session(date_iso: str, plan_data: Dict[str, Any], user_
         "updated_at": datetime.datetime.now().isoformat()
     }
     set_setting("coach_upcoming_plans", plans, user_id=uid)
+    if uid == "usr_guest":
+        set_setting("coach_upcoming_plans", plans, user_id="usr_default")
+    elif uid == "usr_default":
+        set_setting("coach_upcoming_plans", plans, user_id="usr_guest")
 
 def get_athlete_planned_sessions(user_id: Optional[str] = None) -> Dict[str, Any]:
     """Retrieves all upcoming sessions planned via Coach Chat or target planning."""
     uid = user_id or get_current_user_id()
     plans = get_setting("coach_upcoming_plans", {}, user_id=uid)
+    if (not plans or not isinstance(plans, dict)) and uid == "usr_guest":
+        plans = get_setting("coach_upcoming_plans", {}, user_id="usr_default")
     return plans if isinstance(plans, dict) else {}
 
 def clear_athlete_planned_session(date_iso: Optional[str] = None, user_id: Optional[str] = None) -> None:
@@ -127,9 +133,140 @@ def clear_athlete_planned_session(date_iso: Optional[str] = None, user_id: Optio
     uid = user_id or get_current_user_id()
     if not date_iso:
         set_setting("coach_upcoming_plans", {}, user_id=uid)
+        if uid == "usr_guest":
+            set_setting("coach_upcoming_plans", {}, user_id="usr_default")
+        elif uid == "usr_default":
+            set_setting("coach_upcoming_plans", {}, user_id="usr_guest")
         return
-    plans = get_setting("coach_upcoming_plans", {}, user_id=uid)
+    plans = get_athlete_planned_sessions(user_id=uid)
     if isinstance(plans, dict) and date_iso in plans:
         del plans[date_iso]
         set_setting("coach_upcoming_plans", plans, user_id=uid)
+        if uid == "usr_guest":
+            set_setting("coach_upcoming_plans", plans, user_id="usr_default")
+        elif uid == "usr_default":
+            set_setting("coach_upcoming_plans", plans, user_id="usr_guest")
+
+def parse_chat_schedule_directives(message: str, today: Optional[datetime.date] = None, ftp: int = 250) -> List[Dict[str, Any]]:
+    """
+    Intelligently extracts multi-day upcoming workout plans and rest directives
+    stated by the athlete in Coach Chat (e.g. '50 miles tomorrow and resting sunday',
+    'Saturday 50 miles, Sunday off', 'taking tomorrow off and 40 miles Sunday').
+    Returns structured list of plan dictionaries ready to persist to coach_upcoming_plans.
+    """
+    if not message or not message.strip():
+        return []
+
+    import re
+    if not today:
+        today = get_athlete_date()
+
+    lower = message.strip().lower()
+
+    # Strip complaint / bug report tails like 'but it still has rest tomorrow...'
+    complaint_match = re.search(r'\b(?:but\s+(?:it\s+still|it\s+shows|it\s+has)|why\s+does\s+it|it\s+still\s+shows|it\s+still\s+has)\b.*$', lower, re.IGNORECASE)
+    working_text = lower[:complaint_match.start()].strip() if complaint_match else lower
+
+    weekdays = {
+        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+        "friday": 4, "saturday": 5, "sunday": 6
+    }
+
+    # Split into clauses by common conjunctions or punctuation
+    parts = re.split(r'[,;]|\band\b|\bthen\b|\bbut\b', working_text)
+    assigned_dates = {}
+
+    for part in parts:
+        part_str = part.strip()
+        if not part_str:
+            continue
+
+        target_date = None
+        day_label = ""
+
+        # Check relative days
+        if "tomorrow" in part_str or "tmrw" in part_str:
+            target_date = today + datetime.timedelta(days=1)
+            day_label = "Tomorrow"
+        elif "day after tomorrow" in part_str:
+            target_date = today + datetime.timedelta(days=2)
+            day_label = "Day After Tomorrow"
+        elif "today" in part_str:
+            target_date = today
+            day_label = "Today"
+        else:
+            # Check weekday names
+            for w_name, w_idx in weekdays.items():
+                if re.search(rf'\b{w_name}\b', part_str):
+                    days_ahead = (w_idx - today.weekday()) % 7
+                    if days_ahead == 0 and ("next" in part_str or w_idx != today.weekday()):
+                        days_ahead = 7
+                    target_date = today + datetime.timedelta(days=days_ahead)
+                    day_label = w_name.capitalize()
+                    break
+
+        if not target_date:
+            continue
+
+        date_iso = target_date.isoformat()
+        weekday_name = target_date.strftime("%A")
+
+        # Check for rest intent
+        is_rest = any(k in part_str for k in ["rest", "resting", "off", "day off", "take off", "skip", "no ride", "passive"])
+        dist_match = re.search(r'(\d+(?:\.\d+)?)\s*[-–—]?\s*(?:miles|mile|mi)\b', part_str)
+        dur_match = re.search(r'\b(20|25|30|35|40|45|50|60|75|90|120|150|180)\s*(?:m|min|mins|minutes)?\b', part_str)
+
+        if is_rest and not dist_match:
+            assigned_dates[date_iso] = {
+                "date_iso": date_iso,
+                "target_date": date_iso,
+                "title": "Rest & Recovery",
+                "duration_min": 0,
+                "duration_minutes": 0,
+                "estimated_tss": 0,
+                "estimated_xss": 0,
+                "focus_area": "Rest & Recovery",
+                "focus_duration": "Rest & Recovery",
+                "is_rest": True,
+                "description": f"Scheduled rest day for {day_label or weekday_name}."
+            }
+        elif dist_match:
+            dist = float(dist_match.group(1))
+            dur = max(60, min(360, int((dist / 17.5) * 60)))
+            tss = max(40, int(dist * 2.1))
+            assigned_dates[date_iso] = {
+                "date_iso": date_iso,
+                "target_date": date_iso,
+                "title": f"{int(dist)}-Mile {weekday_name} Ride",
+                "duration_min": dur,
+                "duration_minutes": dur,
+                "distance_miles": dist,
+                "elevation_gain_ft": round(dist * 50),
+                "estimated_tss": tss,
+                "estimated_xss": tss,
+                "focus_area": "Endurance",
+                "focus_duration": "Endurance / Century (>1h Focus)",
+                "is_rest": False,
+                "description": f"Planned {int(dist)}-mile {weekday_name} endurance ride (~{dur}m, ~{tss} TSS)."
+            }
+        elif dur_match or any(k in part_str for k in ["interval", "sweet spot", "threshold", "tempo", "vo2", "over-under", "spin", "ride"]):
+            dur = int(dur_match.group(1)) if dur_match else 45
+            focus = "Sweet Spot" if "sweet spot" in part_str else ("Threshold" if "threshold" in part_str or "over" in part_str else "Aerobic Base")
+            assigned_dates[date_iso] = {
+                "date_iso": date_iso,
+                "target_date": date_iso,
+                "title": f"{dur}-Min {focus} Session",
+                "duration_min": dur,
+                "duration_minutes": dur,
+                "distance_miles": 0.0,
+                "elevation_gain_ft": 0.0,
+                "estimated_tss": round(dur * 1.1),
+                "estimated_xss": round(dur * 1.1),
+                "focus_area": focus,
+                "focus_duration": f"{focus} Focus",
+                "is_rest": False,
+                "description": f"Planned {dur}-minute {focus} session for {weekday_name}."
+            }
+
+    return list(assigned_dates.values())
 

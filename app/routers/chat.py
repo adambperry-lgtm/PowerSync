@@ -303,6 +303,34 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             save_scheduled_workout(workout_obj, target_date)
             from app.services.forecast_service import save_athlete_planned_session
             save_athlete_planned_session(target_date, workout_obj, user_id=uid)
+            if uid == "usr_guest":
+                save_athlete_planned_session(target_date, workout_obj, user_id="usr_default")
+            elif uid == "usr_default":
+                save_athlete_planned_session(target_date, workout_obj, user_id="usr_guest")
+
+            from app.services.review_coach import build_preference_aligned_outlook_days
+            from app.services.forecast_service import save_coach_forecast_plan
+            try:
+                today_dt = get_athlete_date(uid)
+                refreshed_outlook = build_preference_aligned_outlook_days(
+                    today=today_dt,
+                    today_recovery=75,
+                    today_strain=5.0,
+                    workout_strain=5.0,
+                    is_today=False,
+                    is_yesterday=False,
+                    has_trained_today=False,
+                    session_summary={},
+                    ftp=ftp,
+                    program={}
+                )
+                save_coach_forecast_plan(uid, refreshed_outlook)
+                if uid == "usr_guest":
+                    save_coach_forecast_plan("usr_default", refreshed_outlook)
+                elif uid == "usr_default":
+                    save_coach_forecast_plan("usr_guest", refreshed_outlook)
+            except Exception:
+                pass
 
             options_list = []
             if is_for_today:
@@ -353,10 +381,37 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 "description": data.get("description") or "Scheduled via AI Coach chat consultation"
             }
             plan_id = save_target_plan(plan_dict)
-            from app.services.forecast_service import save_athlete_planned_session
+            from app.services.forecast_service import save_athlete_planned_session, save_coach_forecast_plan
             save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id=uid)
+            if uid == "usr_guest":
+                save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id="usr_default")
+            elif uid == "usr_default":
+                save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id="usr_guest")
+
+            from app.services.review_coach import build_preference_aligned_outlook_days
+            try:
+                today_dt = get_athlete_date(uid)
+                refreshed_outlook = build_preference_aligned_outlook_days(
+                    today=today_dt,
+                    today_recovery=75,
+                    today_strain=5.0,
+                    workout_strain=5.0,
+                    is_today=False,
+                    is_yesterday=False,
+                    has_trained_today=False,
+                    session_summary={},
+                    ftp=ftp,
+                    program={}
+                )
+                save_coach_forecast_plan(uid, refreshed_outlook)
+                if uid == "usr_guest":
+                    save_coach_forecast_plan("usr_default", refreshed_outlook)
+                elif uid == "usr_default":
+                    save_coach_forecast_plan("usr_guest", refreshed_outlook)
+            except Exception:
+                pass
+
             active = get_active_target_plan()
-            ftp = _clean_int(get_setting("athlete_ftp", 250), 250)
             schedule = compute_taper_leadup_schedule(active, current_ftp=ftp) if active else []
 
             return {
@@ -370,8 +425,36 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
         elif action_type == "clear_upcoming_plan":
             from app.database import clear_active_target_plans
             clear_active_target_plans()
-            from app.services.forecast_service import clear_athlete_planned_session
+            from app.services.forecast_service import clear_athlete_planned_session, save_coach_forecast_plan
             clear_athlete_planned_session(user_id=uid)
+            if uid == "usr_guest":
+                clear_athlete_planned_session(user_id="usr_default")
+            elif uid == "usr_default":
+                clear_athlete_planned_session(user_id="usr_guest")
+
+            from app.services.review_coach import build_preference_aligned_outlook_days
+            try:
+                today_dt = get_athlete_date(uid)
+                refreshed_outlook = build_preference_aligned_outlook_days(
+                    today=today_dt,
+                    today_recovery=75,
+                    today_strain=5.0,
+                    workout_strain=5.0,
+                    is_today=False,
+                    is_yesterday=False,
+                    has_trained_today=False,
+                    session_summary={},
+                    ftp=_clean_int(get_setting("athlete_ftp", 250, user_id=uid), 250),
+                    program={}
+                )
+                save_coach_forecast_plan(uid, refreshed_outlook)
+                if uid == "usr_guest":
+                    save_coach_forecast_plan("usr_default", refreshed_outlook)
+                elif uid == "usr_default":
+                    save_coach_forecast_plan("usr_guest", refreshed_outlook)
+            except Exception:
+                pass
+
             return {
                 "success": True,
                 "action_type": "clear_upcoming_plan",

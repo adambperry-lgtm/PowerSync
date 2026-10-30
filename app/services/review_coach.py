@@ -612,6 +612,8 @@ def build_preference_aligned_outlook_days(
             item["intervals"] = [] if is_chat_rest else (chat_plan.get("intervals") or item.get("intervals", []))
             item["is_coach_scheduled"] = True
             item["is_athlete_adjusted"] = True
+            item["is_default_rest"] = is_chat_rest
+            item["is_directive_rest"] = False
 
             # Adjust recovery projection for subsequent days based on this planned load
             if offset < 3:

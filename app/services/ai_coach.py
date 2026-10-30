@@ -319,6 +319,14 @@ def build_adaptive_workout_local(
             return enrich_workout_strain(workout_obj, ftp)
 
     # 0D. TARGET PLAN ACTIVE ADAPTATION: T-0 (Event Day), T-1 (Primer), T-2 (Flush), T-3 (Taper Onset)
+    is_periodized_target = bool(
+        active_plan and (
+            active_plan.get("is_periodized_goal") or
+            active_plan.get("activate_taper") or
+            any(k in str(active_plan.get("title", "")).lower() for k in ["gran fondo", "century race", "championship", "a-race", "state crit"])
+        )
+    )
+
     if active_plan and days_until is not None and days_until >= 0 and not has_explicit_override:
         plan_title = active_plan.get("title", "Target Event")
         plan_dist = float(active_plan.get("distance_miles") or 50.0)
@@ -361,8 +369,8 @@ def build_adaptive_workout_local(
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
             return enrich_workout_strain(workout_obj, ftp)
 
-        elif days_until == 1:
-            # T-1 PRIMER (Day Before Event)
+        elif days_until == 1 and is_periodized_target:
+            # T-1 PRIMER (Day Before Major Event with Active Taper)
             duration = 30
             title = "Pre-Event Neuromuscular Primer"
             focus_area = "Neural Activation & Glycogen Sparing"
@@ -405,7 +413,7 @@ def build_adaptive_workout_local(
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
             return enrich_workout_strain(workout_obj, ftp)
 
-        elif days_until == 2:
+        elif days_until == 2 and is_periodized_target:
             # T-2 FLUSH (2 Days Before Event)
             duration = 35
             title = "Pre-Event Active Recovery Flush"
@@ -438,7 +446,7 @@ def build_adaptive_workout_local(
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
             return enrich_workout_strain(workout_obj, ftp)
 
-        elif days_until == 3:
+        elif days_until == 3 and is_periodized_target:
             # T-3 TAPER ONSET (3 Days Before Event)
             duration = 45
             title = "Taper Onset: Controlled Tempo Touch"
@@ -835,7 +843,8 @@ def build_workout_bundle(
     is_eval_today = (cur_eval_date == get_athlete_date())
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
-    has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0
+    has_active_day_strain = (today_strain >= 4.0) or (today_acts and today_strain >= 2.0)
+    has_substantial_ride = (today_moving_min >= 20 and has_active_day_strain) or (today_moving_min >= 45 and today_strain >= 1.5)
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and recovery_score <= 55)
 
     primary = build_adaptive_workout_local(

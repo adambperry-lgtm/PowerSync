@@ -196,7 +196,8 @@ def generate_workout(req: WorkoutGenerateRequest):
 
     today_acts = today_activities or []
     today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
-    has_substantial_ride = today_moving_min >= 30 or len(today_acts) > 0
+    has_active_day_strain = (today_strain >= 4.0) or (today_acts and today_strain >= 2.0)
+    has_substantial_ride = (today_moving_min >= 20 and has_active_day_strain) or (today_moving_min >= 45 and today_strain >= 1.5)
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and rec_score <= 55)
 
     # Check recent intensity

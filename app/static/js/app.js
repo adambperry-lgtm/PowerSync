@@ -3652,26 +3652,26 @@ function renderDebrief(data) {
         ? `<span class="tag" style="background:rgba(6,182,212,0.12);color:#06b6d4;border:1px solid rgba(6,182,212,0.25);">🎯 ${item.focus_duration}</span>`
         : '';
 
-      const scheduledBadge = item.is_athlete_adjusted
-        ? `<span class="badge-status" style="color:#a78bfa;border-color:rgba(167,139,250,0.4);background:rgba(167,139,250,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">✍️ Athlete Note</span>`
-        : (item.is_directive_rest
-          ? `<span class="badge-status" style="color:#10b981;border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">📋 Schedule Directive</span>`
-          : (item.is_coach_scheduled
-            ? `<span class="badge-status" style="color:var(--accent-cyan);border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">💬 Coach Scheduled</span>`
+      const scheduledBadge = item.is_coach_scheduled
+        ? `<span class="badge-status" style="color:var(--accent-cyan);border-color:rgba(6,182,212,0.4);background:rgba(6,182,212,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">💬 Coach Scheduled</span>`
+        : (item.is_athlete_adjusted
+          ? `<span class="badge-status" style="color:#a78bfa;border-color:rgba(167,139,250,0.4);background:rgba(167,139,250,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">✍️ Athlete Note</span>`
+          : (item.is_directive_rest
+            ? `<span class="badge-status" style="color:#10b981;border-color:rgba(16,185,129,0.4);background:rgba(16,185,129,0.12);font-size:0.75rem;padding:0.15rem 0.5rem;">📋 Schedule Directive</span>`
             : ''));
-      const cardStyle = item.is_athlete_adjusted
-        ? 'style="border-color:rgba(167,139,250,0.45);background:rgba(167,139,250,0.03);box-shadow:0 0 15px rgba(167,139,250,0.06);"'
-        : (item.is_directive_rest
-          ? 'style="border-color:rgba(16,185,129,0.45);background:rgba(16,185,129,0.03);box-shadow:0 0 15px rgba(16,185,129,0.06);"'
-          : (item.is_coach_scheduled
-            ? 'style="border-color:rgba(6,182,212,0.45);background:rgba(6,182,212,0.03);box-shadow:0 0 15px rgba(6,182,212,0.06);"'
+      const cardStyle = item.is_coach_scheduled
+        ? 'style="border-color:rgba(6,182,212,0.45);background:rgba(6,182,212,0.03);box-shadow:0 0 15px rgba(6,182,212,0.06);"'
+        : (item.is_athlete_adjusted
+          ? 'style="border-color:rgba(167,139,250,0.45);background:rgba(167,139,250,0.03);box-shadow:0 0 15px rgba(167,139,250,0.06);"'
+          : (item.is_directive_rest
+            ? 'style="border-color:rgba(16,185,129,0.45);background:rgba(16,185,129,0.03);box-shadow:0 0 15px rgba(16,185,129,0.06);"'
             : ''));
-      const titleStyle = item.is_athlete_adjusted
-        ? 'style="color:#a78bfa;font-weight:700;"'
-        : (item.is_directive_rest
-          ? 'style="color:#10b981;font-weight:700;"'
-          : (item.is_coach_scheduled
-            ? 'style="color:var(--accent-cyan);font-weight:700;"'
+      const titleStyle = item.is_coach_scheduled
+        ? 'style="color:var(--accent-cyan);font-weight:700;"'
+        : (item.is_athlete_adjusted
+          ? 'style="color:#a78bfa;font-weight:700;"'
+          : (item.is_directive_rest
+            ? 'style="color:#10b981;font-weight:700;"'
             : ''));
       const zwiftTag = item.is_coach_scheduled
         ? `<span class="tag" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);font-weight:600;">🚀 Zwift Synced</span>`
@@ -5584,6 +5584,9 @@ function closeCoachChat() {
   if (document.activeElement && drawer && drawer.contains(document.activeElement)) {
     try { document.activeElement.blur(); } catch (e) {}
   }
+  if (typeof loadDebrief === "function") {
+    loadDebrief();
+  }
 }
 
 window.openCoachChat = openCoachChat;
@@ -5833,9 +5836,6 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
             if (typeof loadUpcomingPlan === "function") {
               await loadUpcomingPlan();
             }
-            if (typeof loadWorkout === "function") {
-              await loadWorkout(state.currentDuration || 60, 0, "");
-            }
             if (typeof loadDebrief === "function") {
               await loadDebrief();
             }
@@ -5927,6 +5927,12 @@ async function sendCoachMessage(text) {
     if (data.success && data.reply) {
       appendCoachChatMessage("coach", data.reply, data.proposed_action, data.executed_tools);
       coachChatHistory.push({ role: "model", text: data.reply });
+
+      if (data.scheduled_plans || data.proposed_action) {
+        if (typeof loadDebrief === "function") {
+          loadDebrief();
+        }
+      }
 
       const subtitle = document.getElementById("coachChatSubtitle");
       if (subtitle) {

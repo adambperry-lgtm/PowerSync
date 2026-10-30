@@ -5,7 +5,7 @@ import requests
 import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
-from app.database import get_setting, set_setting, get_db_connection, get_active_target_plan, get_current_user_id
+from app.database import get_setting, set_setting, get_db_connection, get_active_target_plan, get_current_user_id, get_athlete_date
 
 def extract_gemini_key_from_text(text: str) -> Optional[str]:
     """Detects if user provided a Google Gemini API key in their message."""
@@ -329,13 +329,14 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
         "vo2", "recovery", "flush", "threshold", "over-under", "over under", "overunder",
         "trainer", "zwift", "shorter", "20 min", "25 min", "30 min", "45 min", "60 min",
         "75 min", "90 min", "give me a", "make a", "create a", "suggest a", "change to",
-        "swap to", "switch to", "can i do", "put together", "schedule", "new workout", "prescribe"
+        "swap to", "switch to", "can i do", "put together", "schedule", "new workout", "prescribe",
+        "doing", "riding", "plan to ride", "plans", "tomorrow", "sunday", "saturday", "weekend"
     ])
     
     # Check if this is an explicit major target event or large outdoor ride (NOT a daily workout)
     is_major_event = any(k in msg for k in [
-        "gran fondo", "century", "century ride", "target event", "target plan",
-        "charity ride", "gravel race", "crit", "fondo"
+        "gran fondo", "century race", "target event", "target plan",
+        "charity ride", "gravel race", "crit", "fondo", "a-race"
     ])
     large_dist_match = re.search(r'\b([2-9]\d|\d{3})\s*[-–—]?\s*(?:miles|mile|mi)\b', msg)
 
@@ -460,14 +461,15 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
                 "intervals": intervals
             }
 
-    # 2. Check for Major Target Event Plan (Gran Fondo, Century, 50-mile race, etc.)
+    # 2. Check for Major Target Event Plan (Gran Fondo, Century, 50-mile race, etc.) or Scheduled Outdoor Ride
     if is_major_event or (large_dist_match and any(k in msg for k in ["ride", "plan", "doing", "riding", "sunday", "saturday", "weekend"])):
         try:
             from app.services.plan_service import parse_plan_description
             parsed = parse_plan_description(user_message)
             if parsed.get("success"):
+                action_type = "schedule_upcoming_plan" if is_major_event else "schedule_workout"
                 return {
-                    "action_type": "schedule_upcoming_plan",
+                    "action_type": action_type,
                     "title": parsed["title"],
                     "target_date": parsed["target_date"],
                     "distance_miles": parsed["distance_miles"],
@@ -475,6 +477,7 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
                     "intensity_type": parsed["intensity_type"],
                     "duration_minutes": parsed["estimated_duration_min"],
                     "estimated_tss": parsed["estimated_tss"],
+                    "is_indoor": False,
                     "description": f"{parsed['title']} ({parsed['distance_miles']} mi, ~{parsed['estimated_tss']} TSS, {parsed['elevation_gain_ft']} ft elev)"
                 }
         except Exception as e:
@@ -947,9 +950,45 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     # 3. Retrieve athlete context snapshot (reflects newly saved preference)
     snapshot = compile_athlete_context()
 
+    # 3B. Parse multi-day schedule directives from user message (e.g. '50 miles tomorrow and resting sunday')
+    from app.services.forecast_service import parse_chat_schedule_directives, save_athlete_planned_session, clear_athlete_planned_session, save_coach_forecast_plan
+    uid = get_current_user_id()
+    ftp_val = int(snapshot.get("athlete", {}).get("ftp_watts", 250))
+    today_dt = get_athlete_date(uid)
+    chat_directives = parse_chat_schedule_directives(user_message, today=today_dt, ftp=ftp_val)
+
+    if chat_directives:
+        for cd in chat_directives:
+            save_athlete_planned_session(cd["date_iso"], cd, user_id=uid)
+            if uid == "usr_guest":
+                save_athlete_planned_session(cd["date_iso"], cd, user_id="usr_default")
+            elif uid == "usr_default":
+                save_athlete_planned_session(cd["date_iso"], cd, user_id="usr_guest")
+
+        from app.services.review_coach import build_preference_aligned_outlook_days
+        try:
+            refreshed_outlook = build_preference_aligned_outlook_days(
+                today=today_dt,
+                today_recovery=int(snapshot["whoop_readiness_today"]["recovery_score_pct"]),
+                today_strain=float(snapshot.get("today_strain", 0.0)),
+                workout_strain=float(snapshot.get("today_strain", 0.0)),
+                is_today=False,
+                is_yesterday=False,
+                has_trained_today=False,
+                session_summary={},
+                ftp=ftp_val,
+                program=snapshot.get("program", {})
+            )
+            save_coach_forecast_plan(uid, refreshed_outlook)
+            if uid == "usr_guest":
+                save_coach_forecast_plan("usr_default", refreshed_outlook)
+            elif uid == "usr_default":
+                save_coach_forecast_plan("usr_guest", refreshed_outlook)
+        except Exception as e:
+            print(f"Error updating forecast plan from chat directives: {e}")
+
     # 4. Retrieve API Key & active user
     api_key = get_gemini_api_key()
-    uid = get_current_user_id()
 
     if api_key:
         system_prompt = build_system_prompt(snapshot)
@@ -961,10 +1000,26 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 has_action_request = any(k in user_message.lower() for k in [
                     "give me a", "schedule", "create a", "make a", "prescribe", "suggest a workout",
                     "change to", "swap to", "switch to", "put together", "plan a ride", "upcoming ride",
-                    "cancel plan", "clear plan", "what workout should i do", "what should i do today"
+                    "cancel plan", "clear plan", "what workout should i do", "what should i do today",
+                    "doing", "riding", "plan", "plans", "tomorrow", "sunday", "saturday", "weekend"
                 ])
                 if has_action_request:
                     proposed_action = build_sports_science_action(user_message, snapshot)
+
+            if not proposed_action and chat_directives:
+                active_cd = next((c for c in chat_directives if not c.get("is_rest")), chat_directives[0])
+                proposed_action = {
+                    "action_type": "schedule_workout",
+                    "title": active_cd["title"],
+                    "target_date": active_cd["target_date"],
+                    "duration_minutes": active_cd["duration_min"],
+                    "estimated_tss": active_cd["estimated_tss"],
+                    "focus_area": active_cd["focus_area"],
+                    "distance_miles": active_cd.get("distance_miles", 0.0),
+                    "is_indoor": active_cd.get("distance_miles", 0.0) == 0.0,
+                    "description": active_cd.get("description", f"Scheduled for {active_cd['target_date']}"),
+                    "intervals": active_cd.get("intervals", [])
+                }
 
             if proposed_action and "intervals" in proposed_action and "duration_minutes" in proposed_action:
                 from app.services.zwift_service import reconcile_workout_intervals
@@ -989,6 +1044,10 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             if learned_notice and not any(w in clean_reply.lower() for w in ["saved", "remembered", "profile", "coaching directives"]):
                 reply_text = learned_notice + reply_text
 
+            if chat_directives and not any(w in reply_text.lower() for w in ["forecast", "updated your plan", "3-day"]):
+                desc_list = [f"**{d['target_date']}**: {d['title']}" for d in chat_directives]
+                reply_text += f"\n\n🎯 **3-Day Forecast Updated:** {', '.join(desc_list)}."
+
             return {
                 "success": True,
                 "reply": key_saved_notice + reply_text,
@@ -996,6 +1055,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 "model": model_used,
                 "gemini_configured": True,
                 "proposed_action": proposed_action,
+                "scheduled_plans": chat_directives,
                 "executed_tools": executed_tools,
                 "athlete_snapshot": {
                     "ftp": snapshot["athlete"]["ftp_watts"],
@@ -1012,6 +1072,21 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     if learned_notice:
         fallback_reply = learned_notice + fallback_reply
     proposed_action = build_sports_science_action(user_message, snapshot)
+    if not proposed_action and chat_directives:
+        active_cd = next((c for c in chat_directives if not c.get("is_rest")), chat_directives[0])
+        proposed_action = {
+            "action_type": "schedule_workout",
+            "title": active_cd["title"],
+            "target_date": active_cd["target_date"],
+            "duration_minutes": active_cd["duration_min"],
+            "estimated_tss": active_cd["estimated_tss"],
+            "focus_area": active_cd["focus_area"],
+            "distance_miles": active_cd.get("distance_miles", 0.0),
+            "is_indoor": active_cd.get("distance_miles", 0.0) == 0.0,
+            "description": active_cd.get("description", f"Scheduled for {active_cd['target_date']}"),
+            "intervals": active_cd.get("intervals", [])
+        }
+
     if proposed_action and "intervals" in proposed_action and "duration_minutes" in proposed_action:
         from app.services.zwift_service import reconcile_workout_intervals
         proposed_action["intervals"] = reconcile_workout_intervals(
@@ -1030,6 +1105,11 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         elif act_type == "clear_upcoming_plan":
             clear_athlete_planned_session(user_id=uid)
 
+    reply_out = key_saved_notice + fallback_reply
+    if chat_directives and not any(w in reply_out.lower() for w in ["forecast", "updated your plan", "3-day"]):
+        desc_list = [f"**{d['target_date']}**: {d['title']}" for d in chat_directives]
+        reply_out += f"\n\n🎯 **3-Day Forecast Updated:** {', '.join(desc_list)}."
+
     # Check if fallback used direct tool lookup
     fallback_tools = []
     if any(k in user_message.lower() for k in ["lap", "split", "power numbers", "breakdown", "telemetry"]):
@@ -1040,11 +1120,12 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
 
     return {
         "success": True,
-        "reply": key_saved_notice + fallback_reply,
+        "reply": reply_out,
         "provider": "sports_science_engine",
         "model": "powersync-coach-v1",
         "gemini_configured": bool(api_key),
         "proposed_action": proposed_action,
+        "scheduled_plans": chat_directives,
         "executed_tools": fallback_tools,
         "athlete_snapshot": {
             "ftp": snapshot["athlete"]["ftp_watts"],
