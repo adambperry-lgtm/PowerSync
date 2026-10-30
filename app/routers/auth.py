@@ -540,6 +540,8 @@ def whoop_callback(
 def sync_strava():
     uid = get_current_user_id()
     tokens = get_setting("strava_tokens", {}, user_id=uid)
+    if (not tokens or not tokens.get("access_token")) and uid == "usr_guest":
+        tokens = get_setting("strava_tokens", {}, user_id="usr_default")
     if not tokens or not tokens.get("access_token"):
         return {"success": False, "error": "Strava is not connected for this account. Please connect in Settings.", "count": 0}
         

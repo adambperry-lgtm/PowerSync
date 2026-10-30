@@ -62,7 +62,9 @@ def refresh_strava_token(user_id: Optional[str] = None) -> Optional[str]:
 def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     uid = user_id or get_current_user_id()
     tokens = get_setting("strava_tokens", {}, user_id=uid)
-    access_token = tokens.get("access_token")
+    if (not tokens or not tokens.get("access_token")) and uid == "usr_guest":
+        tokens = get_setting("strava_tokens", {}, user_id="usr_default")
+    access_token = tokens.get("access_token") if tokens else None
     if not access_token:
         print("fetch_recent_strava_activities: No strava access_token found.")
         return []
@@ -147,6 +149,30 @@ def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = Non
                 kilojoules = excluded.kilojoules,
                 raw_json = excluded.raw_json
         """, (uid, act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, json.dumps(a)))
+
+        if uid in ("usr_guest", "usr_default"):
+            other_uid = "usr_default" if uid == "usr_guest" else "usr_guest"
+            c.execute("""
+                INSERT INTO strava_activities (
+                    user_id, id, name, sport_type, start_date, moving_time_sec, distance_meters,
+                    total_elevation_gain, average_watts, weighted_average_watts,
+                    average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, id) DO UPDATE SET
+                    start_date = excluded.start_date,
+                    name = excluded.name,
+                    sport_type = excluded.sport_type,
+                    moving_time_sec = excluded.moving_time_sec,
+                    distance_meters = excluded.distance_meters,
+                    total_elevation_gain = excluded.total_elevation_gain,
+                    average_watts = excluded.average_watts,
+                    weighted_average_watts = excluded.weighted_average_watts,
+                    average_heartrate = excluded.average_heartrate,
+                    max_heartrate = excluded.max_heartrate,
+                    suffer_score = excluded.suffer_score,
+                    kilojoules = excluded.kilojoules,
+                    raw_json = excluded.raw_json
+            """, (other_uid, act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, json.dumps(a)))
         
         saved.append({
             "id": act_id,

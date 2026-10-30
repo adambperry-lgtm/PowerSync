@@ -652,6 +652,181 @@ def build_preference_aligned_outlook_days(
 
     return outlook_days
 
+def resolve_day_prescribed_target(
+    date_str: str,
+    workout_recovery: int,
+    ftp: int = 250,
+    user_id: Optional[str] = None,
+    is_today: bool = False
+) -> Dict[str, Any]:
+    """
+    Resolves the prescribed workout intensity and target zone for an evaluated workout day.
+    Prioritizes:
+    1. Specifically scheduled workout for that date (get_scheduled_workout_for_date)
+    2. Planned session from Coach Chat / Forecast (get_athlete_planned_sessions)
+    3. Active today's workout prescription from workout_cache (if evaluating today)
+    4. Day Target Config weekly schedule preferences (e.g. rest day, 35-45m cap, indoor/outdoor)
+    5. Fallback to Whoop recovery baseline (only if no schedule/plan exists)
+    """
+    uid = user_id or get_current_user_id()
+
+    # 1. Scheduled workout for this date
+    from app.database import get_scheduled_workout_for_date
+    scheduled_w = get_scheduled_workout_for_date(date_str, user_id=uid)
+    if not scheduled_w and uid == "usr_guest":
+        scheduled_w = get_scheduled_workout_for_date(date_str, user_id="usr_default")
+
+    # 2. Planned session for this date
+    from app.services.forecast_service import get_athlete_planned_sessions
+    planned_sessions = get_athlete_planned_sessions(user_id=uid)
+    if not planned_sessions and uid == "usr_guest":
+        planned_sessions = get_athlete_planned_sessions(user_id="usr_default")
+    planned_session = planned_sessions.get(date_str) if planned_sessions else None
+
+    # 3. Active prescribed workout if evaluating today
+    active_prescribed = None
+    if is_today:
+        try:
+            from app.routers.workouts import get_current_workout_cache, _workout_cache_by_user
+            w_cache = get_current_workout_cache()
+            if not w_cache and uid == "usr_guest":
+                w_cache = _workout_cache_by_user.get("usr_default", {})
+            active_prescribed = w_cache.get("workout_primary") or w_cache.get("workout_custom_replaced")
+        except Exception:
+            active_prescribed = None
+
+    # 4. Weekly schedule / Day Target config
+    day_cfg = None
+    try:
+        act_d = datetime.date.fromisoformat(date_str)
+        from app.services.preferences_service import get_day_target_config
+        day_cfg = get_day_target_config(act_d)
+    except Exception:
+        pass
+
+    target_obj = scheduled_w or planned_session or active_prescribed
+
+    if target_obj and isinstance(target_obj, dict):
+        title = target_obj.get("title", "")
+        focus = (target_obj.get("focus_area") or target_obj.get("focus") or target_obj.get("description") or title).lower()
+        opt_type = (target_obj.get("option_type") or "").lower()
+        intervals = target_obj.get("intervals") or []
+        is_rest = target_obj.get("is_rest") or (opt_type == "rest") or ("rest" in title.lower() and "interval" not in title.lower())
+
+        # Check intervals for exact work power
+        work_ivs = [
+            iv for iv in intervals
+            if iv.get("type") not in ("Warmup", "Cooldown", "Rest") and (iv.get("power_pct", 0) > 40 or iv.get("power_high_pct", 0) > 40)
+        ]
+        if work_ivs:
+            tot_dur = sum(iv.get("duration_sec", 60) for iv in work_ivs)
+            tot_power = sum(
+                iv.get("duration_sec", 60) * (iv.get("power_pct") or ((iv.get("power_low_pct", 65) + iv.get("power_high_pct", 65)) / 2.0))
+                for iv in work_ivs
+            )
+            pct = round(tot_power / max(1, tot_dur))
+            if pct <= 55:
+                zone = "Zone 1 Active Recovery"
+            elif pct <= 75:
+                zone = "Zone 2 Aerobic Base"
+            elif pct <= 85:
+                zone = "Zone 3 Tempo"
+            elif pct <= 94:
+                zone = "Sweet Spot"
+            elif pct <= 105:
+                zone = "Threshold"
+            else:
+                zone = "VO2 Max"
+            return {
+                "target_pct_ftp": pct,
+                "target_zone": zone,
+                "target_title": title or zone,
+                "source": "prescribed_intervals"
+            }
+
+        if is_rest:
+            return {
+                "target_pct_ftp": 50,
+                "target_zone": "Rest & Recovery",
+                "target_title": title or "Rest & Recovery",
+                "source": "scheduled_rest"
+            }
+
+        if any(k in focus for k in ["recovery", "flush", "active recovery", "gentle spin"]):
+            return {
+                "target_pct_ftp": 50,
+                "target_zone": "Zone 1 Active Recovery",
+                "target_title": title or "Active Recovery Flush",
+                "source": "prescribed_recovery"
+            }
+
+        if any(k in focus for k in ["zone 2", "endurance", "aerobic base", "base flush", "easy base", "cruise"]):
+            return {
+                "target_pct_ftp": 70,
+                "target_zone": "Zone 2 Aerobic Base",
+                "target_title": title or "Zone 2 Aerobic Base",
+                "source": "prescribed_endurance"
+            }
+
+        if any(k in focus for k in ["tempo", "zone 3"]):
+            return {
+                "target_pct_ftp": 80,
+                "target_zone": "Zone 3 Tempo",
+                "target_title": title or "Tempo Cruise",
+                "source": "prescribed_tempo"
+            }
+
+        if "sweet spot" in focus:
+            return {
+                "target_pct_ftp": 88,
+                "target_zone": "Sweet Spot",
+                "target_title": title or "Sweet Spot Sustained",
+                "source": "prescribed_sweet_spot"
+            }
+
+        if any(k in focus for k in ["threshold", "over-under", "over under", "ladder"]):
+            return {
+                "target_pct_ftp": 98,
+                "target_zone": "Threshold",
+                "target_title": title or "Threshold Intervals",
+                "source": "prescribed_threshold"
+            }
+
+        if any(k in focus for k in ["vo2", "anaerobic", "microburst", "climb"]):
+            return {
+                "target_pct_ftp": 110,
+                "target_zone": "VO2 Max",
+                "target_title": title or "VO2 Max Climbing",
+                "source": "prescribed_vo2"
+            }
+
+    # 5. Check Day Config (e.g. dedicated rest day or directive rest)
+    if day_cfg and (day_cfg.get("is_default_rest") or day_cfg.get("is_directive_rest")):
+        return {
+            "target_pct_ftp": 50,
+            "target_zone": "Rest & Recovery",
+            "target_title": day_cfg.get("notes") or "Scheduled Rest Day",
+            "source": "weekly_rest_directive"
+        }
+
+    # 6. Fallback: Whoop recovery baseline (when no scheduled or updated workout was prescribed)
+    if workout_recovery < 34:
+        pct = 50
+        zone = "Zone 1 Active Recovery"
+    elif workout_recovery <= 66:
+        pct = 66
+        zone = "Zone 2 Aerobic Base"
+    else:
+        pct = 90
+        zone = "Sweet Spot / VO2 Max"
+
+    return {
+        "target_pct_ftp": pct,
+        "target_zone": zone,
+        "target_title": zone,
+        "source": "recovery_baseline"
+    }
+
 def build_daily_review_and_outlook_local(
     whoop_data: Dict[str, Any],
     trailing_strava: Dict[str, Any],
@@ -868,16 +1043,18 @@ def build_daily_review_and_outlook_local(
             workout_strain = 12.0
             workout_hrv = 35.0
 
-        # Check pacing fidelity relative to the recovery on the day of the workout
-        if workout_recovery < 34:
-            target_pct_ftp = 50
-            target_zone_name = "Zone 1 Active Recovery"
-        elif workout_recovery <= 66:
-            target_pct_ftp = 66
-            target_zone_name = "Zone 2 Aerobic Base"
-        else:
-            target_pct_ftp = 90
-            target_zone_name = "Sweet Spot / VO2 Max"
+        # Resolve prescribed target taking into account updated schedule, planned sessions, and weekly preferences
+        prescribed_info = resolve_day_prescribed_target(
+            date_str=act_date_str,
+            workout_recovery=workout_recovery,
+            ftp=ftp,
+            user_id=get_current_user_id(),
+            is_today=is_today
+        )
+        target_pct_ftp = prescribed_info["target_pct_ftp"]
+        target_zone_name = prescribed_info["target_zone"]
+        prescribed_title = prescribed_info["target_title"]
+        prescribed_source = prescribed_info["source"]
 
         # Pacing diff: evaluate against primary effort (or combined) so cooldown doesn't penalize
         diff_pct_primary = abs(primary_pct_ftp - target_pct_ftp)
@@ -1052,6 +1229,9 @@ def build_daily_review_and_outlook_local(
             "day_strain": workout_strain if not is_today else today_strain,
             "target_zone": target_zone_name,
             "target_watts": int(ftp * (target_pct_ftp / 100.0)),
+            "target_pct_ftp": target_pct_ftp,
+            "prescribed_workout_title": prescribed_title,
+            "prescribed_source": prescribed_source,
             "low_strain_xss": act_strain.get("low_xss", 0.0),
             "high_strain_xss": act_strain.get("high_xss", 0.0),
             "peak_strain_xss": act_strain.get("peak_xss", 0.0),
@@ -1365,6 +1545,7 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
         day_acts=day_acts
     )
     base_review["athlete_note"] = custom_prompt
+    base_review["strava"] = dash.get("strava", {})
     
     # 2. Check if Gemini API key is configured
     gemini_key = get_setting("gemini_api_key", "").strip()
@@ -1456,10 +1637,11 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
         f"Timeline & Data: {temporal_context}\n"
         f"{sessions_breakdown}\n"
         f"Physiological Strain Breakdown: {sess.get('total_xss', 0)} Total XSS ({sess.get('low_strain_xss', 0)} Low / {sess.get('high_strain_xss', 0)} High / {sess.get('peak_strain_xss', 0)} Peak), W' Anaerobic Battery Depleted: {sess.get('battery_depleted_pct', 0)}%, Focus Duration: {sess.get('focus_duration', 'Endurance')}.\n"
-        f"Target Zone was: {sess.get('target_zone')}. Compliance verdict: {sess.get('verdict')}.\n"
+        f"Target Zone was: {sess.get('target_zone')} ({sess.get('target_watts', 0)}W, {sess.get('target_pct_ftp', 0)}% FTP). Prescribed session: '{sess.get('prescribed_workout_title', sess.get('target_zone'))}'. Compliance verdict: {sess.get('verdict')} ({sess.get('compliance_score', 95)}% score).\n"
         f"Tomorrow outlook: {review_data['outlook_days'][0]['title']} (est. {review_data['outlook_days'][0].get('estimated_xss', 50)} XSS, Focus: {review_data['outlook_days'][0].get('focus_duration', 'Sweet Spot')}, {review_data['outlook_days'][0]['focus']}).\n"
+        f"Mandatory: If the athlete was prescribed a lower-effort or endurance ride (such as Zone 2 Aerobic Base, Recovery, or endurance) per their updated schedule or preferences, evaluate fidelity against THAT prescribed lower-effort target. Do NOT treat a lower-effort ride as 'conservative' or complain that it was not Sweet Spot/VO2 Max when a lower-effort ride was prescribed.\n"
         f"Mandatory: All advice and tomorrow guidance MUST strictly respect the athlete's workout and schedule preferences.\n"
-        f"Format response as strict JSON: {{\"insights\": \"1-2 paragraphs assessing all sessions of the day collectively against recovery and explaining fatigue state, under 150 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\"}}"
+        f"Format response as strict JSON: {{\"insights\": \"1-2 paragraphs assessing all sessions of the day collectively against the prescribed target and explaining fatigue state, under 150 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\"}}"
     )
     if custom_prompt:
         prompt += f"\nAthlete note: '{custom_prompt}'"

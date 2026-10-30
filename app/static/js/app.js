@@ -224,6 +224,33 @@ async function loadDashboard() {
           });
       }
     }
+
+    // Auto-sync Strava if connected and >60s elapsed
+    if (data.integrations && data.integrations.strava && data.integrations.strava.connected) {
+      const needsStravaSync = (Date.now() - (state.lastStravaAutoSyncTime || 0)) > 60000;
+      if (needsStravaSync && !state.isAutoSyncingStrava) {
+        state.isAutoSyncingStrava = true;
+        state.lastStravaAutoSyncTime = Date.now();
+        fetch("/api/auth/sync/strava", { method: "POST" })
+          .then(r => r.ok ? r.json() : null)
+          .then(syncData => {
+            state.isAutoSyncingStrava = false;
+            if (syncData && syncData.success && syncData.count > 0) {
+              return fetch("/api/dashboard").then(r => r.json());
+            }
+          })
+          .then(freshData => {
+            if (freshData && freshData.strava) {
+              state.strava = freshData.strava;
+              renderStrava(freshData.strava);
+            }
+          })
+          .catch(syncErr => {
+            state.isAutoSyncingStrava = false;
+            console.warn("Background Strava sync error:", syncErr);
+          });
+      }
+    }
   } catch (err) {
     console.error("Failed to load dashboard:", err);
   }
@@ -3439,6 +3466,10 @@ async function loadDebrief() {
     state.dailyDebrief = data;
     renderDebrief(data);
     renderAiCoachTodayCard(data, state.currentWorkout);
+    if (data.strava && typeof renderStrava === "function") {
+      state.strava = data.strava;
+      renderStrava(data.strava);
+    }
   } catch (err) {
     console.error("Failed to load daily debrief:", err);
   }
@@ -7110,18 +7141,18 @@ if (document.readyState === "loading") {
   bootApp();
 }
 
-// Auto-sync biometrics when athlete switches back into PowerSync (e.g. from Whoop app)
+// Auto-sync biometrics when athlete switches back into PowerSync (e.g. from Whoop or Strava app)
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") {
     const now = Date.now();
-    if ((now - (state.lastWhoopAutoSyncTime || 0)) > 60000) {
+    if ((now - (state.lastWhoopAutoSyncTime || 0)) > 60000 || (now - (state.lastStravaAutoSyncTime || 0)) > 60000) {
       loadDashboard();
     }
   }
 });
 window.addEventListener("focus", () => {
   const now = Date.now();
-  if ((now - (state.lastWhoopAutoSyncTime || 0)) > 60000) {
+  if ((now - (state.lastWhoopAutoSyncTime || 0)) > 60000 || (now - (state.lastStravaAutoSyncTime || 0)) > 60000) {
     loadDashboard();
   }
 });

@@ -133,6 +133,17 @@ def version_info():
         },
         "changelog": [
             {
+                "version": "v2.3.3",
+                "date": "2026-10-30",
+                "title": "Prescribed Schedule Target Fidelity in Coach Analysis & Live Strava List Auto-Sync",
+                "items": [
+                    "Updated Schedule Target Fidelity: Enhanced review coach with resolve_day_prescribed_target() to evaluate completed workouts against the specific prescribed session (e.g. Zone 2 Aerobic Base, Active Recovery Flush, or scheduled intervals) rather than defaulting to Sweet Spot whenever Whoop recovery is high.",
+                    "Execution Bullseye for Lower-Effort Adherence: Athletes adhering precisely to lower-effort rides or endurance targets receive 'Target Mastered' / 'Execution Bullseye' verdicts without false 'Conservative Pacing' warnings.",
+                    "Live Strava Feed Auto-Sync: Added automatic background syncing for Strava on 60s cadence and on tab focus, auto-populating the Recent Workouts table at the bottom of the dashboard without manual button clicks.",
+                    "Expanded Recent Workouts Feed: Increased recent Strava activity history from 5 to 15 items in the dashboard response."
+                ]
+            },
+            {
                 "version": "v2.3.2",
                 "date": "2026-10-30",
                 "title": "Multi-Day Weekend Forecast Sync, Instant UI Refresh & Training Slate Safeguard",

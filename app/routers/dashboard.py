@@ -133,13 +133,13 @@ def get_dashboard_data(request: Request = None):
     if not strava_tokens and uid == "usr_guest":
         strava_tokens = get_setting("strava_tokens", {}, user_id="usr_default")
 
-    # Auto-sync live Strava activities if athlete has connected tokens and no activity today (or 10m elapsed)
+    # Auto-sync live Strava activities if athlete has connected tokens and no activity today (or 60s elapsed)
     if strava_tokens:
         has_today = any(dict(r).get("start_date", "").startswith(today_iso) for r in rows)
         last_sync_key = "last_strava_sync_timestamp"
         last_sync_time = float(get_setting(last_sync_key, 0.0, user_id=uid))
         now_ts = datetime.datetime.now().timestamp()
-        if (not has_today) or (now_ts - last_sync_time > 600):
+        if (not has_today) or (now_ts - last_sync_time > 60):
             try:
                 synced = fetch_recent_strava_activities(limit=15, user_id=uid)
                 if synced:
@@ -236,6 +236,6 @@ def get_dashboard_data(request: Request = None):
         "strava": {
             "weekly_stats": weekly_stats,
             "strain_systems": strain_systems,
-            "recent_activities": enriched_activities[:5]
+            "recent_activities": enriched_activities[:15]
         }
     }

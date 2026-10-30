@@ -5,6 +5,15 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.3.3] - 2026-10-30
+### Added & Fixed
+- **Updated Schedule Target Fidelity in Coach Analysis**: Enhanced `review_coach.py` with `resolve_day_prescribed_target()` to evaluate completed workouts against the specific prescribed session and updated schedule (e.g. Zone 2 Aerobic Base, Active Recovery Flush, or scheduled workouts) rather than blindly assuming Sweet Spot / VO2 Max (90% FTP) whenever Whoop recovery is in the green. Pacing compliance, target zone, and target watts now accurately reflect the updated schedule, awarding `Execution Bullseye` (🎯 Target Mastered) for adhering to prescribed lower-effort work.
+- **Gemini Debrief Guidance Guardrail**: Instructed Gemini LLM debrief generation to honor prescribed lower-effort rides and evaluate fidelity against that target rather than falsely diagnosing "Conservative Pacing" or headroom.
+- **Automatic Strava Feed Syncing & Expanded History**: Integrated continuous background auto-sync for Strava into `loadDashboard()` and `loadDebrief()` (matching Whoop's 60s auto-refresh cadence) and on window focus/tab return. Expanded the Recent Workouts table from 5 to 15 activities and ensured real-time DOM re-rendering so freshly completed Strava workouts populate the bottom table automatically.
+- **Dual-Write Guest / Default Strava Sync Isolation**: Enhanced `fetch_recent_strava_activities` and `/api/auth/sync/strava` with guest account fallback and dual-user synchronization so both sessions stay fully populated.
+
+---
+
 ## [2.3.2] - 2026-10-30
 ### Added & Fixed
 - **Multi-Day Weekend Chat Directives & Multi-Clause Intent Parsing**: Enhanced Coach Chat and forecast service to parse multi-day weekend directives simultaneously (e.g. "50 miles tomorrow and resting sunday"). Robust regex boundary parsing separates athlete intent from complaint clauses ("but it still has..."), staging distinct plans for both Saturday and Sunday in a single message.
