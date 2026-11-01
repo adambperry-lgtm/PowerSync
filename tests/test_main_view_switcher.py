@@ -62,6 +62,10 @@ class TestMainViewSwitcher(unittest.TestCase):
         self.assertIn('.hidden-pane', self.css_content)
         self.assertIn('@keyframes fadeInMainView', self.css_content)
 
+        # Verify telemetry-grid defines 3-column row for Whoop, Strava, and AI Coach Directive
+        self.assertIn('.telemetry-grid', self.css_content)
+        self.assertIn('repeat(3, minmax(0, 1fr))', self.css_content)
+
     def test_js_view_switcher_implementation(self):
         """Verify app.js implements view switcher functions and state persistence."""
         self.assertIn('function switchMainDashboardView', self.js_content)
