@@ -7124,6 +7124,42 @@ function setupSpiderwebPlannerNav() {
       }
     });
   }
+
+  const programSpiderwebBadge = document.getElementById("programSpiderwebBadge");
+  if (programSpiderwebBadge) {
+    programSpiderwebBadge.style.cursor = "pointer";
+    programSpiderwebBadge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (typeof switchMainDashboardView === "function" && currentActiveMainView !== "analysis") {
+        switchMainDashboardView("analysis", true);
+      }
+      if (powerSpiderwebCollapsible && typeof powerSpiderwebCollapsible.expand === "function") {
+        powerSpiderwebCollapsible.expand();
+      }
+      const section = document.getElementById("spiderwebPlannerSection") || document.getElementById("cardPowerSpiderweb");
+      if (section) {
+        section.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }
+
+  const plannerSyncBadge = document.getElementById("plannerMacrocycleSyncBadge");
+  if (plannerSyncBadge) {
+    plannerSyncBadge.style.cursor = "pointer";
+    plannerSyncBadge.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (typeof switchMainDashboardView === "function" && currentActiveMainView !== "analysis") {
+        switchMainDashboardView("analysis", true);
+      }
+      const card = document.getElementById("cardProgram");
+      if (card) {
+        if (programCollapsible && typeof programCollapsible.expand === "function") {
+          programCollapsible.expand();
+        }
+        card.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }
 }
 
 function renderSpiderwebTargetPlanner() {

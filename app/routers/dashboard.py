@@ -198,7 +198,8 @@ def get_dashboard_data(request: Request = None):
     program_data = get_current_program(
         strava_weekly_tss=strava_weekly_tss,
         strava_weekly_xss=strava_weekly_xss,
-        strain_systems=strain_systems
+        strain_systems=strain_systems,
+        user_id=uid
     )
 
     from app.services.preferences_service import get_coaching_preferences, get_day_target_config

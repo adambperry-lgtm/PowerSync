@@ -51,7 +51,7 @@ def set_spiderweb_goal_endpoint(payload: Dict[str, Any] = Body(...)):
     goal = set_active_spiderweb_goal(payload=payload, user_id=uid)
     profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
     from app.services.program_service import get_current_program
-    program = get_current_program()
+    program = get_current_program(user_id=uid)
     return {
         "success": True,
         "goal": goal,
@@ -67,7 +67,7 @@ def delete_spiderweb_goal_endpoint():
     clear_active_spiderweb_goal(user_id=uid)
     profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
     from app.services.program_service import get_current_program
-    program = get_current_program()
+    program = get_current_program(user_id=uid)
     return {
         "success": True,
         "profile": profile,

@@ -48,17 +48,20 @@ DEFAULT_GOALS = {
 def get_current_program(
     strava_weekly_tss: int = 0,
     strava_weekly_xss: int = 0,
-    strain_systems: Optional[Dict[str, Any]] = None
+    strain_systems: Optional[Dict[str, Any]] = None,
+    user_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    goal_id = get_setting("program_goal", "FTP_BUILD")
+    from app.database import get_current_user_id
+    uid = user_id or get_current_user_id()
+    goal_id = get_setting("program_goal", "FTP_BUILD", user_id=uid)
     if goal_id not in DEFAULT_GOALS:
         goal_id = "FTP_BUILD"
         
     goal_def = DEFAULT_GOALS[goal_id]
-    current_ftp = int(get_setting("athlete_ftp", 250))
-    target_ftp = int(get_setting("program_target_ftp", current_ftp + goal_def["target_ftp_gain"]))
-    weekly_tss_target = int(get_setting("program_weekly_tss_target", goal_def["weekly_tss_baseline"]))
-    weekly_xss_target = int(get_setting("program_weekly_xss_target", goal_def.get("weekly_xss_baseline", weekly_tss_target)))
+    current_ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    target_ftp = int(get_setting("program_target_ftp", current_ftp + goal_def["target_ftp_gain"], user_id=uid))
+    weekly_tss_target = int(get_setting("program_weekly_tss_target", goal_def["weekly_tss_baseline"], user_id=uid))
+    weekly_xss_target = int(get_setting("program_weekly_xss_target", goal_def.get("weekly_xss_baseline", weekly_tss_target), user_id=uid))
 
     # Resolve weekly XSS actual
     if strava_weekly_xss <= 0 and strain_systems:
@@ -67,8 +70,8 @@ def get_current_program(
         strava_weekly_xss = strava_weekly_tss
     
     # Dates
-    today = get_athlete_date()
-    start_date_str = get_setting("program_start_date")
+    today = get_athlete_date(uid)
+    start_date_str = get_setting("program_start_date", user_id=uid)
     if not start_date_str:
         # Default start 3 weeks ago
         start_date = today - datetime.timedelta(days=21)
@@ -133,7 +136,7 @@ def get_current_program(
     active_spiderweb_goal = None
     try:
         from app.services.power_profile_service import get_active_spiderweb_goal
-        active_spiderweb_goal = get_active_spiderweb_goal()
+        active_spiderweb_goal = get_active_spiderweb_goal(user_id=uid)
     except Exception:
         active_spiderweb_goal = None
 
