@@ -802,17 +802,18 @@ def build_alternative_endurance_workout(
 
 def build_alternative_express_workout(
     recovery_score: int,
+    duration_min: int = 35,
     ftp: int = 250,
     user_id: Optional[str] = None
 ) -> Dict[str, Any]:
-    """Generates a time-crunched 35-min high-efficiency session using the dynamic archetype catalog."""
+    """Generates a time-crunched high-efficiency session using the dynamic archetype catalog."""
     uid = user_id or get_current_user_id()
-    dur = 35
+    dur = duration_min or 35
     selected = select_diverse_archetype("express", dur, ftp=ftp, user_id=uid)
     workout = {
         "id": "workout_alt_express",
         "option_type": "express",
-        "badge": "⏱️ Time-Crunched (35m)",
+        "badge": f"⏱️ Time-Crunched ({dur}m)",
         "badge_color": "amber",
         "title": selected["title"],
         "description": "Time-crunched alternative session",
@@ -904,14 +905,15 @@ def build_workout_bundle(
         alt_flush["intervals_icu_text"] = generate_intervals_icu_text(alt_flush)
         alt_flush = enrich_workout_strain(alt_flush, ftp)
 
+        opt_base_dur = target_duration_min if (target_duration_min and target_duration_min > 0) else 45
         alt_base = build_alternative_endurance_workout(
             recovery_score=recovery_score,
-            duration_min=45,
+            duration_min=opt_base_dur,
             ftp=ftp
         )
-        alt_base["badge"] = "🚴 Optional Easy Base"
-        alt_base["title"] = "Optional 45m Aerobic Endurance"
-        alt_base["ai_rationale"] = "If you feel like riding on your scheduled rest day, keep it to a strict Zone 2 steady endurance cruise."
+        alt_base["badge"] = f"🚴 Optional Easy Base ({opt_base_dur}m)"
+        alt_base["title"] = f"Optional {opt_base_dur}m Aerobic Endurance"
+        alt_base["ai_rationale"] = f"If you feel like riding on your scheduled rest day, keep it to a strict Zone 2 steady endurance cruise ({opt_base_dur}m)."
         alt_base["zwo_content"] = generate_zwo_xml(alt_base, ftp)
         alt_base["intervals_icu_text"] = generate_intervals_icu_text(alt_base)
         alt_base = enrich_workout_strain(alt_base, ftp)
@@ -940,15 +942,16 @@ def build_workout_bundle(
         alt_rest["intervals_icu_text"] = generate_intervals_icu_text(alt_rest)
         alt_rest = enrich_workout_strain(alt_rest, ftp)
 
+        opt_override_dur = max(20, target_duration_min or 45)
         alt_override = build_alternative_endurance_workout(
             recovery_score=recovery_score,
-            duration_min=max(30, target_duration_min or 45),
+            duration_min=opt_override_dur,
             ftp=ftp
         )
-        alt_override["badge"] = "⚠️ Manual Override (Z2)"
+        alt_override["badge"] = f"⚠️ Manual Override ({opt_override_dur}m Z2)"
         alt_override["badge_color"] = "amber"
-        alt_override["title"] = "Manual Override: Zone 2 Endurance"
-        alt_override["ai_rationale"] = f"Override Session: If you deliberately want a two-a-day training block despite {today_strain:.1f} strain today, cap intensity strictly at 65% FTP."
+        alt_override["title"] = f"Manual Override: {opt_override_dur}m Zone 2 Endurance"
+        alt_override["ai_rationale"] = f"Override Session: If you deliberately want an extra training session despite {today_strain:.1f} strain today, cap intensity strictly at 65% FTP ({opt_override_dur}m)."
         alt_override["zwo_content"] = generate_zwo_xml(alt_override, ftp)
         alt_override["intervals_icu_text"] = generate_intervals_icu_text(alt_override)
         alt_override = enrich_workout_strain(alt_override, ftp)
@@ -1006,14 +1009,19 @@ def build_workout_bundle(
             "all_options": [primary, alt_rest, alt_flush]
         }
 
+    opt_base_dur = target_duration_min if (target_duration_min and target_duration_min > 0) else max(30, int(primary.get("duration_minutes") or 45))
     alt_base = build_alternative_endurance_workout(
         recovery_score=recovery_score,
-        duration_min=max(30, int(primary.get("duration_minutes") or target_duration_min or 45)),
+        duration_min=opt_base_dur,
         ftp=ftp
     )
+    alt_base["badge"] = f"🚴 Low-Strain Base ({opt_base_dur}m)"
+    alt_base["title"] = f"Optional {opt_base_dur}m Aerobic Endurance"
     
+    opt_express_dur = min(45, max(20, target_duration_min or 35))
     alt_express = build_alternative_express_workout(
         recovery_score=recovery_score,
+        duration_min=opt_express_dur,
         ftp=ftp
     )
     

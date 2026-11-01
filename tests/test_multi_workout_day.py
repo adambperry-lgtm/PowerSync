@@ -156,5 +156,29 @@ class TestMultiWorkoutDay(unittest.TestCase):
         self.assertIn("2001", activity_ids)
         self.assertIn("2002", activity_ids)
 
+    def test_optional_workout_duration_change_preserves_selection(self):
+        """
+        Verify that selecting an optional endurance workout and then changing
+        duration to 35m scales the selected workout without resetting to default.
+        """
+        from app.routers.workouts import generate_workout, select_workout_option, WorkoutGenerateRequest, WorkoutSelectRequest
+        set_setting("athlete_ftp", 250, user_id=self.user_id)
+
+        # 1. Generate base bundle (default 45 min)
+        res1 = generate_workout(WorkoutGenerateRequest(duration_min=45))
+        options = res1["options"]
+        alt_base = next((o for o in options if o["id"] == "workout_alt_base"), None)
+        self.assertIsNotNone(alt_base, "Optional base workout should exist in bundle")
+
+        # 2. Select the optional endurance workout
+        sel_res = select_workout_option(WorkoutSelectRequest(option_id="workout_alt_base"))
+        self.assertEqual(sel_res["active_workout"]["id"], "workout_alt_base")
+
+        # 3. Change duration to 35 minutes with selected_option_id
+        res2 = generate_workout(WorkoutGenerateRequest(duration_min=35, selected_option_id="workout_alt_base"))
+        self.assertEqual(res2["active_workout"]["id"], "workout_alt_base")
+        self.assertEqual(res2["active_workout"]["duration_minutes"], 35)
+        self.assertIn("35", res2["active_workout"]["title"])
+
 if __name__ == "__main__":
     unittest.main()

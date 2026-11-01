@@ -37,6 +37,7 @@ class WorkoutGenerateRequest(BaseModel):
     gpx_content: Optional[str] = None
     gpx_filename: Optional[str] = None
     target_date: Optional[str] = None
+    selected_option_id: Optional[str] = None
 
 class WorkoutSelectRequest(BaseModel):
     option_id: str
@@ -361,9 +362,17 @@ def generate_workout(req: WorkoutGenerateRequest):
     for opt in bundle["all_options"]:
         options_cache[opt["id"]] = opt
 
-    primary_workout = bundle["primary"]
+    # Determine active workout: check if athlete had selected an alternative option
+    chosen_id = req.selected_option_id or workout_cache.get("id")
+    if chosen_id and chosen_id in options_cache:
+        active_workout = options_cache[chosen_id]
+        is_adapted = True
+    else:
+        active_workout = bundle["primary"]
+        is_adapted = bool(note_clean)
+
     workout_cache.clear()
-    workout_cache.update(primary_workout)
+    workout_cache.update(active_workout)
 
     # Check if user describes planning a custom ride or uploaded a route
     if req.gpx_content or (req.user_note and is_planned_custom_ride_description(req.user_note)):
@@ -394,18 +403,18 @@ def generate_workout(req: WorkoutGenerateRequest):
         }
 
     response_payload: Dict[str, Any] = {
-        "active_workout": primary_workout,
+        "active_workout": active_workout,
         "options": bundle["all_options"]
     }
-    if note_clean:
+    if is_adapted:
         response_payload["is_user_adapted"] = True
         response_payload["fueling_plan"] = generate_fueling_plan(
-            duration_min=int(primary_workout.get("duration_minutes") or 45),
-            distance_miles=float(primary_workout.get("distance_miles") or 0.0),
+            duration_min=int(active_workout.get("duration_minutes") or target_dur),
+            distance_miles=float(active_workout.get("distance_miles") or 0.0),
             avg_power_watts=round(ftp * 0.72),
             ftp=ftp,
-            intensity_type=primary_workout.get("focus_area", "Endurance"),
-            ride_title=primary_workout.get("title", "Adapted Workout"),
+            intensity_type=active_workout.get("focus_area", "Endurance"),
+            ride_title=active_workout.get("title", "Adapted Workout"),
             athlete_weight_kg=70.0,
             temp_f=int(req.temp_f or 74),
             humidity_pct=int(req.humidity_pct or 50),

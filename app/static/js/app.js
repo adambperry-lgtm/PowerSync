@@ -1805,7 +1805,8 @@ async function loadWorkout(duration = null, intensity = 0, userNote = "") {
       intensity_adjust: intensity,
       user_note: userNote,
       temp_f: tempF,
-      humidity_pct: humPct
+      humidity_pct: humPct,
+      selected_option_id: state.activeOptionId
     };
 
     if (state.attachedRoute && state.attachedRoute.gpx_content) {
@@ -1823,27 +1824,19 @@ async function loadWorkout(duration = null, intensity = 0, userNote = "") {
     state.workoutOptions = data.options || [data.active_workout];
     const hasUserNote = Boolean(userNote && userNote.trim());
     
-    if (data.is_custom_replaced || data.is_user_adapted || hasUserNote || (data.active_workout && data.active_workout.id === "workout_custom_replaced")) {
-      state.currentWorkout = data.active_workout;
-      state.activeOptionId = (data.active_workout && data.active_workout.id) || "workout_primary";
+    const activeTargetId = (data.active_workout && data.active_workout.id) || state.activeOptionId || prevOptionId || "workout_primary";
+    const matchingOption = state.workoutOptions.find(o => o.id === activeTargetId);
+    
+    if (matchingOption) {
+      state.currentWorkout = matchingOption;
+      state.activeOptionId = matchingOption.id;
       state.activeCoachView = "prescribed";
       if (typeof setWorkoutStageCollapsed === "function" && state.workoutStageCollapsed) {
         setWorkoutStageCollapsed(false);
       }
     } else {
-      const matchingOption = state.workoutOptions.find(o => o.id === prevOptionId);
-      if (matchingOption) {
-        state.currentWorkout = matchingOption;
-        state.activeOptionId = matchingOption.id;
-        fetch("/api/workouts/select", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ option_id: matchingOption.id })
-        });
-      } else {
-        state.currentWorkout = data.active_workout || data;
-        state.activeOptionId = (data.active_workout && data.active_workout.id) || "workout_primary";
-      }
+      state.currentWorkout = data.active_workout || data;
+      state.activeOptionId = (data.active_workout && data.active_workout.id) || "workout_primary";
     }
     state.currentDuration = (state.currentWorkout.duration_minutes !== undefined) ? state.currentWorkout.duration_minutes : duration;
     syncDurationPills(state.currentDuration);
@@ -2530,7 +2523,6 @@ durPillGroup.addEventListener("click", (e) => {
     state.currentDuration = dur;
     state.selectedIntervalIndex = null;
     syncDurationPills(dur);
-    state.activeOptionId = "workout_primary";
     loadWorkout(state.currentDuration, state.currentIntensity);
   }
 });
