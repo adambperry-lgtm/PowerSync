@@ -927,6 +927,56 @@ function renderIntegrations(integrations) {
       }
     }
   }
+
+  // Update Connections Dropdown Summary (pill indicator & count badge)
+  const summaryDot = document.getElementById("connectionsSummaryDot");
+  const countBadge = document.getElementById("connectionsCountBadge");
+  const btnDropdown = document.getElementById("btnConnectionsDropdown");
+
+  let connectedCount = 0;
+  const totalServices = 4;
+  const hasExpired = Boolean(integrations.whoop?.auth_expired);
+
+  if (integrations.whoop?.connected && !integrations.whoop?.auth_expired) {
+    connectedCount++;
+  }
+  if (integrations.strava?.connected) {
+    connectedCount++;
+  }
+  if (Boolean(integrations.intervals_icu?.configured)) {
+    connectedCount++;
+  }
+  if (Boolean(integrations.gemini?.configured) || (!isDemo && state.dashboard?.has_gemini)) {
+    connectedCount++;
+  }
+
+  if (countBadge) {
+    countBadge.textContent = `${connectedCount}/${totalServices}`;
+  }
+
+  if (btnDropdown) {
+    btnDropdown.title = `Connected Services: ${connectedCount} of ${totalServices} active`;
+  }
+
+  if (summaryDot) {
+    if (hasExpired) {
+      summaryDot.className = "dot red";
+      summaryDot.style.background = "var(--accent-rose, #f43f5e)";
+      summaryDot.style.boxShadow = "0 0 8px rgba(244, 63, 94, 0.6)";
+    } else if (connectedCount >= 3) {
+      summaryDot.className = "dot green";
+      summaryDot.style.background = "var(--accent-emerald, #10b981)";
+      summaryDot.style.boxShadow = "0 0 8px var(--accent-emerald, #10b981)";
+    } else if (connectedCount > 0 || isDemo) {
+      summaryDot.className = "dot amber";
+      summaryDot.style.background = "var(--accent-amber, #f59e0b)";
+      summaryDot.style.boxShadow = "0 0 8px rgba(245, 158, 11, 0.5)";
+    } else {
+      summaryDot.className = "dot gray";
+      summaryDot.style.background = "#94a3b8";
+      summaryDot.style.boxShadow = "none";
+    }
+  }
 }
 
 // Render Long-Term Fitness Goal & Periodization
@@ -2983,6 +3033,70 @@ if (footerPillGeminiEl) {
   footerPillGeminiEl.style.cursor = "pointer";
   footerPillGeminiEl.addEventListener("click", openSettingsModal);
 }
+
+// Connected Services Dropdown Toggle & Accessibility
+function initConnectionsDropdown() {
+  const wrapper = document.getElementById("connectionsDropdownWrapper");
+  const btn = document.getElementById("btnConnectionsDropdown");
+  const menu = document.getElementById("connectionsDropdownMenu");
+  const btnManage = document.getElementById("btnDropdownManage");
+
+  if (!wrapper || !btn || !menu) return;
+
+  function setDropdownOpen(isOpen) {
+    wrapper.classList.toggle("is-open", isOpen);
+    btn.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  }
+
+  // Prevent multiple bindings
+  if (wrapper._connectionsDropdownInit) return;
+  wrapper._connectionsDropdownInit = true;
+
+  btn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const currentlyOpen = wrapper.classList.contains("is-open");
+    setDropdownOpen(!currentlyOpen);
+  });
+
+  if (btnManage) {
+    btnManage.addEventListener("click", (e) => {
+      e.stopPropagation();
+      setDropdownOpen(false);
+      if (typeof openSettingsModal === "function") openSettingsModal();
+    });
+  }
+
+  // Close when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!wrapper.contains(e.target)) {
+      setDropdownOpen(false);
+    }
+  });
+
+  // Close on Escape key
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && wrapper.classList.contains("is-open")) {
+      setDropdownOpen(false);
+      btn.focus();
+    }
+  });
+
+  // Clicking an item in the dropdown closes dropdown
+  const items = menu.querySelectorAll(".connections-dropdown-item");
+  items.forEach(item => {
+    item.addEventListener("click", () => {
+      setDropdownOpen(false);
+    });
+    item.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        setDropdownOpen(false);
+        item.click();
+      }
+    });
+  });
+}
+initConnectionsDropdown();
 
 // Direct OAuth connect buttons & Disconnect listeners
 const stravaOAuthBtn = document.getElementById("btnConnectStravaOAuth");
@@ -7672,6 +7786,7 @@ function initAllCollapsibleTiles() {
 
   initMasterToggleAllTiles();
   initMainViewSwitcher();
+  initConnectionsDropdown();
   syncMasterToggleState();
 }
 

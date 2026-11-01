@@ -63,18 +63,57 @@
     </nav>
     
     <div class="nav-actions">
-      <div class="badge-status" id="badgeWhoop" style="cursor:pointer;" title="Click to connect Whoop">
-        <span class="dot green"></span> Whoop: <span id="whoopStatusText">Ready</span>
+      <!-- Connected Services Dropdown -->
+      <div class="connections-dropdown-wrapper" id="connectionsDropdownWrapper">
+        <button class="btn btn-secondary connections-dropdown-btn" id="btnConnectionsDropdown" type="button" aria-haspopup="true" aria-expanded="false" title="View connected services status">
+          <span class="dot green" id="connectionsSummaryDot"></span>
+          <span class="connections-btn-label">Connections</span>
+          <span class="connections-count-badge" id="connectionsCountBadge">3/4</span>
+          <span class="connections-dropdown-arrow" aria-hidden="true">▾</span>
+        </button>
+        <div class="connections-dropdown-menu" id="connectionsDropdownMenu" role="menu" aria-label="Service Connections Status">
+          <div class="connections-dropdown-header">
+            <div class="connections-header-title">
+              <span>Connected Services</span>
+            </div>
+            <button type="button" class="connections-header-settings-btn" id="btnDropdownManage" title="Open Settings">Settings ⚙️</button>
+          </div>
+          <div class="connections-dropdown-list">
+            <div class="connections-dropdown-item badge-status" id="badgeWhoop" role="menuitem" tabindex="0" title="Click to configure Whoop">
+              <div class="connections-item-left">
+                <span class="dot green"></span>
+                <span class="connections-item-name">Whoop</span>
+              </div>
+              <span class="connections-item-status" id="whoopStatusText">Ready</span>
+            </div>
+            <div class="connections-dropdown-item badge-status" id="badgeStrava" role="menuitem" tabindex="0" title="Click to configure Strava">
+              <div class="connections-item-left">
+                <span class="dot green"></span>
+                <span class="connections-item-name">Strava</span>
+              </div>
+              <span class="connections-item-status" id="stravaStatusText">Ready</span>
+            </div>
+            <div class="connections-dropdown-item badge-status" id="badgeZwift" role="menuitem" tabindex="0" title="Click to configure Zwift (Intervals.icu Bridge)">
+              <div class="connections-item-left">
+                <span class="dot gray" id="zwiftNavDot"></span>
+                <span class="connections-item-name">Zwift</span>
+              </div>
+              <span class="connections-item-status" id="zwiftStatusText">Not connected</span>
+            </div>
+            <div class="connections-dropdown-item badge-status" id="badgeGemini" role="menuitem" tabindex="0" title="Click to configure Google Gemini AI">
+              <div class="connections-item-left">
+                <span class="dot green" id="geminiNavDot"></span>
+                <span class="connections-item-name">Gemini AI</span>
+              </div>
+              <span class="connections-item-status" id="geminiNavStatusText">Ready</span>
+            </div>
+          </div>
+          <div class="connections-dropdown-footer">
+            <span class="connections-dropdown-hint">Tap any service to manage in Settings</span>
+          </div>
+        </div>
       </div>
-      <div class="badge-status" id="badgeStrava" style="cursor:pointer;" title="Click to connect Strava">
-        <span class="dot green"></span> Strava: <span id="stravaStatusText">Ready</span>
-      </div>
-      <div class="badge-status" id="badgeZwift" style="cursor:pointer;" title="Click to configure Zwift (Intervals.icu Bridge)">
-        <span class="dot gray" id="zwiftNavDot"></span> Zwift: <span id="zwiftStatusText">Not connected</span>
-      </div>
-      <div class="badge-status" id="badgeGemini" style="cursor:pointer;" title="Click to configure Google Gemini AI">
-        <span class="dot green" id="geminiNavDot"></span> Gemini: <span id="geminiNavStatusText">Ready</span>
-      </div>
+
       <button class="btn btn-secondary" id="btnOpenSettings">⚙️ Settings</button>
       <button class="btn btn-secondary" id="btnUserAccount" style="display:flex;align-items:center;gap:0.45rem;padding:0.45rem 0.85rem;border-color:rgba(6,182,212,0.4);" title="Account & Google Sign-In">
         <span id="navUserAvatar" style="width:20px;height:20px;border-radius:50%;background:rgba(6,182,212,0.2);display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#06b6d4;">👤</span>
