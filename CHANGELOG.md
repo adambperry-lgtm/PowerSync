@@ -5,6 +5,24 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.4.3] - 2026-11-01
+### Hardened & Fixed
+- **Backend Code Audit & Null Safety Remediation**:
+  - Resolved `UnboundLocalError` in `apply_chat_action_endpoint` across `schedule_workout`, `schedule_upcoming_plan`, and `clear_upcoming_plan`, enabling seamless execution of all coach proposal cards in Coach Chat.
+  - Hardened database and calculation services against nullable fields (`moving_time_sec`, `distance_meters`, `suffer_score`, `recovery_score`), preventing 500 crashes and `TypeError` exceptions during workout generation and sync.
+  - Replaced UTC `datetime.date.today()` with timezone-aware `get_athlete_date(user_id)` in target plans and scheduled workout checks to prevent premature date rollover for athletes in US timezones.
+- **Strict Multi-User Isolation in Coach Tools**:
+  - Removed unauthorized fallbacks to `usr_default` across Strava activity details, high-res stream proxies, and Whoop biometric timelines, ensuring complete data privacy across authenticated athlete accounts.
+  - Handled nullable arguments in `execute_coach_tool` dispatcher (`days_back`, `limit`, `days`) to guard against `None` inputs from LLM tool calls.
+- **Gemini Multi-Turn API Alternation Compliance**:
+  - Bundled parallel function response parts into a single user turn (`{"role": "user", "parts": fn_resp_parts}`), strictly abiding by Gemini API multi-turn alternation constraints and eliminating HTTP 400 Bad Request interruptions.
+- **Frontend & UI/UX Polish**:
+  - Added `requestAnimationFrame` redraw triggers for SVG spiderweb rendering, HTML5 workout graph canvas, and Leaflet outdoor map on tab switches, preventing collapsed 320px canvases.
+  - Implemented `.expand()` and `.collapse()` methods on collapsible card controllers for smooth cross-pane anchor navigation.
+  - Enhanced accessibility with 44x44px minimum touch targets on all modal close buttons and refined contrast for form inputs and labels in light mode.
+
+---
+
 ## [2.4.2] - 2026-11-01
 ### Added & Fixed
 - **Segmented Main Dashboard View Switcher**:

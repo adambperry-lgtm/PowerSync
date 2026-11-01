@@ -153,9 +153,6 @@ def _resolve_activity_record(activity_id: str, user_id: str) -> Optional[Dict[st
     if act_param in ("latest", "recent", "today"):
         c.execute("SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 1", (user_id,))
         row = c.fetchone()
-        if not row and user_id != "usr_default":
-            c.execute("SELECT * FROM strava_activities WHERE user_id = 'usr_default' ORDER BY start_date DESC LIMIT 1")
-            row = c.fetchone()
 
     elif act_param in ("yesterday", "previous", "prior"):
         today = get_athlete_date(user_id)
@@ -187,8 +184,6 @@ def _resolve_activity_record(activity_id: str, user_id: str) -> Optional[Dict[st
 def _fetch_strava_api_activity(activity_id: str, user_id: str) -> Optional[Dict[str, Any]]:
     """Directly calls Strava API /activities/{id} to get laps, splits, and segment efforts."""
     tokens = get_setting("strava_tokens", {}, user_id=user_id)
-    if not tokens and user_id != "usr_default":
-        tokens = get_setting("strava_tokens", {}, user_id="usr_default")
     access_token = tokens.get("access_token") if isinstance(tokens, dict) else None
     if not access_token:
         return None
@@ -211,8 +206,6 @@ def _fetch_strava_api_activity(activity_id: str, user_id: str) -> Optional[Dict[
 def _fetch_strava_api_streams(activity_id: str, user_id: str) -> Optional[Dict[str, Any]]:
     """Fetches high-resolution second-by-second activity streams from Strava API."""
     tokens = get_setting("strava_tokens", {}, user_id=user_id)
-    if not tokens and user_id != "usr_default":
-        tokens = get_setting("strava_tokens", {}, user_id="usr_default")
     access_token = tokens.get("access_token") if isinstance(tokens, dict) else None
     if not access_token:
         return None
@@ -460,12 +453,6 @@ def tool_search_strava_activities(
 
     c.execute(sql, tuple(params))
     rows = c.fetchall()
-    if not rows and uid != "usr_default":
-        # Fallback to usr_default records
-        params[0] = "usr_default"
-        c.execute(sql, tuple(params))
-        rows = c.fetchall()
-
     conn.close()
 
     results = []
@@ -510,17 +497,6 @@ def tool_get_whoop_biometrics_timeline(days: int = 7, user_id: Optional[str] = N
         LIMIT ?
     """, (uid, min(days, 14)))
     rows = c.fetchall()
-    if not rows and uid != "usr_default":
-        c.execute("""
-            SELECT date, recovery_score, hrv_rmssd, resting_heart_rate,
-                   sleep_performance, sleep_duration_hours, day_strain
-            FROM whoop_metrics
-            WHERE user_id = 'usr_default'
-            ORDER BY date DESC
-            LIMIT ?
-        """, (min(days, 14),))
-        rows = c.fetchall()
-
     conn.close()
 
     timeline = []
@@ -555,12 +531,12 @@ def execute_coach_tool(name: str, args: Dict[str, Any], user_id: Optional[str] =
         return tool_search_strava_activities(
             query=args.get("query", ""),
             sport_type=args.get("sport_type", "All"),
-            days_back=int(args.get("days_back", 30)),
-            limit=int(args.get("limit", 5)),
+            days_back=int(args.get("days_back") or 30),
+            limit=int(args.get("limit") or 5),
             user_id=uid
         )
     elif name == "get_whoop_biometrics_timeline":
-        return tool_get_whoop_biometrics_timeline(days=int(args.get("days", 7)), user_id=uid)
+        return tool_get_whoop_biometrics_timeline(days=int(args.get("days") or 7), user_id=uid)
     elif name == "get_active_spiderweb_goal":
         from app.services.power_profile_service import get_power_spiderweb_profile
         profile = get_power_spiderweb_profile(user_id=uid)

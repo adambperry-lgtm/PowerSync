@@ -244,7 +244,7 @@ def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) 
         has_workout = False
         day_acts = acts_by_date.get(d_str, [])
         if day_acts:
-            has_workout = any(a.get("moving_time_sec", 0) >= 600 or a.get("suffer_score", 0) > 0 for a in day_acts)
+            has_workout = any((a.get("moving_time_sec") or 0) >= 600 or (a.get("suffer_score") or 0) > 0 for a in day_acts)
 
         is_past_or_today = (d_obj <= today)
         day_status[w_name] = {
@@ -267,7 +267,7 @@ def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) 
     check_day = today
     while True:
         c_str = check_day.isoformat()
-        if c_str in acts_by_date and any(a.get("moving_time_sec", 0) >= 600 or a.get("suffer_score", 0) > 0 for a in acts_by_date[c_str]):
+        if c_str in acts_by_date and any((a.get("moving_time_sec") or 0) >= 600 or (a.get("suffer_score") or 0) > 0 for a in acts_by_date[c_str]):
             consecutive_streak += 1
             check_day = check_day - datetime.timedelta(days=1)
         else:
@@ -275,7 +275,7 @@ def get_weekday_rest_quota_and_status(ref_date: Optional[datetime.date] = None) 
 
     # Sunday prior check
     sun_str = sunday_prior.isoformat()
-    had_sunday_prior = (sun_str in acts_by_date and any(a.get("moving_time_sec", 0) >= 600 or a.get("suffer_score", 0) > 0 for a in acts_by_date[sun_str]))
+    had_sunday_prior = (sun_str in acts_by_date and any((a.get("moving_time_sec") or 0) >= 600 or (a.get("suffer_score") or 0) > 0 for a in acts_by_date[sun_str]))
 
     # Remaining candidate days in current week:
     # A candidate day is still open/pending if it is in the future (> today),

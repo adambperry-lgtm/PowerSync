@@ -78,19 +78,19 @@ def compile_athlete_context() -> Dict[str, Any]:
     # Recent activities summary (last 5)
     recent_rides_summary = []
     for a in strava.get("recent_activities", strava.get("activities", []))[:5]:
-        dist_mi = round(a.get("distance_meters", 0) / 1609.34, 1)
-        dur_min = round(a.get("moving_time_sec", 0) / 60)
+        dist_mi = round((a.get("distance_meters") or 0.0) / 1609.34, 1)
+        dur_min = round((a.get("moving_time_sec") or 0) / 60)
         recent_rides_summary.append({
             "name": a.get("name", "Ride"),
             "date": a.get("start_date", "")[:10],
             "distance_miles": dist_mi,
             "duration_min": dur_min,
-            "avg_power_watts": a.get("average_watts", 0),
-            "normalized_power_watts": a.get("weighted_average_watts", 0),
-            "pct_ftp": round((a.get("weighted_average_watts", 0) / float(ftp)) * 100) if ftp > 0 else 0,
-            "tss": round(a.get("suffer_score", 0)),
-            "avg_hr": a.get("average_heartrate", 0),
-            "max_hr": a.get("max_heartrate", 0)
+            "avg_power_watts": a.get("average_watts") or 0,
+            "normalized_power_watts": a.get("weighted_average_watts") or 0,
+            "pct_ftp": round(((a.get("weighted_average_watts") or 0) / float(ftp)) * 100) if ftp > 0 else 0,
+            "tss": round(a.get("suffer_score") or 0),
+            "avg_hr": a.get("average_heartrate") or 0,
+            "max_hr": a.get("max_heartrate") or 0
         })
 
     sys_status = strain_systems.get("system_status", {})
@@ -148,11 +148,11 @@ def compile_athlete_context() -> Dict[str, Any]:
             "activities": [
                 {
                     "title": act.get("name"),
-                    "duration_min": round(act.get("moving_time_sec", 0) / 60),
-                    "distance_miles": round(act.get("distance_meters", 0) / 1609.34, 1),
-                    "weighted_watts": act.get("weighted_average_watts", 0),
-                    "tss": round(act.get("suffer_score", 0)),
-                    "avg_hr": act.get("average_heartrate", 0)
+                    "duration_min": round((act.get("moving_time_sec") or 0) / 60),
+                    "distance_miles": round((act.get("distance_meters") or 0.0) / 1609.34, 1),
+                    "weighted_watts": act.get("weighted_average_watts") or 0,
+                    "tss": round(act.get("suffer_score") or 0),
+                    "avg_hr": act.get("average_heartrate") or 0
                 } for act in today_acts
             ]
         },
@@ -616,7 +616,8 @@ def call_gemini_api(
                     "parts": parts
                 })
 
-                # Execute each function call and append response part
+                # Execute each function call and bundle response parts into a single user turn
+                fn_resp_parts = []
                 for fc_part in function_calls:
                     fn_call = fc_part["functionCall"]
                     fn_name = fn_call.get("name")
@@ -638,10 +639,12 @@ def call_gemini_api(
                             }
                         }
                     }
-                    cur_contents.append({
-                        "role": "user",
-                        "parts": [fn_resp_part]
-                    })
+                    fn_resp_parts.append(fn_resp_part)
+
+                cur_contents.append({
+                    "role": "user",
+                    "parts": fn_resp_parts
+                })
 
         except Exception as e:
             print(f"Gemini API error with {api_ver}/{model}: {e}")

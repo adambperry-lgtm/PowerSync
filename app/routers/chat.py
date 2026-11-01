@@ -140,6 +140,8 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
         action_type = payload.action_type
         data = payload.action_data or {}
         import datetime
+        uid = get_current_user_id()
+        ftp = _clean_int(get_setting("athlete_ftp", 250, user_id=uid), 250)
 
         if action_type == "apply_today_workout":
             from app.routers.workouts import get_current_workout_cache, get_current_options_cache
@@ -148,7 +150,6 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             from app.database import get_db_connection
             from app.services.strava_service import get_strava_trailing_stats
 
-            ftp = _clean_int(get_setting("athlete_ftp", 250), 250)
             title = data.get("title") or "Coach Tailored Workout"
             duration = _clean_int(data.get("duration_minutes"), 45)
             focus = data.get("focus_area") or data.get("intensity_type") or "Adaptive Training"
@@ -424,7 +425,11 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
 
         elif action_type == "clear_upcoming_plan":
             from app.database import clear_active_target_plans
-            clear_active_target_plans()
+            clear_active_target_plans(user_id=uid)
+            if uid == "usr_guest":
+                clear_active_target_plans(user_id="usr_default")
+            elif uid == "usr_default":
+                clear_active_target_plans(user_id="usr_guest")
             from app.services.forecast_service import clear_athlete_planned_session, save_coach_forecast_plan
             clear_athlete_planned_session(user_id=uid)
             if uid == "usr_guest":

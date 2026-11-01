@@ -243,12 +243,12 @@ def get_strava_trailing_stats(activities: Optional[List[Dict[str, Any]]] = None,
         if date_key in daily_buckets:
             suffer = act.get("suffer_score")
             if suffer is None or suffer == 0:
-                dur_h = act.get("moving_time_sec", 0) / 3600.0
+                dur_h = (act.get("moving_time_sec") or 0) / 3600.0
                 suffer = round(dur_h * 50)
             daily_buckets[date_key]["tss"] += int(suffer or 0)
-            daily_buckets[date_key]["moving_sec"] += int(act.get("moving_time_sec", 0))
-            daily_buckets[date_key]["elevation_m"] += int(act.get("total_elevation_gain", 0))
-            daily_buckets[date_key]["distance_m"] += float(act.get("distance_meters", 0))
+            daily_buckets[date_key]["moving_sec"] += int(act.get("moving_time_sec") or 0)
+            daily_buckets[date_key]["elevation_m"] += int(act.get("total_elevation_gain") or 0)
+            daily_buckets[date_key]["distance_m"] += float(act.get("distance_meters") or 0)
             daily_buckets[date_key]["activities"].append(act.get("name", "Ride"))
 
     sorted_days = sorted(daily_buckets.keys(), reverse=True) # yesterday first

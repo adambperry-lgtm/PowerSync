@@ -162,5 +162,60 @@ class TestChatPlansAdjustForecast(unittest.TestCase):
         self.assertIn("Over-Under", staged["title"])
         self.assertEqual(staged["duration_min"], 45)
 
+    def test_apply_chat_action_endpoints_no_unbound_local_errors(self):
+        """Verifies apply_chat_action_endpoint succeeds without UnboundLocalError for all actions."""
+        from app.routers.chat import apply_chat_action_endpoint, ApplyChatActionPayload
+        today = get_athlete_date(self.user_id)
+        tomorrow_iso = (today + datetime.timedelta(days=1)).isoformat()
+
+        # 1. Schedule workout action
+        res_sched = apply_chat_action_endpoint(ApplyChatActionPayload(
+            action_type="schedule_workout",
+            action_data={
+                "title": "Chat Planned Sweet Spot",
+                "target_date": tomorrow_iso,
+                "duration_minutes": 50,
+                "focus_area": "Sweet Spot",
+                "estimated_tss": 65
+            }
+        ))
+        self.assertTrue(res_sched["success"])
+        self.assertEqual(res_sched["action_type"], "schedule_workout")
+
+        # 2. Schedule upcoming plan (target plan / taper)
+        future_iso = (today + datetime.timedelta(days=5)).isoformat()
+        res_plan = apply_chat_action_endpoint(ApplyChatActionPayload(
+            action_type="schedule_upcoming_plan",
+            action_data={
+                "title": "Century Gran Fondo",
+                "target_date": future_iso,
+                "distance_miles": 100.0,
+                "elevation_gain_ft": 4500.0,
+                "intensity_type": "Endurance"
+            }
+        ))
+        self.assertTrue(res_plan["success"])
+        self.assertEqual(res_plan["action_type"], "schedule_upcoming_plan")
+
+        # 3. Clear upcoming plan
+        res_clear = apply_chat_action_endpoint(ApplyChatActionPayload(
+            action_type="clear_upcoming_plan",
+            action_data={}
+        ))
+        self.assertTrue(res_clear["success"])
+
+        # 4. Apply today workout
+        res_today = apply_chat_action_endpoint(ApplyChatActionPayload(
+            action_type="apply_today_workout",
+            action_data={
+                "title": "Today Quick Spin",
+                "duration_minutes": 30,
+                "focus_area": "Active Recovery",
+                "estimated_tss": 20
+            }
+        ))
+        self.assertTrue(res_today["success"])
+        self.assertEqual(res_today["action_type"], "apply_today_workout")
+
 if __name__ == "__main__":
     unittest.main()

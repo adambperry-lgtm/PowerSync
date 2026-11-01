@@ -6565,6 +6565,7 @@ function escapeSpiderwebHtml(str) {
 }
 
 let currentSpiderwebTimeframe = "30d";
+let currentSpiderwebData = null;
 
 async function loadPowerSpiderweb(timeframe = "30d") {
   currentSpiderwebTimeframe = timeframe;
@@ -6572,6 +6573,7 @@ async function loadPowerSpiderweb(timeframe = "30d") {
     const res = await fetch(`/api/power/spiderweb?timeframe=${encodeURIComponent(timeframe)}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    currentSpiderwebData = data;
     renderPowerSpiderweb(data);
   } catch (err) {
     console.warn("Failed to load power spiderweb data:", err);
@@ -7398,6 +7400,11 @@ function switchMainDashboardView(targetView, updateHistory = true) {
       paneAnalysis.style.display = "block";
     }
     if (toolbarTitle) toolbarTitle.textContent = "📈 Long-Term Performance & Strategy";
+    requestAnimationFrame(() => {
+      if (typeof renderSpiderwebSvg === "function" && typeof currentSpiderwebData !== "undefined" && currentSpiderwebData && currentSpiderwebData.axes) {
+        renderSpiderwebSvg(currentSpiderwebData.axes, currentSpiderwebData.active_goal);
+      }
+    });
   } else {
     tabDaily?.classList.add("active");
     tabDaily?.setAttribute("aria-selected", "true");
@@ -7412,6 +7419,14 @@ function switchMainDashboardView(targetView, updateHistory = true) {
       paneDaily.style.display = "block";
     }
     if (toolbarTitle) toolbarTitle.textContent = "⚡ Daily Training & Recovery";
+    requestAnimationFrame(() => {
+      if (state.currentWorkout && typeof drawWorkoutGraph === "function") {
+        drawWorkoutGraph(state.currentWorkout);
+      }
+      if (typeof outdoorMap !== "undefined" && outdoorMap && typeof outdoorMap.invalidateSize === "function") {
+        outdoorMap.invalidateSize(true);
+      }
+    });
   }
 
   try {

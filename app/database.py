@@ -1369,7 +1369,7 @@ def get_active_target_plan(user_id: Optional[str] = None) -> Optional[Dict[str, 
     p = dict(row)
     try:
         target_dt = datetime.date.fromisoformat(p["target_date"][:10])
-        today = datetime.date.today()
+        today = get_athlete_date(uid)
         p["days_until"] = (target_dt - today).days
         p["is_past"] = p["days_until"] < 0
     except Exception:
@@ -1387,7 +1387,7 @@ def get_all_target_plans(user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     rows = cursor.fetchall()
     conn.close()
     
-    today = datetime.date.today()
+    today = get_athlete_date(uid)
     results = []
     for r in rows:
         p = dict(r)
@@ -1492,8 +1492,7 @@ def get_scheduled_workout_for_date(date_str: str, user_id: Optional[str] = None)
         w["intervals"] = json.loads(w["intervals_json"])
     except Exception:
         w["intervals"] = []
-    import datetime
-    today_iso = datetime.date.today().isoformat()
+    today_iso = get_athlete_date(uid).isoformat()
     if date_str == today_iso:
         w["badge"] = "⭐ Coach's Choice"
         w["badge_color"] = "emerald"

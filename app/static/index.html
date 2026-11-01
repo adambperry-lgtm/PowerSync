@@ -85,8 +85,8 @@
     </div>
 
     <!-- Main Dashboard View Switcher Toggle (Daily Training vs Long-Term Analysis) -->
-    <nav class="main-view-switcher" role="tablist" aria-label="Dashboard View Selector">
-      <div class="main-view-tabs-container">
+    <nav class="main-view-switcher" aria-label="Dashboard View Selector">
+      <div class="main-view-tabs-container" role="tablist">
         <button class="main-view-tab-btn active" id="tabMainViewDaily" type="button" role="tab" aria-selected="true" data-view="daily">
           <span class="main-view-tab-icon">⚡</span>
           <span class="main-view-tab-title">Daily Training &amp; Execution</span>
@@ -115,7 +115,7 @@
     </div>
 
     <!-- VIEW 1: DAILY TRAINING & EXECUTION -->
-    <div id="viewDailyContainer" class="main-view-pane">
+    <div id="viewDailyContainer" class="main-view-pane" role="tabpanel" aria-labelledby="tabMainViewDaily">
 
       <!-- Top Telemetry Row: The Anti-Xert High-Signal Cards -->
       <section class="telemetry-grid">
@@ -1203,7 +1203,7 @@
   </div> <!-- end viewDailyContainer (Daily Training & Execution) -->
 
   <!-- VIEW 2: LONG-TERM ANALYSIS & STRATEGY -->
-  <div id="viewAnalysisContainer" class="main-view-pane hidden-pane" style="display:none;">
+  <div id="viewAnalysisContainer" class="main-view-pane hidden-pane" role="tabpanel" aria-labelledby="tabMainViewAnalysis" style="display:none;">
 
     <!-- Power Spiderweb Tracker & Progress Over Time (Strava & Xert Model) -->
     <section class="card collapsible-tile" id="cardPowerSpiderweb" style="margin-top:0;">
@@ -1612,7 +1612,7 @@
         <div class="version-text-block">
           <div class="version-title">
             <strong>PowerSync</strong>
-            <span class="version-tag" id="footerVersionBadge">v2.4.2</span>
+            <span class="version-tag" id="footerVersionBadge">v2.4.3</span>
             <span class="version-status-dot"></span>
             <span class="version-status-text">Production Ready</span>
           </div>
@@ -1651,7 +1651,7 @@
     <div class="modal-dialog">
       <div class="modal-header">
         <h3>Settings & Connections</h3>
-        <button class="modal-close" id="btnCloseSettings">&times;</button>
+        <button class="modal-close" id="btnCloseSettings" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
       <div class="modal-body">
 
@@ -2029,7 +2029,7 @@
           <span style="font-size:1.3rem;">👤</span>
           <h3 style="margin:0;">Athlete Account</h3>
         </div>
-        <button class="modal-close" id="btnCloseAuthModal">&times;</button>
+        <button class="modal-close" id="btnCloseAuthModal" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
       <div class="modal-body" style="gap:1.25rem;">
         
@@ -2130,7 +2130,7 @@
           <span style="font-size:1.3rem;">🚀</span>
           <h3>PowerSync Version History & Changelog</h3>
         </div>
-        <button class="modal-close" id="btnCloseChangelog">&times;</button>
+        <button class="modal-close" id="btnCloseChangelog" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
       <div class="modal-body" id="changelogList" style="gap:1.5rem;">
         <!-- Populated dynamically from /api/version -->
@@ -2146,7 +2146,7 @@
           <span style="font-size:1.3rem;">🎯</span>
           <h3 style="margin:0;">Schedule Upcoming Target Ride / Event</h3>
         </div>
-        <button class="modal-close" id="btnClosePlanModal">&times;</button>
+        <button class="modal-close" id="btnClosePlanModal" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
       <div class="modal-body" style="gap:1.25rem;">
         <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;">
@@ -2243,7 +2243,7 @@
           <span style="font-size:1.3rem;">⚡</span>
           <h3 style="margin:0;">Replace Today's Ride & Generate Fueling Plan</h3>
         </div>
-        <button class="modal-close" id="btnCloseReplaceRide">&times;</button>
+        <button class="modal-close" id="btnCloseReplaceRide" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
       <div class="modal-body" style="gap:1.25rem;">
         <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;">
@@ -2338,7 +2338,7 @@
             <span id="forecastModalSubtitle" style="font-size:0.75rem;color:var(--text-muted);font-weight:500;">Tomorrow • Thu, Oct 22</span>
           </div>
         </div>
-        <button class="modal-close" id="btnCloseForecastModal">&times;</button>
+        <button class="modal-close" id="btnCloseForecastModal" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
       <div class="modal-body" style="gap:1rem;">
         

@@ -141,8 +141,8 @@ def generate_workout(req: WorkoutGenerateRequest):
 
     if row:
         whoop = {
-            "recovery_score": int(row["recovery_score"]),
-            "hrv_rmssd": float(row["hrv_rmssd"]),
+            "recovery_score": int(row["recovery_score"] or 50),
+            "hrv_rmssd": float(row["hrv_rmssd"] or 35.0),
             "sleep_performance": int(row["sleep_performance"] or 85),
             "day_strain": float(row["day_strain"] or 0.0)
         }
@@ -179,11 +179,11 @@ def generate_workout(req: WorkoutGenerateRequest):
     else:
         recent_acts = get_mock_strava_activities()
 
-    rec_score = whoop.get("recovery_score", 50)
-    hrv = whoop.get("hrv_rmssd", 35.0)
-    sleep = whoop.get("sleep_performance", 85)
+    rec_score = int(whoop.get("recovery_score") or 50)
+    hrv = float(whoop.get("hrv_rmssd") or 35.0)
+    sleep = int(whoop.get("sleep_performance") or 85)
     
-    total_sec = sum(a.get("moving_time_sec", 0) for a in recent_acts)
+    total_sec = sum(a.get("moving_time_sec") or 0 for a in recent_acts)
     vol_hours = round(total_sec / 3600.0, 1)
 
     # Detect activities completed today
@@ -196,7 +196,7 @@ def generate_workout(req: WorkoutGenerateRequest):
             today_activities.append(a)
 
     today_acts = today_activities or []
-    today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
+    today_moving_min = sum(a.get("moving_time_sec") or 0 for a in today_acts) // 60
     has_active_day_strain = (today_strain >= 4.0) or (today_acts and today_strain >= 2.0)
     has_substantial_ride = (today_moving_min >= 20 and has_active_day_strain) or (today_moving_min >= 45 and today_strain >= 1.5)
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and rec_score <= 55)
@@ -743,7 +743,7 @@ def download_zwo_file():
         workout = gen["active_workout"]
         
     zwo_content = workout.get("zwo_content", "")
-    title = workout.get("title", "PowerSync_Workout").replace(" ", "_")
+    title = (workout.get("title") or "PowerSync_Workout").replace(" ", "_")
     filename = f"{title}.zwo"
     
     return Response(
@@ -837,11 +837,11 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
     else:
         recent_acts = get_mock_strava_activities()
 
-    rec_score = whoop.get("recovery_score", 50)
-    hrv = whoop.get("hrv_rmssd", 35.0)
-    sleep = whoop.get("sleep_performance", 85)
+    rec_score = int(whoop.get("recovery_score") or 50)
+    hrv = float(whoop.get("hrv_rmssd") or 35.0)
+    sleep = int(whoop.get("sleep_performance") or 85)
     
-    total_sec = sum(a.get("moving_time_sec", 0) for a in recent_acts)
+    total_sec = sum(a.get("moving_time_sec") or 0 for a in recent_acts)
     vol_hours = round(total_sec / 3600.0, 1)
 
     today_iso = get_athlete_date(uid).isoformat()
@@ -854,7 +854,7 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
 
     recent_high_intensity = False
     for a in recent_acts[:3]:
-        if a.get("suffer_score", 0) > 70 or a.get("weighted_average_watts", 0) > (ftp * 0.88):
+        if (a.get("suffer_score") or 0) > 70 or (a.get("weighted_average_watts") or 0) > (ftp * 0.88):
             recent_high_intensity = True
 
     # Retrieve trailing Strava stats (with recency decay)

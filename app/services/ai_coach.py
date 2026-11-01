@@ -146,7 +146,7 @@ def build_adaptive_workout_local(
     cur_eval_date = target_date or get_athlete_date()
     is_eval_today = (cur_eval_date == get_athlete_date())
     today_acts = today_activities or []
-    today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
+    today_moving_min = sum(a.get("moving_time_sec") or 0 for a in today_acts) // 60
     # Must be corroborated by daytime cardiovascular strain (or substantial moving time with daytime strain).
     # A fresh morning recovery baseline (e.g. 0.0 strain with 95% recovery) should never be blocked as "already trained".
     has_active_day_strain = (today_strain >= 4.0) or (today_acts and today_strain >= 2.0)
@@ -853,7 +853,7 @@ def build_workout_bundle(
     cur_eval_date = target_date or get_athlete_date()
     is_eval_today = (cur_eval_date == get_athlete_date())
     today_acts = today_activities or []
-    today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
+    today_moving_min = sum(a.get("moving_time_sec") or 0 for a in today_acts) // 60
     has_active_day_strain = (today_strain >= 4.0) or (today_acts and today_strain >= 2.0)
     has_substantial_ride = (today_moving_min >= 20 and has_active_day_strain) or (today_moving_min >= 45 and today_strain >= 1.5)
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and recovery_score <= 55)

@@ -138,7 +138,7 @@ def get_candidate_outdoor_rides() -> List[Dict[str, Any]]:
     filtered = []
     for r in rides:
         name_lower = r.get("name", "").lower()
-        if any(ign in name_lower for ign in ["doordash", "errand", "commute", "cool down"]) and r.get("moving_time_sec", 0) < 1800:
+        if any(ign in name_lower for ign in ["doordash", "errand", "commute", "cool down"]) and (r.get("moving_time_sec") or 0) < 1800:
             continue
         filtered.append(r)
 
@@ -208,7 +208,7 @@ def build_outdoor_ride_recommendation(
 
     # Determine desired physiological stimulus today
     today_acts = today_activities or []
-    today_moving_min = sum(a.get("moving_time_sec", 0) for a in today_acts) // 60
+    today_moving_min = sum(a.get("moving_time_sec") or 0 for a in today_acts) // 60
     has_active_day_strain = (today_strain >= 4.0) or (today_acts and today_strain >= 2.0)
     has_substantial_ride = (today_moving_min >= 20 and has_active_day_strain) or (today_moving_min >= 45 and today_strain >= 1.5)
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and recovery_score <= 55)
@@ -302,10 +302,10 @@ def build_outdoor_ride_recommendation(
     # Score and annotate each candidate ride
     scored_rides = []
     for ride in candidates:
-        r_sec = ride.get("moving_time_sec", 0)
+        r_sec = ride.get("moving_time_sec") or 0
         r_min = r_sec // 60
-        r_dist_km = round(ride.get("distance_meters", 0) / 1000.0, 1)
-        r_elev_m = int(ride.get("total_elevation_gain", 0))
+        r_dist_km = round((ride.get("distance_meters") or 0.0) / 1000.0, 1)
+        r_elev_m = int(ride.get("total_elevation_gain") or 0)
         r_watts = ride.get("average_watts") or ride.get("weighted_average_watts") or 0.0
         r_pct_ftp = round((r_watts / max(1, ftp)) * 100) if r_watts > 0 else 70
         r_suffer = ride.get("suffer_score") or 0

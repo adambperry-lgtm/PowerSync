@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.4.2",
-        "release_name": "Dashboard View Switcher & Evening Workout Timezone Resolution",
+        "version": "2.4.3",
+        "release_name": "Comprehensive Code Audit, Multi-User Isolation & UI Hardening",
         "build_date": "2026-11-01",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,19 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.4.3",
+                "date": "2026-11-01",
+                "title": "Comprehensive Code Audit, Multi-User Isolation & UI Hardening",
+                "items": [
+                    "Coach Chat UnboundLocalError Remediation: Lifted uid and ftp definitions to top of apply_chat_action_endpoint, ensuring seamless execution across schedule_workout, schedule_upcoming_plan, clear_upcoming_plan, and apply_today_workout.",
+                    "Strict Multi-User Isolation in Coach Tools: Removed default user fallbacks across Strava activity details, API proxies, and Whoop timeline tools, guaranteeing authenticated athletes never leak or view another user's biometric telemetry or ride data.",
+                    "Gemini Parallel Tool Call Turn Bundling: Bundled all parallel tool function response parts into a single user turn, strictly satisfying Gemini API multi-turn alternation requirements and preventing HTTP 400 errors.",
+                    "Comprehensive Null-Safety Hardening: Added fallback defaults for nullable moving_time_sec, distance_meters, suffer_score, and recovery_score fields across workouts, preferences, outdoor coach, and dashboard routers.",
+                    "Canvas & Outdoor Map View Switcher Redraw: Bound drawWorkoutGraph, outdoorMap.invalidateSize, and spiderweb SVG rendering to requestAnimationFrame triggers during tab transitions, preventing canvas collapsing.",
+                    "Touch Target & Modal Accessibility: Enlarged modal close buttons to 44x44px minimum touch targets and refined light-mode contrast across inputs, dropdowns, and form labels."
+                ]
+            },
             {
                 "version": "v2.4.2",
                 "date": "2026-11-01",

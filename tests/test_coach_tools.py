@@ -113,5 +113,33 @@ class TestCoachTools(unittest.TestCase):
         self.assertTrue(res["found"])
         self.assertIn("Sweet Spot", res["name"])
 
+    def test_user_isolation_no_leak_of_default_user_data(self):
+        """Verify non-default user does not see usr_default activities or Whoop metrics."""
+        other_uid = "usr_isolated_athlete_999"
+        res_act = tool_get_strava_activity_details(activity_id="latest", user_id=other_uid)
+        self.assertFalse(res_act["found"])
+
+        res_search = tool_search_strava_activities(query="sweet spot", user_id=other_uid)
+        self.assertEqual(res_search["count"], 0)
+
+        res_whoop = tool_get_whoop_biometrics_timeline(days=7, user_id=other_uid)
+        self.assertEqual(res_whoop["count"], 0)
+
+    def test_execute_coach_tool_null_arguments_graceful_handling(self):
+        """Verify dispatcher gracefully handles None values for integer arguments."""
+        res_search = execute_coach_tool(
+            "search_strava_activities",
+            {"query": "ride", "sport_type": "All", "days_back": None, "limit": None},
+            user_id=self.user_id
+        )
+        self.assertIn("activities", res_search)
+
+        res_whoop = execute_coach_tool(
+            "get_whoop_biometrics_timeline",
+            {"days": None},
+            user_id=self.user_id
+        )
+        self.assertIn("timeline", res_whoop)
+
 if __name__ == "__main__":
     unittest.main()
