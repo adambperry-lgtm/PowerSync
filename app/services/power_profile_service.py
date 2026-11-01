@@ -5,6 +5,8 @@ from typing import Dict, Any, List, Optional, Tuple
 from app.database import (
     get_db_connection,
     get_setting,
+    set_setting,
+    delete_setting,
     get_current_user_id,
     get_athlete_date,
     resolve_strava_local_start
@@ -240,8 +242,15 @@ def get_power_spiderweb_profile(
         all_vals = [a["peaks"].get(k, 0) for a in all_acts if a["peaks"].get(k, 0) > 0]
         all_time_envelope[k] = max(all_vals) if all_vals else modeled_baseline[k]
 
+    # Retrieve athlete's active training goal if configured
+    active_goal = get_active_spiderweb_goal(user_id=uid)
+    goal_envelope = active_goal.get("target_envelope", {}) if active_goal else {}
+
     # Build axis points and deltas
     axes_data = []
+    total_goal_initial_gap = 0
+    total_goal_remaining_gap = 0
+
     for meta in RADAR_DURATIONS:
         k = meta["key"]
         cur_w = cur_envelope.get(k, 0)
@@ -257,6 +266,24 @@ def get_power_spiderweb_profile(
         # Scale 20% to 100% radius for visual radar chart
         cur_radar_pct = round(min(100.0, max(20.0, (cur_w / bm) * 100.0)), 1)
         prev_radar_pct = round(min(100.0, max(20.0, (prev_w / bm) * 100.0)), 1)
+
+        # Goal target points
+        target_w = None
+        target_w_kg = None
+        target_radar_pct = None
+        goal_remaining_w = 0
+        goal_met = False
+
+        if active_goal and k in goal_envelope:
+            target_w = int(goal_envelope[k])
+            target_w_kg = round(target_w / max(40.0, weight_kg), 2)
+            target_radar_pct = round(min(100.0, max(20.0, (target_w / bm) * 100.0)), 1)
+            goal_remaining_w = max(0, target_w - cur_w)
+            goal_met = (cur_w >= target_w)
+
+            initial_axis_target_gap = max(0, target_w - prev_w)
+            total_goal_initial_gap += initial_axis_target_gap
+            total_goal_remaining_gap += goal_remaining_w
 
         axes_data.append({
             "key": k,
@@ -274,10 +301,31 @@ def get_power_spiderweb_profile(
             "benchmark_watts": bm,
             "current_radar_pct": cur_radar_pct,
             "previous_radar_pct": prev_radar_pct,
+            "target_watts": target_w,
+            "target_w_kg": target_w_kg,
+            "target_radar_pct": target_radar_pct,
+            "goal_remaining_watts": goal_remaining_w,
+            "goal_met": goal_met,
             "improved": delta_w > 0,
             "unchanged": delta_w == 0,
             "declined": delta_w < 0
         })
+
+    # Evaluate active goal progression percentage
+    if active_goal:
+        all_axes_met = all(ax.get("goal_met", True) for ax in axes_data if ax.get("target_watts") is not None)
+        if all_axes_met:
+            active_goal["progress_pct"] = 100.0
+            active_goal["is_achieved"] = True
+            active_goal["remaining_total_watts"] = 0
+        else:
+            active_goal["is_achieved"] = False
+            active_goal["remaining_total_watts"] = total_goal_remaining_gap
+            if total_goal_initial_gap > 0:
+                prog = max(0.0, min(99.0, ((total_goal_initial_gap - total_goal_remaining_gap) / total_goal_initial_gap) * 100.0))
+                active_goal["progress_pct"] = round(prog, 1)
+            else:
+                active_goal["progress_pct"] = 0.0
 
     # Classify Rider Phenotype (Xert & Coggan Model)
     sprint_ratio = cur_envelope["5s"] / max(1, ftp)
@@ -436,6 +484,8 @@ def get_power_spiderweb_profile(
             "primary_strength": primary_strength,
             "growth_focus": growth_focus
         },
+        "has_active_goal": bool(active_goal),
+        "active_goal": active_goal,
         "axes": axes_data,
         "summary_deltas": {
             "sprint_5s": next((a for a in axes_data if a["key"] == "5s"), {}),
@@ -451,4 +501,438 @@ def get_power_spiderweb_profile(
             "previous_period": len(prev_acts),
             "total_analyzed": len(all_acts)
         }
+    }
+
+
+# --- Spiderweb Training Goals & Target Improvement Planning ---
+
+RIDER_PHENOTYPE_DEFINITIONS: List[Dict[str, Any]] = [
+    {
+        "id": "Puncheur",
+        "title": "Puncheur",
+        "badge": "🥊 Puncheur",
+        "icon": "🥊",
+        "description": "High-octane anaerobic battery (W') capable of violent steep hill attacks and sharp short climbs.",
+        "primary_strength": "1m–3m Glycolytic Power & Attack Repeatability",
+        "focus_energy_system": "1m–3m Glycolytic Capacity & Anaerobic Power (W')",
+        "recommended_workouts": [
+            "30/30s High-Cadence VO2 Microbursts (120% FTP / 50% recovery)",
+            "5x 2-Min Steep Anaerobic Hill Repeats (125-130% FTP)",
+            "Tabata High-Torque Acceleration Blocks"
+        ],
+        "requirements": {
+            "5s_ratio": 2.80,
+            "1m_ratio": 1.70,
+            "5m_ratio": 1.22,
+            "20m_ratio": 0.95,
+            "60m_ratio": 0.85
+        }
+    },
+    {
+        "id": "Rouleur",
+        "title": "Rouleur / TT Specialist",
+        "badge": "⏱️ Rouleur",
+        "icon": "⏱️",
+        "description": "Diesel engine with massive sustained aerobic power and fatigue resistance over prolonged durations.",
+        "primary_strength": "20m–60m Sustained Lactate Threshold",
+        "focus_energy_system": "Lactate Clearance & Aerobic Threshold (FTP)",
+        "recommended_workouts": [
+            "2x 20-Min Progressive Sweet Spot (88–94% FTP)",
+            "3x 12-Min Threshold Over-Unders (95% / 105% FTP)",
+            "75-Min Aerobic Tempo Density Ride"
+        ],
+        "requirements": {
+            "5s_ratio": 2.40,
+            "1m_ratio": 1.45,
+            "5m_ratio": 1.15,
+            "20m_ratio": 1.02,
+            "60m_ratio": 0.92
+        }
+    },
+    {
+        "id": "Climber",
+        "title": "Climber",
+        "badge": "⛰️ Climber",
+        "icon": "⛰️",
+        "description": "Exceptional power-to-weight ratio over extended elevation gradients and sustained mountain passes.",
+        "primary_strength": "High Sustained W/kg Output on Gradients",
+        "focus_energy_system": "Sustained W/kg & High Aerobic Ceiling",
+        "recommended_workouts": [
+            "4x 10-Min High-Cadence Alpine Threshold Repeats (96–102% FTP)",
+            "5x 4-Min VO2 Max Climbing Ladders (110–115% FTP)",
+            "2-Hour Endurance Mountain Simulation"
+        ],
+        "requirements": {
+            "5s_ratio": 2.50,
+            "1m_ratio": 1.50,
+            "5m_ratio": 1.24,
+            "20m_ratio": 1.04,
+            "60m_ratio": 0.90,
+            "min_20m_wkg": 3.75,
+            "min_5m_wkg": 4.90
+        }
+    },
+    {
+        "id": "Sprinter",
+        "title": "Sprinter",
+        "badge": "⚡ Sprinter",
+        "icon": "⚡",
+        "description": "Explosive neuromuscular recruitment and fast-twitch power. Dominates final kicks and short accelerations.",
+        "primary_strength": "5s Sprint & Max Neuromuscular Burst",
+        "focus_energy_system": "Neuromuscular Recruitment & Peak Sprint P_max",
+        "recommended_workouts": [
+            "6x 15s All-Out Standing Start Sprints with 4m Recovery",
+            "3 Blocks of 30s High-Torque Acceleration Spin-Ups",
+            "Heavy Resistance Squat & Plyometric Priming"
+        ],
+        "requirements": {
+            "5s_ratio": 3.45,
+            "1m_ratio": 1.75,
+            "5m_ratio": 1.15,
+            "20m_ratio": 0.90,
+            "60m_ratio": 0.82
+        }
+    },
+    {
+        "id": "Pursuiter",
+        "title": "Pursuiter / VO2 Specialist",
+        "badge": "🫁 Pursuiter",
+        "icon": "🫁",
+        "description": "Huge maximal aerobic ceiling (MAP). Excels at bridge attempts, breakaway pacing, and 3-8 minute climbs.",
+        "primary_strength": "5m Maximal Aerobic Power (MAP)",
+        "focus_energy_system": "Maximal Aerobic Power (MAP) & Stroke Volume",
+        "recommended_workouts": [
+            "5x 4-Min Maximal Aerobic Power (MAP @ 112–118% FTP)",
+            "4x 5-Min VO2 Max Extenders with 1:1 Recovery",
+            "40/20s High-Intensity Interval Sets"
+        ],
+        "requirements": {
+            "5s_ratio": 2.60,
+            "1m_ratio": 1.58,
+            "5m_ratio": 1.26,
+            "20m_ratio": 0.96,
+            "60m_ratio": 0.86
+        }
+    },
+    {
+        "id": "All-Rounder",
+        "title": "All-Rounder",
+        "badge": "🎯 All-Rounder",
+        "icon": "🎯",
+        "description": "Well-balanced spiderweb with harmonious capabilities across sprint, anaerobic capacity, and sustained threshold.",
+        "primary_strength": "Versatile Energy System Equilibrium",
+        "focus_energy_system": "Harmonious Multi-System Progression (+5% Envelope Lift)",
+        "recommended_workouts": [
+            "Weekly Polarized Mix: 1x VO2 Intervals, 1x Sweet Spot, 2x Z2 Base",
+            "Over-Under Threshold Ladders",
+            "Weekend Long Aerobic Simulation"
+        ],
+        "requirements": {
+            "5s_ratio": 2.90,
+            "1m_ratio": 1.55,
+            "5m_ratio": 1.18,
+            "20m_ratio": 0.96,
+            "60m_ratio": 0.86
+        }
+    }
+]
+
+
+def get_active_spiderweb_goal(user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Retrieves the active spiderweb training goal for the athlete."""
+    uid = user_id or get_current_user_id()
+    raw = get_setting("spiderweb_goal", None, user_id=uid)
+    if not raw:
+        return None
+    try:
+        if isinstance(raw, str):
+            goal = json.loads(raw)
+        elif isinstance(raw, dict):
+            goal = dict(raw)
+        else:
+            return None
+        return goal
+    except Exception:
+        return None
+
+
+def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Saves a new or updated active spiderweb goal.
+    Supports either Duration-based goals (e.g. 20m Threshold 260W)
+    or Phenotype Transformation goals (e.g. Transform to Puncheur).
+    """
+    uid = user_id or get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    weight_kg = float(get_setting("athlete_weight_kg", 70.0, user_id=uid))
+
+    goal_type = payload.get("goal_type", "phenotype") # "phenotype" or "duration"
+    target_key = payload.get("target_key", "Puncheur")
+
+    # Get current envelope to anchor non-target axes
+    profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
+    cur_envelope = {ax["key"]: ax["current_watts"] for ax in profile.get("axes", [])}
+
+    target_envelope = dict(cur_envelope)
+
+    if goal_type == "phenotype":
+        pheno_def = next((p for p in RIDER_PHENOTYPE_DEFINITIONS if p["id"].lower() == target_key.lower()), None)
+        if not pheno_def:
+            pheno_def = RIDER_PHENOTYPE_DEFINITIONS[0] # Default Puncheur
+
+        target_title = f"Transform into {pheno_def['title']}"
+        target_badge = f"{pheno_def['icon']} {pheno_def['title']} Target"
+        focus_system = pheno_def["focus_energy_system"]
+        rec_workouts = pheno_def["recommended_workouts"]
+
+        reqs = pheno_def["requirements"]
+        target_envelope["5s"] = max(cur_envelope.get("5s", 600), round(ftp * reqs["5s_ratio"]))
+        target_envelope["1m"] = max(cur_envelope.get("1m", 400), round(ftp * reqs["1m_ratio"]))
+        target_envelope["5m"] = max(cur_envelope.get("5m", 300), round(ftp * reqs["5m_ratio"]))
+        target_envelope["20m"] = max(cur_envelope.get("20m", 240), round(ftp * reqs["20m_ratio"]))
+        target_envelope["60m"] = max(cur_envelope.get("60m", 210), round(ftp * reqs["60m_ratio"]))
+
+        # Check climber specific W/kg minimums
+        if "min_20m_wkg" in reqs:
+            wkg_target_20m = round(weight_kg * reqs["min_20m_wkg"])
+            target_envelope["20m"] = max(target_envelope["20m"], wkg_target_20m)
+        if "min_5m_wkg" in reqs:
+            wkg_target_5m = round(weight_kg * reqs["min_5m_wkg"])
+            target_envelope["5m"] = max(target_envelope["5m"], wkg_target_5m)
+
+        # Automatically align program_goal in settings so workouts adapt
+        program_goal_map = {
+            "Puncheur": "VO2_CRIT",
+            "Pursuiter": "VO2_CRIT",
+            "Rouleur": "FTP_BUILD",
+            "Climber": "FTP_BUILD",
+            "Sprinter": "VO2_CRIT",
+            "All-Rounder": "GRAN_FONDO"
+        }
+        if pheno_def["id"] in program_goal_map:
+            set_setting("program_goal", program_goal_map[pheno_def["id"]], user_id=uid)
+
+    else: # duration goal
+        # e.g. target_key = "20m", target_watts = 260
+        target_watts = int(payload.get("target_watts") or round(cur_envelope.get(target_key, 250) * 1.06))
+        dur_meta = next((d for d in RADAR_DURATIONS if d["key"] == target_key), RADAR_DURATIONS[3])
+
+        target_envelope[target_key] = target_watts
+        target_title = f"{dur_meta['name']} @ {target_watts}W"
+        target_badge = f"{dur_meta['icon']} {target_watts}W ({dur_meta['label']})"
+        focus_system = f"{dur_meta['energy']} ({dur_meta['label']})"
+
+        workouts_map = {
+            "5s": ["6x 15s Standing Start Sprints", "Cadence Acceleration Drills", "Heavy Squats"],
+            "1m": ["30/30s VO2 Microbursts", "5x 2-Min Anaerobic Repeats", "Tabata Power Surges"],
+            "5m": ["5x 4-Min MAP @ 115% FTP", "4x 5-Min VO2 Extenders", "High-Cadence MAP Ramps"],
+            "20m": ["2x 20-Min Sweet Spot @ 92% FTP", "3x 12-Min Threshold Over-Unders", "45-Min TT Simulation"],
+            "60m": ["3x 20-Min Threshold Progression", "90-Min Zone 2 Steady Aerobic Base", "Carbohydrate Depletion Resistance"]
+        }
+        rec_workouts = workouts_map.get(target_key, ["Structured Interval Progressions"])
+
+        if target_key in ("20m", "60m"):
+            set_setting("program_goal", "FTP_BUILD", user_id=uid)
+        elif target_key in ("1m", "5m"):
+            set_setting("program_goal", "VO2_CRIT", user_id=uid)
+
+    goal_obj = {
+        "id": f"spiderweb_goal_{int(datetime.datetime.now().timestamp())}",
+        "goal_type": goal_type,
+        "target_key": target_key,
+        "target_title": target_title,
+        "target_badge": target_badge,
+        "target_envelope": target_envelope,
+        "focus_energy_system": focus_system,
+        "recommended_workouts": rec_workouts,
+        "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "status": "active"
+    }
+
+    set_setting("spiderweb_goal", goal_obj, user_id=uid)
+    return goal_obj
+
+
+def clear_active_spiderweb_goal(user_id: Optional[str] = None) -> bool:
+    """Clears the active spiderweb training goal."""
+    uid = user_id or get_current_user_id()
+    delete_setting("spiderweb_goal", user_id=uid)
+    return True
+
+
+def calculate_spiderweb_target_changes(
+    user_id: Optional[str] = None,
+    timeframe: str = "30d"
+) -> Dict[str, Any]:
+    """
+    Computes precise target wattage changes, W/kg deltas, and training stimulus
+    needed to improve across individual duration categories (5s, 1m, 5m, 20m, 60m)
+    or transform athlete phenotype into any targeted rider type.
+    """
+    uid = user_id or get_current_user_id()
+    profile = get_power_spiderweb_profile(user_id=uid, timeframe=timeframe)
+    ftp = profile["athlete"]["ftp_watts"]
+    weight_kg = profile["athlete"]["weight_kg"]
+    cur_phenotype = profile["phenotype"]
+    active_goal = profile.get("active_goal")
+
+    cur_envelope = {ax["key"]: ax["current_watts"] for ax in profile.get("axes", [])}
+
+    # 1. Duration Category Improvement Analysis
+    duration_targets = []
+    category_workout_guidance = {
+        "5s": {
+            "stimulus": "Neuromuscular motor unit synchronization & peak phosphagen turnover.",
+            "workouts": "6x 15s maximal standing starts with 4min full recovery; 3x 30s high-cadence torque openers."
+        },
+        "1m": {
+            "stimulus": "Anaerobic glycolytic capacity (W') & lactate buffering tolerance.",
+            "workouts": "8x 30/30s microbursts (120% / 50% FTP); 4x 90s all-out anaerobic surges."
+        },
+        "5m": {
+            "stimulus": "Maximal Aerobic Power (MAP), cardiac stroke volume & VO2 max ceiling.",
+            "workouts": "5x 4-Min MAP intervals @ 112–118% FTP with 3min recovery; 40/20s high-frequency ladders."
+        },
+        "20m": {
+            "stimulus": "Lactate shuttle efficiency, mitochondrial density & critical power (FTP).",
+            "workouts": "2x 20-Min Sweet Spot (90–94% FTP); 3x 12-Min Threshold Over-Unders (95% / 105% FTP)."
+        },
+        "60m": {
+            "stimulus": "Type I slow-twitch endurance, fat oxidation rate & glycogen sparing.",
+            "workouts": "90–120 Min Zone 2 aerobic endurance ride @ 65–72% FTP; 3x 20-Min steady tempo progressions."
+        }
+    }
+
+    for meta in RADAR_DURATIONS:
+        k = meta["key"]
+        cur_w = cur_envelope.get(k, 0)
+        cur_wkg = round(cur_w / max(40.0, weight_kg), 2)
+        bm_w = next((ax["benchmark_watts"] for ax in profile["axes"] if ax["key"] == k), 300)
+
+        # Tier 1: Progressive +5% (Achievable in 2-3 weeks)
+        tier1_w = round(cur_w * 1.05) if cur_w > 0 else round(ftp * 1.1)
+        tier1_delta = tier1_w - cur_w
+        tier1_wkg = round(tier1_w / max(40.0, weight_kg), 2)
+
+        # Tier 2: Category Leap +10% (4-6 week block)
+        tier2_w = round(cur_w * 1.10) if cur_w > 0 else round(ftp * 1.25)
+        tier2_delta = tier2_w - cur_w
+        tier2_wkg = round(tier2_w / max(40.0, weight_kg), 2)
+
+        # Tier 3: Benchmark Ceiling
+        tier3_w = bm_w
+        tier3_delta = max(0, bm_w - cur_w)
+        tier3_wkg = round(bm_w / max(40.0, weight_kg), 2)
+
+        duration_targets.append({
+            "key": k,
+            "label": meta["label"],
+            "name": meta["name"],
+            "icon": meta["icon"],
+            "energy_system": meta["energy"],
+            "current_watts": cur_w,
+            "current_w_kg": cur_wkg,
+            "benchmark_watts": bm_w,
+            "tier1_progressive": {
+                "label": "Progressive Target (+5%)",
+                "target_watts": tier1_w,
+                "target_w_kg": tier1_wkg,
+                "delta_watts": tier1_delta,
+                "delta_pct": 5.0,
+                "timeline": "2–3 Weeks Focused Overload"
+            },
+            "tier2_transformative": {
+                "label": "Transformative Leap (+10%)",
+                "target_watts": tier2_w,
+                "target_w_kg": tier2_wkg,
+                "delta_watts": tier2_delta,
+                "delta_pct": 10.0,
+                "timeline": "4–6 Week Periodized Block"
+            },
+            "tier3_benchmark": {
+                "label": "Benchmark Ceiling (Elite)",
+                "target_watts": tier3_w,
+                "target_w_kg": tier3_wkg,
+                "delta_watts": tier3_delta,
+                "delta_pct": round((tier3_delta / max(1, cur_w)) * 100.0, 1),
+                "timeline": "Macro-Cycle Progression"
+            },
+            "guidance": category_workout_guidance.get(k, {})
+        })
+
+    # 2. Rider Type Transformation Analysis
+    rider_type_targets = []
+    for pheno in RIDER_PHENOTYPE_DEFINITIONS:
+        reqs = pheno["requirements"]
+        target_5s = max(cur_envelope.get("5s", 0), round(ftp * reqs["5s_ratio"]))
+        target_1m = max(cur_envelope.get("1m", 0), round(ftp * reqs["1m_ratio"]))
+        target_5m = max(cur_envelope.get("5m", 0), round(ftp * reqs["5m_ratio"]))
+        target_20m = max(cur_envelope.get("20m", 0), round(ftp * reqs["20m_ratio"]))
+        target_60m = max(cur_envelope.get("60m", 0), round(ftp * reqs["60m_ratio"]))
+
+        if "min_20m_wkg" in reqs:
+            target_20m = max(target_20m, round(weight_kg * reqs["min_20m_wkg"]))
+        if "min_5m_wkg" in reqs:
+            target_5m = max(target_5m, round(weight_kg * reqs["min_5m_wkg"]))
+
+        target_env = {
+            "5s": target_5s,
+            "1m": target_1m,
+            "5m": target_5m,
+            "20m": target_20m,
+            "60m": target_60m
+        }
+
+        axis_gaps = []
+        met_count = 0
+        total_delta = 0
+
+        for ax_meta in RADAR_DURATIONS:
+            dur_k = ax_meta["key"]
+            curr_val = cur_envelope.get(dur_k, 0)
+            tgt_val = target_env[dur_k]
+            gap = max(0, tgt_val - curr_val)
+            is_met = (curr_val >= tgt_val)
+            if is_met:
+                met_count += 1
+            total_delta += gap
+
+            axis_gaps.append({
+                "key": dur_k,
+                "name": ax_meta["name"],
+                "icon": ax_meta["icon"],
+                "current_watts": curr_val,
+                "current_w_kg": round(curr_val / max(40.0, weight_kg), 2),
+                "target_watts": tgt_val,
+                "target_w_kg": round(tgt_val / max(40.0, weight_kg), 2),
+                "delta_watts": gap,
+                "delta_pct": round((gap / max(1, curr_val)) * 100.0, 1) if curr_val > 0 else 0.0,
+                "is_met": is_met
+            })
+
+        is_current_type = (pheno["id"].lower() == cur_phenotype["title"].lower())
+        completion_pct = 100.0 if is_current_type else round((met_count / 5.0) * 100.0, 1)
+
+        rider_type_targets.append({
+            "id": pheno["id"],
+            "title": pheno["title"],
+            "badge": pheno["badge"],
+            "icon": pheno["icon"],
+            "description": pheno["description"],
+            "primary_strength": pheno["primary_strength"],
+            "focus_energy_system": pheno["focus_energy_system"],
+            "is_current_type": is_current_type,
+            "completion_pct": completion_pct,
+            "total_delta_watts": total_delta,
+            "target_envelope": target_env,
+            "axis_gaps": axis_gaps,
+            "recommended_workouts": pheno["recommended_workouts"]
+        })
+
+    return {
+        "current_phenotype": cur_phenotype,
+        "athlete": profile["athlete"],
+        "active_goal": active_goal,
+        "duration_category_targets": duration_targets,
+        "rider_type_transformation_targets": rider_type_targets
     }

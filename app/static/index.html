@@ -1335,6 +1335,36 @@
 
       <!-- Collapsible Body Container -->
       <div class="collapsible-tile-body" id="powerSpiderwebBody">
+        <!-- Active Spiderweb Goal Banner (Visible when active goal set) -->
+        <div class="spiderweb-goal-banner" id="spiderwebGoalBanner" style="display:none;">
+          <div class="spiderweb-goal-banner-header">
+            <div style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+              <span class="spiderweb-goal-badge" id="spiderwebGoalBadge">🎯 Active Goal</span>
+              <span class="spiderweb-goal-title" id="spiderwebGoalTitle">Transform into Puncheur</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <button class="btn btn-secondary" id="btnTogglePlannerSection" style="padding:0.25rem 0.65rem;font-size:0.75rem;" type="button">
+                🎯 Target Planner
+              </button>
+              <button class="btn btn-secondary" id="btnClearSpiderwebGoal" style="padding:0.25rem 0.5rem;font-size:0.75rem;color:var(--text-muted);" type="button" title="Clear active spiderweb goal">
+                ✕ Clear Goal
+              </button>
+            </div>
+          </div>
+          <div class="spiderweb-goal-progress-wrap">
+            <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;">
+              <span style="color:var(--text-muted);" id="spiderwebGoalProgressLabel">Goal Progress: 0% achieved</span>
+              <span style="font-weight:700;color:#10b981;" id="spiderwebGoalRemainingLabel">0W remaining</span>
+            </div>
+            <div class="spiderweb-goal-progress-bar-bg">
+              <div class="spiderweb-goal-progress-bar-fill" id="spiderwebGoalProgressBar" style="width:0%;"></div>
+            </div>
+          </div>
+          <div class="spiderweb-goal-chips" id="spiderwebGoalChips">
+            <!-- Dynamic axis chips -->
+          </div>
+        </div>
+
         <!-- Main Spiderweb Grid: Radar Chart + Phenotype & Metrics -->
         <div class="spiderweb-main-layout">
           <!-- Left: SVG Radar Spiderweb -->
@@ -1348,6 +1378,10 @@
                 <span class="spiderweb-legend-dot previous"></span>
                 <span id="spiderwebLegendPreviousLabel">Prior 30 Days (Baseline)</span>
               </span>
+              <span class="spiderweb-legend-item" id="spiderwebLegendGoalItem" style="display:none;">
+                <span class="spiderweb-legend-dot goal"></span>
+                <span id="spiderwebLegendGoalLabel">Active Goal</span>
+              </span>
             </div>
             
             <div class="spiderweb-svg-wrapper">
@@ -1360,6 +1394,10 @@
                   <radialGradient id="radarPreviousGradient" cx="50%" cy="50%" r="50%">
                     <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18" />
                     <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.05" />
+                  </radialGradient>
+                  <radialGradient id="radarGoalGradient" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.35" />
+                    <stop offset="100%" stop-color="#059669" stop-opacity="0.10" />
                   </radialGradient>
                 </defs>
               </svg>
@@ -1395,6 +1433,46 @@
             <!-- Duration Metrics Grid (5s, 1m, 5m, 20m, 60m) -->
             <div class="spiderweb-durations-grid" id="spiderwebDurationsGrid">
               <!-- Dynamically populated via JavaScript -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Target Changes Explorer & Training Goal Setter -->
+        <div class="spiderweb-planner-section" id="spiderwebPlannerSection">
+          <div class="spiderweb-planner-nav">
+            <div>
+              <div style="display:flex;align-items:center;gap:0.4rem;">
+                <span style="font-size:1rem;">🎯</span>
+                <span class="spiderweb-section-title" style="margin:0;">Target Changes &amp; Goal Planner</span>
+              </div>
+              <div class="spiderweb-section-subtitle">
+                Explore wattage targets to improve categories or set your training goal to transform rider archetype
+              </div>
+            </div>
+            <div class="planner-toggle-tabs" id="plannerToggleTabs">
+              <button class="planner-tab-btn active" id="btnPlannerTabDuration" type="button" data-mode="duration">
+                ⚡ Duration Targets
+              </button>
+              <button class="planner-tab-btn" id="btnPlannerTabPhenotype" type="button" data-mode="phenotype">
+                🥊 Rider Type Transformation
+              </button>
+            </div>
+          </div>
+
+          <!-- Duration Category Targets Sub-panel -->
+          <div id="plannerDurationView">
+            <div class="duration-pills-row" id="plannerDurationPills">
+              <!-- Duration pills populated via JS -->
+            </div>
+            <div class="planner-tiers-grid" id="plannerTiersGrid">
+              <!-- Tier cards populated via JS -->
+            </div>
+          </div>
+
+          <!-- Rider Type Transformation Targets Sub-panel -->
+          <div id="plannerPhenotypeView" style="display:none;">
+            <div class="planner-phenotypes-grid" id="plannerPhenotypesGrid">
+              <!-- Phenotype transformation cards populated via JS -->
             </div>
           </div>
         </div>
@@ -1498,7 +1576,7 @@
         <div class="version-text-block">
           <div class="version-title">
             <strong>PowerSync</strong>
-            <span class="version-tag" id="footerVersionBadge">v2.4.0</span>
+            <span class="version-tag" id="footerVersionBadge">v2.4.1</span>
             <span class="version-status-dot"></span>
             <span class="version-status-text">Production Ready</span>
           </div>

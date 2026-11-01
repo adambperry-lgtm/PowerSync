@@ -658,6 +658,14 @@ def set_setting(key: str, value: Any, user_id: Optional[str] = None):
     conn.commit()
     conn.close()
 
+def delete_setting(key: str, user_id: Optional[str] = None):
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM settings WHERE user_id = ? AND key = ?", (uid, key))
+    conn.commit()
+    conn.close()
+
 def get_all_settings(user_id: Optional[str] = None) -> Dict[str, Any]:
     uid = user_id or get_current_user_id()
     conn = get_db_connection()

@@ -6568,6 +6568,8 @@ function setupPowerSpiderwebTabs() {
       loadPowerSpiderweb(tf);
     });
   });
+
+  setupSpiderwebPlannerNav();
 }
 
 function renderPowerSpiderweb(data) {
@@ -6578,6 +6580,52 @@ function renderPowerSpiderweb(data) {
   const prevLbl = document.getElementById("spiderwebLegendPreviousLabel");
   if (curLbl) curLbl.textContent = `${data.current_label || 'Current Period'} (Current)`;
   if (prevLbl) prevLbl.textContent = `${data.previous_label || 'Baseline Period'} (Baseline)`;
+
+  // Active Spiderweb Goal Banner
+  const goalBanner = document.getElementById("spiderwebGoalBanner");
+  const goalBadge = document.getElementById("spiderwebGoalBadge");
+  const goalTitle = document.getElementById("spiderwebGoalTitle");
+  const goalProgLbl = document.getElementById("spiderwebGoalProgressLabel");
+  const goalRemLbl = document.getElementById("spiderwebGoalRemainingLabel");
+  const goalBar = document.getElementById("spiderwebGoalProgressBar");
+  const goalChips = document.getElementById("spiderwebGoalChips");
+  const legendGoalItem = document.getElementById("spiderwebLegendGoalItem");
+  const legendGoalLbl = document.getElementById("spiderwebLegendGoalLabel");
+
+  if (data.has_active_goal && data.active_goal) {
+    const g = data.active_goal;
+    if (goalBanner) goalBanner.style.display = "flex";
+    if (goalBadge) goalBadge.textContent = g.target_badge || "🎯 Active Goal";
+    if (goalTitle) goalTitle.textContent = g.target_title;
+    if (goalProgLbl) goalProgLbl.textContent = `Goal Progress: ${g.progress_pct || 0}% achieved`;
+    if (goalBar) goalBar.style.width = `${Math.min(100, Math.max(5, g.progress_pct || 0))}%`;
+    if (goalRemLbl) {
+      if (g.is_achieved) {
+        goalRemLbl.textContent = "🏆 Target Unlocked!";
+        goalRemLbl.style.color = "#10b981";
+      } else {
+        goalRemLbl.textContent = `${g.remaining_total_watts || 0}W total gap remaining`;
+        goalRemLbl.style.color = "#f59e0b";
+      }
+    }
+    if (goalChips && data.axes) {
+      goalChips.innerHTML = data.axes.map(ax => {
+        if (!ax.target_watts) return "";
+        const isMet = ax.goal_met;
+        const cls = isMet ? "met" : "gap";
+        const icon = isMet ? "✓" : "▲";
+        const remText = isMet ? "Met" : `-${ax.goal_remaining_watts}W`;
+        return `<span class="spiderweb-goal-chip ${cls}">${ax.icon} ${ax.name}: ${ax.target_watts}W (${icon} ${remText})</span>`;
+      }).join("");
+    }
+    if (legendGoalItem) {
+      legendGoalItem.style.display = "inline-flex";
+      if (legendGoalLbl) legendGoalLbl.textContent = `Goal: ${g.target_title}`;
+    }
+  } else {
+    if (goalBanner) goalBanner.style.display = "none";
+    if (legendGoalItem) legendGoalItem.style.display = "none";
+  }
 
   // Phenotype badge & card
   const badgeEl = document.getElementById("spiderwebPhenotypeBadge");
@@ -6628,20 +6676,23 @@ function renderPowerSpiderweb(data) {
     c20m.textContent = `20m: ${s20m.current_watts}W (${sign}${s20m.delta_watts}W)`;
   }
 
-  // Draw SVG Radar
-  renderSpiderwebSvg(data.axes);
+  // Draw SVG Radar with active goal polygon
+  renderSpiderwebSvg(data.axes, data.active_goal);
 
   // Duration metrics grid
   renderSpiderwebDurationsGrid(data.axes);
 
-  // Progression timeline
+  // Historical Timeline
   renderSpiderwebTimeline(data.progression_timeline);
 
   // Breakthrough PRs
   renderSpiderwebBreakthroughs(data.recent_breakthroughs);
+
+  // Auto-load target analysis planner data
+  loadSpiderwebTargetAnalysis();
 }
 
-function renderSpiderwebSvg(axes) {
+function renderSpiderwebSvg(axes, activeGoal) {
   const svg = document.getElementById("spiderwebSvg");
   if (!svg || !axes || axes.length === 0) return;
 
@@ -6659,6 +6710,10 @@ function renderSpiderwebSvg(axes) {
       <radialGradient id="radarPreviousGradient" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.22" />
         <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.06" />
+      </radialGradient>
+      <radialGradient id="radarGoalGradient" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#10b981" stop-opacity="0.28" />
+        <stop offset="100%" stop-color="#059669" stop-opacity="0.08" />
       </radialGradient>
       <filter id="radarGlow" x="-20%" y="-20%" width="140%" height="140%">
         <feGaussianBlur stdDeviation="3" result="blur" />
@@ -6716,7 +6771,30 @@ function renderSpiderwebSvg(axes) {
     content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="#a78bfa" stroke="#4c1d95" stroke-width="1.5"><title>Baseline: ${pt.axis.previous_watts || '--'}W</title></circle>`;
   });
 
-  // Current polygon
+  // Active Goal Polygon (if active goal set)
+  const hasGoal = !!(activeGoal && axes.some(a => a.target_radar_pct !== null && a.target_radar_pct !== undefined));
+  if (hasGoal) {
+    const goalPts = [];
+    const goalDiamonds = [];
+    for (let i = 0; i < n; i++) {
+      const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+      const pct = Math.max(15, Math.min(100, axes[i].target_radar_pct || axes[i].current_radar_pct || 20)) / 100;
+      const gx = cx + (r * pct) * Math.cos(angle);
+      const gy = cy + (r * pct) * Math.sin(angle);
+      goalPts.push(`${gx.toFixed(1)},${gy.toFixed(1)}`);
+      goalDiamonds.push({ x: gx, y: gy, axis: axes[i] });
+    }
+    content += `<polygon points="${goalPts.join(" ")}" fill="url(#radarGoalGradient)" stroke="#10b981" stroke-width="2.5" stroke-dasharray="6 3" opacity="0.95" />`;
+    goalDiamonds.forEach(pt => {
+      content += `
+        <polygon points="${(pt.x).toFixed(1)},${(pt.y - 4.5).toFixed(1)} ${(pt.x + 4.5).toFixed(1)},${(pt.y).toFixed(1)} ${(pt.x).toFixed(1)},${(pt.y + 4.5).toFixed(1)} ${(pt.x - 4.5).toFixed(1)},${(pt.y).toFixed(1)}" fill="#10b981" stroke="#064e3b" stroke-width="1.5">
+          <title>Goal Target: ${escapeSpiderwebHtml(pt.axis.name)} @ ${pt.axis.target_watts || '--'}W (${pt.axis.target_w_kg || '--'} W/kg)</title>
+        </polygon>
+      `;
+    });
+  }
+
+  // Current period polygon
   const curPts = [];
   const curCircles = [];
   for (let i = 0; i < n; i++) {
@@ -6760,6 +6838,15 @@ function renderSpiderwebSvg(axes) {
     const deltaSign = ax.delta_watts > 0 ? "+" : "";
     const deltaColor = ax.delta_watts > 0 ? "#10b981" : ax.delta_watts < 0 ? "#ef4444" : "#94a3b8";
 
+    let goalLine = "";
+    if (hasGoal && ax.target_watts) {
+      if (ax.goal_met) {
+        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 33).toFixed(1)}" text-anchor="${textAnchor}" fill="#10b981" font-size="8.5" font-weight="700">🎯 ${ax.target_watts}W (✓ Met)</text>`;
+      } else {
+        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 33).toFixed(1)}" text-anchor="${textAnchor}" fill="#f59e0b" font-size="8.5" font-weight="700">🎯 ${ax.target_watts}W (-${ax.goal_remaining_watts}W)</text>`;
+      }
+    }
+
     content += `
       <g class="spiderweb-svg-axis-label">
         <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="var(--text-bright, #f8fafc)" font-size="11" font-weight="700">
@@ -6771,6 +6858,7 @@ function renderSpiderwebSvg(axes) {
         <text x="${lx.toFixed(1)}" y="${(ly + 23).toFixed(1)}" text-anchor="${textAnchor}" fill="${deltaColor}" font-size="9" font-weight="700">
           ${deltaSign}${ax.delta_watts}W (${deltaSign}${ax.delta_pct ? ax.delta_pct.toFixed(1) : '0.0'}%)
         </text>
+        ${goalLine}
       </g>
     `;
   }
@@ -6864,6 +6952,300 @@ function renderSpiderwebBreakthroughs(breakthroughs) {
       <span class="breakthrough-date">${escapeSpiderwebHtml(b.date)}</span>
     </div>
   `).join("");
+}
+
+// --- Interactive Spiderweb Target Changes Explorer & Goal Planner ---
+
+let currentPlannerMode = "duration"; // "duration" or "phenotype"
+let currentPlannerDurationKey = "20m";
+let currentTargetAnalysisData = null;
+let isPlannerNavBound = false;
+
+async function loadSpiderwebTargetAnalysis() {
+  try {
+    const res = await fetch(`/api/power/spiderweb/target-analysis?timeframe=${encodeURIComponent(currentSpiderwebTimeframe || "30d")}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    currentTargetAnalysisData = await res.json();
+    renderSpiderwebTargetPlanner();
+  } catch (err) {
+    console.warn("Failed to load spiderweb target analysis:", err);
+  }
+}
+
+function setupSpiderwebPlannerNav() {
+  if (isPlannerNavBound) return;
+  isPlannerNavBound = true;
+
+  const btnDur = document.getElementById("btnPlannerTabDuration");
+  const btnPheno = document.getElementById("btnPlannerTabPhenotype");
+  const durView = document.getElementById("plannerDurationView");
+  const phenoView = document.getElementById("plannerPhenotypeView");
+
+  if (btnDur && btnPheno) {
+    btnDur.addEventListener("click", () => {
+      btnDur.classList.add("active");
+      btnPheno.classList.remove("active");
+      currentPlannerMode = "duration";
+      if (durView) durView.style.display = "block";
+      if (phenoView) phenoView.style.display = "none";
+      renderSpiderwebTargetPlanner();
+    });
+
+    btnPheno.addEventListener("click", () => {
+      btnPheno.classList.add("active");
+      btnDur.classList.remove("active");
+      currentPlannerMode = "phenotype";
+      if (durView) durView.style.display = "none";
+      if (phenoView) phenoView.style.display = "block";
+      renderSpiderwebTargetPlanner();
+    });
+  }
+
+  const clearBtn = document.getElementById("btnClearSpiderwebGoal");
+  if (clearBtn) {
+    clearBtn.addEventListener("click", async () => {
+      if (!confirm("Are you sure you want to clear your active spiderweb training goal?")) return;
+      try {
+        const res = await fetch("/api/power/spiderweb/goal", { method: "DELETE" });
+        if (res.ok) {
+          const resp = await res.json();
+          showToast("Active spiderweb goal cleared");
+          if (resp.profile) {
+            renderPowerSpiderweb(resp.profile);
+          } else {
+            loadPowerSpiderweb(currentSpiderwebTimeframe);
+          }
+          loadSpiderwebTargetAnalysis();
+        }
+      } catch (err) {
+        console.error("Error clearing spiderweb goal:", err);
+      }
+    });
+  }
+
+  const togglePlannerBtn = document.getElementById("btnTogglePlannerSection");
+  if (togglePlannerBtn) {
+    togglePlannerBtn.addEventListener("click", () => {
+      const section = document.getElementById("spiderwebPlannerSection");
+      if (section) {
+        section.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }
+}
+
+function renderSpiderwebTargetPlanner() {
+  if (!currentTargetAnalysisData) return;
+
+  if (currentPlannerMode === "duration") {
+    renderPlannerDurationView();
+  } else {
+    renderPlannerPhenotypeView();
+  }
+}
+
+function renderPlannerDurationView() {
+  const pillsContainer = document.getElementById("plannerDurationPills");
+  const tiersContainer = document.getElementById("plannerTiersGrid");
+  if (!pillsContainer || !tiersContainer || !currentTargetAnalysisData) return;
+
+  const list = currentTargetAnalysisData.duration_category_targets || [];
+  if (list.length === 0) return;
+
+  // Render pills
+  pillsContainer.innerHTML = list.map(item => `
+    <button type="button" class="duration-pill-btn ${item.key === currentPlannerDurationKey ? 'active' : ''}" data-dur="${item.key}">
+      <span>${item.icon}</span>
+      <span>${escapeSpiderwebHtml(item.label)}</span>
+      <span style="opacity:0.75;font-size:0.75rem;">(${item.current_watts}W)</span>
+    </button>
+  `).join("");
+
+  pillsContainer.querySelectorAll(".duration-pill-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      currentPlannerDurationKey = btn.dataset.dur;
+      renderPlannerDurationView();
+    });
+  });
+
+  const selected = list.find(item => item.key === currentPlannerDurationKey) || list[0];
+  if (!selected) return;
+
+  const t1 = selected.tier1_progressive;
+  const t2 = selected.tier2_transformative;
+  const t3 = selected.tier3_benchmark;
+  const guidance = selected.guidance || {};
+
+  tiersContainer.innerHTML = `
+    <!-- Current Baseline Card -->
+    <div class="planner-tier-card" style="background:rgba(255,255,255,0.02);border-color:rgba(255,255,255,0.08);">
+      <div class="tier-card-header">
+        <span class="tier-title">${selected.icon} Current Best Envelope</span>
+        <span class="spiderweb-goal-badge" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border-color:rgba(6,182,212,0.3);">Baseline</span>
+      </div>
+      <div class="tier-power-row">
+        <span class="tier-target-watts" style="color:var(--accent-cyan);">${selected.current_watts}W</span>
+        <span style="font-size:0.85rem;color:var(--text-muted);">${selected.current_w_kg} W/kg</span>
+      </div>
+      <div class="tier-stimulus-text">
+        <strong>Energy System:</strong> ${escapeSpiderwebHtml(selected.energy_system)}<br>
+        <strong>Benchmark Ceiling:</strong> ${selected.benchmark_watts}W (${Math.round((selected.current_watts / selected.benchmark_watts) * 100)}%)
+      </div>
+    </div>
+
+    <!-- Tier 1: Progressive +5% -->
+    <div class="planner-tier-card">
+      <div class="tier-card-header">
+        <span class="tier-title">${escapeSpiderwebHtml(t1.label)}</span>
+        <span class="tier-delta-chip">+${t1.delta_watts}W (+${t1.delta_pct}%)</span>
+      </div>
+      <div class="tier-power-row">
+        <span class="tier-target-watts">${t1.target_watts}W</span>
+        <span style="font-size:0.85rem;color:var(--text-muted);">${t1.target_w_kg} W/kg</span>
+      </div>
+      <div class="tier-stimulus-text">
+        <strong>Timeline:</strong> ${t1.timeline}<br>
+        <strong>Adaptation:</strong> ${escapeSpiderwebHtml(guidance.stimulus || 'Cardiovascular efficiency and progressive wattage density.')}
+      </div>
+      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t1.target_watts}">
+        🎯 Set ${t1.target_watts}W as Active Goal
+      </button>
+    </div>
+
+    <!-- Tier 2: Transformative Leap +10% -->
+    <div class="planner-tier-card">
+      <div class="tier-card-header">
+        <span class="tier-title">${escapeSpiderwebHtml(t2.label)}</span>
+        <span class="tier-delta-chip">+${t2.delta_watts}W (+${t2.delta_pct}%)</span>
+      </div>
+      <div class="tier-power-row">
+        <span class="tier-target-watts">${t2.target_watts}W</span>
+        <span style="font-size:0.85rem;color:var(--text-muted);">${t2.target_w_kg} W/kg</span>
+      </div>
+      <div class="tier-stimulus-text">
+        <strong>Timeline:</strong> ${t2.timeline}<br>
+        <strong>Workouts:</strong> ${escapeSpiderwebHtml(guidance.workouts || 'Progressive interval overload.')}
+      </div>
+      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t2.target_watts}">
+        🎯 Set ${t2.target_watts}W as Active Goal
+      </button>
+    </div>
+
+    <!-- Tier 3: Benchmark Ceiling -->
+    <div class="planner-tier-card">
+      <div class="tier-card-header">
+        <span class="tier-title">${escapeSpiderwebHtml(t3.label)}</span>
+        <span class="tier-delta-chip" style="color:var(--accent-purple);border-color:rgba(167,139,250,0.3);background:rgba(167,139,250,0.15);">
+          +${t3.delta_watts}W (+${t3.delta_pct}%)
+        </span>
+      </div>
+      <div class="tier-power-row">
+        <span class="tier-target-watts" style="color:#c084fc;">${t3.target_watts}W</span>
+        <span style="font-size:0.85rem;color:var(--text-muted);">${t3.target_w_kg} W/kg</span>
+      </div>
+      <div class="tier-stimulus-text">
+        <strong>Timeline:</strong> ${t3.timeline}<br>
+        <strong>Peak Physiology:</strong> 100% outer radar benchmark cap.
+      </div>
+      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t3.target_watts}">
+        🎯 Set ${t3.target_watts}W as Active Goal
+      </button>
+    </div>
+  `;
+
+  tiersContainer.querySelectorAll(".btn-set-goal").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const type = btn.dataset.type;
+      const key = btn.dataset.key;
+      const watts = parseInt(btn.dataset.watts, 10);
+      await submitSpiderwebGoal({
+        goal_type: type,
+        target_key: key,
+        target_watts: watts
+      });
+    });
+  });
+}
+
+function renderPlannerPhenotypeView() {
+  const container = document.getElementById("plannerPhenotypesGrid");
+  if (!container || !currentTargetAnalysisData) return;
+
+  const phenotypes = currentTargetAnalysisData.rider_type_transformation_targets || [];
+  container.innerHTML = phenotypes.map(p => {
+    const isCurrent = p.is_current_type;
+    const badgeCls = isCurrent ? "background:rgba(6,182,212,0.15);color:var(--accent-cyan);border-color:rgba(6,182,212,0.3);" : "background:rgba(16,185,129,0.15);color:#10b981;border-color:rgba(16,185,129,0.3);";
+    const statusText = isCurrent ? "Current Rider Type" : `${p.completion_pct}% Met (${p.total_delta_watts}W gap)`;
+
+    const axesRows = (p.axis_gaps || []).map(ax => {
+      const icon = ax.is_met ? "✓" : "▲";
+      const valColor = ax.is_met ? "#10b981" : "#f59e0b";
+      const deltaText = ax.is_met ? "Met" : `+${ax.delta_watts}W`;
+      return `
+        <div class="pheno-axis-row">
+          <span>${ax.icon} ${escapeSpiderwebHtml(ax.name)}</span>
+          <span style="color:${valColor};font-weight:700;">
+            ${ax.target_watts}W <span style="font-weight:400;color:var(--text-muted);">(${icon} ${deltaText})</span>
+          </span>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="planner-pheno-card ${isCurrent ? 'selected' : ''}">
+        <div class="planner-pheno-header">
+          <span class="planner-pheno-title">${p.icon} ${escapeSpiderwebHtml(p.title)}</span>
+          <span class="spiderweb-goal-badge" style="${badgeCls}">${statusText}</span>
+        </div>
+        <div class="planner-pheno-desc">${escapeSpiderwebHtml(p.description)}</div>
+        <div class="planner-pheno-axes">
+          <div style="font-weight:700;color:var(--text-muted);font-size:0.7rem;margin-bottom:0.15rem;">REQUIRED 5-AXIS ENVELOPE:</div>
+          ${axesRows}
+        </div>
+        <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">
+          <strong>Prescribed Protocol:</strong> ${escapeSpiderwebHtml((p.recommended_workouts || [])[0] || '')}
+        </div>
+        <button type="button" class="btn-set-goal" data-type="phenotype" data-key="${p.id}" style="margin-top:0.5rem;">
+          🎯 ${isCurrent ? 'Keep Focus on ' + escapeSpiderwebHtml(p.title) : 'Transform to ' + escapeSpiderwebHtml(p.title)}
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  container.querySelectorAll(".btn-set-goal").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const type = btn.dataset.type;
+      const key = btn.dataset.key;
+      await submitSpiderwebGoal({
+        goal_type: type,
+        target_key: key
+      });
+    });
+  });
+}
+
+async function submitSpiderwebGoal(payload) {
+  try {
+    const res = await fetch("/api/power/spiderweb/goal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    showToast(`🎉 Active Training Goal Set: ${data.goal.target_title}!`);
+    if (data.profile) {
+      renderPowerSpiderweb(data.profile);
+    } else {
+      loadPowerSpiderweb(currentSpiderwebTimeframe);
+    }
+    loadSpiderwebTargetAnalysis();
+    const card = document.getElementById("cardPowerSpiderweb");
+    if (card) card.scrollIntoView({ behavior: "smooth" });
+  } catch (err) {
+    console.error("Failed to set spiderweb goal:", err);
+    showToast("⚠️ Failed to set spiderweb goal");
+  }
 }
 
 let whoopCollapsible = null;

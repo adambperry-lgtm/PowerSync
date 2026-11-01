@@ -12,8 +12,13 @@ from app.database import (
 )
 from app.services.power_profile_service import (
     calculate_activity_peak_powers,
-    get_power_spiderweb_profile
+    get_power_spiderweb_profile,
+    calculate_spiderweb_target_changes,
+    set_active_spiderweb_goal,
+    get_active_spiderweb_goal,
+    clear_active_spiderweb_goal
 )
+from app.services.coach_tools import execute_coach_tool
 
 class TestPowerSpiderweb(unittest.TestCase):
     def setUp(self):
@@ -147,6 +152,111 @@ class TestPowerSpiderweb(unittest.TestCase):
         self.assertIn("power_spiderweb", data)
         self.assertIsNotNone(data["power_spiderweb"])
         self.assertIn("axes", data["power_spiderweb"])
+
+
+    def test_calculate_spiderweb_target_changes(self):
+        targets = calculate_spiderweb_target_changes(user_id=self.user_id, timeframe="30d")
+        self.assertIn("duration_category_targets", targets)
+        self.assertEqual(len(targets["duration_category_targets"]), 5)
+
+        for d in targets["duration_category_targets"]:
+            self.assertIn("tier1_progressive", d)
+            self.assertIn("tier2_transformative", d)
+            self.assertIn("tier3_benchmark", d)
+            self.assertGreater(d["tier1_progressive"]["target_watts"], d["current_watts"])
+            self.assertGreater(d["tier2_transformative"]["target_watts"], d["tier1_progressive"]["target_watts"])
+
+        self.assertIn("rider_type_transformation_targets", targets)
+        self.assertEqual(len(targets["rider_type_transformation_targets"]), 6)
+        pheno_ids = [p["id"] for p in targets["rider_type_transformation_targets"]]
+        self.assertIn("Puncheur", pheno_ids)
+        self.assertIn("Rouleur", pheno_ids)
+        self.assertIn("Climber", pheno_ids)
+        self.assertIn("Sprinter", pheno_ids)
+        self.assertIn("Pursuiter", pheno_ids)
+
+    def test_set_and_clear_spiderweb_goal(self):
+        # 1. Set duration goal
+        goal_payload = {
+            "goal_type": "duration",
+            "target_key": "20m",
+            "target_watts": 310
+        }
+        saved_goal = set_active_spiderweb_goal(goal_payload, user_id=self.user_id)
+        self.assertEqual(saved_goal["target_key"], "20m")
+        self.assertEqual(saved_goal["target_envelope"]["20m"], 310)
+
+        # Verify profile incorporates goal
+        profile = get_power_spiderweb_profile(user_id=self.user_id, timeframe="30d")
+        self.assertTrue(profile["has_active_goal"])
+        self.assertIsNotNone(profile["active_goal"])
+        ax_20m = next(a for a in profile["axes"] if a["key"] == "20m")
+        self.assertEqual(ax_20m["target_watts"], 310)
+        self.assertFalse(ax_20m["goal_met"])
+        self.assertGreater(ax_20m["goal_remaining_watts"], 0)
+
+        # 2. Set phenotype goal (Puncheur)
+        pheno_payload = {
+            "goal_type": "phenotype",
+            "target_key": "Puncheur"
+        }
+        saved_pheno = set_active_spiderweb_goal(pheno_payload, user_id=self.user_id)
+        self.assertEqual(saved_pheno["target_key"], "Puncheur")
+        self.assertIn("1m", saved_pheno["target_envelope"])
+        self.assertIn("5m", saved_pheno["target_envelope"])
+
+        # 3. Clear goal
+        clear_active_spiderweb_goal(user_id=self.user_id)
+        profile_cleared = get_power_spiderweb_profile(user_id=self.user_id, timeframe="30d")
+        self.assertFalse(profile_cleared["has_active_goal"])
+        self.assertIsNone(profile_cleared["active_goal"])
+
+    def test_api_power_spiderweb_target_endpoints(self):
+        # GET target analysis
+        res_analysis = self.client.get("/api/power/spiderweb/target-analysis", headers={"X-User-ID": self.user_id})
+        self.assertEqual(res_analysis.status_code, 200)
+        data_a = res_analysis.json()
+        self.assertIn("duration_category_targets", data_a)
+        self.assertIn("rider_type_transformation_targets", data_a)
+
+        # POST goal
+        post_res = self.client.post("/api/power/spiderweb/goal", json={
+            "goal_type": "phenotype",
+            "target_key": "Rouleur"
+        }, headers={"X-User-ID": self.user_id})
+        self.assertEqual(post_res.status_code, 200)
+        post_data = post_res.json()
+        self.assertTrue(post_data["success"])
+        self.assertEqual(post_data["goal"]["target_key"], "Rouleur")
+
+        # GET goal
+        get_res = self.client.get("/api/power/spiderweb/goal", headers={"X-User-ID": self.user_id})
+        self.assertEqual(get_res.status_code, 200)
+        get_data = get_res.json()
+        self.assertTrue(get_data["has_active_goal"])
+        self.assertEqual(get_data["goal"]["target_key"], "Rouleur")
+
+        # DELETE goal
+        del_res = self.client.request("DELETE", "/api/power/spiderweb/goal", headers={"X-User-ID": self.user_id})
+        self.assertEqual(del_res.status_code, 200)
+        del_data = del_res.json()
+        self.assertTrue(del_data["success"])
+
+    def test_coach_tools_spiderweb_goal(self):
+        # Test setting goal via coach tool
+        res = execute_coach_tool("set_spiderweb_goal", {
+            "goal_type": "phenotype",
+            "target_key": "Puncheur"
+        }, user_id=self.user_id)
+        self.assertTrue(res["success"])
+        self.assertIn("Puncheur", res["tool_summary"])
+
+        # Test inspecting goal via coach tool
+        res_inspect = execute_coach_tool("get_active_spiderweb_goal", {}, user_id=self.user_id)
+        self.assertTrue(res_inspect["has_active_goal"])
+        self.assertIn("Puncheur", res_inspect["goal"]["target_title"])
+
+        clear_active_spiderweb_goal(user_id=self.user_id)
 
 
 if __name__ == "__main__":

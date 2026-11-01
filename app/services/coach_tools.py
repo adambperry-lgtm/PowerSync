@@ -101,6 +101,45 @@ COACH_TOOL_DECLARATIONS = [
                 }
             }
         }
+    },
+    {
+        "name": "get_active_spiderweb_goal",
+        "description": (
+            "Retrieves the athlete's active Power Spiderweb training goal, current progress percentage, "
+            "remaining wattage gaps across physiological durations, and recommended weekly interval focus."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {}
+        }
+    },
+    {
+        "name": "set_spiderweb_goal",
+        "description": (
+            "Sets the athlete's active training goal based on a specific duration achievement "
+            "(e.g. '20m' threshold target of 260W, '5m' VO2 max target of 350W) or a rider type transformation "
+            "(e.g. 'Puncheur', 'Rouleur', 'Climber', 'Sprinter', 'Pursuiter'). "
+            "Use this whenever the athlete asks you to focus their training on becoming a Puncheur, Rouleur, Climber, "
+            "or hitting a specific wattage target on their power spiderweb."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "goal_type": {
+                    "type": "STRING",
+                    "description": "'phenotype' for rider type changes (e.g. Puncheur), or 'duration' for specific power duration (e.g. 20m)."
+                },
+                "target_key": {
+                    "type": "STRING",
+                    "description": "Rider type name ('Puncheur', 'Rouleur', 'Climber', 'Sprinter', 'Pursuiter') or duration key ('5s', '1m', '5m', '20m', '60m')."
+                },
+                "target_watts": {
+                    "type": "INTEGER",
+                    "description": "Target wattage if setting a duration goal (e.g. 260)."
+                }
+            },
+            "required": ["goal_type", "target_key"]
+        }
     }
 ]
 
@@ -522,5 +561,25 @@ def execute_coach_tool(name: str, args: Dict[str, Any], user_id: Optional[str] =
         )
     elif name == "get_whoop_biometrics_timeline":
         return tool_get_whoop_biometrics_timeline(days=int(args.get("days", 7)), user_id=uid)
+    elif name == "get_active_spiderweb_goal":
+        from app.services.power_profile_service import get_power_spiderweb_profile
+        profile = get_power_spiderweb_profile(user_id=uid)
+        goal = profile.get("active_goal")
+        return {
+            "has_active_goal": bool(goal),
+            "goal": goal,
+            "current_phenotype": profile["phenotype"]["title"],
+            "tool_summary": f"Active Spiderweb Goal: {goal.get('target_title') if goal else 'None configured'}"
+        }
+    elif name == "set_spiderweb_goal":
+        from app.services.power_profile_service import set_active_spiderweb_goal, get_power_spiderweb_profile
+        g = set_active_spiderweb_goal(args, user_id=uid)
+        prof = get_power_spiderweb_profile(user_id=uid)
+        return {
+            "success": True,
+            "goal": g,
+            "progress_pct": prof.get("active_goal", {}).get("progress_pct", 0.0),
+            "tool_summary": f"Configured active spiderweb training goal: {g.get('target_title')}"
+        }
     else:
         return {"error": f"Unknown tool '{name}'", "tool_summary": f"Unknown tool '{name}'"}

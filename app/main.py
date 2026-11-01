@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.4.0",
-        "release_name": "Power Spiderweb Fitness Profile & Multi-Duration Progress Tracker",
+        "version": "2.4.1",
+        "release_name": "Spiderweb Category Target Improvement & Active Training Goal Setting",
         "build_date": "2026-11-01",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,18 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.4.1",
+                "date": "2026-11-01",
+                "title": "Category Target Changes Explorer & Spiderweb Training Goal Setting",
+                "items": [
+                    "Duration Category Target Explorer: Interactive target progression engine analyzing what wattage changes (+W, +%, +W/kg) are required across 5s, 1m, 5m, 20m, and 60m durations to achieve Progressive (+5%), Transformative (+10%), or Elite Benchmark Ceiling leaps.",
+                    "Rider Type Transformation Analysis: Precise multi-axis gap analysis mapping exact power envelope requirements needed to transform into target phenotypes (Puncheur, Rouleur, Climber, Sprinter, Pursuiter, All-Rounder) with readiness completion percentages.",
+                    "Active Spiderweb Training Goal Setting: Athletes can set active training goals from any duration milestone or rider archetype via UI or Coach Chat. Persisted per athlete in database.",
+                    "3rd Radar Target Overlay Polygon: Visualizes active training goal directly on the spiderweb radar as a glowing emerald dashed polygon (#10b981) with diamond vertex targets and progress tracking.",
+                    "AI Coach Adaptation & Tool Calling: AI coach incorporates active spiderweb goals into daily session prescriptions and sports-science debriefs, and exposes Gemini function calling tools (get_active_spiderweb_goal, set_spiderweb_goal) in Coach Chat."
+                ]
+            },
             {
                 "version": "v2.4.0",
                 "date": "2026-11-01",

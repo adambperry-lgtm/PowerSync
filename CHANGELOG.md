@@ -5,6 +5,24 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.4.1] - 2026-11-01
+### Added
+- **Spiderweb Category Target Improvement Explorer**:
+  - Displays what target wattage and W/kg changes are needed across each duration category (5s Sprint, 1m Anaerobic, 5m VO2 Max, 20m Threshold, 60m Stamina) across three progressive milestone tiers: Progressive (+5%), Transformative Leap (+10%), and Benchmark Ceiling (Elite).
+  - Outlines physiological energy system stimulus, adaptations, and prescribed interval workouts for each category.
+- **Rider Type Transformation Analysis**:
+  - Detailed 5-axis gap analysis showing exact target envelope requirements to transform the athlete's phenotype into Puncheur, Rouleur, Climber, Sprinter, Pursuiter, or All-Rounder.
+  - Highlights met vs pending wattage gaps with readiness completion percentages.
+- **Active Spiderweb Training Goal Setting & 3rd Radar Polygon**:
+  - One-click goal setting from any duration tier or rider type archetype, saved per athlete in database.
+  - Renders a 3rd distinct glowing emerald dashed polygon (`#10b981`) on the Power Spiderweb radar chart with diamond vertex markers and legend indicators.
+  - Live progress tracking banner displaying percentage of wattage gap closed and remaining watts to target.
+- **AI Coach Integration & Gemini Tool Calling**:
+  - Daily adaptive workout recommendations and sports-science debriefs incorporate the active spiderweb goal, prioritizing the appropriate energy system on green recovery days.
+  - Added Gemini function calling tools `get_active_spiderweb_goal` and `set_spiderweb_goal` so athletes can inspect or set spiderweb goals dynamically in Coach Chat.
+
+---
+
 ## [2.4.0] - 2026-11-01
 ### Added
 - **Interactive Power Spiderweb Radar & Progress Over Time (Strava & Xert Signature Model)**:

@@ -737,6 +737,17 @@ def build_adaptive_workout_local(
     if active_plan and days_until is not None and days_until >= 4:
         badge_text = f"🎯 T-{days_until} Prep • Coach's Choice"
         ai_rationale = f"Target Event Horizon: '{active_plan.get('title')}' ({float(active_plan.get('distance_miles') or 50):.1f} mi) in {days_until} days. {ai_rationale}"
+    else:
+        try:
+            from app.services.power_profile_service import get_active_spiderweb_goal
+            spiderweb_goal = get_active_spiderweb_goal(user_id=uid)
+            if spiderweb_goal and recovery_score >= 67 and not (user_note and user_note.strip()):
+                goal_title = spiderweb_goal.get("target_title", "Spiderweb Target")
+                focus_sys = spiderweb_goal.get("focus_energy_system", "Target Energy System")
+                badge_text = f"🎯 {spiderweb_goal.get('target_badge', 'Spiderweb Goal')}"
+                ai_rationale = f"Aligned with your active spiderweb goal ({goal_title}): Today's high-readiness session ({title}) delivers key adaptations for {focus_sys}. {ai_rationale}"
+        except Exception:
+            pass
 
     if user_note and user_note.strip():
         badge_text = "✨ Adapted to Your Note"
