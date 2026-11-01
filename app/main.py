@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.4.1",
-        "release_name": "Spiderweb Category Target Improvement & Active Training Goal Setting",
+        "version": "2.4.2",
+        "release_name": "Dashboard View Switcher & Evening Workout Timezone Resolution",
         "build_date": "2026-11-01",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,18 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.4.2",
+                "date": "2026-11-01",
+                "title": "Dual Dashboard View Switcher & Evening Workout Timezone Alignment",
+                "items": [
+                    "Segmented Dashboard View Switcher: High-contrast toggle at top of dashboard separating Daily Training & Execution (Whoop, Strava, Coach Directive, Workout Stage, 3-Day Forecast, Debrief, Recent Workouts) from Long-Term Performance & Strategy (Power Spiderweb, Macrocycle Program, Coggan Zones).",
+                    "View State & Hash Persistence: Preserves active view in localStorage and URL hash (#daily vs #analysis) with automatic tab switching on cross-pane anchor clicks.",
+                    "View-Scoped Master Collapse/Expand: Dynamically scopes the master expand/collapse button to control tiles only within the active view pane.",
+                    "Authoritative Evening Workout Timezone Resolution: Prioritizes athlete's configured timezone over inaccurate Strava/Watopia UTC timestamps for virtual/indoor rides, preventing 9-10 PM workouts from rolling into the next day.",
+                    "Daily Training Slate & Debrief Harmony: Ensures evening workouts appear with their true local calendar date, properly referenced in yesterday's debrief while keeping today's prescription fresh and unblocked."
+                ]
+            },
             {
                 "version": "v2.4.1",
                 "date": "2026-11-01",

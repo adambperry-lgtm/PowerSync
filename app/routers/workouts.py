@@ -160,7 +160,8 @@ def generate_workout(req: WorkoutGenerateRequest):
 
     strava_tokens = get_setting("strava_tokens", None, user_id=uid)
     today_iso_str = get_athlete_date().isoformat()
-    if strava_tokens and (not rows or not any(dict(r).get("start_date", "").startswith(today_iso_str) for r in rows)):
+    from app.services.strava_service import resolve_strava_local_start
+    if strava_tokens and (not rows or not any((resolve_strava_local_start(dict(r), user_id=uid) or dict(r).get("start_date", "")).startswith(today_iso_str) for r in rows)):
         try:
             from app.services.strava_service import fetch_recent_strava_activities
             synced = fetch_recent_strava_activities(limit=10, user_id=uid)

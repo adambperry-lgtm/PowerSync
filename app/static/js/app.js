@@ -7258,18 +7258,123 @@ let recentWorkoutsCollapsible = null;
 let powerSpiderwebCollapsible = null;
 let athleteCardCollapsible = null;
 
+// --- Main Dashboard View Switcher (Daily Training vs Long-Term Analysis) ---
+let currentActiveMainView = "daily";
+
+function switchMainDashboardView(targetView, updateHistory = true) {
+  currentActiveMainView = (targetView === "analysis") ? "analysis" : "daily";
+  const tabDaily = document.getElementById("tabMainViewDaily");
+  const tabAnalysis = document.getElementById("tabMainViewAnalysis");
+  const paneDaily = document.getElementById("viewDailyContainer");
+  const paneAnalysis = document.getElementById("viewAnalysisContainer");
+  const toolbarTitle = document.getElementById("dashboardToolbarTitle");
+
+  if (currentActiveMainView === "analysis") {
+    tabAnalysis?.classList.add("active");
+    tabAnalysis?.setAttribute("aria-selected", "true");
+    tabDaily?.classList.remove("active");
+    tabDaily?.setAttribute("aria-selected", "false");
+    if (paneDaily) {
+      paneDaily.classList.add("hidden-pane");
+      paneDaily.style.display = "none";
+    }
+    if (paneAnalysis) {
+      paneAnalysis.classList.remove("hidden-pane");
+      paneAnalysis.style.display = "block";
+    }
+    if (toolbarTitle) toolbarTitle.textContent = "📈 Long-Term Performance & Strategy";
+  } else {
+    tabDaily?.classList.add("active");
+    tabDaily?.setAttribute("aria-selected", "true");
+    tabAnalysis?.classList.remove("active");
+    tabAnalysis?.setAttribute("aria-selected", "false");
+    if (paneAnalysis) {
+      paneAnalysis.classList.add("hidden-pane");
+      paneAnalysis.style.display = "none";
+    }
+    if (paneDaily) {
+      paneDaily.classList.remove("hidden-pane");
+      paneDaily.style.display = "block";
+    }
+    if (toolbarTitle) toolbarTitle.textContent = "⚡ Daily Training & Recovery";
+  }
+
+  try {
+    localStorage.setItem("powersync_main_view", currentActiveMainView);
+  } catch (_) {}
+
+  if (updateHistory) {
+    try {
+      history.replaceState(null, "", `#${currentActiveMainView}`);
+    } catch (_) {}
+  }
+
+  syncMasterToggleState();
+}
+
+function initMainViewSwitcher() {
+  const tabDaily = document.getElementById("tabMainViewDaily");
+  const tabAnalysis = document.getElementById("tabMainViewAnalysis");
+
+  tabDaily?.addEventListener("click", () => switchMainDashboardView("daily"));
+  tabAnalysis?.addEventListener("click", () => switchMainDashboardView("analysis"));
+
+  // Check URL hash or localStorage for initial view
+  let initialView = "daily";
+  const hash = window.location.hash.toLowerCase();
+  if (hash.includes("analysis") || hash.includes("spiderweb") || hash.includes("program") || hash.includes("athlete")) {
+    initialView = "analysis";
+  } else {
+    try {
+      const saved = localStorage.getItem("powersync_main_view");
+      if (saved === "analysis") initialView = "analysis";
+    } catch (_) {}
+  }
+
+  switchMainDashboardView(initialView, false);
+
+  // Cross-tab anchor navigation listener
+  document.addEventListener("click", (e) => {
+    const anchor = e.target.closest("a[href^='#']");
+    if (!anchor) return;
+    const href = anchor.getAttribute("href");
+    if (["#cardPowerSpiderweb", "#cardProgram", "#cardAthlete"].includes(href)) {
+      if (currentActiveMainView !== "analysis") {
+        switchMainDashboardView("analysis", true);
+      }
+    } else if (["#cardWhoop", "#cardStrava", "#cardAiCoachToday", "#workoutStageSection", "#cardUpcomingPlan", "#cardCoachDebrief", "#cardRecentWorkouts"].includes(href)) {
+      if (currentActiveMainView !== "daily") {
+        switchMainDashboardView("daily", true);
+      }
+    }
+  });
+
+  window.addEventListener("hashchange", () => {
+    const newHash = window.location.hash.toLowerCase();
+    if (newHash.includes("analysis") || newHash.includes("spiderweb") || newHash.includes("program") || newHash.includes("athlete")) {
+      if (currentActiveMainView !== "analysis") switchMainDashboardView("analysis", false);
+    } else if (newHash.includes("daily") || newHash.includes("today")) {
+      if (currentActiveMainView !== "daily") switchMainDashboardView("daily", false);
+    }
+  });
+}
+
 function getAllCollapsiblesList() {
+  if (currentActiveMainView === "analysis") {
+    return [
+      powerSpiderwebCollapsible,
+      programCollapsible,
+      athleteCardCollapsible
+    ].filter(Boolean);
+  }
   return [
     whoopCollapsible,
     stravaCollapsible,
     coachTodayCollapsible,
-    programCollapsible,
     upcomingPlanCollapsible,
     { isCollapsed: () => isWorkoutStageCollapsed(), setCollapsed: (c, cb, um) => setWorkoutStageCollapsed(c, cb, um) },
     coachDebriefCollapsible,
-    recentWorkoutsCollapsible,
-    powerSpiderwebCollapsible,
-    athleteCardCollapsible
+    recentWorkoutsCollapsible
   ].filter(Boolean);
 }
 
@@ -7408,6 +7513,7 @@ function initAllCollapsibleTiles() {
   }
 
   initMasterToggleAllTiles();
+  initMainViewSwitcher();
   syncMasterToggleState();
 }
 

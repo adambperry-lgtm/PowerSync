@@ -84,10 +84,26 @@
       </button>
     </div>
 
+    <!-- Main Dashboard View Switcher Toggle (Daily Training vs Long-Term Analysis) -->
+    <nav class="main-view-switcher" role="tablist" aria-label="Dashboard View Selector">
+      <div class="main-view-tabs-container">
+        <button class="main-view-tab-btn active" id="tabMainViewDaily" type="button" role="tab" aria-selected="true" data-view="daily">
+          <span class="main-view-tab-icon">⚡</span>
+          <span class="main-view-tab-title">Daily Training &amp; Execution</span>
+          <span class="main-view-tab-badge">Today</span>
+        </button>
+        <button class="main-view-tab-btn" id="tabMainViewAnalysis" type="button" role="tab" aria-selected="false" data-view="analysis">
+          <span class="main-view-tab-icon">📈</span>
+          <span class="main-view-tab-title">Long-Term Analysis &amp; Strategy</span>
+          <span class="main-view-tab-badge">Fitness &amp; Goals</span>
+        </button>
+      </div>
+    </nav>
+
     <!-- Dashboard Master Controls Toolbar -->
     <div class="dashboard-toolbar">
       <div class="dashboard-toolbar-left">
-        <span class="dashboard-toolbar-title">⚡ Performance Dashboard</span>
+        <span class="dashboard-toolbar-title" id="dashboardToolbarTitle">⚡ Daily Training &amp; Recovery</span>
         <span class="dashboard-toolbar-hint">Tap any tile header or switch to expand / collapse</span>
       </div>
       <div class="dashboard-toolbar-right">
@@ -98,8 +114,11 @@
       </div>
     </div>
 
-    <!-- Top Telemetry Row: The Anti-Xert High-Signal Cards -->
-    <section class="telemetry-grid">
+    <!-- VIEW 1: DAILY TRAINING & EXECUTION -->
+    <div id="viewDailyContainer" class="main-view-pane">
+
+      <!-- Top Telemetry Row: The Anti-Xert High-Signal Cards -->
+      <section class="telemetry-grid">
       
       <!-- Card 1: Whoop Daily Readiness (All 3 Whoop Rings) -->
       <div class="card collapsible-tile" id="cardWhoop">
@@ -332,113 +351,6 @@
         </div>
       </div>
 
-    </section>
-
-    <!-- Long-Term Fitness Goal & Periodization Card (Xert Alternative) -->
-    <section class="card program-card collapsible-tile" id="cardProgram">
-      <div class="program-top-bar collapsible-tile-header" id="programCardHeader" role="button" tabindex="0" title="Click to collapse or expand Fitness Goal & Periodization" aria-expanded="true">
-        <div class="card-header-left">
-          <span class="card-header-icon">🎯</span>
-          <div>
-            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-              <span class="card-title" id="programGoalTitle">Threshold &amp; FTP Booster</span>
-              <span class="phase-badge" id="programPhaseBadge">Build Phase</span>
-            </div>
-            <div class="card-subtitle collapsible-tile-subtitle" id="programGoalDesc">
-              Targeting sustained 20-min power output with structured sweet spot &amp; threshold progressions.
-            </div>
-            <!-- Collapsed Summary Chips (Visible when collapsed) -->
-            <div class="collapsible-tile-summary" id="programCollapsedSummary" style="display:none;margin-top:0.25rem;">
-              <span class="tag tag-focus" id="collapsedProgramPhase">Build Phase</span>
-              <span class="tag tag-dur" id="collapsedProgramWeek">Week 4 of 8</span>
-              <span class="tag tag-tss" id="collapsedProgramCompliance">85% Compliance</span>
-              <span class="tag" id="collapsedProgramFtpDelta" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid var(--accent-cyan);">+15W FTP Target</span>
-            </div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-          <button class="btn btn-secondary" style="padding:0.25rem 0.65rem;font-size:0.75rem;" id="btnOpenPlanBuilder" type="button">
-            📅 Plan Event
-          </button>
-          <button class="btn btn-secondary" style="padding:0.25rem 0.65rem;font-size:0.75rem;" id="btnAdjustGoal" type="button">
-            ⚙️ Adjust Goal
-          </button>
-          <button class="btn btn-secondary btn-stage-collapse" id="btnToggleProgramCard" type="button" aria-label="Collapse or expand fitness goal & periodization">
-            <span id="programToggleIcon">▲</span>
-            <span id="programToggleText">Collapse</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Collapsible Body Container -->
-      <div class="collapsible-tile-body" id="programCardBody">
-        <!-- Macrocycle Periodization Timeline -->
-        <div class="macrocycle-bar-wrap">
-          <div class="macrocycle-labels">
-            <div class="phase-col" id="phaseColBase">1. Base (Vol)</div>
-            <div class="phase-col" id="phaseColBuild">2. Build (FTP)</div>
-            <div class="phase-col" id="phaseColPeak">3. Peak (VO2)</div>
-            <div class="phase-col" id="phaseColTaper">4. Taper & Fresh</div>
-          </div>
-          <div class="macrocycle-track">
-            <div class="macrocycle-fill" id="macrocycleFillBar" style="width: 50%;"></div>
-          </div>
-          <div class="macrocycle-info-row">
-            <span id="programWeekInfo">Week 4 of 8 • Build Phase</span>
-            <span id="programDaysInfo">35 Days Remaining</span>
-          </div>
-        </div>
-
-        <!-- High-Signal Program Metrics -->
-        <div class="program-stats-grid">
-          <div class="program-stat-box">
-            <div class="program-stat-label">
-              <span>Target FTP</span>
-              <span style="color:var(--accent-cyan);font-weight:700;" id="programFtpDelta">+15W</span>
-            </div>
-            <div class="program-stat-value">
-              <span id="programTargetFtpVal">265</span>
-              <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span>
-            </div>
-            <div class="program-stat-sub">
-              Current: <span id="programCurrentFtpVal">250W</span>
-            </div>
-          </div>
-
-          <div class="program-stat-box">
-            <div class="program-stat-label">
-              <span>Weekly Compliance</span>
-              <span id="programCompliancePct" style="color:var(--accent-emerald);font-weight:700;">85%</span>
-            </div>
-            <div class="program-stat-value">
-              <span id="programWeeklyTssActual">305</span>
-              <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">/ <span id="programWeeklyTssTarget">360</span> TSS</span>
-            </div>
-            <div class="mini-meter-track">
-              <div class="mini-meter-fill" id="programTssMeterFill" style="width: 85%;"></div>
-            </div>
-            <div class="program-stat-sub" style="margin-top:0.35rem;display:flex;justify-content:space-between;align-items:center;">
-              <span>⚡ Strain: <b id="programWeeklyXssActual" style="color:#a78bfa;">312</b> / <span id="programWeeklyXssTarget">360</span> XSS</span>
-              <span id="programXssCompliancePct" style="color:#a78bfa;font-weight:600;">87%</span>
-            </div>
-          </div>
-
-          <div class="program-stat-box" style="grid-column: span 2;">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-              <div class="program-stat-label">Current Macrocycle Objective</div>
-              <span class="badge-status" id="programFocusDurationBadge" style="font-size:0.7rem;padding:0.15rem 0.45rem;background:rgba(6,182,212,0.12);color:#06b6d4;border-color:rgba(6,182,212,0.25);">
-                Sweet Spot (45:00 Focus)
-              </span>
-            </div>
-            <div style="font-size:0.9rem;font-weight:700;color:var(--accent-cyan);margin-top:0.2rem;" id="programPhaseFocus">
-              Sweet Spot & Threshold Progression
-            </div>
-            <div class="program-stat-sub" id="programPhaseDetail">
-              Increasing muscular endurance and raising functional threshold power before peak VO2 sharpening.
-            </div>
-          </div>
-        </div>
-      </div>
     </section>
 
     <!-- Upcoming Target Plan Mission Control Banner (Shown dynamically when an event plan is active) -->
@@ -1288,9 +1200,13 @@
         </div>
       </div>
     </section>
- 
+  </div> <!-- end viewDailyContainer (Daily Training & Execution) -->
+
+  <!-- VIEW 2: LONG-TERM ANALYSIS & STRATEGY -->
+  <div id="viewAnalysisContainer" class="main-view-pane hidden-pane" style="display:none;">
+
     <!-- Power Spiderweb Tracker & Progress Over Time (Strava & Xert Model) -->
-    <section class="card collapsible-tile" id="cardPowerSpiderweb" style="margin-top:1.5rem;">
+    <section class="card collapsible-tile" id="cardPowerSpiderweb" style="margin-top:0;">
       <div class="card-header collapsible-tile-header" id="powerSpiderwebHeader" role="button" tabindex="0" title="Click to collapse or expand Power Spiderweb Tracker" aria-expanded="true">
         <div class="card-header-left">
           <span class="card-header-icon">🕸️</span>
@@ -1504,6 +1420,113 @@
       </div>
     </section>
 
+    <!-- Long-Term Fitness Goal & Periodization Card (Xert Alternative) -->
+    <section class="card program-card collapsible-tile" id="cardProgram" style="margin-top:1.5rem;">
+      <div class="program-top-bar collapsible-tile-header" id="programCardHeader" role="button" tabindex="0" title="Click to collapse or expand Fitness Goal & Periodization" aria-expanded="true">
+        <div class="card-header-left">
+          <span class="card-header-icon">🎯</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <span class="card-title" id="programGoalTitle">Threshold &amp; FTP Booster</span>
+              <span class="phase-badge" id="programPhaseBadge">Build Phase</span>
+            </div>
+            <div class="card-subtitle collapsible-tile-subtitle" id="programGoalDesc">
+              Targeting sustained 20-min power output with structured sweet spot &amp; threshold progressions.
+            </div>
+            <!-- Collapsed Summary Chips (Visible when collapsed) -->
+            <div class="collapsible-tile-summary" id="programCollapsedSummary" style="display:none;margin-top:0.25rem;">
+              <span class="tag tag-focus" id="collapsedProgramPhase">Build Phase</span>
+              <span class="tag tag-dur" id="collapsedProgramWeek">Week 4 of 8</span>
+              <span class="tag tag-tss" id="collapsedProgramCompliance">85% Compliance</span>
+              <span class="tag" id="collapsedProgramFtpDelta" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid var(--accent-cyan);">+15W FTP Target</span>
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <button class="btn btn-secondary" style="padding:0.25rem 0.65rem;font-size:0.75rem;" id="btnOpenPlanBuilder" type="button">
+            📅 Plan Event
+          </button>
+          <button class="btn btn-secondary" style="padding:0.25rem 0.65rem;font-size:0.75rem;" id="btnAdjustGoal" type="button">
+            ⚙️ Adjust Goal
+          </button>
+          <button class="btn btn-secondary btn-stage-collapse" id="btnToggleProgramCard" type="button" aria-label="Collapse or expand fitness goal & periodization">
+            <span id="programToggleIcon">▲</span>
+            <span id="programToggleText">Collapse</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Body Container -->
+      <div class="collapsible-tile-body" id="programCardBody">
+        <!-- Macrocycle Periodization Timeline -->
+        <div class="macrocycle-bar-wrap">
+          <div class="macrocycle-labels">
+            <div class="phase-col" id="phaseColBase">1. Base (Vol)</div>
+            <div class="phase-col" id="phaseColBuild">2. Build (FTP)</div>
+            <div class="phase-col" id="phaseColPeak">3. Peak (VO2)</div>
+            <div class="phase-col" id="phaseColTaper">4. Taper &amp; Fresh</div>
+          </div>
+          <div class="macrocycle-track">
+            <div class="macrocycle-fill" id="macrocycleFillBar" style="width: 50%;"></div>
+          </div>
+          <div class="macrocycle-info-row">
+            <span id="programWeekInfo">Week 4 of 8 • Build Phase</span>
+            <span id="programDaysInfo">35 Days Remaining</span>
+          </div>
+        </div>
+
+        <!-- High-Signal Program Metrics -->
+        <div class="program-stats-grid">
+          <div class="program-stat-box">
+            <div class="program-stat-label">
+              <span>Target FTP</span>
+              <span style="color:var(--accent-cyan);font-weight:700;" id="programFtpDelta">+15W</span>
+            </div>
+            <div class="program-stat-value">
+              <span id="programTargetFtpVal">265</span>
+              <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span>
+            </div>
+            <div class="program-stat-sub">
+              Current: <span id="programCurrentFtpVal">250W</span>
+            </div>
+          </div>
+
+          <div class="program-stat-box">
+            <div class="program-stat-label">
+              <span>Weekly Compliance</span>
+              <span id="programCompliancePct" style="color:var(--accent-emerald);font-weight:700;">85%</span>
+            </div>
+            <div class="program-stat-value">
+              <span id="programWeeklyTssActual">305</span>
+              <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">/ <span id="programWeeklyTssTarget">360</span> TSS</span>
+            </div>
+            <div class="mini-meter-track">
+              <div class="mini-meter-fill" id="programTssMeterFill" style="width: 85%;"></div>
+            </div>
+            <div class="program-stat-sub" style="margin-top:0.35rem;display:flex;justify-content:space-between;align-items:center;">
+              <span>⚡ Strain: <b id="programWeeklyXssActual" style="color:#a78bfa;">312</b> / <span id="programWeeklyXssTarget">360</span> XSS</span>
+              <span id="programXssCompliancePct" style="color:#a78bfa;font-weight:600;">87%</span>
+            </div>
+          </div>
+
+          <div class="program-stat-box" style="grid-column: span 2;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div class="program-stat-label">Current Macrocycle Objective</div>
+              <span class="badge-status" id="programFocusDurationBadge" style="font-size:0.7rem;padding:0.15rem 0.45rem;background:rgba(6,182,212,0.12);color:#06b6d4;border-color:rgba(6,182,212,0.25);">
+                Sweet Spot (45:00 Focus)
+              </span>
+            </div>
+            <div style="font-size:0.9rem;font-weight:700;color:var(--accent-cyan);margin-top:0.2rem;" id="programPhaseFocus">
+              Sweet Spot &amp; Threshold Progression
+            </div>
+            <div class="program-stat-sub" id="programPhaseDetail">
+              Increasing muscular endurance and raising functional threshold power before peak VO2 sharpening.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Athlete Power Profile & Training Zones (Moved to bottom of dashboard) -->
     <section class="card collapsible-tile" id="cardAthlete" style="margin-top:1.5rem;">
       <div class="card-header collapsible-tile-header" id="athleteCardHeader" role="button" tabindex="0" title="Click to collapse or expand Athlete Power Profile &amp; Training Zones" aria-expanded="true">
@@ -1565,6 +1588,7 @@
         </div>
       </div>
     </section>
+  </div> <!-- end viewAnalysisContainer (Long-Term Analysis & Strategy) -->
 
   </main>
 
@@ -1576,7 +1600,7 @@
         <div class="version-text-block">
           <div class="version-title">
             <strong>PowerSync</strong>
-            <span class="version-tag" id="footerVersionBadge">v2.4.1</span>
+            <span class="version-tag" id="footerVersionBadge">v2.4.2</span>
             <span class="version-status-dot"></span>
             <span class="version-status-text">Production Ready</span>
           </div>

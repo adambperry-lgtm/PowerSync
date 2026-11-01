@@ -5,6 +5,23 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.4.2] - 2026-11-01
+### Added & Fixed
+- **Segmented Main Dashboard View Switcher**:
+  - Prominent high-contrast toggle at top of the dashboard separating **Daily Training & Execution** (Whoop readiness, Strava training load, AI Coach directive, Today's Workout stage with Zwift sync & fueling, 3-Day Forward Forecast, Daily Debrief, and Recent Workouts feed) from **Long-Term Performance & Strategy** (Power Spiderweb & Fitness Profile, Macrocycle Fitness Goal & Periodization, and Athlete Power Profile & Coggan Zones).
+  - Preserves view selection in `localStorage` (`powersync_main_view`) and URL hash (`#daily` vs `#analysis`).
+  - Cross-tab jump links automatically switch view panes with smooth fade-in transitions.
+  - Dynamically scopes the master "Expand All / Collapse All" button to expand and collapse only visible cards within the active view pane.
+- **Authoritative Evening Workout Timezone Resolution**:
+  - Overrides inaccurate Strava/Watopia UTC timestamps by directly converting UTC `start_date` into the athlete's configured local timezone (`America/New_York`) for all virtual/indoor rides (Zwift, TrainerRoad, etc.).
+  - Workouts completed in local evening hours (9-10 PM) permanently remain on the evening date they occurred (e.g. October 27th), preventing them from rolling over into the next day (October 28th).
+  - Recent Workouts feed correctly displays the true local calendar date.
+- **Daily Training Slate & Debrief Harmony**:
+  - The Coach Sports-Science assessment accurately debriefs yesterday's evening session against yesterday's scheduled caps (e.g. Tuesday 45m cap).
+  - Today's prescribed workout stays fresh and unblocked, preventing false "Daily Target Achieved — Rest & Recovery" blocks on high-recovery mornings.
+
+---
+
 ## [2.4.1] - 2026-11-01
 ### Added
 - **Spiderweb Category Target Improvement Explorer**:

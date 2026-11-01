@@ -222,5 +222,108 @@ class TestEveningWorkoutTimezone(unittest.TestCase):
             f"Expected {migrated['start_date']} to be migrated to {yesterday_iso}"
         )
 
+    def test_zwift_ride_with_utc_or_watopia_strava_start_date_local(self):
+        """
+        Strava often sets start_date_local identical to UTC start_date or in Watopia coordinates (+11)
+        for virtual rides. For virtual rides, athlete_tz conversion from UTC start_date must override
+        Strava's inaccurate start_date_local.
+        """
+        today = get_athlete_date(self.user_id)
+        yesterday = today - datetime.timedelta(days=1)
+        today_iso = today.isoformat()
+        yesterday_iso = yesterday.isoformat()
+
+        # 9:15 PM EDT yesterday is 01:15 UTC today
+        utc_str = f"{today_iso}T01:15:00Z"
+        # Strava defaulted start_date_local to UTC (today) or Watopia (+11)
+        erroneous_strava_local = f"{today_iso}T01:15:00Z"
+
+        activity_payload = {
+            "id": 888899,
+            "name": "Zwift - Intervals icu: PowerSync: 45-Min Sweet Spot Sustained Blocks",
+            "type": "VirtualRide",
+            "sport_type": "VirtualRide",
+            "start_date": utc_str,
+            "start_date_local": erroneous_strava_local,
+            "timezone": "(GMT+00:00) UTC",
+            "moving_time": 2820,
+            "distance": 24000.0,
+            "total_elevation_gain": 150.0,
+            "average_watts": 186.0,
+            "weighted_average_watts": 190.0,
+            "average_heartrate": 135.0,
+            "max_heartrate": 155.0,
+            "suffer_score": 50.0,
+            "kilojoules": 500.0
+        }
+
+        # Must resolve to yesterday, NOT today
+        resolved_start = resolve_strava_local_start(activity_payload, user_id=self.user_id)
+        self.assertTrue(
+            resolved_start.startswith(yesterday_iso),
+            f"Expected {resolved_start} to start with yesterday ({yesterday_iso}), but got {resolved_start}"
+        )
+        self.assertEqual(get_activity_date_str(activity_payload, user_id=self.user_id), yesterday_iso)
+
+    def test_coach_debrief_evaluates_yesterday_evening_ride(self):
+        """
+        Verify that review_coach evaluates yesterday's evening ride as 'Yesterday',
+        correctly attributing it to yesterday and reporting has_trained_today = False.
+        """
+        today = get_athlete_date(self.user_id)
+        yesterday = today - datetime.timedelta(days=1)
+        today_iso = today.isoformat()
+        yesterday_iso = yesterday.isoformat()
+
+        utc_str = f"{today_iso}T01:15:00Z"
+        activity_payload = {
+            "id": "zwift_debrief_test_1",
+            "name": "Zwift - Intervals icu: PowerSync: 45-Min Sweet Spot Sustained Blocks",
+            "type": "VirtualRide",
+            "sport_type": "VirtualRide",
+            "start_date": utc_str,
+            "moving_time": 2820,
+            "distance": 24000.0,
+            "total_elevation_gain": 150.0,
+            "average_watts": 186.0,
+            "weighted_average_watts": 190.0,
+            "average_heartrate": 135.0,
+            "max_heartrate": 155.0,
+            "suffer_score": 50.0,
+            "kilojoules": 500.0
+        }
+        resolved_start = resolve_strava_local_start(activity_payload, user_id=self.user_id)
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec,
+                distance_meters, total_elevation_gain, average_watts,
+                weighted_average_watts, average_heartrate, max_heartrate,
+                suffer_score, kilojoules, raw_json
+            ) VALUES (?, 'zwift_debrief_test_1', ?, 'VirtualRide', ?, 2820, 24000, 150, 186, 190, 135, 155, 50, 500, ?)
+        """, (
+            self.user_id,
+            activity_payload["name"],
+            resolved_start,
+            json.dumps(activity_payload)
+        ))
+        conn.commit()
+        conn.close()
+
+        from unittest.mock import patch
+        from app.services.review_coach import generate_ai_review_and_outlook
+        with patch("app.services.review_coach.get_current_user_id", return_value=self.user_id), \
+             patch("app.routers.dashboard.get_current_user_id", return_value=self.user_id), \
+             patch("app.services.strava_service.get_current_user_id", return_value=self.user_id), \
+             patch("app.database.get_current_user_id", return_value=self.user_id):
+            review = generate_ai_review_and_outlook()
+            today_assessment = review.get("today_assessment", {})
+            self.assertEqual(today_assessment.get("relative_day_label"), "Yesterday")
+            self.assertFalse(today_assessment.get("is_today"))
+            self.assertTrue(today_assessment.get("is_yesterday"))
+            self.assertEqual(today_assessment.get("date"), yesterday_iso)
+
 if __name__ == "__main__":
     unittest.main()
