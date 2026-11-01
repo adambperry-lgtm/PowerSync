@@ -13,7 +13,7 @@ from app.database import (
     set_current_user_context, reset_current_user_context,
     set_current_timezone_context, reset_current_timezone_context
 )
-from app.routers import dashboard, workouts, settings, auth, review, plans, chat
+from app.routers import dashboard, workouts, settings, auth, review, plans, chat, power
 
 app = FastAPI(
     title="PowerSync - AI Fitness Dashboard",
@@ -101,6 +101,7 @@ app.include_router(auth.router)
 app.include_router(review.router)
 app.include_router(plans.router)
 app.include_router(chat.router)
+app.include_router(power.router)
 
 # Mount Static Files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -121,9 +122,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.3.1",
-        "release_name": "Coach Chat 3-Day Forecast Dynamic Adjustment & Evening Workout Timezone Resolution",
-        "build_date": "2026-10-29",
+        "version": "2.4.0",
+        "release_name": "Power Spiderweb Fitness Profile & Multi-Duration Progress Tracker",
+        "build_date": "2026-11-01",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -132,6 +133,18 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.4.0",
+                "date": "2026-11-01",
+                "title": "Interactive Power Spiderweb Radar & Progress Over Time (Strava & Xert Signature Model)",
+                "items": [
+                    "5-Axis Physiological Power Spiderweb: Implemented interactive radar spiderweb comparing athlete power outputs across 5 core energy system durations: 5s Sprint (Neuromuscular), 1m Anaerobic (Glycolytic), 5m VO2 Max (Aerobic Ceiling), 20m Threshold (Lactate Equilibrium), and 60m Stamina (Aerobic Endurance).",
+                    "Dual-Period Overlay Polygons: Visualizes current period (glowing cyan polygon) overlaid directly against baseline comparative periods (translucent dashed violet polygon) with dynamic percentage scaling against benchmark physiology ceilings.",
+                    "Multi-Window Timeframe Analysis: Interactive timeframe tabs supporting 30D vs Prior 30D, 60D vs Prior 60D, 90D vs Season, and All-Time PR envelopes.",
+                    "Rider Phenotype Classification: Analyzes envelope distribution to categorize athlete phenotype (Sprinter, Puncheur, Pursuiter, Rouleur, Climber, All-Rounder) highlighting primary strengths and targeted physiological growth opportunities.",
+                    "Duration Metrics Grid & Progression Timeline: Displays live power deltas (+W, +%, W/kg) for each duration alongside chronological monthly peak power progressions and historical power PR breakthroughs feed."
+                ]
+            },
             {
                 "version": "v2.3.3",
                 "date": "2026-10-30",

@@ -5,6 +5,19 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.4.0] - 2026-11-01
+### Added
+- **Interactive Power Spiderweb Radar & Progress Over Time (Strava & Xert Signature Model)**:
+  - **5-Axis Physiological Power Spiderweb**: Pure vanilla SVG radar chart mapping athlete power across 5 core energy system durations: 5s Sprint (Neuromuscular), 1m Anaerobic (Glycolytic), 5m VO2 Max (Maximal Aerobic Power ceiling), 20m Threshold (Lactate Equilibrium / Critical Power), and 60m Stamina (Aerobic Endurance).
+  - **Dual-Period Overlay Comparison**: Directly overlays current training period (glowing cyan polygon) against baseline periods (translucent dashed violet polygon) with dynamic percentage normalization against benchmark physiology ceilings.
+  - **Interactive Multi-Window Timeframe Selectors**: One-click switching between `30D vs Prior 30D`, `60D vs Prior 60D`, `90D vs Season`, and `All-Time PRs`.
+  - **Rider Phenotype Classification**: Classifies athlete rider archetype (`Sprinter`, `Puncheur`, `Pursuiter`, `Rouleur`, `Climber`, `All-Rounder`), identifying primary physiological strengths and targeted growth opportunities.
+  - **Duration Metrics Grid & Delta Chips**: Responsive metric cards displaying current Watts, Watts/kg, benchmark progress bar, prior period comparisons, and delta chips (`+W`, `+%`).
+  - **Historical Power Progression Grid & PR Breakthroughs Feed**: Chronological monthly peak power envelope progression tracking training volume (TSS & hours) alongside an automated milestone breakthrough tracker highlighting new power PR records.
+  - **Full Dashboard Integration**: Registered in collapsible tile manager with localStorage state memory and bundled into `/api/dashboard` for instant render.
+
+---
+
 ## [2.3.3] - 2026-10-30
 ### Added & Fixed
 - **Updated Schedule Target Fidelity in Coach Analysis**: Enhanced `review_coach.py` with `resolve_day_prescribed_target()` to evaluate completed workouts against the specific prescribed session and updated schedule (e.g. Zone 2 Aerobic Base, Active Recovery Flush, or scheduled workouts) rather than blindly assuming Sweet Spot / VO2 Max (90% FTP) whenever Whoop recovery is in the green. Pacing compliance, target zone, and target watts now accurately reflect the updated schedule, awarding `Execution Bullseye` (🎯 Target Mastered) for adhering to prescribed lower-effort work.

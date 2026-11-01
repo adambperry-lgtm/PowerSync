@@ -1289,6 +1289,143 @@
       </div>
     </section>
  
+    <!-- Power Spiderweb Tracker & Progress Over Time (Strava & Xert Model) -->
+    <section class="card collapsible-tile" id="cardPowerSpiderweb" style="margin-top:1.5rem;">
+      <div class="card-header collapsible-tile-header" id="powerSpiderwebHeader" role="button" tabindex="0" title="Click to collapse or expand Power Spiderweb Tracker" aria-expanded="true">
+        <div class="card-header-left">
+          <span class="card-header-icon">🕸️</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <span class="card-title">Power Spiderweb &amp; Fitness Profile</span>
+              <span class="tag tag-focus" id="spiderwebPhenotypeBadge" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.3);font-weight:700;">🎯 All-Rounder</span>
+            </div>
+            <div class="card-subtitle collapsible-tile-subtitle" id="spiderwebSubtitle">
+              Multi-duration power signature &amp; progress over time (Strava &amp; Xert model)
+            </div>
+            <!-- Collapsed Summary Chips (Visible when collapsed) -->
+            <div class="collapsible-tile-summary" id="spiderwebCollapsedSummary" style="display:none;margin-top:0.25rem;">
+              <span class="tag tag-focus" id="collapsedSpiderweb5s">5s: --W</span>
+              <span class="tag tag-dur" id="collapsedSpiderweb5m">5m: --W</span>
+              <span class="tag tag-tss" id="collapsedSpiderweb20m">20m: --W</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <div class="mode-tabs" id="spiderwebTimeframeGroup" style="padding:0.2rem;">
+            <button class="mode-tab active" data-timeframe="30d" id="tabSpiderweb30d" type="button">
+              30D vs Prior
+            </button>
+            <button class="mode-tab" data-timeframe="60d" id="tabSpiderweb60d" type="button">
+              60D vs Prior
+            </button>
+            <button class="mode-tab" data-timeframe="90d" id="tabSpiderweb90d" type="button">
+              90D vs Season
+            </button>
+            <button class="mode-tab" data-timeframe="all_time" id="tabSpiderwebAllTime" type="button">
+              All-Time PRs
+            </button>
+          </div>
+          <button class="btn btn-secondary btn-stage-collapse" id="btnTogglePowerSpiderweb" type="button" aria-label="Collapse or expand power spiderweb tracker">
+            <span id="powerSpiderwebToggleIcon">▲</span>
+            <span id="powerSpiderwebToggleText">Collapse</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Collapsible Body Container -->
+      <div class="collapsible-tile-body" id="powerSpiderwebBody">
+        <!-- Main Spiderweb Grid: Radar Chart + Phenotype & Metrics -->
+        <div class="spiderweb-main-layout">
+          <!-- Left: SVG Radar Spiderweb -->
+          <div class="spiderweb-radar-container">
+            <div class="spiderweb-legend">
+              <span class="spiderweb-legend-item">
+                <span class="spiderweb-legend-dot current"></span>
+                <span id="spiderwebLegendCurrentLabel">Last 30 Days (Current)</span>
+              </span>
+              <span class="spiderweb-legend-item">
+                <span class="spiderweb-legend-dot previous"></span>
+                <span id="spiderwebLegendPreviousLabel">Prior 30 Days (Baseline)</span>
+              </span>
+            </div>
+            
+            <div class="spiderweb-svg-wrapper">
+              <svg id="spiderwebSvg" viewBox="0 0 420 380" preserveAspectRatio="xMidYMid meet">
+                <defs>
+                  <radialGradient id="radarCurrentGradient" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.35" />
+                    <stop offset="100%" stop-color="#0891b2" stop-opacity="0.15" />
+                  </radialGradient>
+                  <radialGradient id="radarPreviousGradient" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18" />
+                    <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.05" />
+                  </radialGradient>
+                </defs>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Right: Phenotype & Duration Breakdown Cards -->
+          <div class="spiderweb-metrics-container">
+            <!-- Phenotype & Rider Archetype Summary -->
+            <div class="spiderweb-phenotype-card">
+              <div class="phenotype-header">
+                <div>
+                  <span class="phenotype-eyebrow">RIDER PHENOTYPE</span>
+                  <div class="phenotype-title" id="spiderwebPhenotypeTitle">All-Rounder</div>
+                </div>
+                <div class="phenotype-icon-badge" id="spiderwebPhenotypeIcon">🎯</div>
+              </div>
+              <div class="phenotype-description" id="spiderwebPhenotypeDesc">
+                Well-balanced spiderweb with harmonious capabilities across sprint, anaerobic capacity, and sustained threshold.
+              </div>
+              <div class="phenotype-focus-tags">
+                <div class="phenotype-focus-item">
+                  <span class="phenotype-focus-lbl">PRIMARY STRENGTH:</span>
+                  <span class="phenotype-focus-val" id="spiderwebStrengthVal">5m Maximal Aerobic Power</span>
+                </div>
+                <div class="phenotype-focus-item">
+                  <span class="phenotype-focus-lbl">GROWTH FOCUS:</span>
+                  <span class="phenotype-focus-val" id="spiderwebGrowthVal">Neuromuscular Peak Sprint P_max</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Duration Metrics Grid (5s, 1m, 5m, 20m, 60m) -->
+            <div class="spiderweb-durations-grid" id="spiderwebDurationsGrid">
+              <!-- Dynamically populated via JavaScript -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom: Historical Progress Over Time Timeline & Breakthroughs -->
+        <div class="spiderweb-bottom-section">
+          <!-- Historical Progression Buckets -->
+          <div class="spiderweb-timeline-block">
+            <div class="spiderweb-section-title">
+              <span>📈 Power Curve Progress Over Time</span>
+              <span class="spiderweb-section-subtitle" id="spiderwebTimelineSubtitle">Monthly peak power envelope progression</span>
+            </div>
+            <div class="spiderweb-timeline-grid" id="spiderwebTimelineGrid">
+              <!-- Chronological monthly bars/cards -->
+            </div>
+          </div>
+
+          <!-- Recent PR Breakthroughs -->
+          <div class="spiderweb-breakthroughs-block">
+            <div class="spiderweb-section-title">
+              <span>🏆 Power PR Breakthroughs</span>
+              <span class="spiderweb-section-subtitle">Milestones unlocked across training</span>
+            </div>
+            <div class="spiderweb-breakthroughs-list" id="spiderwebBreakthroughsList">
+              <!-- Breakthrough chips -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <!-- Athlete Power Profile & Training Zones (Moved to bottom of dashboard) -->
     <section class="card collapsible-tile" id="cardAthlete" style="margin-top:1.5rem;">
       <div class="card-header collapsible-tile-header" id="athleteCardHeader" role="button" tabindex="0" title="Click to collapse or expand Athlete Power Profile &amp; Training Zones" aria-expanded="true">
@@ -1361,7 +1498,7 @@
         <div class="version-text-block">
           <div class="version-title">
             <strong>PowerSync</strong>
-            <span class="version-tag" id="footerVersionBadge">v2.3.3</span>
+            <span class="version-tag" id="footerVersionBadge">v2.4.0</span>
             <span class="version-status-dot"></span>
             <span class="version-status-text">Production Ready</span>
           </div>

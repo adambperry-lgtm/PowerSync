@@ -207,6 +207,12 @@ def get_dashboard_data(request: Request = None):
 
     is_guest = (uid == "usr_guest" or current_user.get("is_guest", False))
 
+    from app.services.power_profile_service import get_power_spiderweb_profile
+    try:
+        power_spiderweb = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
+    except Exception:
+        power_spiderweb = None
+
     return {
         "user": {
             "id": uid,
@@ -233,6 +239,7 @@ def get_dashboard_data(request: Request = None):
         "whoop": whoop_data,
         "day_config": day_config,
         "coaching_preferences": coaching_prefs,
+        "power_spiderweb": power_spiderweb,
         "strava": {
             "weekly_stats": weekly_stats,
             "strain_systems": strain_systems,

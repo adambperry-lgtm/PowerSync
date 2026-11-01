@@ -194,6 +194,11 @@ async function loadDashboard() {
     renderAthleteProfile();
     renderIntegrations(data.integrations);
     renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
+    if (data.power_spiderweb) {
+      renderPowerSpiderweb(data.power_spiderweb);
+    } else {
+      loadPowerSpiderweb("30d");
+    }
     loadDebrief();
     updateCoachChatTelemetryChips();
 
@@ -6524,6 +6529,343 @@ function setupCollapsibleTile({
   return { isCollapsed, setCollapsed, toggle };
 }
 
+// --- Power Spiderweb Tracker & Progress Over Time (Strava & Xert Model) ---
+
+function escapeSpiderwebHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+let currentSpiderwebTimeframe = "30d";
+
+async function loadPowerSpiderweb(timeframe = "30d") {
+  currentSpiderwebTimeframe = timeframe;
+  try {
+    const res = await fetch(`/api/power/spiderweb?timeframe=${encodeURIComponent(timeframe)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderPowerSpiderweb(data);
+  } catch (err) {
+    console.warn("Failed to load power spiderweb data:", err);
+  }
+}
+
+function setupPowerSpiderwebTabs() {
+  const group = document.getElementById("spiderwebTimeframeGroup");
+  if (!group) return;
+  const tabs = group.querySelectorAll(".mode-tab");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", (e) => {
+      e.stopPropagation();
+      tabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const tf = tab.getAttribute("data-timeframe") || "30d";
+      loadPowerSpiderweb(tf);
+    });
+  });
+}
+
+function renderPowerSpiderweb(data) {
+  if (!data || !data.axes) return;
+
+  // Legend labels
+  const curLbl = document.getElementById("spiderwebLegendCurrentLabel");
+  const prevLbl = document.getElementById("spiderwebLegendPreviousLabel");
+  if (curLbl) curLbl.textContent = `${data.current_label || 'Current Period'} (Current)`;
+  if (prevLbl) prevLbl.textContent = `${data.previous_label || 'Baseline Period'} (Baseline)`;
+
+  // Phenotype badge & card
+  const badgeEl = document.getElementById("spiderwebPhenotypeBadge");
+  const titleEl = document.getElementById("spiderwebPhenotypeTitle");
+  const descEl = document.getElementById("spiderwebPhenotypeDesc");
+  const strengthEl = document.getElementById("spiderwebStrengthVal");
+  const growthEl = document.getElementById("spiderwebGrowthVal");
+  const iconEl = document.getElementById("spiderwebPhenotypeIcon");
+
+  if (data.phenotype) {
+    if (badgeEl) badgeEl.textContent = data.phenotype.badge || data.phenotype.title;
+    if (titleEl) titleEl.textContent = data.phenotype.title;
+    if (descEl) descEl.textContent = data.phenotype.description;
+    if (strengthEl) strengthEl.textContent = data.phenotype.primary_strength;
+    if (growthEl) growthEl.textContent = data.phenotype.growth_focus;
+    if (iconEl) {
+      const icons = {
+        "Sprinter": "⚡",
+        "Puncheur": "🚀",
+        "Pursuiter": "⏱️",
+        "Rouleur": "🛡️",
+        "Climber": "🏔️",
+        "All-Rounder": "🎯"
+      };
+      iconEl.textContent = icons[data.phenotype.title] || "🎯";
+    }
+  }
+
+  // Collapsed summary chips
+  const c5s = document.getElementById("collapsedSpiderweb5s");
+  const c5m = document.getElementById("collapsedSpiderweb5m");
+  const c20m = document.getElementById("collapsedSpiderweb20m");
+
+  const s5 = data.axes.find(a => a.key === "5s");
+  const s5m = data.axes.find(a => a.key === "5m");
+  const s20m = data.axes.find(a => a.key === "20m");
+
+  if (c5s && s5) {
+    const sign = s5.delta_watts > 0 ? "+" : "";
+    c5s.textContent = `5s: ${s5.current_watts}W (${sign}${s5.delta_watts}W)`;
+  }
+  if (c5m && s5m) {
+    const sign = s5m.delta_watts > 0 ? "+" : "";
+    c5m.textContent = `5m: ${s5m.current_watts}W (${sign}${s5m.delta_watts}W)`;
+  }
+  if (c20m && s20m) {
+    const sign = s20m.delta_watts > 0 ? "+" : "";
+    c20m.textContent = `20m: ${s20m.current_watts}W (${sign}${s20m.delta_watts}W)`;
+  }
+
+  // Draw SVG Radar
+  renderSpiderwebSvg(data.axes);
+
+  // Duration metrics grid
+  renderSpiderwebDurationsGrid(data.axes);
+
+  // Progression timeline
+  renderSpiderwebTimeline(data.progression_timeline);
+
+  // Breakthrough PRs
+  renderSpiderwebBreakthroughs(data.recent_breakthroughs);
+}
+
+function renderSpiderwebSvg(axes) {
+  const svg = document.getElementById("spiderwebSvg");
+  if (!svg || !axes || axes.length === 0) return;
+
+  const cx = 210;
+  const cy = 190;
+  const r = 115;
+  const n = axes.length;
+
+  const defsHtml = `
+    <defs>
+      <radialGradient id="radarCurrentGradient" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.38" />
+        <stop offset="100%" stop-color="#0891b2" stop-opacity="0.14" />
+      </radialGradient>
+      <radialGradient id="radarPreviousGradient" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.22" />
+        <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.06" />
+      </radialGradient>
+      <filter id="radarGlow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+  `;
+
+  let content = defsHtml;
+
+  // Concentric pentagon rings
+  const levels = [0.2, 0.4, 0.6, 0.8, 1.0];
+  levels.forEach((lvl, idx) => {
+    const isOuter = idx === levels.length - 1;
+    const pts = [];
+    for (let i = 0; i < n; i++) {
+      const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+      const px = cx + (r * lvl) * Math.cos(angle);
+      const py = cy + (r * lvl) * Math.sin(angle);
+      pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+    }
+    const strokeColor = isOuter ? "rgba(148, 163, 184, 0.45)" : "rgba(148, 163, 184, 0.18)";
+    const strokeW = isOuter ? "1.5" : "1";
+    const dash = isOuter ? "none" : "3 3";
+    content += `<polygon points="${pts.join(" ")}" fill="none" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="${dash}" />`;
+
+    // Percentage tick label along top axis
+    if (idx > 0 && idx < levels.length - 1) {
+      const labelY = cy - (r * lvl);
+      content += `<text x="${cx + 4}" y="${(labelY + 11).toFixed(1)}" fill="rgba(148,163,184,0.4)" font-size="9" font-family="monospace">${Math.round(lvl * 100)}%</text>`;
+    }
+  });
+
+  // Radial spoke lines
+  for (let i = 0; i < n; i++) {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+    const sx = cx + r * Math.cos(angle);
+    const sy = cy + r * Math.sin(angle);
+    content += `<line x1="${cx}" y1="${cy}" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="rgba(148, 163, 184, 0.22)" stroke-width="1" />`;
+  }
+
+  // Baseline polygon
+  const prevPts = [];
+  const prevCircles = [];
+  for (let i = 0; i < n; i++) {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+    const pct = Math.max(15, Math.min(100, axes[i].previous_radar_pct || 20)) / 100;
+    const px = cx + (r * pct) * Math.cos(angle);
+    const py = cy + (r * pct) * Math.sin(angle);
+    prevPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+    prevCircles.push({ x: px, y: py, axis: axes[i] });
+  }
+  content += `<polygon points="${prevPts.join(" ")}" fill="url(#radarPreviousGradient)" stroke="#a78bfa" stroke-width="2" stroke-dasharray="4 3" opacity="0.9" />`;
+  prevCircles.forEach(pt => {
+    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="#a78bfa" stroke="#4c1d95" stroke-width="1.5"><title>Baseline: ${pt.axis.previous_watts || '--'}W</title></circle>`;
+  });
+
+  // Current polygon
+  const curPts = [];
+  const curCircles = [];
+  for (let i = 0; i < n; i++) {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+    const pct = Math.max(15, Math.min(100, axes[i].current_radar_pct || 20)) / 100;
+    const px = cx + (r * pct) * Math.cos(angle);
+    const py = cy + (r * pct) * Math.sin(angle);
+    curPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+    curCircles.push({ x: px, y: py, axis: axes[i] });
+  }
+  content += `<polygon points="${curPts.join(" ")}" fill="url(#radarCurrentGradient)" stroke="#06b6d4" stroke-width="2.5" filter="url(#radarGlow)" />`;
+  curCircles.forEach(pt => {
+    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="5" fill="#06b6d4" stroke="#ffffff" stroke-width="1.5"><title>${escapeSpiderwebHtml(pt.axis.name)}: ${pt.axis.current_watts}W (${pt.axis.current_w_kg} W/kg)</title></circle>`;
+  });
+
+  // Outer axis labels
+  for (let i = 0; i < n; i++) {
+    const ax = axes[i];
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+    const labelDist = r + 26;
+    let lx = cx + labelDist * Math.cos(angle);
+    let ly = cy + labelDist * Math.sin(angle);
+
+    let textAnchor = "middle";
+    if (Math.abs(Math.cos(angle)) > 0.3) {
+      if (Math.cos(angle) > 0) {
+        textAnchor = "start";
+        lx += 6;
+      } else {
+        textAnchor = "end";
+        lx -= 6;
+      }
+    } else {
+      if (Math.sin(angle) < 0) {
+        ly -= 10;
+      } else {
+        ly += 16;
+      }
+    }
+
+    const deltaSign = ax.delta_watts > 0 ? "+" : "";
+    const deltaColor = ax.delta_watts > 0 ? "#10b981" : ax.delta_watts < 0 ? "#ef4444" : "#94a3b8";
+
+    content += `
+      <g class="spiderweb-svg-axis-label">
+        <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="var(--text-bright, #f8fafc)" font-size="11" font-weight="700">
+          ${ax.icon} ${escapeSpiderwebHtml(ax.label)}
+        </text>
+        <text x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${textAnchor}" fill="var(--accent-cyan, #06b6d4)" font-size="10" font-weight="600">
+          ${ax.current_watts}W <tspan fill="var(--text-muted, #94a3b8)" font-weight="400">· ${ax.current_w_kg ? ax.current_w_kg.toFixed(1) : '--'} W/kg</tspan>
+        </text>
+        <text x="${lx.toFixed(1)}" y="${(ly + 23).toFixed(1)}" text-anchor="${textAnchor}" fill="${deltaColor}" font-size="9" font-weight="700">
+          ${deltaSign}${ax.delta_watts}W (${deltaSign}${ax.delta_pct ? ax.delta_pct.toFixed(1) : '0.0'}%)
+        </text>
+      </g>
+    `;
+  }
+
+  svg.innerHTML = content;
+}
+
+function renderSpiderwebDurationsGrid(axes) {
+  const container = document.getElementById("spiderwebDurationsGrid");
+  if (!container || !axes) return;
+
+  container.innerHTML = axes.map(ax => {
+    const deltaClass = ax.delta_watts > 0 ? "positive" : ax.delta_watts < 0 ? "negative" : "neutral";
+    const deltaSign = ax.delta_watts > 0 ? "▲ +" : ax.delta_watts < 0 ? "▼ " : "";
+    const barPct = Math.min(100, Math.max(12, ax.current_radar_pct || 20));
+
+    return `
+      <div class="spiderweb-duration-card">
+        <div class="duration-card-header">
+          <div style="display:flex;align-items:center;gap:0.4rem;">
+            <span class="duration-icon">${ax.icon}</span>
+            <span class="duration-title">${escapeSpiderwebHtml(ax.name || ax.label)}</span>
+          </div>
+          <span class="duration-system-tag">${escapeSpiderwebHtml(ax.energy_system || '')}</span>
+        </div>
+        <div class="duration-card-values">
+          <div class="duration-primary-val">
+            <span class="duration-watts">${ax.current_watts}W</span>
+            <span class="duration-wkg">${ax.current_w_kg ? ax.current_w_kg.toFixed(2) : '--'} W/kg</span>
+          </div>
+          <div class="duration-delta-chip ${deltaClass}">
+            ${deltaSign}${ax.delta_watts}W (${ax.delta_pct > 0 ? '+' : ''}${ax.delta_pct ? ax.delta_pct.toFixed(1) : '0.0'}%)
+          </div>
+        </div>
+        <div class="duration-card-sub">
+          <span>Prior: ${ax.previous_watts || '--'}W (${ax.previous_w_kg ? ax.previous_w_kg.toFixed(2) + ' W/kg' : '--'})</span>
+          <span class="duration-pr-badge">All-Time PR: ${ax.all_time_pr_watts}W</span>
+        </div>
+        <div class="duration-progress-bar-bg" title="${(ax.current_radar_pct || 0).toFixed(0)}% benchmark ceiling">
+          <div class="duration-progress-bar-fill" style="width:${barPct}%;"></div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function renderSpiderwebTimeline(timeline) {
+  const container = document.getElementById("spiderwebTimelineGrid");
+  if (!container) return;
+
+  if (!timeline || timeline.length === 0) {
+    container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:1rem;">No monthly progression data recorded yet.</div>`;
+    return;
+  }
+
+  container.innerHTML = timeline.map(item => `
+    <div class="spiderweb-timeline-card">
+      <div class="timeline-card-header">
+        <span class="timeline-month">${escapeSpiderwebHtml(item.label)}</span>
+        <span class="timeline-count">${item.workout_count} rides · ${item.total_hours}h</span>
+      </div>
+      <div class="timeline-power-row">
+        <span class="timeline-power-metric"><span class="lbl">5s</span> <strong>${item.peak_5s || '--'}W</strong></span>
+        <span class="timeline-power-metric"><span class="lbl">1m</span> <strong>${item.peak_1m || '--'}W</strong></span>
+        <span class="timeline-power-metric"><span class="lbl">5m</span> <strong>${item.peak_5m || '--'}W</strong></span>
+        <span class="timeline-power-metric"><span class="lbl">20m</span> <strong>${item.peak_20m || '--'}W</strong></span>
+        <span class="timeline-power-metric"><span class="lbl">60m</span> <strong>${item.peak_60m || '--'}W</strong></span>
+      </div>
+      <div class="timeline-card-footer">
+        <span>Total Work: ${item.total_tss || 0} TSS</span>
+      </div>
+    </div>
+  `).join("");
+}
+
+function renderSpiderwebBreakthroughs(breakthroughs) {
+  const container = document.getElementById("spiderwebBreakthroughsList");
+  if (!container) return;
+
+  if (!breakthroughs || breakthroughs.length === 0) {
+    container.innerHTML = `<div style="text-align:center;color:var(--text-muted);padding:1rem;font-size:0.85rem;">Complete more high-intensity intervals to log power PR breakthroughs!</div>`;
+    return;
+  }
+
+  container.innerHTML = breakthroughs.map(b => `
+    <div class="spiderweb-breakthrough-item">
+      <span class="breakthrough-badge">${escapeSpiderwebHtml(b.badge)}</span>
+      <span class="breakthrough-info">
+        <strong>${escapeSpiderwebHtml(b.duration)}</strong> on <em>${escapeSpiderwebHtml(b.activity_name)}</em>
+      </span>
+      <span class="breakthrough-date">${escapeSpiderwebHtml(b.date)}</span>
+    </div>
+  `).join("");
+}
+
 let whoopCollapsible = null;
 let stravaCollapsible = null;
 let coachTodayCollapsible = null;
@@ -6531,6 +6873,7 @@ let programCollapsible = null;
 let upcomingPlanCollapsible = null;
 let coachDebriefCollapsible = null;
 let recentWorkoutsCollapsible = null;
+let powerSpiderwebCollapsible = null;
 let athleteCardCollapsible = null;
 
 function getAllCollapsiblesList() {
@@ -6543,6 +6886,7 @@ function getAllCollapsiblesList() {
     { isCollapsed: () => isWorkoutStageCollapsed(), setCollapsed: (c, cb, um) => setWorkoutStageCollapsed(c, cb, um) },
     coachDebriefCollapsible,
     recentWorkoutsCollapsible,
+    powerSpiderwebCollapsible,
     athleteCardCollapsible
   ].filter(Boolean);
 }
@@ -6649,6 +6993,17 @@ function initAllCollapsibleTiles() {
     toggleTextId: "recentWorkoutsToggleText",
     storageKey: "recentWorkoutsCollapsed"
   });
+
+  powerSpiderwebCollapsible = setupCollapsibleTile({
+    cardId: "cardPowerSpiderweb",
+    headerId: "powerSpiderwebHeader",
+    toggleBtnId: "btnTogglePowerSpiderweb",
+    toggleIconId: "powerSpiderwebToggleIcon",
+    toggleTextId: "powerSpiderwebToggleText",
+    storageKey: "powerSpiderwebCollapsed"
+  });
+
+  setupPowerSpiderwebTabs();
 
   athleteCardCollapsible = setupCollapsibleTile({
     cardId: "cardAthlete",

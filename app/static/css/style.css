@@ -4557,8 +4557,416 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-color: rgba(2, 132, 199, 0.35) !important;
 }
 
-[data-theme="light"] #demoModeBanner div {
-  color: #0f172a !important;
+/* ==========================================================================
+   Power Spiderweb & Fitness Profile (Strava & Xert Model)
+   ========================================================================== */
+
+.spiderweb-main-layout {
+  display: grid;
+  grid-template-columns: minmax(340px, 440px) 1fr;
+  gap: 1.5rem;
+  align-items: stretch;
+  margin-top: 0.5rem;
 }
+
+@media (max-width: 900px) {
+  .spiderweb-main-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.spiderweb-radar-container {
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.spiderweb-legend {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  width: 100%;
+}
+
+.spiderweb-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--text-secondary);
+}
+
+.spiderweb-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.spiderweb-legend-dot.current {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.6);
+}
+
+.spiderweb-legend-dot.previous {
+  background: #a78bfa;
+  border: 1px dashed rgba(167, 139, 250, 0.8);
+}
+
+.spiderweb-svg-wrapper {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#spiderwebSvg {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.3));
+}
+
+.spiderweb-metrics-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.spiderweb-phenotype-card {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.08), rgba(139, 92, 246, 0.08));
+  border: 1px solid rgba(6, 182, 212, 0.25);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+}
+
+.phenotype-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.4rem;
+}
+
+.phenotype-eyebrow {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent-cyan);
+}
+
+.phenotype-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.phenotype-icon-badge {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.phenotype-description {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+  margin-bottom: 0.75rem;
+}
+
+.phenotype-focus-tags {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.phenotype-focus-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.phenotype-focus-lbl {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 125px;
+}
+
+.phenotype-focus-val {
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.spiderweb-durations-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.65rem;
+}
+
+.spiderweb-duration-card {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  transition: all 0.2s ease;
+}
+
+.spiderweb-duration-card:hover {
+  border-color: rgba(6, 182, 212, 0.4);
+  background: rgba(15, 23, 42, 0.7);
+  transform: translateY(-1px);
+}
+
+.spiderweb-dur-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.spiderweb-dur-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.spiderweb-dur-energy {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.spiderweb-dur-power {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.spiderweb-cur-watts {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.spiderweb-cur-wkg {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+.spiderweb-dur-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.7rem;
+  padding-top: 0.3rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.spiderweb-prev-ref {
+  color: var(--text-muted);
+}
+
+.spiderweb-delta-badge {
+  font-weight: 700;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.68rem;
+}
+
+.spiderweb-delta-badge.positive {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.spiderweb-delta-badge.neutral {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+}
+
+.spiderweb-delta-badge.negative {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+  border: 1px solid rgba(244, 63, 94, 0.3);
+}
+
+.spiderweb-bottom-section {
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 1.25rem;
+}
+
+@media (max-width: 900px) {
+  .spiderweb-bottom-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+.spiderweb-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  margin-bottom: 0.65rem;
+}
+
+.spiderweb-section-subtitle {
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.spiderweb-timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.65rem;
+}
+
+.spiderweb-timeline-card {
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.spiderweb-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--accent-cyan);
+}
+
+.spiderweb-timeline-vol {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+}
+
+.spiderweb-timeline-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.3rem;
+  font-size: 0.7rem;
+}
+
+.spiderweb-timeline-stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.spiderweb-timeline-stat-lbl {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+}
+
+.spiderweb-timeline-stat-val {
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.spiderweb-breakthroughs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.spiderweb-breakthrough-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(16, 185, 129, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.65rem;
+  font-size: 0.75rem;
+}
+
+.breakthrough-left {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.breakthrough-title {
+  font-weight: 700;
+  color: #10b981;
+}
+
+.breakthrough-date {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+.breakthrough-badge {
+  font-weight: 800;
+  color: #10b981;
+  background: rgba(16, 185, 129, 0.15);
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+}
+
+/* Light Theme overrides */
+[data-theme="light"] .spiderweb-radar-container {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .spiderweb-phenotype-card {
+  background: linear-gradient(135deg, #f0fdf4, #f8fafc);
+  border-color: #cbd5e1;
+}
+
+[data-theme="light"] .phenotype-title {
+  color: #0f172a;
+}
+
+[data-theme="light"] .spiderweb-cur-watts {
+  color: #0f172a;
+}
+
+[data-theme="light"] .spiderweb-duration-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .spiderweb-timeline-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .spiderweb-section-title {
+  color: #0f172a;
+}
+
 
 
