@@ -674,12 +674,23 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
     cur_envelope = {ax["key"]: ax["current_watts"] for ax in profile.get("axes", [])}
 
     target_envelope = dict(cur_envelope)
+    synced_program_goal = str(get_setting("program_goal", "FTP_BUILD", user_id=uid))
+    synced_target_ftp = int(get_setting("program_target_ftp", ftp + 15, user_id=uid))
+
+    # Archetype weekly load baselines (aligned with program_service.DEFAULT_GOALS)
+    program_load_baselines = {
+        "FTP_BUILD": {"gain": 15, "tss": 360, "xss": 360},
+        "GRAN_FONDO": {"gain": 10, "tss": 420, "xss": 420},
+        "VO2_CRIT": {"gain": 12, "tss": 340, "xss": 340},
+        "HEALTH_LONGEVITY": {"gain": 5, "tss": 260, "xss": 260}
+    }
 
     if goal_type == "phenotype":
         pheno_def = next((p for p in RIDER_PHENOTYPE_DEFINITIONS if p["id"].lower() == target_key.lower()), None)
         if not pheno_def:
             pheno_def = RIDER_PHENOTYPE_DEFINITIONS[0] # Default Puncheur
 
+        target_key = pheno_def["id"]
         target_title = f"Transform into {pheno_def['title']}"
         target_badge = f"{pheno_def['icon']} {pheno_def['title']} Target"
         focus_system = pheno_def["focus_energy_system"]
@@ -700,7 +711,7 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
             wkg_target_5m = round(weight_kg * reqs["min_5m_wkg"])
             target_envelope["5m"] = max(target_envelope["5m"], wkg_target_5m)
 
-        # Automatically align program_goal in settings so workouts adapt
+        # Automatically align program_goal & program_target_ftp so Macrocycle & Spiderweb never conflict
         program_goal_map = {
             "Puncheur": "VO2_CRIT",
             "Pursuiter": "VO2_CRIT",
@@ -709,8 +720,18 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
             "Sprinter": "VO2_CRIT",
             "All-Rounder": "GRAN_FONDO"
         }
-        if pheno_def["id"] in program_goal_map:
-            set_setting("program_goal", program_goal_map[pheno_def["id"]], user_id=uid)
+        synced_program_goal = program_goal_map.get(pheno_def["id"], "FTP_BUILD")
+        baseline_cfg = program_load_baselines[synced_program_goal]
+        derived_ftp = max(
+            ftp + baseline_cfg["gain"],
+            round(target_envelope["20m"] * 0.95),
+            target_envelope["60m"]
+        )
+        synced_target_ftp = derived_ftp
+        set_setting("program_goal", synced_program_goal, user_id=uid)
+        set_setting("program_target_ftp", synced_target_ftp, user_id=uid)
+        set_setting("program_weekly_tss_target", baseline_cfg["tss"], user_id=uid)
+        set_setting("program_weekly_xss_target", baseline_cfg["xss"], user_id=uid)
 
     else: # duration goal
         # e.g. target_key = "20m", target_watts = 260
@@ -731,26 +752,135 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
         }
         rec_workouts = workouts_map.get(target_key, ["Structured Interval Progressions"])
 
-        if target_key in ("20m", "60m"):
-            set_setting("program_goal", "FTP_BUILD", user_id=uid)
-        elif target_key in ("1m", "5m"):
-            set_setting("program_goal", "VO2_CRIT", user_id=uid)
+        if target_key == "20m":
+            synced_program_goal = "FTP_BUILD"
+            synced_target_ftp = max(ftp + 5, round(target_watts * 0.95))
+            # Keep 60m envelope physiologically coherent with 20m target
+            target_envelope["60m"] = max(target_envelope.get("60m", 210), round(target_watts * 0.91))
+        elif target_key == "60m":
+            synced_program_goal = "GRAN_FONDO" if target_watts <= round(ftp * 1.04) else "FTP_BUILD"
+            synced_target_ftp = max(ftp + 5, target_watts)
+            target_envelope["20m"] = max(target_envelope.get("20m", 240), round(target_watts / 0.95))
+        elif target_key in ("1m", "5m", "5s"):
+            synced_program_goal = "VO2_CRIT"
+            cur_axis_w = max(1, cur_envelope.get(target_key, target_watts))
+            pct_gain = max(0.03, (target_watts - cur_axis_w) / float(cur_axis_w))
+            synced_target_ftp = max(ftp + 5, ftp + round(ftp * min(0.12, pct_gain * 0.6)))
+
+        baseline_cfg = program_load_baselines.get(synced_program_goal, program_load_baselines["FTP_BUILD"])
+        set_setting("program_goal", synced_program_goal, user_id=uid)
+        set_setting("program_target_ftp", synced_target_ftp, user_id=uid)
+        set_setting("program_weekly_tss_target", baseline_cfg["tss"], user_id=uid)
+        set_setting("program_weekly_xss_target", baseline_cfg["xss"], user_id=uid)
 
     goal_obj = {
         "id": f"spiderweb_goal_{int(datetime.datetime.now().timestamp())}",
         "goal_type": goal_type,
         "target_key": target_key,
+        "target_watts": payload.get("target_watts") if goal_type == "duration" else None,
         "target_title": target_title,
         "target_badge": target_badge,
         "target_envelope": target_envelope,
         "focus_energy_system": focus_system,
         "recommended_workouts": rec_workouts,
+        "synced_program_goal": synced_program_goal,
+        "synced_target_ftp": synced_target_ftp,
         "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "status": "active"
     }
 
     set_setting("spiderweb_goal", goal_obj, user_id=uid)
     return goal_obj
+
+
+def sync_spiderweb_goal_from_program(
+    program_goal: Optional[str] = None,
+    program_target_ftp: Optional[int] = None,
+    user_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Synchronizes the active Spiderweb Goal when the athlete updates
+    'Long-Term Fitness Goal & Program (Xert Alternative)' in Settings,
+    guaranteeing the two systems are 100% integrated and never conflict.
+    """
+    uid = user_id or get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    weight_kg = float(get_setting("athlete_weight_kg", 70.0, user_id=uid))
+    p_goal = program_goal or str(get_setting("program_goal", "FTP_BUILD", user_id=uid))
+    p_target_ftp = int(program_target_ftp or get_setting("program_target_ftp", ftp + 15, user_id=uid))
+
+    existing = get_active_spiderweb_goal(user_id=uid)
+    profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
+    cur_envelope = {ax["key"]: ax["current_watts"] for ax in profile.get("axes", [])}
+
+    # Map macrocycle program_goal -> compatible spiderweb goals
+    compatible_map = {
+        "FTP_BUILD": [("duration", "20m"), ("duration", "60m"), ("phenotype", "Climber"), ("phenotype", "Rouleur")],
+        "GRAN_FONDO": [("duration", "60m"), ("phenotype", "All-Rounder"), ("phenotype", "Rouleur")],
+        "VO2_CRIT": [("phenotype", "Puncheur"), ("phenotype", "Pursuiter"), ("phenotype", "Sprinter"), ("duration", "5m"), ("duration", "1m"), ("duration", "5s")],
+        "HEALTH_LONGEVITY": [("phenotype", "All-Rounder"), ("duration", "60m")]
+    }
+    allowed_pairs = compatible_map.get(p_goal, compatible_map["FTP_BUILD"])
+
+    # If existing spiderweb goal is already compatible with p_goal, update its target wattage to match p_target_ftp
+    if existing and (existing.get("goal_type"), existing.get("target_key")) in allowed_pairs:
+        g_type = existing.get("goal_type")
+        t_key = existing.get("target_key")
+        env = dict(existing.get("target_envelope") or cur_envelope)
+        env["20m"] = max(cur_envelope.get("20m", 240), round(p_target_ftp / 0.95))
+        env["60m"] = max(cur_envelope.get("60m", 210), round(p_target_ftp * 0.96))
+
+        if g_type == "duration" and t_key == "20m":
+            t_watts = round(p_target_ftp / 0.95)
+            env["20m"] = t_watts
+            existing["target_watts"] = t_watts
+            existing["target_title"] = f"20-Min Threshold @ {t_watts}W ({p_target_ftp}W FTP)"
+            existing["target_badge"] = f"🔥 {t_watts}W (20m Threshold)"
+        elif g_type == "duration" and t_key == "60m":
+            t_watts = p_target_ftp
+            env["60m"] = t_watts
+            existing["target_watts"] = t_watts
+            existing["target_title"] = f"60-Min Fatigue Resistance @ {t_watts}W"
+            existing["target_badge"] = f"🛡️ {t_watts}W (60m Endurance)"
+        elif g_type == "phenotype":
+            pheno_def = next((p for p in RIDER_PHENOTYPE_DEFINITIONS if p["id"].lower() == str(t_key).lower()), None)
+            if pheno_def:
+                reqs = pheno_def["requirements"]
+                env["5s"] = max(cur_envelope.get("5s", 600), round(p_target_ftp * reqs["5s_ratio"]))
+                env["1m"] = max(cur_envelope.get("1m", 400), round(p_target_ftp * reqs["1m_ratio"]))
+                env["5m"] = max(cur_envelope.get("5m", 300), round(p_target_ftp * reqs["5m_ratio"]))
+                env["20m"] = max(cur_envelope.get("20m", 240), round(p_target_ftp * reqs["20m_ratio"]))
+                env["60m"] = max(cur_envelope.get("60m", 210), round(p_target_ftp * reqs["60m_ratio"]))
+
+        existing["target_envelope"] = env
+        existing["synced_program_goal"] = p_goal
+        existing["synced_target_ftp"] = p_target_ftp
+        set_setting("spiderweb_goal", existing, user_id=uid)
+        return existing
+
+    # Otherwise, build a freshly aligned Spiderweb Goal from p_goal and p_target_ftp
+    if p_goal == "FTP_BUILD":
+        target_20m = max(cur_envelope.get("20m", 240) + 5, round(p_target_ftp / 0.95))
+        return set_active_spiderweb_goal(
+            {"goal_type": "duration", "target_key": "20m", "target_watts": target_20m},
+            user_id=uid
+        )
+    elif p_goal == "GRAN_FONDO":
+        target_60m = max(cur_envelope.get("60m", 210) + 5, round(p_target_ftp * 0.94))
+        return set_active_spiderweb_goal(
+            {"goal_type": "duration", "target_key": "60m", "target_watts": target_60m},
+            user_id=uid
+        )
+    elif p_goal == "VO2_CRIT":
+        return set_active_spiderweb_goal(
+            {"goal_type": "phenotype", "target_key": "Puncheur"},
+            user_id=uid
+        )
+    else: # HEALTH_LONGEVITY
+        return set_active_spiderweb_goal(
+            {"goal_type": "phenotype", "target_key": "All-Rounder"},
+            user_id=uid
+        )
 
 
 def clear_active_spiderweb_goal(user_id: Optional[str] = None) -> bool:

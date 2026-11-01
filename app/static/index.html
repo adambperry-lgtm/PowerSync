@@ -1357,20 +1357,28 @@
         <div class="spiderweb-planner-section" id="spiderwebPlannerSection">
           <div class="spiderweb-planner-nav">
             <div>
-              <div style="display:flex;align-items:center;gap:0.4rem;">
+              <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
                 <span style="font-size:1rem;">🎯</span>
                 <span class="spiderweb-section-title" style="margin:0;">Target Changes &amp; Goal Planner</span>
+                <span class="spiderweb-goal-badge" id="plannerMacrocycleSyncBadge" style="font-size:0.7rem;background:rgba(6,182,212,0.14);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.35);">
+                  🔄 Synced with Long-Term Macrocycle Program
+                </span>
               </div>
-              <div class="spiderweb-section-subtitle">
-                Explore wattage targets to improve categories or set your training goal to transform rider archetype
+              <div class="spiderweb-section-subtitle" id="plannerMacrocycleSyncSubtitle">
+                Select what power curve or rider archetype to target — automatically configures your Long-Term Fitness Goal &amp; Program (Base &rarr; Build &rarr; Peak &rarr; Taper)
               </div>
             </div>
-            <div class="planner-toggle-tabs" id="plannerToggleTabs">
-              <button class="planner-tab-btn active" id="btnPlannerTabDuration" type="button" data-mode="duration">
-                ⚡ Duration Targets
-              </button>
-              <button class="planner-tab-btn" id="btnPlannerTabPhenotype" type="button" data-mode="phenotype">
-                🥊 Rider Type Transformation
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <div class="planner-toggle-tabs" id="plannerToggleTabs">
+                <button class="planner-tab-btn active" id="btnPlannerTabDuration" type="button" data-mode="duration">
+                  ⚡ Duration Targets
+                </button>
+                <button class="planner-tab-btn" id="btnPlannerTabPhenotype" type="button" data-mode="phenotype">
+                  🥊 Rider Type Transformation
+                </button>
+              </div>
+              <button class="btn btn-secondary" id="btnJumpToMacrocycleCard" type="button" style="padding:0.3rem 0.65rem;font-size:0.73rem;" title="View Macrocycle Periodization & Weekly Strain Compliance">
+                📅 Macrocycle &amp; XSS &darr;
               </button>
             </div>
           </div>
@@ -1429,6 +1437,7 @@
             <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
               <span class="card-title" id="programGoalTitle">Threshold &amp; FTP Booster</span>
               <span class="phase-badge" id="programPhaseBadge">Build Phase</span>
+              <span class="phase-badge" id="programSpiderwebBadge" style="display:none;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.35);">🎯 Spiderweb Target</span>
             </div>
             <div class="card-subtitle collapsible-tile-subtitle" id="programGoalDesc">
               Targeting sustained 20-min power output with structured sweet spot &amp; threshold progressions.
@@ -1443,6 +1452,9 @@
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <button class="btn btn-secondary" style="padding:0.25rem 0.65rem;font-size:0.75rem;" id="btnJumpToSpiderwebPlanner" type="button" title="Select Duration or Rider Type Target on 5-Axis Power Spiderweb">
+            🕸️ Target Envelope
+          </button>
           <button class="btn btn-secondary" style="padding:0.25rem 0.65rem;font-size:0.75rem;" id="btnOpenPlanBuilder" type="button">
             📅 Plan Event
           </button>

@@ -147,6 +147,17 @@ def update_settings_endpoint(payload: SettingsUpdate):
     if payload.program_weekly_xss_target is not None:
         set_setting("program_weekly_xss_target", payload.program_weekly_xss_target)
 
+    # Bidirectional Sync: Keep Spiderweb Target Envelope aligned with Long-Term Fitness Goal & Program
+    if payload.program_goal is not None or payload.program_target_ftp is not None or payload.athlete_ftp is not None:
+        try:
+            from app.services.power_profile_service import sync_spiderweb_goal_from_program
+            sync_spiderweb_goal_from_program(
+                program_goal=payload.program_goal,
+                program_target_ftp=payload.program_target_ftp
+            )
+        except Exception:
+            pass
+
     return {"success": True, "message": "Settings updated successfully"}
 
 class DirectivePayload(BaseModel):

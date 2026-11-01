@@ -42,17 +42,21 @@ def get_spiderweb_goal_endpoint():
 def set_spiderweb_goal_endpoint(payload: Dict[str, Any] = Body(...)):
     """
     Sets the athlete's active training goal based on a specific duration achievement
-    (e.g. 20m Threshold 260W) or a rider type transformation (e.g. Puncheur).
+    (e.g. 20m Threshold 260W) or a rider type transformation (e.g. Puncheur),
+    and synchronizes the Long-Term Fitness Goal & Program (Xert Alternative).
     """
     uid = get_current_user_id()
     if not payload:
         raise HTTPException(status_code=400, detail="Missing goal payload")
     goal = set_active_spiderweb_goal(payload=payload, user_id=uid)
     profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
+    from app.services.program_service import get_current_program
+    program = get_current_program()
     return {
         "success": True,
         "goal": goal,
         "profile": profile,
+        "program": program,
         "message": f"Active training goal updated to: {goal.get('target_title')}"
     }
 
@@ -62,8 +66,11 @@ def delete_spiderweb_goal_endpoint():
     uid = get_current_user_id()
     clear_active_spiderweb_goal(user_id=uid)
     profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
+    from app.services.program_service import get_current_program
+    program = get_current_program()
     return {
         "success": True,
         "profile": profile,
+        "program": program,
         "message": "Active spiderweb training goal cleared"
     }

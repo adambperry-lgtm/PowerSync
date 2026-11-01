@@ -129,10 +129,32 @@ def get_current_program(
     weekly_xss_pct = min(100, int((strava_weekly_xss / float(weekly_xss_target)) * 100)) if weekly_xss_target > 0 else 0
     days_left = max(0, (target_date - today).days)
 
+    # Integrate active Spiderweb Goal so 'Target Changes & Goal Planner' and 'Long-Term Fitness Goal & Program' are 100% unified
+    active_spiderweb_goal = None
+    try:
+        from app.services.power_profile_service import get_active_spiderweb_goal
+        active_spiderweb_goal = get_active_spiderweb_goal()
+    except Exception:
+        active_spiderweb_goal = None
+
+    goal_title = goal_def["title"]
+    goal_description = goal_def["description"]
+    if active_spiderweb_goal:
+        sw_title = active_spiderweb_goal.get("target_title")
+        sw_focus = active_spiderweb_goal.get("focus_energy_system")
+        sw_workouts = active_spiderweb_goal.get("recommended_workouts") or []
+        if sw_title:
+            goal_title = f"{goal_def['title']} • {sw_title}"
+        if sw_focus:
+            target_focus_duration = f"{sw_focus}"
+            workout_preview = f" Key sessions: {', '.join(sw_workouts[:2])}." if sw_workouts else ""
+            goal_description = f"Active Spiderweb Target ({sw_title}) integrated into your {phase} macrocycle.{workout_preview}"
+
     return {
         "goal_id": goal_id,
-        "goal_title": goal_def["title"],
-        "goal_description": goal_def["description"],
+        "base_goal_title": goal_def["title"],
+        "goal_title": goal_title,
+        "goal_description": goal_description,
         "target_ftp": target_ftp,
         "current_ftp": current_ftp,
         "ftp_delta": target_ftp - current_ftp,
@@ -153,5 +175,6 @@ def get_current_program(
         "weekly_xss_target": weekly_xss_target,
         "weekly_xss_actual": strava_weekly_xss,
         "weekly_xss_compliance_pct": weekly_xss_pct,
+        "active_spiderweb_goal": active_spiderweb_goal,
         "all_goals": list(DEFAULT_GOALS.values())
     }

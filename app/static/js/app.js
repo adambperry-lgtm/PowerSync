@@ -938,6 +938,21 @@ function renderProgram(p) {
   if (programPhaseBadge) programPhaseBadge.textContent = p.phase || "Build Phase";
   if (programGoalDesc) programGoalDesc.textContent = p.goal_description || "";
 
+  const programSpiderwebBadge = document.getElementById("programSpiderwebBadge");
+  if (programSpiderwebBadge) {
+    if (p.active_spiderweb_goal && p.active_spiderweb_goal.target_badge) {
+      programSpiderwebBadge.style.display = "inline-flex";
+      programSpiderwebBadge.textContent = `🎯 ${p.active_spiderweb_goal.target_badge}`;
+    } else {
+      programSpiderwebBadge.style.display = "none";
+    }
+  }
+
+  const plannerSyncBadge = document.getElementById("plannerMacrocycleSyncBadge");
+  if (plannerSyncBadge) {
+    plannerSyncBadge.textContent = `🔄 Synced: ${p.phase || "Build Phase"} • Target FTP ${p.target_ftp || 265}W (${p.weekly_xss_target || p.weekly_tss_target || 360} XSS/wk)`;
+  }
+
   // Highlight active column in macrocycle
   const phaseStr = (p.phase || "").toLowerCase();
   const cols = ["phaseColBase", "phaseColBuild", "phaseColPeak", "phaseColTaper"];
@@ -3081,6 +3096,8 @@ btnSaveSettings.addEventListener("click", async () => {
     await loadDashboard();
     await loadWorkout(state.currentDuration, state.currentIntensity);
     await loadDebrief();
+    await loadPowerSpiderweb(currentSpiderwebTimeframe);
+    await loadSpiderwebTargetAnalysis();
   } catch (err) {
     showToast("⚠️ Failed to save settings.");
   }
@@ -7015,7 +7032,12 @@ function setupSpiderwebPlannerNav() {
           } else {
             loadPowerSpiderweb(currentSpiderwebTimeframe);
           }
-          loadSpiderwebTargetAnalysis();
+          if (resp.program) {
+            renderProgram(resp.program);
+          }
+          await loadSpiderwebTargetAnalysis();
+          await loadDashboard();
+          await loadWorkout(state.currentDuration, state.currentIntensity);
         }
       } catch (err) {
         console.error("Error clearing spiderweb goal:", err);
@@ -7026,6 +7048,34 @@ function setupSpiderwebPlannerNav() {
   const togglePlannerBtn = document.getElementById("btnTogglePlannerSection");
   if (togglePlannerBtn) {
     togglePlannerBtn.addEventListener("click", () => {
+      const section = document.getElementById("spiderwebPlannerSection");
+      if (section) {
+        section.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }
+
+  const btnJumpToMacrocycle = document.getElementById("btnJumpToMacrocycleCard");
+  if (btnJumpToMacrocycle) {
+    btnJumpToMacrocycle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const card = document.getElementById("cardProgram");
+      if (card) {
+        if (programCollapsible && typeof programCollapsible.expand === "function") {
+          programCollapsible.expand();
+        }
+        card.scrollIntoView({ behavior: "smooth" });
+      }
+    });
+  }
+
+  const btnJumpToSpiderweb = document.getElementById("btnJumpToSpiderwebPlanner");
+  if (btnJumpToSpiderweb) {
+    btnJumpToSpiderweb.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (powerSpiderwebCollapsible && typeof powerSpiderwebCollapsible.expand === "function") {
+        powerSpiderwebCollapsible.expand();
+      }
       const section = document.getElementById("spiderwebPlannerSection");
       if (section) {
         section.scrollIntoView({ behavior: "smooth" });
@@ -7052,12 +7102,18 @@ function renderPlannerDurationView() {
   const list = currentTargetAnalysisData.duration_category_targets || [];
   if (list.length === 0) return;
 
+  const activeGoal = currentTargetAnalysisData.active_goal || null;
+  const activeGoalKey = (activeGoal && activeGoal.goal_type === "duration") ? activeGoal.target_key : null;
+  const activeGoalWatts = (activeGoal && activeGoal.goal_type === "duration" && activeGoal.target_envelope)
+    ? activeGoal.target_envelope[activeGoalKey]
+    : null;
+
   // Render pills
   pillsContainer.innerHTML = list.map(item => `
     <button type="button" class="duration-pill-btn ${item.key === currentPlannerDurationKey ? 'active' : ''}" data-dur="${item.key}">
       <span>${item.icon}</span>
       <span>${escapeSpiderwebHtml(item.label)}</span>
-      <span style="opacity:0.75;font-size:0.75rem;">(${item.current_watts}W)</span>
+      <span style="opacity:0.75;font-size:0.75rem;">(${item.current_watts}W${activeGoalKey === item.key ? ' 🎯' : ''})</span>
     </button>
   `).join("");
 
@@ -7075,6 +7131,8 @@ function renderPlannerDurationView() {
   const t2 = selected.tier2_transformative;
   const t3 = selected.tier3_benchmark;
   const guidance = selected.guidance || {};
+
+  const isTierActive = (watts) => activeGoalKey === selected.key && activeGoalWatts === watts;
 
   tiersContainer.innerHTML = `
     <!-- Current Baseline Card -->
@@ -7094,7 +7152,7 @@ function renderPlannerDurationView() {
     </div>
 
     <!-- Tier 1: Progressive +5% -->
-    <div class="planner-tier-card">
+    <div class="planner-tier-card" style="${isTierActive(t1.target_watts) ? 'border-color:#10b981;box-shadow:0 0 12px rgba(16,185,129,0.2);' : ''}">
       <div class="tier-card-header">
         <span class="tier-title">${escapeSpiderwebHtml(t1.label)}</span>
         <span class="tier-delta-chip">+${t1.delta_watts}W (+${t1.delta_pct}%)</span>
@@ -7107,13 +7165,13 @@ function renderPlannerDurationView() {
         <strong>Timeline:</strong> ${t1.timeline}<br>
         <strong>Adaptation:</strong> ${escapeSpiderwebHtml(guidance.stimulus || 'Cardiovascular efficiency and progressive wattage density.')}
       </div>
-      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t1.target_watts}">
-        🎯 Set ${t1.target_watts}W as Active Goal
+      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t1.target_watts}" style="${isTierActive(t1.target_watts) ? 'background:rgba(16,185,129,0.2);border-color:#10b981;color:#10b981;' : ''}">
+        ${isTierActive(t1.target_watts) ? `✓ Active Goal (${t1.target_watts}W Synced to Program)` : `🎯 Set ${t1.target_watts}W as Active Goal`}
       </button>
     </div>
 
     <!-- Tier 2: Transformative Leap +10% -->
-    <div class="planner-tier-card">
+    <div class="planner-tier-card" style="${isTierActive(t2.target_watts) ? 'border-color:#10b981;box-shadow:0 0 12px rgba(16,185,129,0.2);' : ''}">
       <div class="tier-card-header">
         <span class="tier-title">${escapeSpiderwebHtml(t2.label)}</span>
         <span class="tier-delta-chip">+${t2.delta_watts}W (+${t2.delta_pct}%)</span>
@@ -7126,13 +7184,13 @@ function renderPlannerDurationView() {
         <strong>Timeline:</strong> ${t2.timeline}<br>
         <strong>Workouts:</strong> ${escapeSpiderwebHtml(guidance.workouts || 'Progressive interval overload.')}
       </div>
-      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t2.target_watts}">
-        🎯 Set ${t2.target_watts}W as Active Goal
+      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t2.target_watts}" style="${isTierActive(t2.target_watts) ? 'background:rgba(16,185,129,0.2);border-color:#10b981;color:#10b981;' : ''}">
+        ${isTierActive(t2.target_watts) ? `✓ Active Goal (${t2.target_watts}W Synced to Program)` : `🎯 Set ${t2.target_watts}W as Active Goal`}
       </button>
     </div>
 
     <!-- Tier 3: Benchmark Ceiling -->
-    <div class="planner-tier-card">
+    <div class="planner-tier-card" style="${isTierActive(t3.target_watts) ? 'border-color:#10b981;box-shadow:0 0 12px rgba(16,185,129,0.2);' : ''}">
       <div class="tier-card-header">
         <span class="tier-title">${escapeSpiderwebHtml(t3.label)}</span>
         <span class="tier-delta-chip" style="color:var(--accent-purple);border-color:rgba(167,139,250,0.3);background:rgba(167,139,250,0.15);">
@@ -7147,8 +7205,8 @@ function renderPlannerDurationView() {
         <strong>Timeline:</strong> ${t3.timeline}<br>
         <strong>Peak Physiology:</strong> 100% outer radar benchmark cap.
       </div>
-      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t3.target_watts}">
-        🎯 Set ${t3.target_watts}W as Active Goal
+      <button type="button" class="btn-set-goal" data-type="duration" data-key="${selected.key}" data-watts="${t3.target_watts}" style="${isTierActive(t3.target_watts) ? 'background:rgba(16,185,129,0.2);border-color:#10b981;color:#10b981;' : ''}">
+        ${isTierActive(t3.target_watts) ? `✓ Active Goal (${t3.target_watts}W Synced to Program)` : `🎯 Set ${t3.target_watts}W as Active Goal`}
       </button>
     </div>
   `;
@@ -7171,11 +7229,23 @@ function renderPlannerPhenotypeView() {
   const container = document.getElementById("plannerPhenotypesGrid");
   if (!container || !currentTargetAnalysisData) return;
 
+  const activeGoal = currentTargetAnalysisData.active_goal || null;
+  const activePhenoKey = (activeGoal && activeGoal.goal_type === "phenotype") ? String(activeGoal.target_key || "").toLowerCase() : null;
+
   const phenotypes = currentTargetAnalysisData.rider_type_transformation_targets || [];
   container.innerHTML = phenotypes.map(p => {
     const isCurrent = p.is_current_type;
-    const badgeCls = isCurrent ? "background:rgba(6,182,212,0.15);color:var(--accent-cyan);border-color:rgba(6,182,212,0.3);" : "background:rgba(16,185,129,0.15);color:#10b981;border-color:rgba(16,185,129,0.3);";
-    const statusText = isCurrent ? "Current Rider Type" : `${p.completion_pct}% Met (${p.total_delta_watts}W gap)`;
+    const isGoalActive = activePhenoKey === String(p.id || "").toLowerCase();
+    const badgeCls = isGoalActive
+      ? "background:rgba(16,185,129,0.22);color:#10b981;border-color:#10b981;"
+      : isCurrent
+      ? "background:rgba(6,182,212,0.15);color:var(--accent-cyan);border-color:rgba(6,182,212,0.3);"
+      : "background:rgba(16,185,129,0.15);color:#10b981;border-color:rgba(16,185,129,0.3);";
+    const statusText = isGoalActive
+      ? "🎯 Active Program Goal"
+      : isCurrent
+      ? "Current Rider Type"
+      : `${p.completion_pct}% Met (${p.total_delta_watts}W gap)`;
 
     const axesRows = (p.axis_gaps || []).map(ax => {
       const icon = ax.is_met ? "✓" : "▲";
@@ -7192,7 +7262,7 @@ function renderPlannerPhenotypeView() {
     }).join("");
 
     return `
-      <div class="planner-pheno-card ${isCurrent ? 'selected' : ''}">
+      <div class="planner-pheno-card ${isCurrent || isGoalActive ? 'selected' : ''}" style="${isGoalActive ? 'border-color:#10b981;box-shadow:0 0 12px rgba(16,185,129,0.2);' : ''}">
         <div class="planner-pheno-header">
           <span class="planner-pheno-title">${p.icon} ${escapeSpiderwebHtml(p.title)}</span>
           <span class="spiderweb-goal-badge" style="${badgeCls}">${statusText}</span>
@@ -7205,8 +7275,8 @@ function renderPlannerPhenotypeView() {
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">
           <strong>Prescribed Protocol:</strong> ${escapeSpiderwebHtml((p.recommended_workouts || [])[0] || '')}
         </div>
-        <button type="button" class="btn-set-goal" data-type="phenotype" data-key="${p.id}" style="margin-top:0.5rem;">
-          🎯 ${isCurrent ? 'Keep Focus on ' + escapeSpiderwebHtml(p.title) : 'Transform to ' + escapeSpiderwebHtml(p.title)}
+        <button type="button" class="btn-set-goal" data-type="phenotype" data-key="${p.id}" style="margin-top:0.5rem;${isGoalActive ? 'background:rgba(16,185,129,0.2);border-color:#10b981;color:#10b981;' : ''}">
+          ${isGoalActive ? '✓ Active Goal (Synced to Macrocycle Program)' : '🎯 ' + (isCurrent ? 'Keep Focus on ' + escapeSpiderwebHtml(p.title) : 'Transform to ' + escapeSpiderwebHtml(p.title))}
         </button>
       </div>
     `;
@@ -7233,13 +7303,18 @@ async function submitSpiderwebGoal(payload) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    showToast(`🎉 Active Training Goal Set: ${data.goal.target_title}!`);
+    showToast(`🎉 Active Goal & Macrocycle Synced: ${data.goal.target_title}!`);
     if (data.profile) {
       renderPowerSpiderweb(data.profile);
     } else {
       loadPowerSpiderweb(currentSpiderwebTimeframe);
     }
-    loadSpiderwebTargetAnalysis();
+    if (data.program) {
+      renderProgram(data.program);
+    }
+    await loadSpiderwebTargetAnalysis();
+    await loadDashboard();
+    await loadWorkout(state.currentDuration, state.currentIntensity);
     const card = document.getElementById("cardPowerSpiderweb");
     if (card) card.scrollIntoView({ behavior: "smooth" });
   } catch (err) {
