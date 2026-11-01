@@ -25,6 +25,14 @@ class TestMainViewSwitcher(unittest.TestCase):
         self.assertIn('id="viewDailyContainer"', self.html_content)
         self.assertIn('id="viewAnalysisContainer"', self.html_content)
 
+        # Tab switcher is placed directly in the top header navbar alongside nav-actions and brand
+        navbar_start = self.html_content.index('<header class="navbar">')
+        navbar_end = self.html_content.index('</header>')
+        switcher_idx = self.html_content.index('class="main-view-switcher"')
+        nav_actions_idx = self.html_content.index('class="nav-actions"')
+        self.assertTrue(navbar_start < switcher_idx < navbar_end)
+        self.assertTrue(navbar_start < nav_actions_idx < navbar_end)
+
         # Ensure cards are partitioned into their respective view containers
         daily_idx = self.html_content.index('id="viewDailyContainer"')
         analysis_idx = self.html_content.index('id="viewAnalysisContainer"')

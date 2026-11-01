@@ -45,6 +45,22 @@
         <span>Adaptive Coach & Zwift Sync</span>
       </div>
     </div>
+
+    <!-- Main Dashboard View Switcher Toggle (Daily Training vs Long-Term Analysis) -->
+    <nav class="main-view-switcher" aria-label="Dashboard View Selector">
+      <div class="main-view-tabs-container" role="tablist">
+        <button class="main-view-tab-btn active" id="tabMainViewDaily" type="button" role="tab" aria-selected="true" data-view="daily">
+          <span class="main-view-tab-icon">⚡</span>
+          <span class="main-view-tab-title">Daily Training</span>
+          <span class="main-view-tab-badge">Today</span>
+        </button>
+        <button class="main-view-tab-btn" id="tabMainViewAnalysis" type="button" role="tab" aria-selected="false" data-view="analysis">
+          <span class="main-view-tab-icon">📈</span>
+          <span class="main-view-tab-title">Long-Term Analysis</span>
+          <span class="main-view-tab-badge">Strategy</span>
+        </button>
+      </div>
+    </nav>
     
     <div class="nav-actions">
       <div class="badge-status" id="badgeWhoop" style="cursor:pointer;" title="Click to connect Whoop">
@@ -83,22 +99,6 @@
         🔑 Connect Whoop & Strava
       </button>
     </div>
-
-    <!-- Main Dashboard View Switcher Toggle (Daily Training vs Long-Term Analysis) -->
-    <nav class="main-view-switcher" aria-label="Dashboard View Selector">
-      <div class="main-view-tabs-container" role="tablist">
-        <button class="main-view-tab-btn active" id="tabMainViewDaily" type="button" role="tab" aria-selected="true" data-view="daily">
-          <span class="main-view-tab-icon">⚡</span>
-          <span class="main-view-tab-title">Daily Training</span>
-          <span class="main-view-tab-badge">Today</span>
-        </button>
-        <button class="main-view-tab-btn" id="tabMainViewAnalysis" type="button" role="tab" aria-selected="false" data-view="analysis">
-          <span class="main-view-tab-icon">📈</span>
-          <span class="main-view-tab-title">Long-Term Analysis</span>
-          <span class="main-view-tab-badge">Strategy</span>
-        </button>
-      </div>
-    </nav>
 
     <!-- Dashboard Master Controls Toolbar -->
     <div class="dashboard-toolbar">
