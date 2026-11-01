@@ -1675,6 +1675,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 0.25rem;
 }
 
+.program-stat-box-wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 640px) {
+  .program-stat-box-wide {
+    grid-column: 1 / -1;
+  }
+}
+
 .program-stat-label {
   font-size: var(--type-metric-label);
   font-weight: 600;

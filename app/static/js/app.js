@@ -3092,12 +3092,12 @@ btnSaveSettings.addEventListener("click", async () => {
       applyBaseTileLayer(payload.preferred_map_layer);
     }
     showToast("✅ Settings saved!");
+    hasSyncedInitialPlannerMode = false;
     await checkCoachGeminiStatus();
     await loadDashboard();
     await loadWorkout(state.currentDuration, state.currentIntensity);
     await loadDebrief();
     await loadPowerSpiderweb(currentSpiderwebTimeframe);
-    await loadSpiderwebTargetAnalysis();
   } catch (err) {
     showToast("⚠️ Failed to save settings.");
   }
@@ -6543,7 +6543,13 @@ function setupCollapsibleTile({
     }
   } catch (_) {}
 
-  return { isCollapsed, setCollapsed, toggle };
+  return {
+    isCollapsed,
+    setCollapsed,
+    toggle,
+    expand: () => setCollapsed(false),
+    collapse: () => setCollapsed(true)
+  };
 }
 
 // --- Power Spiderweb Tracker & Progress Over Time (Strava & Xert Model) ---
@@ -6713,9 +6719,9 @@ function renderSpiderwebSvg(axes, activeGoal) {
   const svg = document.getElementById("spiderwebSvg");
   if (!svg || !axes || axes.length === 0) return;
 
-  const cx = 210;
-  const cy = 190;
-  const r = 115;
+  const cx = 250;
+  const cy = 195;
+  const r = 110;
   const n = axes.length;
 
   const defsHtml = `
@@ -6846,9 +6852,9 @@ function renderSpiderwebSvg(axes, activeGoal) {
       }
     } else {
       if (Math.sin(angle) < 0) {
-        ly -= 10;
+        ly -= 16;
       } else {
-        ly += 16;
+        ly += 14;
       }
     }
 
@@ -6978,11 +6984,40 @@ let currentPlannerDurationKey = "20m";
 let currentTargetAnalysisData = null;
 let isPlannerNavBound = false;
 
-async function loadSpiderwebTargetAnalysis() {
+let hasSyncedInitialPlannerMode = false;
+
+async function loadSpiderwebTargetAnalysis(syncToActiveGoal = false) {
   try {
     const res = await fetch(`/api/power/spiderweb/target-analysis?timeframe=${encodeURIComponent(currentSpiderwebTimeframe || "30d")}`);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     currentTargetAnalysisData = await res.json();
+
+    const activeGoal = currentTargetAnalysisData.active_goal;
+    if ((syncToActiveGoal || !hasSyncedInitialPlannerMode) && activeGoal) {
+      hasSyncedInitialPlannerMode = true;
+      const btnDur = document.getElementById("btnPlannerTabDuration");
+      const btnPheno = document.getElementById("btnPlannerTabPhenotype");
+      const durView = document.getElementById("plannerDurationView");
+      const phenoView = document.getElementById("plannerPhenotypeView");
+
+      if (activeGoal.goal_type === "phenotype") {
+        currentPlannerMode = "phenotype";
+        btnPheno?.classList.add("active");
+        btnDur?.classList.remove("active");
+        if (durView) durView.style.display = "none";
+        if (phenoView) phenoView.style.display = "block";
+      } else if (activeGoal.goal_type === "duration") {
+        currentPlannerMode = "duration";
+        if (activeGoal.target_key) {
+          currentPlannerDurationKey = activeGoal.target_key;
+        }
+        btnDur?.classList.add("active");
+        btnPheno?.classList.remove("active");
+        if (durView) durView.style.display = "block";
+        if (phenoView) phenoView.style.display = "none";
+      }
+    }
+
     renderSpiderwebTargetPlanner();
   } catch (err) {
     console.warn("Failed to load spiderweb target analysis:", err);
@@ -7035,7 +7070,6 @@ function setupSpiderwebPlannerNav() {
           if (resp.program) {
             renderProgram(resp.program);
           }
-          await loadSpiderwebTargetAnalysis();
           await loadDashboard();
           await loadWorkout(state.currentDuration, state.currentIntensity);
         }
@@ -7059,6 +7093,9 @@ function setupSpiderwebPlannerNav() {
   if (btnJumpToMacrocycle) {
     btnJumpToMacrocycle.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (typeof switchMainDashboardView === "function" && currentActiveMainView !== "analysis") {
+        switchMainDashboardView("analysis", true);
+      }
       const card = document.getElementById("cardProgram");
       if (card) {
         if (programCollapsible && typeof programCollapsible.expand === "function") {
@@ -7073,6 +7110,9 @@ function setupSpiderwebPlannerNav() {
   if (btnJumpToSpiderweb) {
     btnJumpToSpiderweb.addEventListener("click", (e) => {
       e.stopPropagation();
+      if (typeof switchMainDashboardView === "function" && currentActiveMainView !== "analysis") {
+        switchMainDashboardView("analysis", true);
+      }
       if (powerSpiderwebCollapsible && typeof powerSpiderwebCollapsible.expand === "function") {
         powerSpiderwebCollapsible.expand();
       }
@@ -7303,6 +7343,7 @@ async function submitSpiderwebGoal(payload) {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    hasSyncedInitialPlannerMode = false;
     showToast(`🎉 Active Goal & Macrocycle Synced: ${data.goal.target_title}!`);
     if (data.profile) {
       renderPowerSpiderweb(data.profile);
@@ -7312,7 +7353,6 @@ async function submitSpiderwebGoal(payload) {
     if (data.program) {
       renderProgram(data.program);
     }
-    await loadSpiderwebTargetAnalysis();
     await loadDashboard();
     await loadWorkout(state.currentDuration, state.currentIntensity);
     const card = document.getElementById("cardPowerSpiderweb");
