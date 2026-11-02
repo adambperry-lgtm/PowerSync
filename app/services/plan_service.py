@@ -501,3 +501,157 @@ def compute_taper_leadup_schedule(
             })
             
     return schedule
+
+def execute_clear_plan(user_id: Optional[str] = None, is_recovery_week: bool = True, notes: str = "") -> Dict[str, Any]:
+    """
+    Centralized plan cancellation engine:
+    1. Deactivates target plans in SQLite.
+    2. Deletes scheduled interval sessions in database.
+    3. Clears coach chat planned sessions and active spiderweb goals.
+    4. Sets travel_recovery_week_active = True for seamless deload.
+    5. Rebuilds and caches today's Rest Day & Light Mobility bundle.
+    6. Refreshes 3-day forecast with restorative sessions.
+    7. Updates macrocycle program phase to 'Recovery & Travel Week'.
+    """
+    from app.database import (
+        get_current_user_id,
+        get_athlete_date,
+        clear_active_target_plans,
+        clear_scheduled_workouts,
+        set_setting,
+        get_setting,
+        get_db_connection
+    )
+    from app.services.forecast_service import clear_athlete_planned_session, save_coach_forecast_plan
+    from app.services.power_profile_service import clear_active_spiderweb_goal
+    from app.services.review_coach import build_preference_aligned_outlook_days
+    from app.services.program_service import get_current_program
+    from app.services.ai_coach import build_workout_bundle
+    from app.routers.workouts import USER_WORKOUT_CACHE, USER_OPTIONS_CACHE
+
+    uid = user_id or get_current_user_id()
+    today_iso = get_athlete_date(uid).isoformat()
+
+    # 1. Clear target plans and scheduled workouts
+    clear_active_target_plans(user_id=uid)
+    clear_scheduled_workouts(from_date=today_iso, user_id=uid)
+    clear_athlete_planned_session(user_id=uid)
+    clear_active_spiderweb_goal(user_id=uid)
+
+    if uid == "usr_guest":
+        clear_active_target_plans(user_id="usr_default")
+        clear_scheduled_workouts(from_date=today_iso, user_id="usr_default")
+        clear_athlete_planned_session(user_id="usr_default")
+        clear_active_spiderweb_goal(user_id="usr_default")
+    elif uid == "usr_default":
+        clear_active_target_plans(user_id="usr_guest")
+        clear_scheduled_workouts(from_date=today_iso, user_id="usr_guest")
+        clear_athlete_planned_session(user_id="usr_guest")
+        clear_active_spiderweb_goal(user_id="usr_guest")
+
+    # 2. Persist travel / recovery week state
+    set_setting("travel_recovery_week_active", True, user_id=uid)
+    set_setting("travel_recovery_week_start", today_iso, user_id=uid)
+    if notes:
+        set_setting("travel_recovery_week_notes", notes, user_id=uid)
+
+    if uid == "usr_guest":
+        set_setting("travel_recovery_week_active", True, user_id="usr_default")
+        set_setting("travel_recovery_week_start", today_iso, user_id="usr_default")
+        if notes:
+            set_setting("travel_recovery_week_notes", notes, user_id="usr_default")
+    elif uid == "usr_default":
+        set_setting("travel_recovery_week_active", True, user_id="usr_guest")
+        set_setting("travel_recovery_week_start", today_iso, user_id="usr_guest")
+        if notes:
+            set_setting("travel_recovery_week_notes", notes, user_id="usr_guest")
+
+    # 3. Retrieve Whoop recovery baseline & build rest/recovery workout bundle
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+    whoop_row = c.fetchone()
+    if not whoop_row and uid == "usr_guest":
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
+        whoop_row = c.fetchone()
+    conn.close()
+
+    rec_score = int(whoop_row["recovery_score"]) if whoop_row and whoop_row["recovery_score"] else 65
+    hrv_val = float(whoop_row["hrv"]) if whoop_row and whoop_row["hrv"] else 45.0
+    sleep_sc = int(whoop_row["sleep_score"]) if whoop_row and whoop_row["sleep_score"] else 75
+    try:
+        athlete_ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    except Exception:
+        athlete_ftp = 250
+
+    bundle = build_workout_bundle(
+        recovery_score=rec_score,
+        hrv_rmssd=hrv_val,
+        sleep_score=sleep_sc,
+        recent_volume_hours=4.5,
+        recent_high_intensity=False,
+        target_duration_min=0,
+        ftp=athlete_ftp
+    )
+
+    primary_w = bundle["primary"]
+    all_opts = bundle["all_options"]
+
+    # Invalidate and update caches
+    w_cache = USER_WORKOUT_CACHE.setdefault(uid, {})
+    o_cache = USER_OPTIONS_CACHE.setdefault(uid, {})
+    w_cache.clear()
+    w_cache.update(primary_w)
+    o_cache.clear()
+    for opt in all_opts:
+        o_cache[opt["id"]] = opt
+
+    other_uid = "usr_default" if uid == "usr_guest" else ("usr_guest" if uid == "usr_default" else None)
+    if other_uid:
+        ow_cache = USER_WORKOUT_CACHE.setdefault(other_uid, {})
+        oo_cache = USER_OPTIONS_CACHE.setdefault(other_uid, {})
+        ow_cache.clear()
+        ow_cache.update(primary_w)
+        oo_cache.clear()
+        for opt in all_opts:
+            oo_cache[opt["id"]] = opt
+
+    # 4. Generate refreshed restorative 3-day forecast
+    refreshed_outlook = []
+    try:
+        today_dt = get_athlete_date(uid)
+        refreshed_outlook = build_preference_aligned_outlook_days(
+            today=today_dt,
+            today_recovery=rec_score,
+            today_strain=0.0,
+            workout_strain=0.0,
+            is_today=False,
+            is_yesterday=False,
+            has_trained_today=False,
+            session_summary={},
+            ftp=athlete_ftp,
+            program={}
+        )
+        save_coach_forecast_plan(uid, refreshed_outlook)
+        if uid == "usr_guest":
+            save_coach_forecast_plan("usr_default", refreshed_outlook)
+        elif uid == "usr_default":
+            save_coach_forecast_plan("usr_guest", refreshed_outlook)
+    except Exception as e:
+        print("Error refreshing outlook in execute_clear_plan:", e)
+
+    # 5. Fetch updated macrocycle program
+    updated_program = get_current_program(user_id=uid)
+
+    return {
+        "success": True,
+        "action_type": "clear_upcoming_plan",
+        "is_recovery_week": True,
+        "plan_cleared": True,
+        "message": "Training plan cleared! Activated Rest & Travel Recovery Week with light cross-training and mobility.",
+        "active_workout": primary_w,
+        "workout": primary_w,
+        "options": all_opts,
+        "forecast": refreshed_outlook,
+        "program": updated_program
+    }

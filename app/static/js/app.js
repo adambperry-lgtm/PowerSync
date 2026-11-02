@@ -4734,10 +4734,28 @@ if (btnClearUpcomingPlan) {
       const res = await fetch("/api/plans/clear", { method: "POST" });
       const data = await res.json();
       if (data.success) {
-        showToast("Upcoming plan cleared. Schedule reverted.");
+        showToast("Training plan cleared. Deload & recovery active.");
+        if (data.active_workout || data.workout) {
+          const activeW = data.active_workout || data.workout;
+          state.currentWorkout = activeW;
+          state.activeOptionId = activeW.id;
+          state.currentDuration = activeW.duration_minutes;
+          if (data.options) state.workoutOptions = data.options;
+          syncDurationPills(state.currentDuration);
+          renderWorkout(state.currentWorkout);
+          renderWorkoutOptions(state.workoutOptions, state.activeOptionId);
+          renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
+        }
+        if (data.program) {
+          state.program = data.program;
+          if (typeof renderProgram === "function") {
+            renderProgram(state.program);
+          }
+        }
         await loadUpcomingPlan();
-        await loadWorkout(60, 0, "");
         await loadDebrief();
+        await loadDashboard();
+        await loadWorkout();
       }
     } catch (e) {
       console.error(e);
@@ -5895,8 +5913,8 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
       badgeLabel = `📅 Scheduled for ${d}`;
       btnLabel = "🚀 Sync to Zwift Calendar";
     } else if (isClear) {
-      badgeLabel = "🗑️ Clear Target Plan";
-      btnLabel = "🗑️ Confirm Clear Plan";
+      badgeLabel = "🗑️ Plan Cleared";
+      btnLabel = actionData.already_applied ? "✓ Plan Cleared! 🗑️" : "🗑️ Confirm Clear Plan";
     } else {
       badgeLabel = `🏆 Target Event (${actionData.target_date || 'Upcoming'})`;
       btnLabel = "🏆 Set as Target Event & Activate Taper";
@@ -5928,6 +5946,12 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
     `;
 
     const applyBtn = actionCard.querySelector(".btn-chat-apply-action");
+    if (actionData.already_applied && isClear) {
+      applyBtn.classList.remove("btn-primary");
+      applyBtn.classList.add("btn-applied");
+      applyBtn.disabled = true;
+    }
+
     applyBtn.addEventListener("click", async () => {
       applyBtn.disabled = true;
       applyBtn.textContent = "⏳ Applying...";
@@ -6117,7 +6141,32 @@ async function sendCoachMessage(text) {
       appendCoachChatMessage("coach", data.reply, data.proposed_action, data.executed_tools);
       coachChatHistory.push({ role: "model", text: data.reply });
 
-      if (data.scheduled_plans || data.proposed_action) {
+      if (data.cleared_plan || (data.proposed_action && data.proposed_action.action_type === "clear_upcoming_plan")) {
+        if (data.active_workout || data.workout) {
+          const activeW = data.active_workout || data.workout;
+          state.currentWorkout = activeW;
+          state.activeOptionId = activeW.id;
+          state.currentDuration = activeW.duration_minutes;
+          if (data.options) state.workoutOptions = data.options;
+          syncDurationPills(state.currentDuration);
+          renderWorkout(state.currentWorkout);
+          renderWorkoutOptions(state.workoutOptions, state.activeOptionId);
+          renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
+        }
+        if (data.program) {
+          state.program = data.program;
+          if (typeof renderProgram === "function") {
+            renderProgram(state.program);
+          }
+        }
+        const cardUpcoming = document.getElementById("cardUpcomingPlan");
+        if (cardUpcoming) cardUpcoming.style.display = "none";
+
+        if (typeof loadUpcomingPlan === "function") await loadUpcomingPlan();
+        if (typeof loadDebrief === "function") await loadDebrief();
+        if (typeof loadDashboard === "function") await loadDashboard();
+        if (typeof loadWorkout === "function") await loadWorkout();
+      } else if (data.scheduled_plans || data.proposed_action) {
         if (typeof loadDebrief === "function") {
           loadDebrief();
         }

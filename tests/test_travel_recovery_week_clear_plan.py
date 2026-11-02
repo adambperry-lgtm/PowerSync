@@ -48,7 +48,7 @@ class TestTravelRecoveryWeekClearPlan(unittest.TestCase):
         fallback = generate_sports_science_fallback_response(msg, snapshot)
         self.assertIn("Travel & Rest/Recovery Week", fallback)
         self.assertIn("cross-training", fallback)
-        self.assertIn("Confirm Clear Plan", fallback)
+        self.assertIn("completely cleared", fallback)
 
     def test_apply_chat_action_endpoint_activates_recovery_week(self):
         payload = ApplyChatActionPayload(
@@ -90,6 +90,48 @@ class TestTravelRecoveryWeekClearPlan(unittest.TestCase):
         self.assertGreaterEqual(len(forecast), 1)
         f_titles = [f.get("title") for f in forecast]
         self.assertTrue(any("Cross-Training" in t or "Recovery" in t for t in f_titles))
+
+    def test_cancel_the_plan_short_phrase_intent(self):
+        snapshot = {"athlete": {"ftp_watts": 260}}
+        for phrase in [
+            "cancel the plan",
+            "cancel my plan",
+            "cancel plan",
+            "clear the plan",
+            "i cancelled the plan in the chat again and it is still there on the app",
+            "cancel it",
+            "cancel"
+        ]:
+            action = build_sports_science_action(phrase, snapshot)
+            self.assertIsNotNone(action, f"Failed for phrase: {phrase}")
+            self.assertEqual(action.get("action_type"), "clear_upcoming_plan")
+            self.assertTrue(action.get("is_recovery_week"))
+
+    def test_handle_coach_chat_auto_applies_clear_plan(self):
+        from app.services.coach_chat_service import handle_coach_chat
+        res = handle_coach_chat("cancel my plan", [])
+        self.assertTrue(res.get("success"))
+        self.assertTrue(res.get("cleared_plan"))
+        self.assertTrue(get_setting("travel_recovery_week_active", False, user_id=self.user_id))
+
+        # Check active workout returned is rest/recovery
+        w = res.get("active_workout")
+        self.assertIsNotNone(w)
+        self.assertEqual(w.get("duration_minutes"), 0)
+        self.assertEqual(w.get("badge"), "🧘 Travel & Recovery Week")
+
+        # Check program is Recovery & Travel Week
+        prog = res.get("program")
+        self.assertIsNotNone(prog)
+        self.assertEqual(prog.get("phase"), "Recovery & Travel Week")
+
+    def test_clear_plans_endpoint_calls_execute_clear_plan(self):
+        from app.routers.plans import clear_active_plan
+        res = clear_active_plan()
+        self.assertTrue(res.get("success"))
+        self.assertTrue(res.get("plan_cleared"))
+        self.assertTrue(get_setting("travel_recovery_week_active", False, user_id=self.user_id))
+        self.assertEqual(res.get("active_workout", {}).get("duration_minutes"), 0)
 
 if __name__ == "__main__":
     unittest.main()

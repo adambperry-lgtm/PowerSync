@@ -36,10 +36,12 @@ class TestChatPlansAdjustForecast(unittest.TestCase):
         self.ctx_token = set_current_user_context(self.user_id)
         set_setting("athlete_ftp", 250, user_id=self.user_id)
         set_setting("athlete_timezone", "America/New_York", user_id=self.user_id)
+        set_setting("travel_recovery_week_active", False, user_id=self.user_id)
         clear_athlete_planned_session(user_id=self.user_id)
 
     def tearDown(self):
         clear_athlete_planned_session(user_id=self.user_id)
+        set_setting("travel_recovery_week_active", False, user_id=self.user_id)
         reset_current_user_context(self.ctx_token)
 
     def test_save_and_retrieve_planned_session(self):

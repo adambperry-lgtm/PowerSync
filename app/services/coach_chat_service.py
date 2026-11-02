@@ -308,8 +308,8 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
     today = datetime.date.today()
 
     # 0. Check for plan cancellation / clear intent or travel / recovery week intent
-    has_cancel_verb = any(v in msg for v in ["cancel", "clear", "remove", "delete", "drop", "reset"])
-    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule", "week"])
+    has_cancel_verb = any(v in msg for v in ["cancel", "clear", "remove", "delete", "drop", "reset", "stop"])
+    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule", "week", "training", "workout"])
     is_recovery_travel = any(k in msg for k in [
         "travel", "recovery", "recoveyr", "rest week", "rest and recovery", "rest and recoveyr",
         "cross-train", "cross train", "cross-trainig", "crosstraining", "deload", "vacation",
@@ -317,22 +317,18 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
         "new plan next week", "reset my week"
     ])
     is_clear_intent = (has_cancel_verb and has_plan_noun) or any(k in msg for k in [
-        "no longer doing", "wont be doing", "won't be doing", "not doing"
-    ]) or (is_recovery_travel and any(w in msg for w in ["clear", "reset", "cancel", "drop", "rest", "off", "start something new"]))
+        "no longer doing", "wont be doing", "won't be doing", "not doing", "cancel plan", "clear plan",
+        "cancel the plan", "clear the plan", "cancel my plan", "clear my plan", "cancelled the plan",
+        "canceled the plan", "cancelled my plan", "canceled my plan", "cancelled", "cancel it", "clear it",
+        "stop my plan", "drop my plan"
+    ]) or (is_recovery_travel and any(w in msg for w in ["clear", "reset", "cancel", "drop", "rest", "off", "start something new"])) or (msg in ["cancel", "clear", "cancel plan", "clear plan"])
 
     if is_clear_intent:
-        if is_recovery_travel:
-            return {
-                "action_type": "clear_upcoming_plan",
-                "is_recovery_week": True,
-                "title": "Clear Plan & Activate Travel / Recovery Week",
-                "description": "Clear high-intensity intervals for a Travel & Recovery week with light cross-training, resetting dashboard before launching a new block next week."
-            }
         return {
             "action_type": "clear_upcoming_plan",
-            "is_recovery_week": False,
-            "title": "Clear Target Event Plan",
-            "description": "Revert to standard training macrocycle progression and clear lead-up taper."
+            "is_recovery_week": True,
+            "title": "Clear Plan & Activate Travel / Recovery Week" if is_recovery_travel else "Clear Training Plan & Activate Recovery",
+            "description": "Clear high-intensity intervals for a Travel & Recovery week with light cross-training, resetting dashboard before launching a new block next week."
         }
 
     # 1. Check for daily workout / interval session intent (today OR scheduled for tomorrow/future date)
@@ -718,8 +714,8 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
     last_ride = recent[0] if recent else None
 
     # 0a. Clear / Cancel upcoming target event or activate travel/recovery week
-    has_cancel_verb = any(v in msg for v in ["cancel", "clear", "remove", "delete", "drop", "reset"])
-    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule", "week"])
+    has_cancel_verb = any(v in msg for v in ["cancel", "clear", "remove", "delete", "drop", "reset", "stop"])
+    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule", "week", "training", "workout"])
     is_recovery_travel = any(k in msg for k in [
         "travel", "recovery", "recoveyr", "rest week", "rest and recovery", "rest and recoveyr",
         "cross-train", "cross train", "cross-trainig", "crosstraining", "deload", "vacation",
@@ -727,20 +723,16 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
         "new plan next week", "reset my week"
     ])
     is_clear = (has_cancel_verb and has_plan_noun) or any(k in msg for k in [
-        "no longer doing", "wont be doing", "won't be doing", "not doing"
-    ]) or (is_recovery_travel and any(w in msg for w in ["clear", "reset", "cancel", "drop", "rest", "off", "start something new"]))
+        "no longer doing", "wont be doing", "won't be doing", "not doing", "cancel plan", "clear plan",
+        "cancel the plan", "clear the plan", "cancel my plan", "clear my plan", "cancelled the plan",
+        "canceled the plan", "cancelled my plan", "canceled my plan", "cancelled", "cancel it", "clear it",
+        "stop my plan", "drop my plan"
+    ]) or (is_recovery_travel and any(w in msg for w in ["clear", "reset", "cancel", "drop", "rest", "off", "start something new"])) or (msg in ["cancel", "clear", "cancel plan", "clear plan"])
 
     if is_clear or is_recovery_travel:
-        if is_recovery_travel:
-            return (
-                "Understood, Adam! I've cleared high-intensity intervals and staged a **Travel & Rest/Recovery Week** with light cross-training and mobility for this week. "
-                "Your daily workouts, 3-day forecast, and program will transition to restorative sessions so you can absorb past training and travel stress before starting your new block next week. "
-                "Tap **Confirm Clear Plan** below to reset your dashboard."
-            )
         return (
-            "I've got you covered, Adam. I've staged the cancellation of your upcoming target plan. "
-            "Your forward outlook and daily training prescriptions will revert to your standard macrocycle progression. "
-            "Tap **Confirm Clear Plan** below to reset your dashboard."
+            "Understood, Adam! I have completely cleared your training plan and reset your dashboard to a **Travel & Rest/Recovery Week** with light cross-training and mobility. "
+            "High-intensity intervals are removed, today is set to Rest & Mobility with optional light cross-training, your 3-day forecast is set to restorative sessions, and your macrocycle is in deload mode so you can absorb prior training and travel fatigue before launching your new block next week."
         )
 
     # 0a2. Workout Breakdown / Lap Telemetry Query (Direct Strava Tool Integration)
@@ -1060,7 +1052,8 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                     ftp=snapshot["athlete"]["ftp_watts"]
                 )
 
-            # Auto-persist planned upcoming sessions into coach forecast overrides
+            # Auto-persist planned upcoming sessions or auto-apply plan cancellation
+            applied_clear = None
             if proposed_action:
                 act_type = proposed_action.get("action_type")
                 t_date = proposed_action.get("target_date")
@@ -1068,7 +1061,9 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 if act_type in ("schedule_workout", "schedule_upcoming_plan") and t_date:
                     save_athlete_planned_session(t_date, proposed_action, user_id=uid)
                 elif act_type == "clear_upcoming_plan":
-                    clear_athlete_planned_session(user_id=uid)
+                    from app.services.plan_service import execute_clear_plan
+                    applied_clear = execute_clear_plan(user_id=uid, is_recovery_week=True, notes=user_message)
+                    proposed_action["already_applied"] = True
 
             # Prepend learned notice if Gemini didn't mention saving it
             reply_text = clean_reply
@@ -1086,6 +1081,11 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 "model": model_used,
                 "gemini_configured": True,
                 "proposed_action": proposed_action,
+                "cleared_plan": bool(applied_clear),
+                "active_workout": applied_clear.get("active_workout") if applied_clear else None,
+                "options": applied_clear.get("options") if applied_clear else None,
+                "forecast": applied_clear.get("forecast") if applied_clear else None,
+                "program": applied_clear.get("program") if applied_clear else None,
                 "scheduled_plans": chat_directives,
                 "executed_tools": executed_tools,
                 "athlete_snapshot": {
@@ -1126,7 +1126,8 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             ftp=snapshot["athlete"]["ftp_watts"]
         )
 
-    # Auto-persist planned upcoming sessions into coach forecast overrides
+    # Auto-persist planned upcoming sessions or auto-apply plan cancellation
+    applied_clear = None
     if proposed_action:
         act_type = proposed_action.get("action_type")
         t_date = proposed_action.get("target_date")
@@ -1134,7 +1135,9 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         if act_type in ("schedule_workout", "schedule_upcoming_plan") and t_date:
             save_athlete_planned_session(t_date, proposed_action, user_id=uid)
         elif act_type == "clear_upcoming_plan":
-            clear_athlete_planned_session(user_id=uid)
+            from app.services.plan_service import execute_clear_plan
+            applied_clear = execute_clear_plan(user_id=uid, is_recovery_week=True, notes=user_message)
+            proposed_action["already_applied"] = True
 
     reply_out = key_saved_notice + fallback_reply
     if chat_directives and not any(w in reply_out.lower() for w in ["forecast", "updated your plan", "3-day"]):
@@ -1156,6 +1159,11 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         "model": "powersync-coach-v1",
         "gemini_configured": bool(api_key),
         "proposed_action": proposed_action,
+        "cleared_plan": bool(applied_clear),
+        "active_workout": applied_clear.get("active_workout") if applied_clear else None,
+        "options": applied_clear.get("options") if applied_clear else None,
+        "forecast": applied_clear.get("forecast") if applied_clear else None,
+        "program": applied_clear.get("program") if applied_clear else None,
         "scheduled_plans": chat_directives,
         "executed_tools": fallback_tools,
         "athlete_snapshot": {

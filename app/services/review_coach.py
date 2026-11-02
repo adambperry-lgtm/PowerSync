@@ -296,8 +296,11 @@ def build_preference_aligned_outlook_days(
         is_default_rest = (cfg.get("is_default_rest", False) and not is_directive_rest) or (w_key == "saturday")
         mode = cfg.get("mode", "indoor_priority")
 
-        # CASE -1: Travel & Recovery Deload Week Active
-        if is_travel_recovery:
+        tgt_iso = target_date.isoformat()
+        has_specific_planned_session = bool(planned_sessions and tgt_iso in planned_sessions)
+
+        # CASE -1: Travel & Recovery Deload Week Active (when no explicit session is scheduled for this date)
+        if is_travel_recovery and not has_specific_planned_session:
             if offset == 1:
                 desc = (
                     f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Travel & Recovery Week: Light 30m cross-training & mobility session "

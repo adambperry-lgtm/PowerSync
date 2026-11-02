@@ -117,12 +117,10 @@ def upload_gpx(payload: UploadGpxPayload):
 
 @router.post("/clear")
 def clear_active_plan(req: Optional[ClearPlanRequest] = None):
-    """Deactivates active target plans and returns default training progression."""
-    db_clear_active_target_plans()
-    return {
-        "success": True,
-        "message": "Upcoming target plan cleared. Training schedule reverted to standard progression."
-    }
+    """Deactivates active target plans and resets dashboard to restorative recovery progression."""
+    from app.services.plan_service import execute_clear_plan
+    res = execute_clear_plan()
+    return res
 
 @router.delete("/{plan_id}")
 def delete_plan(plan_id: str):
