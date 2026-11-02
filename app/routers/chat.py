@@ -382,6 +382,11 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 "description": data.get("description") or "Scheduled via AI Coach chat consultation"
             }
             plan_id = save_target_plan(plan_dict)
+            set_setting("travel_recovery_week_active", False, user_id=uid)
+            if uid == "usr_guest":
+                set_setting("travel_recovery_week_active", False, user_id="usr_default")
+            elif uid == "usr_default":
+                set_setting("travel_recovery_week_active", False, user_id="usr_guest")
             from app.services.forecast_service import save_athlete_planned_session, save_coach_forecast_plan
             save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id=uid)
             if uid == "usr_guest":
@@ -424,12 +429,17 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             }
 
         elif action_type == "clear_upcoming_plan":
-            from app.database import clear_active_target_plans
+            from app.database import clear_active_target_plans, clear_scheduled_workouts
+            today_iso = get_athlete_date(uid).isoformat()
             clear_active_target_plans(user_id=uid)
+            clear_scheduled_workouts(from_date=today_iso, user_id=uid)
             if uid == "usr_guest":
                 clear_active_target_plans(user_id="usr_default")
+                clear_scheduled_workouts(from_date=today_iso, user_id="usr_default")
             elif uid == "usr_default":
                 clear_active_target_plans(user_id="usr_guest")
+                clear_scheduled_workouts(from_date=today_iso, user_id="usr_guest")
+
             from app.services.forecast_service import clear_athlete_planned_session, save_coach_forecast_plan
             clear_athlete_planned_session(user_id=uid)
             if uid == "usr_guest":
@@ -437,19 +447,94 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             elif uid == "usr_default":
                 clear_athlete_planned_session(user_id="usr_guest")
 
+            # Check if this clear action is for a Travel / Rest / Recovery Week
+            title_text = str(data.get("title", "")).lower()
+            desc_text = str(data.get("description", "")).lower()
+            is_recovery_week = bool(
+                data.get("is_recovery_week") or
+                any(w in title_text or w in desc_text for w in ["recovery", "travel", "rest", "recoveyr", "cross-train", "deload"])
+            )
+
+            if is_recovery_week:
+                set_setting("travel_recovery_week_active", True, user_id=uid)
+                set_setting("travel_recovery_week_start", today_iso, user_id=uid)
+                if uid == "usr_guest":
+                    set_setting("travel_recovery_week_active", True, user_id="usr_default")
+                    set_setting("travel_recovery_week_start", today_iso, user_id="usr_default")
+                elif uid == "usr_default":
+                    set_setting("travel_recovery_week_active", True, user_id="usr_guest")
+                    set_setting("travel_recovery_week_start", today_iso, user_id="usr_guest")
+            else:
+                set_setting("travel_recovery_week_active", False, user_id=uid)
+                if uid in ("usr_guest", "usr_default"):
+                    set_setting("travel_recovery_week_active", False, user_id="usr_default")
+                    set_setting("travel_recovery_week_active", False, user_id="usr_guest")
+
+            # Re-generate workout bundle and refresh workout cache
+            from app.routers.workouts import USER_WORKOUT_CACHE, USER_OPTIONS_CACHE
+            from app.services.ai_coach import build_workout_bundle
+            from app.database import get_db_connection
+
+            conn = get_db_connection()
+            c = conn.cursor()
+            c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+            whoop_row = c.fetchone()
+            if not whoop_row and uid == "usr_guest":
+                c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
+                whoop_row = c.fetchone()
+            conn.close()
+
+            rec_score = int(whoop_row["recovery_score"]) if whoop_row and whoop_row["recovery_score"] else 65
+            hrv_val = float(whoop_row["hrv"]) if whoop_row and whoop_row["hrv"] else 45.0
+            sleep_sc = int(whoop_row["sleep_score"]) if whoop_row and whoop_row["sleep_score"] else 75
+            athlete_ftp = _clean_int(get_setting("athlete_ftp", 250, user_id=uid), 250)
+
+            bundle = build_workout_bundle(
+                recovery_score=rec_score,
+                hrv_rmssd=hrv_val,
+                sleep_score=sleep_sc,
+                recent_volume_hours=4.5,
+                recent_high_intensity=False,
+                target_duration_min=45,
+                ftp=athlete_ftp
+            )
+
+            primary_w = bundle["primary"]
+            all_opts = bundle["all_options"]
+
+            w_cache = USER_WORKOUT_CACHE.setdefault(uid, {})
+            o_cache = USER_OPTIONS_CACHE.setdefault(uid, {})
+            w_cache.clear()
+            w_cache.update(primary_w)
+            o_cache.clear()
+            for opt in all_opts:
+                o_cache[opt["id"]] = opt
+
+            other_uid = "usr_default" if uid == "usr_guest" else ("usr_guest" if uid == "usr_default" else None)
+            if other_uid:
+                ow_cache = USER_WORKOUT_CACHE.setdefault(other_uid, {})
+                oo_cache = USER_OPTIONS_CACHE.setdefault(other_uid, {})
+                ow_cache.clear()
+                ow_cache.update(primary_w)
+                oo_cache.clear()
+                for opt in all_opts:
+                    oo_cache[opt["id"]] = opt
+
             from app.services.review_coach import build_preference_aligned_outlook_days
+            from app.services.program_service import get_current_program
+            refreshed_outlook = []
             try:
                 today_dt = get_athlete_date(uid)
                 refreshed_outlook = build_preference_aligned_outlook_days(
                     today=today_dt,
-                    today_recovery=75,
+                    today_recovery=rec_score,
                     today_strain=5.0,
-                    workout_strain=5.0,
+                    workout_strain=0.0 if is_recovery_week else 5.0,
                     is_today=False,
                     is_yesterday=False,
                     has_trained_today=False,
                     session_summary={},
-                    ftp=_clean_int(get_setting("athlete_ftp", 250, user_id=uid), 250),
+                    ftp=athlete_ftp,
                     program={}
                 )
                 save_coach_forecast_plan(uid, refreshed_outlook)
@@ -460,10 +545,24 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             except Exception:
                 pass
 
+            updated_program = get_current_program(user_id=uid)
+
+            msg = (
+                "Plan cleared and Travel & Recovery Week activated! Today's session is set to Rest & Mobility with light cross-training options."
+                if is_recovery_week
+                else "Upcoming target plan cleared! Reverted to standard progression."
+            )
+
             return {
                 "success": True,
                 "action_type": "clear_upcoming_plan",
-                "message": "Upcoming target plan cleared! Reverted to standard progression."
+                "is_recovery_week": is_recovery_week,
+                "message": msg,
+                "active_workout": primary_w,
+                "workout": primary_w,
+                "options": all_opts,
+                "forecast": refreshed_outlook,
+                "program": updated_program
             }
 
         else:

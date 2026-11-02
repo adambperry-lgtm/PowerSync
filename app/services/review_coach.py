@@ -277,6 +277,8 @@ def build_preference_aligned_outlook_days(
     planned_sessions = get_athlete_planned_sessions(uid)
     active_target_plan = get_active_target_plan(uid)
 
+    is_travel_recovery = bool(get_setting("travel_recovery_week_active", False, user_id=uid))
+
     for offset in [1, 2, 3]:
         target_date = today + datetime.timedelta(days=offset)
         rec_est = recoveries[offset - 1]
@@ -293,6 +295,98 @@ def build_preference_aligned_outlook_days(
         is_directive_rest = (w_key in must_rest_days) or cfg.get("is_directive_rest", False)
         is_default_rest = (cfg.get("is_default_rest", False) and not is_directive_rest) or (w_key == "saturday")
         mode = cfg.get("mode", "indoor_priority")
+
+        # CASE -1: Travel & Recovery Deload Week Active
+        if is_travel_recovery:
+            if offset == 1:
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Travel & Recovery Week: Light 30m cross-training & mobility session "
+                    f"focusing on hips, core, and thoracic spine to ease travel fatigue without cardiovascular strain."
+                )
+                item = {
+                    "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": "30-Min Light Cross-Training & Mobility",
+                    "duration_min": 30,
+                    "estimated_tss": 15,
+                    "estimated_xss": 15,
+                    "low_xss": 15,
+                    "high_xss": 0,
+                    "peak_xss": 0,
+                    "focus_duration": "Active Recovery & Mobility",
+                    "focus": "Cross-Training",
+                    "intervals": [
+                        {"type": "Warmup", "duration_sec": 300, "power_low_pct": 35, "power_high_pct": 45, "cadence": 80, "name": "Dynamic Joint Mobility & Breathing"},
+                        {"type": "SteadyState", "duration_sec": 1200, "power_pct": 45, "cadence": 85, "name": "Gentle Aerobic Flow / Core Stability"},
+                        {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 35, "cadence": 80, "name": "Full Body Lengthening & Relaxation"}
+                    ],
+                    "ai_rationale": desc,
+                    "description": desc
+                }
+            elif offset == 2:
+                desc = (
+                    f"Expected Recovery: ~{min(85, rec_est + 10)}% (Rebound). Travel & Recovery Week: Dedicated rest day. "
+                    f"Focus on hydration, restorative sleep, and letting autonomic nervous system fully rebound."
+                )
+                item = {
+                    "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": min(85, rec_est + 10),
+                    "projected_zone": "green",
+                    "title": "Rest Day (Travel & Recovery)",
+                    "duration_min": 0,
+                    "estimated_tss": 0,
+                    "estimated_xss": 0,
+                    "low_xss": 0,
+                    "high_xss": 0,
+                    "peak_xss": 0,
+                    "focus_duration": "Rest & Recovery",
+                    "focus": "Rest & Recovery",
+                    "is_default_rest": True,
+                    "intervals": [],
+                    "ai_rationale": desc,
+                    "description": desc
+                }
+            else:
+                desc = (
+                    f"Expected Recovery: ~{rec_est}% ({zone.capitalize()}). Travel & Recovery Week: Light 20m active recovery flush "
+                    f"or walk (<50% FTP) to maintain metabolic suppleness ahead of your new training block next week."
+                )
+                item = {
+                    "day_offset": offset,
+                    "target_date": target_date.isoformat(),
+                    "date_iso": target_date.isoformat(),
+                    "date_relative": date_relative,
+                    "date_formatted": date_formatted,
+                    "projected_recovery": rec_est,
+                    "projected_zone": zone,
+                    "title": "20-Min Active Recovery Flush",
+                    "duration_min": 20,
+                    "estimated_tss": 10,
+                    "estimated_xss": 10,
+                    "low_xss": 10,
+                    "high_xss": 0,
+                    "peak_xss": 0,
+                    "focus_duration": "Active Flush",
+                    "focus": "Active Recovery",
+                    "intervals": [
+                        {"type": "Warmup", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 50, "cadence": 85, "name": "Gentle Spin"},
+                        {"type": "SteadyState", "duration_sec": 600, "power_pct": 50, "cadence": 88, "name": "Easy Flush"},
+                        {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 48, "power_high_pct": 38, "cadence": 80, "name": "Spin Out"}
+                    ],
+                    "ai_rationale": desc,
+                    "description": desc
+                }
+            outlook_days.append(item)
+            continue
 
         # CASE 0: Directive-Mandated Rest / Easy Day (e.g. Thursday when Mon/Tue/Wed workouts were logged)
         if is_directive_rest:

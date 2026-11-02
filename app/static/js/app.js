@@ -5959,7 +5959,37 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
           const todayIso = new Date().toISOString().slice(0, 10);
           const isForToday = isToday || (isScheduleWorkout && (resData.is_for_today || resData.target_date === todayIso || actionData.target_date === todayIso));
 
-          if (isForToday && (resData.active_workout || resData.workout)) {
+          if (isClear) {
+            if (resData.active_workout || resData.workout) {
+              const activeW = resData.active_workout || resData.workout;
+              state.currentWorkout = activeW;
+              state.activeOptionId = activeW.id;
+              state.currentDuration = activeW.duration_minutes;
+              if (resData.options) state.workoutOptions = resData.options;
+              syncDurationPills(state.currentDuration);
+              renderWorkout(state.currentWorkout);
+              renderWorkoutOptions(state.workoutOptions, state.activeOptionId);
+              renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
+            }
+            if (resData.program) {
+              state.program = resData.program;
+              if (typeof renderProgram === "function") {
+                renderProgram(state.program);
+              }
+            }
+            if (typeof loadUpcomingPlan === "function") {
+              await loadUpcomingPlan();
+            }
+            if (typeof loadDebrief === "function") {
+              await loadDebrief();
+            }
+            if (typeof loadDashboard === "function") {
+              await loadDashboard();
+            }
+            if (typeof loadWorkout === "function") {
+              await loadWorkout();
+            }
+          } else if (isForToday && (resData.active_workout || resData.workout)) {
             const activeW = resData.active_workout || resData.workout;
             if (resData.synced_to_zwift) {
               activeW.pushed_to_zwift = true;

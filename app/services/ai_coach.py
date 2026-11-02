@@ -82,11 +82,40 @@ def build_adaptive_workout_local(
     has_glycolytic_surge = (acute_high_xss >= 30.0 or yesterday_high_xss >= 20.0)
 
     # 0. Parse explicit duration or intent from user_note if provided
+    from app.database import get_setting, get_current_user_id
+    uid = get_current_user_id()
+    is_travel_recovery = bool(get_setting("travel_recovery_week_active", False, user_id=uid))
+
     import re
     note_clean = (user_note or "").strip().lower()
     wants_rest_note = bool(note_clean and any(k in note_clean for k in [
         "rest day", "take today off", "full rest", "skip today", "no ride", "day off"
     ]) and not any(k in note_clean for k in ["active", "spin", "flush"]))
+
+    if is_travel_recovery and not (note_clean and not wants_rest_note):
+        title = "Rest Day & Light Mobility (Travel Week)"
+        focus_area = "Rest & Recovery"
+        badge_text = "🧘 Travel & Recovery Week"
+        ai_rationale = (
+            "Travel & Recovery Week Active: High-intensity intervals are cleared. Today is designated for restorative passive rest, travel adaptation, or light mobility to absorb prior training load before starting your new block next week."
+        )
+        workout_obj = {
+            "id": "workout_primary",
+            "option_type": "rest",
+            "badge": badge_text,
+            "badge_color": "emerald",
+            "title": title,
+            "description": "Rest, travel recovery, and light mobility work.",
+            "focus_area": focus_area,
+            "duration_minutes": 0,
+            "estimated_tss": 0,
+            "ai_rationale": ai_rationale,
+            "intervals": [],
+            "is_travel_recovery": True
+        }
+        workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
+        workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+        return enrich_workout_strain(workout_obj, ftp)
 
     if note_clean and not wants_rest_note:
         dur_min_match = re.search(r'\b(\d{2,3})\s*(?:m|min|mins|minute|minutes)\b', note_clean)
@@ -882,6 +911,55 @@ def build_workout_bundle(
         strain_profile=strain_profile,
         target_date=target_date
     )
+
+    if primary.get("is_travel_recovery") or (primary.get("option_type") == "rest" and bool(get_setting("travel_recovery_week_active", False, user_id=get_current_user_id()))):
+        alt_cross = {
+            "id": "workout_alt_crosstrain",
+            "option_type": "cross_training",
+            "badge": "🧘 Light Cross-Training (30m)",
+            "badge_color": "emerald",
+            "title": "30-Min Light Cross-Training & Mobility",
+            "description": "Gentle core, hip openers, bodyweight mobility, or light walk/cross-training while traveling.",
+            "focus_area": "Cross-Training",
+            "duration_minutes": 30,
+            "estimated_tss": 15,
+            "ai_rationale": "Light cross-training session focusing on joint mobility, thoracic extension, and gentle movement to counteract travel stiffness without creating neuromuscular fatigue.",
+            "intervals": [
+                {"type": "Warmup", "duration_sec": 300, "power_low_pct": 35, "power_high_pct": 45, "cadence": 80, "name": "Dynamic Joint Mobility & Breathing"},
+                {"type": "SteadyState", "duration_sec": 1200, "power_pct": 45, "cadence": 85, "name": "Gentle Aerobic Flow / Core Stability"},
+                {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 35, "cadence": 80, "name": "Full Body Lengthening & Relaxation"}
+            ]
+        }
+        alt_cross["zwo_content"] = generate_zwo_xml(alt_cross, ftp)
+        alt_cross["intervals_icu_text"] = generate_intervals_icu_text(alt_cross)
+        alt_cross = enrich_workout_strain(alt_cross, ftp)
+
+        alt_flush = {
+            "id": "workout_alt_flush",
+            "option_type": "flush",
+            "badge": "🌱 Gentle Leg Flush (20m)",
+            "badge_color": "emerald",
+            "title": "20-Min Active Recovery Flush",
+            "description": "Very light recovery spin or walk to keep muscles loose",
+            "focus_area": "Active Flush",
+            "duration_minutes": 20,
+            "estimated_tss": 10,
+            "ai_rationale": "Light 20-minute gentle flush (<50% FTP) to stimulate circulation and lymphatic clearance without placing metabolic strain on muscles.",
+            "intervals": [
+                {"type": "Warmup", "duration_sec": 300, "power_low_pct": 40, "power_high_pct": 50, "cadence": 85, "name": "Gentle Spin"},
+                {"type": "SteadyState", "duration_sec": 600, "power_pct": 50, "cadence": 88, "name": "Easy Flush"},
+                {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 48, "power_high_pct": 38, "cadence": 80, "name": "Spin Out"}
+            ]
+        }
+        alt_flush["zwo_content"] = generate_zwo_xml(alt_flush, ftp)
+        alt_flush["intervals_icu_text"] = generate_intervals_icu_text(alt_flush)
+        alt_flush = enrich_workout_strain(alt_flush, ftp)
+
+        return {
+            "primary": primary,
+            "alternatives": [alt_cross, alt_flush],
+            "all_options": [primary, alt_cross, alt_flush]
+        }
 
     if primary.get("option_type") == "rest" or primary.get("duration_minutes") == 0:
         alt_flush = {

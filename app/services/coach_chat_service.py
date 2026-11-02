@@ -212,7 +212,7 @@ def build_system_prompt(snapshot: Dict[str, Any]) -> str:
         "B. 'schedule_workout': When Adam wants to schedule a REGULAR DAILY WORKOUT for TOMORROW or an upcoming date (indoor trainer / Zwift session, over-unders, sweet spot, intervals, recovery spin). "
         "IMPORTANT: This is a standard daily workout, NOT a major target event or race! It must NOT create a target event plan, must NOT trigger a multi-day taper lead-up banner, and must NEVER have fake outdoor road distance like 40 miles for a 45-min workout (distance_miles must be 0.0 or realistic virtual miles, and elevation_gain_ft must be 0). When confirmed, it syncs directly to Zwift/Intervals.icu calendar for that target date.\n"
         "C. 'schedule_upcoming_plan': ONLY for Major Target Events, Gran Fondos, Century Rides, Races, or Big Destination Group Rides (typically 25+ miles or event-focused) that require a multi-day lead-up taper periodization.\n"
-        "D. 'clear_upcoming_plan': Cancels or clears an active upcoming target event plan.\n\n"
+        "D. 'clear_upcoming_plan': Cancels or clears an active upcoming target event plan, or clears the training plan for a rest/travel/recovery week (set is_recovery_week: true if athlete mentions travel, recovery week, deload, or cross-training).\n\n"
         "CRITICAL WORKOUT DURATION INVARIANT:\n"
         "The total duration across all interval steps MUST EQUAL EXACTLY duration_minutes * 60 seconds! Intervals.icu and Zwift calculate workout duration strictly by summing step durations. If the steps sum to 30m or 39m, Intervals.icu will display 30m or 39m regardless of title! Always make sure (warmup + sum(repeats) + steady/bridge + cooldown) == duration_minutes * 60 seconds.\n\n"
         "Schema examples:\n"
@@ -307,15 +307,30 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
     ftp = int(snapshot.get("athlete", {}).get("ftp_watts", 250))
     today = datetime.date.today()
 
-    # 0. Check for plan cancellation / clear intent
+    # 0. Check for plan cancellation / clear intent or travel / recovery week intent
     has_cancel_verb = any(v in msg for v in ["cancel", "clear", "remove", "delete", "drop", "reset"])
-    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule"])
+    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule", "week"])
+    is_recovery_travel = any(k in msg for k in [
+        "travel", "recovery", "recoveyr", "rest week", "rest and recovery", "rest and recoveyr",
+        "cross-train", "cross train", "cross-trainig", "crosstraining", "deload", "vacation",
+        "taking this week off", "take this week off", "start something new next week",
+        "new plan next week", "reset my week"
+    ])
     is_clear_intent = (has_cancel_verb and has_plan_noun) or any(k in msg for k in [
         "no longer doing", "wont be doing", "won't be doing", "not doing"
-    ])
+    ]) or (is_recovery_travel and any(w in msg for w in ["clear", "reset", "cancel", "drop", "rest", "off", "start something new"]))
+
     if is_clear_intent:
+        if is_recovery_travel:
+            return {
+                "action_type": "clear_upcoming_plan",
+                "is_recovery_week": True,
+                "title": "Clear Plan & Activate Travel / Recovery Week",
+                "description": "Clear high-intensity intervals for a Travel & Recovery week with light cross-training, resetting dashboard before launching a new block next week."
+            }
         return {
             "action_type": "clear_upcoming_plan",
+            "is_recovery_week": False,
             "title": "Clear Target Event Plan",
             "description": "Revert to standard training macrocycle progression and clear lead-up taper."
         }
@@ -702,13 +717,26 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
     recent = snapshot["training_load_strava"]["recent_rides"]
     last_ride = recent[0] if recent else None
 
-    # 0a. Clear / Cancel upcoming target event
+    # 0a. Clear / Cancel upcoming target event or activate travel/recovery week
     has_cancel_verb = any(v in msg for v in ["cancel", "clear", "remove", "delete", "drop", "reset"])
-    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule"])
+    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule", "week"])
+    is_recovery_travel = any(k in msg for k in [
+        "travel", "recovery", "recoveyr", "rest week", "rest and recovery", "rest and recoveyr",
+        "cross-train", "cross train", "cross-trainig", "crosstraining", "deload", "vacation",
+        "taking this week off", "take this week off", "start something new next week",
+        "new plan next week", "reset my week"
+    ])
     is_clear = (has_cancel_verb and has_plan_noun) or any(k in msg for k in [
         "no longer doing", "wont be doing", "won't be doing", "not doing"
-    ])
-    if is_clear:
+    ]) or (is_recovery_travel and any(w in msg for w in ["clear", "reset", "cancel", "drop", "rest", "off", "start something new"]))
+
+    if is_clear or is_recovery_travel:
+        if is_recovery_travel:
+            return (
+                "Understood, Adam! I've cleared high-intensity intervals and staged a **Travel & Rest/Recovery Week** with light cross-training and mobility for this week. "
+                "Your daily workouts, 3-day forecast, and program will transition to restorative sessions so you can absorb past training and travel stress before starting your new block next week. "
+                "Tap **Confirm Clear Plan** below to reset your dashboard."
+            )
         return (
             "I've got you covered, Adam. I've staged the cancellation of your upcoming target plan. "
             "Your forward outlook and daily training prescriptions will revert to your standard macrocycle progression. "

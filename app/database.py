@@ -1526,6 +1526,26 @@ def get_upcoming_scheduled_workouts(from_date: str, user_id: Optional[str] = Non
         res.append(w)
     return res
 
+def clear_scheduled_workouts(from_date: Optional[str] = None, user_id: Optional[str] = None) -> int:
+    """Cancels or deletes scheduled/prescribed workouts from from_date onwards for user."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if from_date:
+        cursor.execute("""
+            DELETE FROM workouts
+            WHERE user_id = ? AND date >= ? AND status IN ('scheduled', 'prescribed')
+        """, (uid, from_date))
+    else:
+        cursor.execute("""
+            DELETE FROM workouts
+            WHERE user_id = ? AND status IN ('scheduled', 'prescribed')
+        """, (uid,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted
+
 def claim_or_copy_default_data_to_user(target_user_id: str) -> Dict[str, Any]:
     """
     Copies all settings, directives, biometrics, activities, workouts, and plans

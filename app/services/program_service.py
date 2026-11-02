@@ -100,9 +100,16 @@ def get_current_program(
     total_weeks = max(1, round(total_days / 7))
     current_week = min(total_weeks, max(1, (elapsed_days // 7) + 1))
     
-    # Determine Periodization Phase (Base -> Build -> Peak -> Taper)
+    # Determine Periodization Phase (Base -> Build -> Peak -> Taper) or Active Travel/Recovery Deload Week
+    is_travel_recovery = bool(get_setting("travel_recovery_week_active", False, user_id=uid))
     pct_elapsed = min(1.0, elapsed_days / float(total_days))
-    if pct_elapsed < 0.40:
+    if is_travel_recovery:
+        phase = "Recovery & Travel Week"
+        phase_focus = "Rest, Recovery & Light Cross-Training"
+        phase_desc = "Scheduled deload & travel week. Priority is metabolic recovery, mobility, and shedding chronic fatigue before launching a new training block next week."
+        target_focus_duration = "Active Recovery & Mobility"
+        target_strain_distribution = {"low_pct": 95, "high_pct": 5, "peak_pct": 0}
+    elif pct_elapsed < 0.40:
         phase = "Base Phase"
         phase_focus = "Aerobic Base & Muscular Durability"
         phase_desc = "Building mitochondrial volume and cadence economy with Zone 2 foundations."
