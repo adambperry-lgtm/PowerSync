@@ -5,6 +5,13 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.4.4] - 2026-11-09
+### Changed
+- **Header Branding & Subtitle**:
+  - Updated the navbar branding subtitle from "Adaptive Coach & Zwift Sync" to "AI Cycling Coach".
+
+---
+
 ## [2.4.3] - 2026-11-01
 ### Hardened & Fixed
 - **Backend Code Audit & Null Safety Remediation**:

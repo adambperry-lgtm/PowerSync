@@ -122,9 +122,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.4.3",
-        "release_name": "Comprehensive Code Audit, Multi-User Isolation & UI Hardening",
-        "build_date": "2026-11-01",
+        "version": "2.4.4",
+        "release_name": "Header Branding Subtitle Update",
+        "build_date": "2026-11-09",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -133,6 +133,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.4.4",
+                "date": "2026-11-09",
+                "title": "Header Branding Subtitle Update",
+                "items": [
+                    "Updated navbar branding subtitle from 'Adaptive Coach & Zwift Sync' to 'AI Cycling Coach'."
+                ]
+            },
             {
                 "version": "v2.4.3",
                 "date": "2026-11-01",
