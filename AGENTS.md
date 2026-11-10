@@ -35,3 +35,12 @@ Whenever **meaningful updates** (new features, architectural enhancements, bug f
 - 3-Tier strain tracking partitions mechanical work into Low (Aerobic), High (Glycolytic), and Peak (Sprint) strain based on athlete FTP and $W'$.
 - Workout generation must respect user recovery, weekly day-by-day duration rules, dedicated rest days, and catalog anti-repetition tracking.
 - Daily workout suggestions must align with forward forecasts stored in `coach_forecast_plan` when recovery assumptions hold true.
+
+---
+
+## 4. Automatic Git Push & Deployment to Railway (MANDATORY)
+
+- Whenever changes, fixes, or updates are implemented and verified in this repository, the agent **MUST automatically**:
+  1. Stage and commit the changed files with a concise, descriptive commit message.
+  2. Push the commit to `origin/main` (`git push origin main`).
+- PowerSync is linked directly to Railway via GitHub integration; pushing to `main` immediately triggers the production build and deployment pipeline. Never leave finished changes uncommitted or unpushed in the local workspace.
