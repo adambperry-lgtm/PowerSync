@@ -697,12 +697,13 @@ def get_all_settings(user_id: Optional[str] = None) -> Dict[str, Any]:
         except Exception:
             result[r["key"]] = r["value"]
 
-    # Fallback to environment variables for global credentials
-    for k in GLOBAL_ENV_KEYS:
-        if k not in result or result[k] is None or (isinstance(result[k], str) and not result[k].strip()):
-            env_val = get_env_fallback(k)
-            if env_val is not None:
-                result[k] = env_val
+    # Fallback to environment variables for global credentials (authenticated users only)
+    if uid != GUEST_USER_ID:
+        for k in GLOBAL_ENV_KEYS:
+            if k not in result or result[k] is None or (isinstance(result[k], str) and not result[k].strip()):
+                env_val = get_env_fallback(k)
+                if env_val is not None:
+                    result[k] = env_val
 
     # For default user, also inherit other non-secret env defaults
     if uid == DEFAULT_USER_ID:

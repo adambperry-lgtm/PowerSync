@@ -122,9 +122,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.4.4",
-        "release_name": "Header Branding Subtitle Update",
-        "build_date": "2026-11-09",
+        "version": "2.4.5",
+        "release_name": "Settings Authentication & Credential Hardening",
+        "build_date": "2026-11-10",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -133,6 +133,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.4.5",
+                "date": "2026-11-10",
+                "title": "Settings Authentication & Credential Hardening",
+                "items": [
+                    "Authenticated /api/settings Guard: Placed /api/settings and all coaching preference sub-routes behind mandatory session authentication (HTTP 401 Unauthorized for unauthenticated requests).",
+                    "Zero-Credential Response Payload: Removed masked API key strings and raw OAuth client IDs from /api/settings and /api/auth/google/status responses, exposing only boolean status indicators.",
+                    "Endpoint Security Hardening: Restricted /api/auth/debug-headers, /api/auth/lock-owner, /api/auth/disconnect, /api/chat/save-key, and /api/chat/test-connection to signed-in sessions."
+                ]
+            },
             {
                 "version": "v2.4.4",
                 "date": "2026-11-09",

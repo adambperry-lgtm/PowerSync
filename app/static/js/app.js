@@ -2848,10 +2848,25 @@ async function loadAndRenderCoachingPreferences() {
 
 // Settings Modal Handlers
 function openSettingsModal() {
+  if (!currentAthleteUser || currentAthleteUser.is_guest) {
+    showToast("🔒 Please sign in to access Settings");
+    openAuthModal();
+    return;
+  }
   loadAndRenderCoachingPreferences();
   fetch("/api/settings")
-    .then(r => r.json())
+    .then(async r => {
+      if (!r.ok) {
+        if (r.status === 401) {
+          showToast("🔒 Please sign in to access Settings");
+          openAuthModal();
+        }
+        return null;
+      }
+      return r.json();
+    })
     .then(s => {
+      if (!s) return;
       document.getElementById("settingIntervalsAthleteId").value = s.intervals_athlete_id || "";
       const intervalsKeyInput = document.getElementById("settingIntervalsApiKey");
       if (intervalsKeyInput) {
@@ -2860,7 +2875,10 @@ function openSettingsModal() {
       }
 
       const googleClientIdInput = document.getElementById("settingGoogleClientId");
-      if (googleClientIdInput) googleClientIdInput.value = s.google_client_id || "";
+      if (googleClientIdInput) {
+        googleClientIdInput.value = "";
+        googleClientIdInput.placeholder = s.google_client_id_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Enter Google OAuth Client ID";
+      }
       const googleSecretInput = document.getElementById("settingGoogleClientSecret");
       if (googleSecretInput) {
         googleSecretInput.value = "";
@@ -2871,7 +2889,7 @@ function openSettingsModal() {
       const ownerPill = document.getElementById("ownerLockStatusPill");
       if (ownerInput) ownerInput.value = s.primary_owner_email || "";
       if (ownerPill) {
-        if (s.primary_owner_email) {
+        if (s.primary_owner_email || s.primary_owner_locked) {
           ownerPill.textContent = "Lock Active";
           ownerPill.style.background = "rgba(16,185,129,0.15)";
           ownerPill.style.color = "#10b981";
@@ -3174,7 +3192,7 @@ btnSaveSettings.addEventListener("click", async () => {
   }
 
   const googleClientIdVal = document.getElementById("settingGoogleClientId")?.value.trim();
-  if (googleClientIdVal !== undefined) {
+  if (googleClientIdVal && !googleClientIdVal.includes("•")) {
     payload.google_client_id = googleClientIdVal;
   }
   const googleSecretVal = document.getElementById("settingGoogleClientSecret")?.value.trim();
@@ -3183,16 +3201,25 @@ btnSaveSettings.addEventListener("click", async () => {
   }
 
   const primaryOwnerEmailVal = document.getElementById("settingPrimaryOwnerEmail")?.value.trim();
-  if (primaryOwnerEmailVal !== undefined) {
+  if (primaryOwnerEmailVal) {
     payload.primary_owner_email = primaryOwnerEmailVal.toLowerCase();
   }
 
   try {
-    await fetch("/api/settings", {
+    const saveRes = await fetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
+    if (!saveRes.ok) {
+      if (saveRes.status === 401) {
+        showToast("🔒 Please sign in to save settings.");
+        closeSettingsModal();
+        openAuthModal();
+        return;
+      }
+      throw new Error(`HTTP ${saveRes.status}`);
+    }
     closeSettingsModal();
     if (payload.preferred_map_layer) {
       applyBaseTileLayer(payload.preferred_map_layer);
@@ -8265,9 +8292,11 @@ async function bootApp() {
     console.warn("Auth check error in bootApp:", e);
   }
 
+  const isAuthUser = Boolean(currentAthleteUser && !currentAthleteUser.is_guest);
+
   try {
     const tzToSync = (typeof clientTz !== "undefined" && clientTz) ? clientTz : ((typeof Intl !== "undefined" && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : null);
-    if (tzToSync) {
+    if (tzToSync && isAuthUser) {
       fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -8295,18 +8324,22 @@ async function bootApp() {
   }
 
   try {
-    const sRes = await fetch("/api/settings");
-    const s = await sRes.json();
     applyTheme("dark", false);
-    state.googleMapsApiKey = s.google_maps_api_key_set ? "saved" : "";
-    if (s.preferred_map_layer && ["google_roads", "google_hybrid", "google_terrain"].includes(s.preferred_map_layer)) {
-      outdoorBaseLayerName = s.preferred_map_layer;
-    } else {
-      outdoorBaseLayerName = "google_roads";
+    if (isAuthUser) {
+      const sRes = await fetch("/api/settings");
+      if (sRes.ok) {
+        const s = await sRes.json();
+        state.googleMapsApiKey = s.google_maps_api_key_set ? "saved" : "";
+        if (s.preferred_map_layer && ["google_roads", "google_hybrid", "google_terrain"].includes(s.preferred_map_layer)) {
+          outdoorBaseLayerName = s.preferred_map_layer;
+        } else {
+          outdoorBaseLayerName = "google_roads";
+        }
+        const selectElem = document.getElementById("selectMapBaseLayer");
+        if (selectElem) selectElem.value = outdoorBaseLayerName;
+        if (outdoorMap) applyBaseTileLayer(outdoorBaseLayerName);
+      }
     }
-    const selectElem = document.getElementById("selectMapBaseLayer");
-    if (selectElem) selectElem.value = outdoorBaseLayerName;
-    if (outdoorMap) applyBaseTileLayer(outdoorBaseLayerName);
   } catch (err) {
     console.warn("Failed to load settings in bootApp:", err);
   }

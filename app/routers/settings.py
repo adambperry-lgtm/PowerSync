@@ -1,9 +1,29 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-from app.database import get_setting, set_setting, get_all_settings, get_primary_owner_email, set_primary_owner_email, get_current_user_id, DEFAULT_USER_ID
+from app.database import (
+    get_setting, set_setting, get_all_settings,
+    get_primary_owner_email, set_primary_owner_email,
+    get_current_user_id, DEFAULT_USER_ID, GUEST_USER_ID
+)
 
-router = APIRouter(prefix="/api/settings", tags=["settings"])
+def require_authenticated_user(request: Request) -> str:
+    """Ensures the caller has an active authenticated session (rejects unauthenticated guest requests)."""
+    user = getattr(request.state, "user", None)
+    uid = get_current_user_id()
+    if not user or user.get("is_guest", False) or uid == GUEST_USER_ID:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Please sign in to access settings.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return uid
+
+router = APIRouter(
+    prefix="/api/settings",
+    tags=["settings"],
+    dependencies=[Depends(require_authenticated_user)],
+)
 
 class SettingsUpdate(BaseModel):
     athlete_timezone: Optional[str] = None
@@ -40,18 +60,10 @@ def is_valid_secret(secret: Optional[str]) -> bool:
         return False
     return True
 
-def mask_secret(secret: Optional[str]) -> str:
-    if not is_valid_secret(secret):
-        return ""
-    s = secret.strip()
-    if len(s) <= 6:
-        return "••••••"
-    return s[:3] + "••••••••" + s[-3:]
-
 @router.get("")
-def get_settings_endpoint():
-    all_s = get_all_settings()
-    
+def get_settings_endpoint(uid: str = Depends(require_authenticated_user)):
+    all_s = get_all_settings(user_id=uid)
+
     intervals_key = all_s.get("intervals_icu_api_key", "")
     gemini_key = all_s.get("gemini_api_key", "")
     google_maps_key = all_s.get("google_maps_api_key", "")
@@ -59,6 +71,7 @@ def get_settings_endpoint():
     whoop_secret = all_s.get("whoop_client_secret", "")
     google_client_id = all_s.get("google_client_id", "")
     google_secret = all_s.get("google_client_secret", "")
+    owner_email = get_primary_owner_email() or ""
 
     return {
         "athlete_timezone": str(all_s.get("athlete_timezone", "America/New_York")),
@@ -68,20 +81,15 @@ def get_settings_endpoint():
         "athlete_peak_power_watts": int(all_s.get("athlete_peak_power_watts", 1050)),
         "demo_mode": bool(all_s.get("demo_mode", not bool(all_s.get("whoop_tokens") or all_s.get("strava_tokens")))),
         "gemini_api_key_set": is_valid_secret(gemini_key),
-        "gemini_api_key_masked": mask_secret(gemini_key),
         "google_maps_api_key_set": is_valid_secret(google_maps_key),
-        "google_maps_api_key_masked": mask_secret(google_maps_key),
-        "google_client_id": google_client_id,
+        "google_client_id_set": is_valid_secret(google_client_id),
         "google_client_secret_set": is_valid_secret(google_secret),
-        "google_configured": bool(google_client_id and is_valid_secret(google_secret)),
+        "google_configured": bool(is_valid_secret(google_client_id) and is_valid_secret(google_secret)),
         "preferred_map_layer": all_s.get("preferred_map_layer", "google_roads"),
-        "intervals_athlete_id": all_s.get("intervals_athlete_id", ""),
+        "intervals_athlete_id": all_s.get("intervals_athlete_id", "") if uid == DEFAULT_USER_ID or all_s.get("intervals_athlete_id") else "",
         "intervals_icu_api_key_set": is_valid_secret(intervals_key),
-        "intervals_icu_api_key_masked": mask_secret(intervals_key),
-        "strava_client_id": all_s.get("strava_client_id", ""),
         "strava_client_secret_set": is_valid_secret(strava_secret),
         "strava_connected": bool(all_s.get("strava_tokens")),
-        "whoop_client_id": all_s.get("whoop_client_id", ""),
         "whoop_client_secret_set": is_valid_secret(whoop_secret),
         "whoop_connected": bool(all_s.get("whoop_tokens")),
         "program_goal": all_s.get("program_goal", "FTP_BUILD"),
@@ -90,17 +98,18 @@ def get_settings_endpoint():
         "program_weekly_tss_target": int(all_s.get("program_weekly_tss_target", 360)),
         "program_weekly_xss_target": int(all_s.get("program_weekly_xss_target", all_s.get("program_weekly_tss_target", 360))),
         "theme_mode": all_s.get("theme_mode", "system"),
-        "primary_owner_email": get_primary_owner_email() or ""
+        "primary_owner_email": owner_email if uid == DEFAULT_USER_ID else "",
+        "primary_owner_locked": bool(owner_email)
     }
 
 @router.post("")
-def update_settings_endpoint(payload: SettingsUpdate):
+def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require_authenticated_user)):
     if payload.primary_owner_email is not None and payload.primary_owner_email.strip():
         existing_owner = get_primary_owner_email()
         uid = get_current_user_id()
         if not existing_owner or uid == DEFAULT_USER_ID:
             set_primary_owner_email(payload.primary_owner_email.strip())
-    if payload.google_client_id is not None and payload.google_client_id.strip():
+    if is_valid_secret(payload.google_client_id):
         set_setting("google_client_id", payload.google_client_id.strip())
     if is_valid_secret(payload.google_client_secret):
         set_setting("google_client_secret", payload.google_client_secret.strip())
@@ -128,11 +137,11 @@ def update_settings_endpoint(payload: SettingsUpdate):
         set_setting("intervals_athlete_id", payload.intervals_athlete_id.strip())
     if is_valid_secret(payload.intervals_icu_api_key):
         set_setting("intervals_icu_api_key", payload.intervals_icu_api_key.strip())
-    if payload.strava_client_id is not None and payload.strava_client_id.strip():
+    if is_valid_secret(payload.strava_client_id):
         set_setting("strava_client_id", payload.strava_client_id.strip())
     if is_valid_secret(payload.strava_client_secret):
         set_setting("strava_client_secret", payload.strava_client_secret.strip())
-    if payload.whoop_client_id is not None and payload.whoop_client_id.strip():
+    if is_valid_secret(payload.whoop_client_id):
         set_setting("whoop_client_id", payload.whoop_client_id.strip())
     if is_valid_secret(payload.whoop_client_secret):
         set_setting("whoop_client_secret", payload.whoop_client_secret.strip())

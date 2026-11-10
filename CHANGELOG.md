@@ -5,6 +5,19 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.4.5] - 2026-11-10
+### Fixed & Security Hardening
+- **Settings Route Authentication Enforcement (`/api/settings`)**:
+  - Placed `/api/settings` and all `/api/settings/coaching-preferences*` endpoints behind mandatory session authentication (`require_authenticated_user`), returning `HTTP 401 Unauthorized` (`WWW-Authenticate: Bearer`) to unauthenticated requests.
+  - Eliminated exposure of masked API key substrings (`gemini_api_key_masked`, `google_maps_api_key_masked`, `intervals_icu_api_key_masked`) and raw OAuth client IDs (`strava_client_id`, `whoop_client_id`, `google_client_id`) from `/api/settings` and `/api/auth/google/status` responses, returning only boolean configuration flags.
+  - Prevented `get_all_settings()` from populating global environment fallback secrets (`GLOBAL_ENV_KEYS`) when queried under unauthenticated guest contexts (`usr_guest`).
+- **Diagnostic & Key Management Endpoint Hardening**:
+  - Restricted `/api/auth/debug-headers`, `/api/auth/lock-owner`, `/api/auth/disconnect/{service}`, `/api/chat/save-key`, and `/api/chat/test-connection` to authenticated sessions and removed internal environment/mount diagnostics from `/api/auth/debug-headers`.
+  - Redacted `owner_email` from `/api/auth/owner-status` for unauthenticated visitors.
+  - Updated frontend settings modal and startup flow to prompt sign-in before requesting `/api/settings`.
+
+---
+
 ## [2.4.4] - 2026-11-09
 ### Changed
 - **Header Branding & Subtitle**:

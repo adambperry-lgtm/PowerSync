@@ -103,18 +103,17 @@ def get_current_user_profile(request: Request):
 
 @router.get("/google/status")
 def google_auth_status():
-    """Returns whether Google Sign-In client credentials are configured."""
-    client_id = str(get_setting("google_client_id", "") or "").strip()
-    client_secret = str(get_setting("google_client_secret", "") or "").strip()
+    """Returns whether Google Sign-In client credentials are configured (never exposes raw client_id)."""
+    client_id = str(get_setting("google_client_id", "", user_id=DEFAULT_USER_ID) or "").strip()
+    client_secret = str(get_setting("google_client_secret", "", user_id=DEFAULT_USER_ID) or "").strip()
     return {
-        "configured": bool(client_id and client_secret and "•" not in client_secret),
-        "client_id": client_id if client_id else None
+        "configured": bool(client_id and client_secret and "•" not in client_secret)
     }
 
 @router.get("/google/login")
 def google_login(request: Request):
     """Initiates Google OAuth 2.0 OpenID Connect authorization."""
-    client_id = str(get_setting("google_client_id", "") or "").strip()
+    client_id = str(get_setting("google_client_id", "", user_id=DEFAULT_USER_ID) or "").strip()
     if not client_id:
         return RedirectResponse("/?auth_error=Google%20Sign-In%20client%20ID%20is%20not%20configured%20yet.%20Please%20set%20GOOGLE_CLIENT_ID%20in%20Settings%20or%20Railway.", status_code=302)
 
@@ -151,8 +150,8 @@ def google_callback(
     if not code:
         return RedirectResponse("/?auth_error=No%20authorization%20code%20received%20from%20Google", status_code=302)
 
-    client_id = str(get_setting("google_client_id", "") or "").strip()
-    client_secret = str(get_setting("google_client_secret", "") or "").strip()
+    client_id = str(get_setting("google_client_id", "", user_id=DEFAULT_USER_ID) or "").strip()
+    client_secret = str(get_setting("google_client_secret", "", user_id=DEFAULT_USER_ID) or "").strip()
     if not client_id or not client_secret:
         return RedirectResponse("/?auth_error=Google%20OAuth%20client%20credentials%20are%20missing%20on%20the%20server.", status_code=302)
 
@@ -218,12 +217,15 @@ class EmailLoginPayload(BaseModel):
 DevLoginPayload = EmailLoginPayload
 
 @router.get("/owner-status")
-def get_owner_status():
+def get_owner_status(request: Request):
     """Returns whether the primary athlete account has been locked to an exclusive email address."""
     locked_owner = get_primary_owner_email()
+    uid = get_current_user_id()
+    user = getattr(request.state, "user", None)
+    is_authenticated = bool(user and not user.get("is_guest", False) and uid != GUEST_USER_ID)
     return {
         "is_locked": bool(locked_owner),
-        "owner_email": locked_owner
+        "owner_email": locked_owner if (is_authenticated and uid == DEFAULT_USER_ID) else None
     }
 
 class LockOwnerPayload(BaseModel):
@@ -232,14 +234,18 @@ class LockOwnerPayload(BaseModel):
 @router.post("/lock-owner")
 def lock_owner_email(payload: LockOwnerPayload, request: Request):
     """Locks the primary athlete account exclusively to this email address."""
+    current_uid = get_current_user_id()
+    user = getattr(request.state, "user", None)
+    if not user or user.get("is_guest", False) or current_uid == GUEST_USER_ID:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
     clean_email = payload.email.strip().lower()
     if not clean_email or "@" not in clean_email or "." not in clean_email:
         raise HTTPException(status_code=400, detail="Valid email address is required.")
-        
-    current_uid = get_current_user_id()
+
     locked_owner = get_primary_owner_email()
     if locked_owner and locked_owner != clean_email and current_uid != DEFAULT_USER_ID:
-        raise HTTPException(status_code=403, detail=f"Primary account is already locked to {locked_owner}.")
+        raise HTTPException(status_code=403, detail="Primary account is already locked to another owner.")
 
     set_primary_owner_email(clean_email)
     return {"success": True, "message": f"Primary athlete account locked to {clean_email}.", "owner_email": clean_email}
@@ -255,7 +261,7 @@ def primary_login(request: Request):
     if locked_owner and current_uid != DEFAULT_USER_ID:
         raise HTTPException(
             status_code=403,
-            detail=f"Primary athlete account is locked to {locked_owner}. Please enter your email to sign in."
+            detail="Primary athlete account is locked to the owner email. Please enter your email to sign in."
         )
 
     user = get_default_athlete_user()
@@ -350,77 +356,23 @@ def claim_default_data(request: Request):
     return res
 
 # ==========================================
-# Diagnostic Telemetry
+# Diagnostic Telemetry (Authenticated Only)
 # ==========================================
 
 @router.get("/debug-headers")
 def debug_headers(request: Request):
-    from app.database import DB_PATH, get_db_path
-    
-    mount_lines = []
-    if os.path.exists("/proc/mounts"):
-        try:
-            with open("/proc/mounts", "r") as f:
-                for line in f:
-                    if any(term in line.lower() for term in ["data", "volume", "railway", "app"]):
-                        mount_lines.append(line.strip())
-        except Exception as e:
-            mount_lines.append(f"Error reading mounts: {e}")
-
-    vol_raw = os.environ.get("RAILWAY_VOLUME_MOUNT_PATH", "")
-    vol_strip = vol_raw.strip()
-    
-    dir_info = {}
-    for p in ["/app/data", vol_raw, vol_strip]:
-        if p and repr(p) not in dir_info:
-            dir_info[repr(p)] = {
-                "exists": os.path.exists(p),
-                "isdir": os.path.isdir(p),
-                "ismount": os.path.ismount(p) if os.path.exists(p) else False,
-                "files": os.listdir(p) if os.path.isdir(p) else []
-            }
-
-    current_db = get_db_path()
     uid = get_current_user_id()
+    user = getattr(request.state, "user", None)
+    if not user or user.get("is_guest", False) or uid == GUEST_USER_ID:
+        raise HTTPException(status_code=401, detail="Authentication required.")
 
-    conn = get_db_connection()
-    user_count = conn.cursor().execute("SELECT count(*) FROM users").fetchone()[0] if os.path.exists(current_db) else 0
-    session_count = conn.cursor().execute("SELECT count(*) FROM sessions").fetchone()[0] if os.path.exists(current_db) else 0
-    user_keys = [r[0] for r in conn.cursor().execute("SELECT key FROM settings WHERE user_id = ?", (uid,)).fetchall()] if os.path.exists(current_db) else []
-    conn.close()
-
+    from app.database import get_db_path
+    current_db = get_db_path()
     return {
-        "headers": dict(request.headers),
-        "base_url": str(request.base_url),
         "calculated_base_url": get_app_base_url(request),
         "active_user_context": uid,
         "database": {
-            "resolved_path": current_db,
-            "static_DB_PATH": DB_PATH,
             "exists": os.path.exists(current_db),
-            "size_bytes": os.path.getsize(current_db) if os.path.exists(current_db) else 0,
-            "parent_dir_writable": os.access(os.path.dirname(current_db), os.W_OK) if os.path.exists(os.path.dirname(current_db)) else False,
-            "railway_volume_mount_path": os.environ.get("RAILWAY_VOLUME_MOUNT_PATH"),
-            "railway_volume_name": os.environ.get("RAILWAY_VOLUME_NAME")
-        },
-        "mount_inspection": {
-            "matching_mounts": mount_lines,
-            "directories": dir_info
-        },
-        "env_configured": {
-            "gemini_api_key": bool(os.environ.get("GEMINI_API_KEY") or os.environ.get("gemini_api_key")),
-            "google_client_id": bool(os.environ.get("GOOGLE_CLIENT_ID") or get_setting("google_client_id")),
-            "google_client_secret": bool(os.environ.get("GOOGLE_CLIENT_SECRET") or get_setting("google_client_secret")),
-            "strava_client_id": bool(os.environ.get("STRAVA_CLIENT_ID") or os.environ.get("strava_client_id")),
-            "strava_client_secret": bool(os.environ.get("STRAVA_CLIENT_SECRET") or os.environ.get("strava_client_secret")),
-            "whoop_client_id": bool(os.environ.get("WHOOP_CLIENT_ID") or os.environ.get("whoop_client_id")),
-            "whoop_client_secret": bool(os.environ.get("WHOOP_CLIENT_SECRET") or os.environ.get("whoop_client_secret")),
-            "intervals_icu_api_key": bool(os.environ.get("INTERVALS_ICU_API_KEY") or os.environ.get("INTERVALS_API_KEY")),
-        },
-        "multi_user_stats": {
-            "total_users": user_count,
-            "active_sessions": session_count,
-            "active_user_settings_keys": user_keys
         },
         "tokens_connected": {
             "strava_tokens_present": bool(get_setting("strava_tokens", user_id=uid)),
@@ -572,8 +524,11 @@ def sync_whoop():
     return {"success": True, "metrics": metrics}
 
 @router.post("/disconnect/{service}")
-def disconnect_service(service: str):
+def disconnect_service(service: str, request: Request):
     uid = get_current_user_id()
+    user = getattr(request.state, "user", None)
+    if not user or user.get("is_guest", False) or uid == GUEST_USER_ID:
+        raise HTTPException(status_code=401, detail="Authentication required.")
     if service == "strava":
         set_setting("strava_tokens", None, user_id=uid)
     elif service == "whoop":

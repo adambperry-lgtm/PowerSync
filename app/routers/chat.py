@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-from app.database import get_setting, set_setting, get_current_user_id, get_athlete_date
+from app.database import get_setting, set_setting, get_current_user_id, get_athlete_date, GUEST_USER_ID
+from app.routers.settings import require_authenticated_user
 from app.services.coach_chat_service import handle_coach_chat, compile_athlete_context, get_gemini_api_key
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -65,7 +66,7 @@ def get_chat_status():
 class TestConnectionPayload(BaseModel):
     api_key: Optional[str] = None
 
-@router.post("/test-connection")
+@router.post("/test-connection", dependencies=[Depends(require_authenticated_user)])
 def test_gemini_connection_endpoint(payload: Optional[TestConnectionPayload] = None):
     """Live-tests the Google Gemini API connection using the provided or saved key."""
     key = (payload.api_key.strip() if payload and payload.api_key else "") or get_gemini_api_key()
@@ -87,13 +88,13 @@ def test_gemini_connection_endpoint(payload: Optional[TestConnectionPayload] = N
         "message": "Could not connect to Gemini API. Please check your key or network connection."
     }
 
-@router.post("/save-key")
-def save_gemini_key_endpoint(payload: SaveApiKeyPayload):
+@router.post("/save-key", dependencies=[Depends(require_authenticated_user)])
+def save_gemini_key_endpoint(payload: SaveApiKeyPayload, uid: str = Depends(require_authenticated_user)):
     """Allows athlete to save or update Gemini API key directly from the chat interface."""
     key = payload.api_key.strip()
     if not key or len(key) < 20:
         raise HTTPException(status_code=400, detail="Invalid Gemini API key provided.")
-    set_setting("gemini_api_key", key)
+    set_setting("gemini_api_key", key, user_id=uid)
     return {
         "success": True,
         "message": "Google Gemini API key saved! AI Coach is now fully powered by Gemini."
