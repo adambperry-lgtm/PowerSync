@@ -1,7 +1,23 @@
-# PowerSync Version History & Changelog
+# VeloMetrics AI (PowerSync) Version History & Changelog
 
-All notable changes to the PowerSync Adaptive Coach & Zwift Sync platform are documented in this file.
+All notable changes to the VeloMetrics AI (formerly PowerSync) Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
+
+---
+
+## [2.5.0] - 2026-11-10
+### Changed & Added
+- **VeloMetrics AI Brand Identity & Value Proposition**:
+  - Rebranded the application UI to **VeloMetrics AI** with the brand essence *"Data-driven training meets human passion. Your personalized AI coach for every pedal stroke."*
+- **"Speed & Summit" High-Contrast Color Palette**:
+  - Transitioned the dashboard to a crisp, high-tech light-first palette: **Pure White (`#FFFFFF`)** primary background, **Ice Frost (`#F4F7FA`)** card and activity containers, **Electric Cobalt Blue (`#0052FF`)** primary brand/navigation and active metrics, **Sunset Orange (`#FF5E00`)** high-energy calls-to-action and peak power alerts, **Midnight Carbon (`#111625`)** headers and key metrics, **Slate Gray (`#64748B`)** secondary labels/units, and **Mint Teal (`#00C896`)** recovery and goal completion indicators.
+- **Geometric Typography & Custom Cycling Iconography**:
+  - Paired **Outfit** (`Bold`/`Black` weights) for headlines and big wattage/telemetry readouts with **Inter** (`Regular`/`Medium` weights) for high-legibility body copy and dense post-ride analytics.
+  - Added custom SVG iconography combining crisp, rounded line icons for navigation with solid Sunset Orange (`#FF5E00`) lightning bolt accents, cadence dials, wattage meters, elevation profiles, and an AI wave pulse icon.
+- **Directeur Sportif (DS) AI UI Elements & Live Workout Interface**:
+  - Added pulsing dual-tone gradient rings (`#0052FF` fading into `#FF5E00`) around live coaching insights and AI avatars.
+  - Styled pre-ride AI **"Race Briefing" Cards** on an Ice Frost (`#F4F7FA`) surface with a subtle Electric Cobalt Blue (`#0052FF`) border and Sunset Orange (`#FF5E00`) highlights on Target FTP and interval wattage targets.
+  - Updated live workout interval bars to transition smoothly from cool blue (Recovery/Endurance) to Sunset Orange (Sweet Spot/Threshold/VO2 Max) and added a sleek Dynamic Coaching Bottom Sheet (`"AI Coach: You're burning matches early. Ease back 15 watts on this climb to save legs for the final interval."`).
 
 ---
 

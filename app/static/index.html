@@ -1,18 +1,21 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light" data-theme-mode="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="PowerSync">
-  <meta name="theme-color" content="#0b0f19">
-  <title>PowerSync | Whoop + Strava AI Coach & Zwift Bridge</title>
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="VeloMetrics AI">
+  <meta name="theme-color" content="#FFFFFF">
+  <title>VeloMetrics AI | Personalized AI Cycling Coach &amp; Telemetry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
   <script>
-    document.documentElement.setAttribute("data-theme", "dark");
-    document.documentElement.setAttribute("data-theme-mode", "dark");
+    document.documentElement.setAttribute("data-theme", "light");
+    document.documentElement.setAttribute("data-theme-mode", "light");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=61">
+  <link rel="stylesheet" href="/static/css/style.css?v=62">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -39,10 +42,23 @@
   <!-- Navigation -->
   <header class="navbar">
     <div class="brand">
-      <img src="/static/img/logo.jpg?v=12" alt="PowerSync Logo" style="width:38px;height:38px;border-radius:10px;box-shadow:0 0 12px rgba(6,182,212,0.3);object-fit:cover;">
+      <div class="brand-logo-ring" title="VeloMetrics AI — Speed &amp; Summit Engine">
+        <svg class="brand-logo-svg" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="veloBrandGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stop-color="#0052FF"/>
+              <stop offset="100%" stop-color="#FF5E00"/>
+            </linearGradient>
+          </defs>
+          <rect width="36" height="36" rx="10" fill="url(#veloBrandGrad)"/>
+          <!-- Glowing AI Wave & Filled Lightning Bolt Metaphor -->
+          <path d="M6 22.5C9 22.5 10.5 16 13 16C15.5 16 17 25 19.5 25C22 25 23.5 11 26.5 11C28.5 11 29.5 18 31 18" stroke="rgba(255,255,255,0.45)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M20.5 6L11.5 19H17.5L15.5 30L24.5 17H18.5L20.5 6Z" fill="#FFFFFF"/>
+        </svg>
+      </div>
       <div class="brand-text">
-        <h1>PowerSync</h1>
-        <span>AI Cycling Coach</span>
+        <h1>VeloMetrics <span class="brand-ai-pill">AI</span></h1>
+        <span title="Data-driven training meets human passion. Your personalized AI coach for every pedal stroke.">Your Personalized AI Cycling DS</span>
       </div>
     </div>
 
@@ -50,12 +66,22 @@
     <nav class="main-view-switcher" aria-label="Dashboard View Selector">
       <div class="main-view-tabs-container" role="tablist">
         <button class="main-view-tab-btn active" id="tabMainViewDaily" type="button" role="tab" aria-selected="true" data-view="daily">
-          <span class="main-view-tab-icon">⚡</span>
+          <span class="main-view-tab-icon" aria-hidden="true">
+            <!-- Solid Orange Lightning Bolt for Active Power / Daily Training -->
+            <svg class="icon-filled-bolt" width="16" height="16" viewBox="0 0 24 24" fill="#FF5E00" stroke="#FF5E00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+            </svg>
+          </span>
           <span class="main-view-tab-title">Daily Training</span>
           <span class="main-view-tab-badge">Today</span>
         </button>
         <button class="main-view-tab-btn" id="tabMainViewAnalysis" type="button" role="tab" aria-selected="false" data-view="analysis">
-          <span class="main-view-tab-icon">📈</span>
+          <span class="main-view-tab-icon" aria-hidden="true">
+            <!-- Crisp Rounded Line Icon for Navigation / Analytics -->
+            <svg class="icon-line-nav" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
+          </span>
           <span class="main-view-tab-title">Long-Term Analysis</span>
           <span class="main-view-tab-badge">Strategy</span>
         </button>
@@ -114,9 +140,12 @@
         </div>
       </div>
 
-      <button class="btn btn-secondary" id="btnOpenSettings">⚙️ Settings</button>
-      <button class="btn btn-secondary" id="btnUserAccount" style="display:flex;align-items:center;gap:0.45rem;padding:0.45rem 0.85rem;border-color:rgba(6,182,212,0.4);" title="Account & Google Sign-In">
-        <span id="navUserAvatar" style="width:20px;height:20px;border-radius:50%;background:rgba(6,182,212,0.2);display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#06b6d4;">👤</span>
+      <button class="btn btn-secondary" id="btnOpenSettings" style="display:inline-flex;align-items:center;gap:0.4rem;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Settings</span>
+      </button>
+      <button class="btn btn-secondary" id="btnUserAccount" style="display:flex;align-items:center;gap:0.45rem;padding:0.45rem 0.85rem;border-color:rgba(0,82,255,0.35);" title="Account & Google Sign-In">
+        <span id="navUserAvatar" style="width:20px;height:20px;border-radius:50%;background:rgba(0,82,255,0.12);display:inline-flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;color:#0052FF;">👤</span>
         <span id="navUserName" style="font-size:0.85rem;font-weight:600;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">Sign In</span>
       </button>
     </div>
@@ -126,16 +155,16 @@
   <main class="container">
 
     <!-- Quick Connect Live Accounts Banner (Hidden by default; only shown if explicitly in demo mode) -->
-    <div id="demoModeBanner" style="background: linear-gradient(90deg, rgba(6,182,212,0.15), rgba(16,185,129,0.15)); border: 1px solid rgba(6,182,212,0.3); border-radius: var(--radius-md); padding: 1rem 1.5rem; display: none; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+    <div id="demoModeBanner" style="background: linear-gradient(90deg, rgba(0,82,255,0.08), rgba(0,200,150,0.08)); border: 1px solid rgba(0,82,255,0.25); border-radius: var(--radius-md); padding: 1rem 1.5rem; display: none; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
       <div style="display:flex;align-items:center;gap:0.75rem;">
         <span style="font-size:1.4rem;">🔗</span>
         <div>
-          <div style="font-weight:700;font-size:0.95rem;color:#f8fafc;">Currently in Demo / Preview Mode</div>
-          <div style="font-size:0.8rem;color:#94a3b8;">Connect your live Whoop & Strava accounts to replace sample metrics with your real data.</div>
+          <div style="font-weight:700;font-size:0.95rem;color:var(--text-primary);">Currently in Demo / Preview Mode</div>
+          <div style="font-size:0.8rem;color:var(--text-muted);">Connect your live Whoop &amp; Strava accounts to replace sample metrics with your real data.</div>
         </div>
       </div>
       <button class="btn btn-primary" id="btnBannerOpenConnect">
-        🔑 Connect Whoop & Strava
+        🔑 Connect Whoop &amp; Strava
       </button>
     </div>
 
@@ -143,7 +172,7 @@
     <div class="dashboard-toolbar">
       <div class="dashboard-toolbar-left">
         <span class="dashboard-toolbar-title" id="dashboardToolbarTitle">⚡ Daily Training &amp; Recovery</span>
-        <span class="dashboard-toolbar-hint">Tap any tile header or switch to expand / collapse</span>
+        <span class="dashboard-toolbar-hint">Data-driven training meets human passion. Your personalized AI coach for every pedal stroke.</span>
       </div>
       <div class="dashboard-toolbar-right">
         <button class="btn btn-secondary btn-toggle-all-tiles" id="btnToggleAllTiles" type="button" aria-label="Expand or collapse all tiles">
@@ -163,7 +192,9 @@
       <div class="card collapsible-tile" id="cardWhoop">
         <div class="card-header collapsible-tile-header" id="whoopCardHeader" role="button" tabindex="0" title="Click to collapse or expand Whoop Biometrics" aria-expanded="true">
           <div class="card-header-left">
-            <span class="card-header-icon">📊</span>
+            <span class="card-header-icon" title="Cadence &amp; Readiness Dial">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0052FF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 12 19.5 6.5" stroke="#FF5E00" stroke-width="2.4"></path><circle cx="12" cy="12" r="2" fill="#FF5E00"></circle></svg>
+            </span>
             <div>
               <span class="card-title">Whoop Biometrics</span>
               <!-- Collapsed Summary Chips (Visible when collapsed) -->
@@ -171,7 +202,7 @@
                 <span class="tag tag-focus" id="collapsedWhoopRecovery">Recovery: 50%</span>
                 <span class="tag tag-dur" id="collapsedWhoopStrain">Strain: 15.0</span>
                 <span class="tag tag-tss" id="collapsedWhoopSleep">Sleep: 83%</span>
-                <span class="tag" id="collapsedWhoopHrv" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);">HRV: -- ms</span>
+                <span class="tag" id="collapsedWhoopHrv" style="background:rgba(0,82,255,0.1);color:#0052FF;border:1px solid rgba(0,82,255,0.25);">HRV: -- ms</span>
               </div>
             </div>
           </div>
@@ -195,14 +226,14 @@
                 <svg class="ring-svg" viewBox="0 0 96 96">
                   <circle class="ring-bg" cx="48" cy="48" r="38" />
                   <circle class="ring-val" id="gaugeValCircle" cx="48" cy="48" r="38" 
-                          stroke="#f59e0b" stroke-dasharray="238.76" stroke-dashoffset="119.38" />
+                          stroke="#00C896" stroke-dasharray="238.76" stroke-dashoffset="119.38" />
                 </svg>
                 <div class="ring-center">
                   <div class="ring-num" id="gaugeRecoveryNum">50%</div>
                 </div>
               </div>
-              <div class="ring-title" id="ringTitleRecovery" style="color:#f59e0b;">RECOVERY</div>
-              <div class="ring-detail" id="ringDetailRecovery">Yellow Zone</div>
+              <div class="ring-title" id="ringTitleRecovery" style="color:#00C896;">RECOVERY</div>
+              <div class="ring-detail" id="ringDetailRecovery">Readiness</div>
             </div>
 
             <!-- Ring 2: Day Strain -->
@@ -211,13 +242,13 @@
                 <svg class="ring-svg" viewBox="0 0 96 96">
                   <circle class="ring-bg" cx="48" cy="48" r="38" />
                   <circle class="ring-val" id="gaugeStrainCircle" cx="48" cy="48" r="38" 
-                          stroke="#06b6d4" stroke-dasharray="238.76" stroke-dashoffset="68.2" />
+                          stroke="#0052FF" stroke-dasharray="238.76" stroke-dashoffset="68.2" />
                 </svg>
                 <div class="ring-center">
-                  <div class="ring-num" id="gaugeStrainNum" style="color:#06b6d4;">15.0</div>
+                  <div class="ring-num" id="gaugeStrainNum" style="color:#0052FF;">15.0</div>
                 </div>
               </div>
-              <div class="ring-title" style="color:#06b6d4;">DAY STRAIN</div>
+              <div class="ring-title" style="color:#0052FF;">DAY STRAIN</div>
               <div class="ring-detail" id="ringDetailStrain">/ 21.0 Max</div>
             </div>
 
@@ -227,13 +258,13 @@
                 <svg class="ring-svg" viewBox="0 0 96 96">
                   <circle class="ring-bg" cx="48" cy="48" r="38" />
                   <circle class="ring-val" id="gaugeSleepCircle" cx="48" cy="48" r="38" 
-                          stroke="#8b5cf6" stroke-dasharray="238.76" stroke-dashoffset="40.59" />
+                          stroke="#FF5E00" stroke-dasharray="238.76" stroke-dashoffset="40.59" />
                 </svg>
                 <div class="ring-center">
-                  <div class="ring-num" id="gaugeSleepNum" style="color:#8b5cf6;">83%</div>
+                  <div class="ring-num" id="gaugeSleepNum" style="color:#111625;">83%</div>
                 </div>
               </div>
-              <div class="ring-title" style="color:#8b5cf6;">SLEEP</div>
+              <div class="ring-title" style="color:#64748B;">SLEEP</div>
               <div class="ring-detail" id="ringDetailSleep">7.6 hrs</div>
             </div>
           </div>
@@ -250,7 +281,7 @@
             </div>
             <div class="sub-strip-item">
               <span class="sub-strip-lbl">Yesterday Strain</span>
-              <span class="sub-strip-val" id="valYesterdayStrain" style="color:var(--accent-amber);">--</span>
+              <span class="sub-strip-val" id="valYesterdayStrain" style="color:var(--accent-orange);">--</span>
             </div>
             <div class="sub-strip-item">
               <span class="sub-strip-lbl">Weighted Strain</span>
@@ -267,7 +298,9 @@
       <div class="card collapsible-tile" id="cardStrava">
         <div class="card-header collapsible-tile-header" id="stravaCardHeader" role="button" tabindex="0" title="Click to collapse or expand Strava Training Load" aria-expanded="true">
           <div class="card-header-left">
-            <span class="card-header-icon">📈</span>
+            <span class="card-header-icon" title="Wattage Meter &amp; Elevation Profile">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0052FF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18"></path><path d="m4 15 5-6 4 4 7-8" stroke="#FF5E00" stroke-width="2.5"></path><circle cx="20" cy="5" r="2.5" fill="#FF5E00" stroke="none"></circle></svg>
+            </span>
             <div>
               <span class="card-title">Strava Training Load (7 Days)</span>
               <!-- Collapsed Summary Chips (Visible when collapsed) -->
@@ -275,12 +308,12 @@
                 <span class="tag tag-focus" id="collapsedStravaHours">6.8 hrs</span>
                 <span class="tag tag-dur" id="collapsedStravaDist">103.5 mi</span>
                 <span class="tag tag-tss" id="collapsedStravaTss">305 TSS</span>
-                <span class="tag" id="collapsedStravaForm" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);">Optimal</span>
+                <span class="tag" id="collapsedStravaForm" style="background:rgba(0,200,150,0.12);color:#00C896;border:1px solid rgba(0,200,150,0.3);">Optimal</span>
               </div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:0.5rem;">
-            <span class="badge-status" id="formStatusBadge" style="color:#10b981;border-color:#10b981;">Optimal / Fresh</span>
+            <span class="badge-status" id="formStatusBadge" style="color:#00C896;border-color:#00C896;">Optimal / Fresh</span>
             <button class="btn btn-secondary btn-stage-collapse" id="btnToggleStravaCard" type="button" aria-label="Collapse or expand Strava training load">
               <span id="stravaToggleIcon">▲</span>
               <span id="stravaToggleText">Collapse</span>
@@ -305,7 +338,7 @@
             </div>
             <div class="stat-box">
               <div class="stat-box-title">Yesterday TSS</div>
-              <div class="stat-box-num" id="valYesterdayTss" style="color:var(--accent-amber);">--</div>
+              <div class="stat-box-num" id="valYesterdayTss" style="color:var(--accent-orange);">--</div>
             </div>
           </div>
 
@@ -320,13 +353,15 @@
         </div>
       </div>
 
-      <!-- Card 3: AI Coach Daily Directive & Status (Top Right Panel) -->
-      <div class="card collapsible-tile" id="cardAiCoachToday">
-        <div class="card-header collapsible-tile-header" id="coachCardHeader" role="button" tabindex="0" title="Click to collapse or expand AI Coach Directive" aria-expanded="true" style="margin-bottom:0.15rem;">
+      <!-- Card 3: AI "Race Briefing" Card / Daily Directive (Top Right Panel) -->
+      <div class="card collapsible-tile ai-race-briefing-card" id="cardAiCoachToday">
+        <div class="card-header collapsible-tile-header" id="coachCardHeader" role="button" tabindex="0" title="Click to collapse or expand AI Race Briefing &amp; Directive" aria-expanded="true" style="margin-bottom:0.15rem;">
           <div class="card-header-left">
-            <span class="card-header-icon">🧠</span>
+            <span class="card-header-icon ai-pulse-ring" title="Directeur Sportive Live AI Engine">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2.5-6 4 12 3.5-8 2 4h5"></path></svg>
+            </span>
             <div>
-              <span class="card-title" id="coachCardTitle">AI Coach Directive</span>
+              <span class="card-title" id="coachCardTitle">AI Race Briefing</span>
               <!-- Collapsed Summary Chips (Visible when collapsed) -->
               <div class="collapsible-tile-summary" id="coachCardCollapsedSummary" style="display:none;margin-top:0.25rem;">
                 <span class="collapsed-summary-title" id="collapsedCoachSession">Today's Session</span>
@@ -336,9 +371,9 @@
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:0.5rem;">
-            <span class="badge-status badge-gemini connected" id="badgeCardGeminiStatus" title="Google Gemini Sports-Science Intelligence" style="font-size:0.68rem;padding:0.16rem 0.5rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:600;flex-shrink:0;">
-              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #10b981;background:#10b981;border-radius:50%;"></span>
-              <span id="txtCardGeminiStatus">Connected</span>
+            <span class="badge-status badge-gemini connected" id="badgeCardGeminiStatus" title="Directeur Sportive AI Intelligence" style="font-size:0.68rem;padding:0.16rem 0.5rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.35);color:#00C896;font-weight:600;flex-shrink:0;">
+              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #00C896;background:#00C896;border-radius:50%;"></span>
+              <span id="txtCardGeminiStatus">DS Live</span>
             </span>
             <button class="btn btn-secondary btn-stage-collapse" id="btnToggleCoachCard" type="button" aria-label="Collapse or expand AI coach directive">
               <span id="coachCardToggleIcon">▲</span>
@@ -350,11 +385,11 @@
         <!-- Collapsible Body Container -->
         <div class="collapsible-tile-body" id="coachCardBody">
           <div style="display:flex;flex-direction:column;gap:0.15rem;">
-            <div class="section-eyebrow" id="coachCardPreHeading" style="color:var(--text-muted);margin-bottom:0;">
-              TODAY'S COMPLETED WORKOUT
+            <div class="section-eyebrow" id="coachCardPreHeading" style="color:#0052FF;margin-bottom:0;">
+              DIRECTEUR SPORTIVE • PRE-RIDE RACE BRIEFING
             </div>
-            <div style="font-size:var(--type-item-title);font-weight:700;color:var(--text-primary);line-height:1.3;" id="coachCardSessionTitle">
-              Zwift -PowerSync: 35-Min Microburst &amp; Cadence Flush
+            <div style="font-size:var(--type-item-title);font-weight:800;color:var(--text-primary);line-height:1.3;font-family:var(--font-display);" id="coachCardSessionTitle">
+              Zwift - VeloMetrics: 35-Min Microburst &amp; Cadence Flush
             </div>
           </div>
 
@@ -363,27 +398,27 @@
               <div class="stat-box-title" id="coachCardLbl1">Duration</div>
               <div class="stat-box-num" id="coachCardVal1" style="font-size:1rem;">36m</div>
             </div>
-            <div class="stat-box" style="padding:0.35rem 0.45rem;">
-              <div class="stat-box-title" id="coachCardLbl2">Avg Power</div>
-              <div class="stat-box-num" id="coachCardVal2" style="font-size:1rem;color:var(--accent-cyan);">174 W</div>
+            <div class="stat-box" style="padding:0.35rem 0.45rem;border-color:rgba(255,94,0,0.28);background:rgba(255,94,0,0.04);">
+              <div class="stat-box-title" id="coachCardLbl2" style="color:#FF5E00;">Target Power</div>
+              <div class="stat-box-num" id="coachCardVal2" style="font-size:1rem;color:#FF5E00;">174 W</div>
             </div>
             <div class="stat-box" style="padding:0.35rem 0.45rem;">
               <div class="stat-box-title" id="coachCardLbl3">Avg HR</div>
-              <div class="stat-box-num" id="coachCardVal3" style="font-size:1rem;color:#f59e0b;">129 bpm</div>
+              <div class="stat-box-num" id="coachCardVal3" style="font-size:1rem;color:#0052FF;">129 bpm</div>
             </div>
             <div class="stat-box" style="padding:0.35rem 0.45rem;">
               <div class="stat-box-title" id="coachCardLbl4">Verdict</div>
-              <div class="stat-box-num" id="coachCardVal4" style="font-size:0.92rem;color:#10b981;">Bullseye 🎯</div>
+              <div class="stat-box-num" id="coachCardVal4" style="font-size:0.92rem;color:#00C896;">Bullseye 🎯</div>
             </div>
           </div>
 
-          <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.06);padding:0.6rem 0.75rem;border-radius:6px;max-height:105px;overflow-y:auto;" id="coachCardNarrative">
+          <div class="ai-briefing-narrative-box" id="coachCardNarrative">
             Outstanding discipline holding power within your Zone 2 aerobic base ceiling on a 45% recovery day. Cardiac cost remained flat with 7.7 Whoop day strain.
           </div>
 
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.75rem;padding-top:0.35rem;border-top:1px solid rgba(255,255,255,0.06);">
-            <span id="coachCardFooterSubtext" style="color:#10b981;font-weight:600;font-size:0.78rem;">Bullseye 🎯</span>
-            <a href="#cardCoachDebrief" id="coachCardJumpLink" style="color:var(--accent-cyan);text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:0.25rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.75rem;padding-top:0.35rem;border-top:1px solid var(--border-color);">
+            <span id="coachCardFooterSubtext" style="color:#00C896;font-weight:700;font-size:0.78rem;">Bullseye 🎯</span>
+            <a href="#cardCoachDebrief" id="coachCardJumpLink" style="color:#0052FF;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:0.25rem;">
               Full Debrief ↓
             </a>
           </div>
@@ -403,7 +438,7 @@
               <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
                 <span class="card-title" id="upcomingPlanTitle">Sunday 50-Mile Group Ride</span>
                 <span class="upcoming-badge-countdown" id="upcomingCountdownBadge">🎯 T-6 Days Remaining</span>
-                <span class="phase-badge" id="upcomingPhaseBadge" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border-color:rgba(6,182,212,0.3);">Taper Protocol Active</span>
+                <span class="phase-badge" id="upcomingPhaseBadge" style="background:rgba(0,82,255,0.1);color:var(--accent-cyan);border-color:rgba(0,82,255,0.25);">Taper Protocol Active</span>
               </div>
               <div class="card-subtitle collapsible-tile-subtitle" id="upcomingPlanDesc">
                 Planned endurance ride with steady pacing.
@@ -413,18 +448,18 @@
                 <span class="tag tag-focus" id="collapsedUpcomingDist">50.0 mi</span>
                 <span class="tag tag-dur" id="collapsedUpcomingDur">~2h 55m</span>
                 <span class="tag tag-tss" id="collapsedUpcomingTss">~165 TSS</span>
-                <span class="tag" id="collapsedUpcomingIntensity" style="background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.3);">Endurance</span>
+                <span class="tag" id="collapsedUpcomingIntensity" style="background:rgba(0,200,150,0.12);color:#00C896;border:1px solid rgba(0,200,150,0.3);">Endurance</span>
               </div>
             </div>
           </div>
           <div style="display:flex;gap:0.5rem;align-items:center;flex-wrap:wrap;">
-            <button class="btn btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.75rem;border-color:#10b981;color:#10b981;" id="btnViewPlanFueling">
+            <button class="btn btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.75rem;border-color:#00C896;color:#00C896;" id="btnViewPlanFueling">
               🥪 View Fueling Plan
             </button>
             <button class="btn btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.75rem;" id="btnEditUpcomingPlan">
               ✏️ Edit Plan
             </button>
-            <button class="btn btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.75rem;color:#f87171;border-color:rgba(248,113,113,0.3);" id="btnClearUpcomingPlan">
+            <button class="btn btn-secondary" style="font-size:0.78rem;padding:0.35rem 0.75rem;color:#ef4444;border-color:rgba(239,68,68,0.3);" id="btnClearUpcomingPlan">
               🗑️ Clear
             </button>
             <button class="btn btn-secondary btn-stage-collapse" id="btnToggleUpcomingPlan" type="button" aria-label="Collapse or expand upcoming target plan">
@@ -460,15 +495,15 @@
           </div>
 
           <!-- Optional Mini-Map Preview if route attached -->
-          <div id="upcomingRouteMapWrap" style="display:none;margin:0.75rem 0;background:rgba(0,0,0,0.3);padding:0.75rem;border-radius:var(--radius-sm);border:1px solid rgba(255,255,255,0.06);">
+          <div id="upcomingRouteMapWrap" style="display:none;margin:0.75rem 0;background:#FFFFFF;padding:0.75rem;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
             <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;margin-bottom:0.35rem;">Route Preview</div>
-            <svg id="upcomingRouteSvg" viewBox="0 0 380 170" style="width:100%;max-height:140px;stroke:#06b6d4;stroke-width:2.5;fill:none;"></svg>
+            <svg id="upcomingRouteSvg" viewBox="0 0 380 170" style="width:100%;max-height:140px;stroke:#0052FF;stroke-width:2.5;fill:none;"></svg>
           </div>
 
           <!-- Lead-up Taper Roadmap Timeline -->
           <div class="taper-roadmap-wrap">
             <div style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em;">
-              📅 Taper & Preparation Progression leading up to event:
+              📅 Taper &amp; Preparation Progression leading up to event:
             </div>
             <div class="taper-roadmap-grid" id="upcomingTaperGrid">
               <!-- Populated dynamically -->
@@ -484,7 +519,9 @@
       <!-- Collapsible Stage Header -->
       <div class="workout-stage-header" id="workoutStageHeader" role="button" tabindex="0" title="Click to collapse or expand Today's Training" aria-expanded="true">
         <div class="card-header-left">
-          <span class="card-header-icon">⚡</span>
+          <span class="card-header-icon" title="Active Wattage &amp; Power Spikes">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="#FF5E00" stroke="#FF5E00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </span>
           <div>
             <span class="card-title">Today's Training</span>
             <div class="card-subtitle collapsible-tile-subtitle" id="stageHeaderSubtitle">
@@ -496,7 +533,7 @@
               <span class="tag tag-focus" id="collapsedWorkoutFocus">Sweet Spot</span>
               <span class="tag tag-dur" id="collapsedWorkoutDur">60 MIN</span>
               <span class="tag tag-tss" id="collapsedWorkoutTss">~68 TSS</span>
-              <span class="tag tag-xss" id="collapsedWorkoutXss" style="display:none;background:rgba(168,85,247,0.15);color:#c084fc;border:1px solid rgba(168,85,247,0.3);">68 XSS</span>
+              <span class="tag tag-xss" id="collapsedWorkoutXss" style="display:none;background:rgba(255,94,0,0.12);color:#FF5E00;border:1px solid rgba(255,94,0,0.3);">68 XSS</span>
             </div>
           </div>
         </div>
@@ -545,7 +582,7 @@
         <div class="workout-header">
           <div class="workout-title-area">
             <div class="section-eyebrow" id="workoutActiveEyebrow">
-              ⭐ ACTIVE PRESCRIPTION • COACH'S CHOICE
+              ⭐ ACTIVE PRESCRIPTION • DIRECTEUR SPORTIVE CHOICE
             </div>
             <div style="display:flex;align-items:center;gap:0.85rem;flex-wrap:wrap;">
               <h2 id="workoutTitle" style="margin:0;">Sweet Spot Aerobic Density</h2>
@@ -559,13 +596,13 @@
               <span class="tag tag-dur" id="workoutDurationBadge">60 MIN</span>
               <span class="tag tag-tss" id="workoutTssBadge">~68 TSS</span>
               <span class="tag tag-xss" id="workoutXssBadge" style="display:none;" title="3-Tier Physiological Strain (Xert XSS equivalent)">68 XSS</span>
-              <span class="tag" id="workoutStrainBreakdownBadge" style="display:none;background:rgba(6,182,212,0.12);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.3);font-size:0.72rem;">52 Low • 16 High • 0 Peak</span>
+              <span class="tag" id="workoutStrainBreakdownBadge" style="display:none;background:rgba(0,82,255,0.08);color:var(--accent-cyan);border:1px solid rgba(0,82,255,0.25);font-size:0.72rem;">52 Low • 16 High • 0 Peak</span>
             </div>
           </div>
 
           <!-- Action Station for Zwift, Apple TV, Custom Ride & Fueling -->
           <div class="action-buttons">
-            <button class="btn btn-secondary" id="btnToggleFuelingPlan" style="border-color:#10b981;color:#10b981;">
+            <button class="btn btn-secondary" id="btnToggleFuelingPlan" style="border-color:#00C896;color:#00C896;">
               🥪 Fueling Plan
             </button>
             <button class="btn btn-secondary" id="btnOpenReplaceRideModal" style="border-color:var(--accent-cyan);color:var(--accent-cyan);">
@@ -586,7 +623,7 @@
             <div>
               <div style="display:flex;align-items:center;gap:0.5rem;">
                 <span style="font-size:1.25rem;">🥪</span>
-                <h3 class="session-heading" style="color:#10b981;margin:0;" id="fuelingRideTitle">
+                <h3 class="session-heading" style="color:#00C896;margin:0;" id="fuelingRideTitle">
                   Personalized Fueling &amp; Hydration Strategy
                 </h3>
               </div>
@@ -619,18 +656,18 @@
             <button class="btn btn-secondary" id="btnFetchLocalWeather" type="button" style="padding:0.2rem 0.55rem;font-size:0.74rem;" title="Fetch live weather via browser geolocation">
               📍 Use Local Weather
             </button>
-            <div id="fuelingWeatherBadge" style="font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:4px;background:rgba(16,185,129,0.1);color:#10b981;border:1px solid rgba(16,185,129,0.25);">
+            <div id="fuelingWeatherBadge" style="font-size:0.75rem;padding:0.2rem 0.6rem;border-radius:4px;background:rgba(0,200,150,0.1);color:#00C896;border:1px solid rgba(0,200,150,0.28);">
               Optimal Conditions
             </div>
           </div>
 
           <!-- Physiological Recovery & Trailing Stress Impact Bar -->
-          <div class="recovery-load-impact-bar" id="fuelingRecoveryImpactBar" style="margin-top:0.6rem;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.22);border-radius:6px;padding:0.6rem 0.85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+          <div class="recovery-load-impact-bar" id="fuelingRecoveryImpactBar" style="margin-top:0.6rem;background:rgba(0,82,255,0.06);border:1px solid rgba(0,82,255,0.2);border-radius:6px;padding:0.6rem 0.85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.15rem;" id="fuelingRecoveryIcon">🧬</span>
               <div>
-                <div style="font-size:0.78rem;font-weight:700;color:#c7d2fe;" id="fuelingRecoveryTitle">
-                  Physiological Recovery & Load Adaptation
+                <div style="font-size:0.78rem;font-weight:700;color:#0052FF;" id="fuelingRecoveryTitle">
+                  Physiological Recovery &amp; Load Adaptation
                 </div>
                 <div style="font-size:0.74rem;color:var(--text-secondary);" id="fuelingRecoveryDesc">
                   Calibrated to your Whoop recovery score and trailing training load.
@@ -658,20 +695,20 @@
             </div>
             <div class="fueling-stat-box">
               <div class="upcoming-meta-label">Fluid Intake</div>
-              <div class="fueling-stat-val" id="fuelingFluidPerHour" style="color:#38bdf8;">650 <span style="font-size:0.8rem;">ml/h</span></div>
+              <div class="fueling-stat-val" id="fuelingFluidPerHour" style="color:#0052FF;">650 <span style="font-size:0.8rem;">ml/h</span></div>
               <span style="font-size:0.72rem;color:var(--text-muted);" id="fuelingTotalFluid">~2.0 L total</span>
             </div>
             <div class="fueling-stat-box">
               <div class="upcoming-meta-label">Sodium Target</div>
-              <div class="fueling-stat-val" id="fuelingSodiumPerHour" style="color:#fbbf24;">650 <span style="font-size:0.8rem;">mg/h</span></div>
+              <div class="fueling-stat-val" id="fuelingSodiumPerHour" style="color:#FF5E00;">650 <span style="font-size:0.8rem;">mg/h</span></div>
               <span style="font-size:0.72rem;color:var(--text-muted);" id="fuelingTotalSodium">~1,950 mg total</span>
             </div>
           </div>
 
           <!-- Pre-Ride & Recovery Tabs / Sections -->
           <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:0.75rem;margin:0.85rem 0;">
-            <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);padding:0.85rem;border-radius:var(--radius-sm);">
-              <div style="font-size:0.78rem;font-weight:700;color:#a78bfa;text-transform:uppercase;margin-bottom:0.35rem;">
+            <div style="background:#FFFFFF;border:1px solid var(--border-color);padding:0.85rem;border-radius:var(--radius-sm);">
+              <div style="font-size:0.78rem;font-weight:700;color:#0052FF;text-transform:uppercase;margin-bottom:0.35rem;">
                 🍳 Pre-Ride Fueling (2.5h Prior)
               </div>
               <div style="font-size:0.85rem;font-weight:800;color:var(--text-primary);margin-bottom:0.25rem;" id="fuelingPreCarbTarget">
@@ -680,11 +717,11 @@
               <ul style="margin:0;padding-left:1.1rem;font-size:0.76rem;color:var(--text-secondary);line-height:1.45;" id="fuelingPreGuidelines">
                 <!-- Dynamically populated -->
               </ul>
-              <div style="font-size:0.74rem;color:#38bdf8;margin-top:0.4rem;" id="fuelingRolloutSnack"></div>
+              <div style="font-size:0.74rem;color:#0052FF;margin-top:0.4rem;" id="fuelingRolloutSnack"></div>
             </div>
 
-            <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);padding:0.85rem;border-radius:var(--radius-sm);">
-              <div style="font-size:0.78rem;font-weight:700;color:#10b981;text-transform:uppercase;margin-bottom:0.35rem;">
+            <div style="background:#FFFFFF;border:1px solid var(--border-color);padding:0.85rem;border-radius:var(--radius-sm);">
+              <div style="font-size:0.78rem;font-weight:700;color:#00C896;text-transform:uppercase;margin-bottom:0.35rem;">
                 🥛 Post-Ride Recovery Window (&lt;45m)
               </div>
               <div style="font-size:0.85rem;font-weight:800;color:var(--text-primary);margin-bottom:0.25rem;" id="fuelingRecoveryTarget">
@@ -709,7 +746,7 @@
           <!-- Jersey Pocket Packing Checklist -->
           <div style="margin-top:0.85rem;">
             <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;">
-              🎒 Jersey Pocket & Bike Packing Checklist
+              🎒 Jersey Pocket &amp; Bike Packing Checklist
             </div>
             <div class="fueling-checklist-grid" id="fuelingChecklistGrid">
               <!-- Populated dynamically -->
@@ -717,11 +754,16 @@
           </div>
         </div>
 
-        <!-- Coach Plain-English Rationale Box -->
-        <div class="coach-bubble">
-          <div class="coach-icon">🧠</div>
+        <!-- AI "Race Briefing" Card (Pre-Ride Briefing on Ice Frost background with Electric Cobalt Blue border & Sunset Orange highlights) -->
+        <div class="coach-bubble ai-race-briefing-banner">
+          <div class="coach-icon ai-pulse-ring" title="Directeur Sportive AI Engine">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2.5-6 4 12 3.5-8 2 4h5"></path></svg>
+          </div>
           <div class="coach-text">
-            <h4>AI Coach Insight</h4>
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+              <h4>AI Race Briefing • Directeur Sportive</h4>
+              <span class="ai-briefing-target-pill">⚡ Target FTP &amp; Zone 4 Intervals Active</span>
+            </div>
             <p id="workoutRationale">
               Loading tailored workout based on your Whoop recovery and Strava history...
             </p>
@@ -731,14 +773,15 @@
         <!-- Visual Interval Profile Graph -->
         <div class="interval-graph-wrap">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;width:100%;">
-            <span style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-secondary);">
-              Workout Profile & Power Targets (% FTP)
+            <span style="font-size:0.8rem;font-weight:700;text-transform:uppercase;color:var(--text-primary);font-family:var(--font-display);letter-spacing:0.03em;">
+              Live Workout Interface • Power Zones (% FTP)
             </span>
             <div class="graph-legend">
-              <div class="legend-item"><span class="legend-color" style="background:#38bdf8;"></span> Z2 Base</div>
-              <div class="legend-item"><span class="legend-color" style="background:#10b981;"></span> Z3 Tempo</div>
-              <div class="legend-item"><span class="legend-color" style="background:#f59e0b;"></span> Sweet Spot</div>
-              <div class="legend-item"><span class="legend-color" style="background:#f43f5e;"></span> VO2 Max</div>
+              <div class="legend-item"><span class="legend-color" style="background:#60A5FA;"></span> Z1 Recovery</div>
+              <div class="legend-item"><span class="legend-color" style="background:#0052FF;"></span> Z2 Base</div>
+              <div class="legend-item"><span class="legend-color" style="background:#0088FF;"></span> Z3 Tempo</div>
+              <div class="legend-item"><span class="legend-color" style="background:#FF8A00;"></span> Z4 Sweet Spot</div>
+              <div class="legend-item"><span class="legend-color" style="background:#FF5E00;"></span> Z5 VO2 Max</div>
             </div>
           </div>
 
@@ -805,15 +848,15 @@
 
           <!-- Route Uploader & Coach Chat Shortcut -->
           <div class="control-group route-uploader-control" style="margin-left:auto;display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-            <label class="btn btn-secondary route-upload-btn" id="lblInlineGpxUpload" title="Upload GPX Route File (.gpx)" style="margin:0;cursor:pointer;padding:0.42rem 0.85rem;font-size:0.8rem;white-space:nowrap;display:flex;align-items:center;gap:0.45rem;border-color:rgba(6,182,212,0.4);color:var(--accent-cyan);background:rgba(6,182,212,0.08);border-radius:6px;transition:all 0.15s ease;">
+            <label class="btn btn-secondary route-upload-btn" id="lblInlineGpxUpload" title="Upload GPX Route File (.gpx)" style="margin:0;cursor:pointer;padding:0.42rem 0.85rem;font-size:0.8rem;white-space:nowrap;display:flex;align-items:center;gap:0.45rem;border-color:rgba(0,82,255,0.35);color:var(--accent-cyan);background:rgba(0,82,255,0.06);border-radius:6px;transition:all 0.15s ease;">
               <input type="file" id="inputInlineGpxUpload" accept=".gpx" style="display:none;" />
               🗺️ Upload Route (.gpx)
             </label>
-            <span id="chipAttachedRoute" style="display:none;background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.35);padding:0.3rem 0.75rem;border-radius:14px;font-size:0.78rem;align-items:center;gap:0.45rem;">
+            <span id="chipAttachedRoute" style="display:none;background:rgba(0,82,255,0.1);color:var(--accent-cyan);border:1px solid rgba(0,82,255,0.3);padding:0.3rem 0.75rem;border-radius:14px;font-size:0.78rem;align-items:center;gap:0.45rem;">
               📍 <span id="lblAttachedRouteName">Route.gpx</span>
               <button id="btnRemoveAttachedRoute" type="button" title="Remove attached route" style="background:none;border:none;color:var(--text-muted);cursor:pointer;padding:0;font-size:1rem;line-height:1;margin-left:0.25rem;">&times;</button>
             </span>
-            <button type="button" class="btn btn-secondary btn-coach-chat-trigger" data-open-coach-chat="true" title="Ask AI Coach for specific interval edits or modifications" style="margin:0;padding:0.42rem 0.8rem;font-size:0.8rem;white-space:nowrap;display:flex;align-items:center;gap:0.4rem;border-color:rgba(167,139,250,0.35);color:#c4b5fd;background:rgba(167,139,250,0.08);border-radius:6px;">
+            <button type="button" class="btn btn-secondary btn-coach-chat-trigger" data-open-coach-chat="true" title="Ask AI Coach for specific interval edits or modifications" style="margin:0;padding:0.42rem 0.8rem;font-size:0.8rem;white-space:nowrap;display:flex;align-items:center;gap:0.4rem;border-color:rgba(255,94,0,0.35);color:#FF5E00;background:rgba(255,94,0,0.06);border-radius:6px;font-weight:600;">
               <span>💬 Edit in Coach Chat</span>
             </button>
           </div>
@@ -837,7 +880,7 @@
 
         <div class="workout-header">
           <div class="workout-title-area">
-            <div style="font-size:0.8rem;color:#fc5200;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;" id="outdoorPrescriptionBadge">
+            <div style="font-size:0.8rem;color:#FF5E00;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;" id="outdoorPrescriptionBadge">
               RECOMMENDED STRAVA OUTDOOR ROUTE
             </div>
             <div class="outdoor-title-row">
@@ -849,15 +892,15 @@
               </div>
             </div>
             <div class="workout-tags">
-              <span class="tag tag-focus" id="outdoorZoneBadge" style="background:rgba(252,82,0,0.15);color:#fc5200;border:1px solid rgba(252,82,0,0.3);">Zone 2 Aerobic Base</span>
+              <span class="tag tag-focus" id="outdoorZoneBadge" style="background:rgba(255,94,0,0.12);color:#FF5E00;border:1px solid rgba(255,94,0,0.3);">Zone 2 Aerobic Base</span>
               <span class="tag tag-dur" id="outdoorDurationBadge">-- MIN</span>
               <span class="tag tag-tss" id="outdoorDistBadge">-- mi</span>
-              <span class="tag" id="outdoorElevBadge" style="background:rgba(139,92,246,0.15);color:#a78bfa;border:1px solid rgba(139,92,246,0.3);">-- ft Elev</span>
+              <span class="tag" id="outdoorElevBadge" style="background:rgba(0,82,255,0.1);color:#0052FF;border:1px solid rgba(0,82,255,0.25);">-- ft Elev</span>
             </div>
           </div>
 
           <div class="action-buttons">
-            <button class="btn btn-secondary" id="btnToggleOutdoorFueling" style="border-color:#10b981;color:#10b981;">
+            <button class="btn btn-secondary" id="btnToggleOutdoorFueling" style="border-color:#00C896;color:#00C896;">
               🥪 Fueling Plan
             </button>
             <a class="btn btn-strava" id="btnOpenStrava" target="_blank" href="https://www.strava.com">
@@ -873,10 +916,12 @@
         </div>
 
         <!-- Coach Plain-English Rationale Box -->
-        <div class="coach-bubble" style="border-left-color:#fc5200;">
-          <div class="coach-icon">🧠</div>
+        <div class="coach-bubble ai-race-briefing-banner" style="border-left-color:#FF5E00;">
+          <div class="coach-icon ai-pulse-ring">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2.5-6 4 12 3.5-8 2 4h5"></path></svg>
+          </div>
           <div class="coach-text">
-            <h4 style="color:#fc5200;">AI Coach Route Analysis</h4>
+            <h4 style="color:#FF5E00;">AI Race Briefing • Route Analysis</h4>
             <p id="outdoorRationale">
               Loading outdoor recommendation tailored to your Whoop recovery and Strava history...
             </p>
@@ -893,19 +938,19 @@
             <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
               <div class="btn-pill-group" style="margin:0;">
                 <button class="btn-pill active" id="btnMapModeLeaflet" style="font-size:0.75rem;padding:0.25rem 0.6rem;">🗺️ Google Map</button>
-                <button class="btn-pill" id="btnMapModeSilhouette" style="font-size:0.75rem;padding:0.25rem 0.6rem;">✨ Neon Silhouette</button>
+                <button class="btn-pill" id="btnMapModeSilhouette" style="font-size:0.75rem;padding:0.25rem 0.6rem;">✨ Vector Track</button>
               </div>
               <!-- Google Maps Layer Dropdown Switcher -->
-              <select id="selectMapBaseLayer" class="select-map-layer" title="Choose Google Maps Layer" style="background:rgba(15,23,42,0.85);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0.25rem 0.5rem;color:#e2e8f0;font-size:0.74rem;cursor:pointer;">
+              <select id="selectMapBaseLayer" class="select-map-layer" title="Choose Google Maps Layer" style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:6px;padding:0.25rem 0.5rem;color:var(--text-primary);font-size:0.74rem;cursor:pointer;">
                 <option value="google_roads" selected>🗺️ Google Roadmap</option>
                 <option value="google_hybrid">🛰️ Google Satellite Hybrid</option>
                 <option value="google_terrain">⛰️ Google Terrain</option>
               </select>
               <div class="outdoor-map-pills">
-                <span class="badge-status" id="badgeMapStart" style="font-size:0.7rem;padding:0.15rem 0.5rem;color:#10b981;border-color:rgba(16,185,129,0.3);">🟢 Start</span>
-                <span class="badge-status" id="badgeMapEnd" style="font-size:0.7rem;padding:0.15rem 0.5rem;color:#06b6d4;border-color:rgba(6,182,212,0.3);">🏁 Finish</span>
+                <span class="badge-status" id="badgeMapStart" style="font-size:0.7rem;padding:0.15rem 0.5rem;color:#00C896;border-color:rgba(0,200,150,0.3);">🟢 Start</span>
+                <span class="badge-status" id="badgeMapEnd" style="font-size:0.7rem;padding:0.15rem 0.5rem;color:#0052FF;border-color:rgba(0,82,255,0.3);">🏁 Finish</span>
                 <span class="badge-status" id="badgeMapDist" style="font-size:0.7rem;padding:0.15rem 0.5rem;color:var(--text-secondary);">-- mi</span>
-                <button class="btn-pill" id="btnRecenterRoute" type="button" style="font-size:0.7rem;padding:0.15rem 0.55rem;color:var(--accent-cyan);border-color:rgba(6,182,212,0.35);cursor:pointer;background:rgba(6,182,212,0.08);" title="Center route in view">🎯 Center Route</button>
+                <button class="btn-pill" id="btnRecenterRoute" type="button" style="font-size:0.7rem;padding:0.15rem 0.55rem;color:var(--accent-cyan);border-color:rgba(0,82,255,0.3);cursor:pointer;background:rgba(0,82,255,0.06);" title="Center route in view">🎯 Center Route</button>
               </div>
             </div>
           </div>
@@ -920,13 +965,13 @@
           </div>
 
           <!-- Route Course Summary Footer Strip -->
-          <div class="outdoor-map-footer" id="outdoorMapFooter" style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--text-muted);padding:0.45rem 0.6rem;border-top:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;gap:0.4rem;">
+          <div class="outdoor-map-footer" id="outdoorMapFooter" style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;color:var(--text-muted);padding:0.45rem 0.6rem;border-top:1px solid var(--border-color);flex-wrap:wrap;gap:0.4rem;">
             <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;">
               <span id="outdoorMapHeading">🧭 Course Orientation: Loop Course</span>
               <span id="outdoorMapElevationProfile">⛰️ Gradient: Rolling</span>
             </div>
             <div style="display:flex;align-items:center;gap:0.5rem;">
-              <a id="btnExternalGoogleMaps" target="_blank" href="https://maps.google.com" class="btn-pill" style="font-size:0.72rem;padding:0.2rem 0.55rem;color:#60a5fa;border-color:rgba(96,165,250,0.35);text-decoration:none;display:inline-flex;align-items:center;gap:0.3rem;">
+              <a id="btnExternalGoogleMaps" target="_blank" href="https://maps.google.com" class="btn-pill" style="font-size:0.72rem;padding:0.2rem 0.55rem;color:#0052FF;border-color:rgba(0,82,255,0.3);text-decoration:none;display:inline-flex;align-items:center;gap:0.3rem;">
                 🌍 Open in Google Maps ↗
               </a>
             </div>
@@ -970,7 +1015,7 @@
         <!-- On-the-Bike Execution Guidance -->
         <div class="outdoor-tips-wrap">
           <div class="outdoor-tips-title">
-            <span>🎯 On-the-Bike Pacing & Execution Guidance</span>
+            <span>🎯 On-the-Bike Pacing &amp; Execution Guidance</span>
           </div>
           <div class="outdoor-tips-grid" id="outdoorTipsGrid">
             <!-- Populated dynamically by app.js -->
@@ -992,7 +1037,7 @@
 
           <div class="control-group" style="flex:1;min-width:280px;">
             <input type="text" id="inputOutdoorUserNote" placeholder="Outdoor notes (e.g. 'Looking for flat recovery', 'Rolling hills')..." 
-                   style="width:100%;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;padding:0.4rem 0.75rem;color:#fff;font-size:0.85rem;" />
+                   style="width:100%;background:#FFFFFF;border:1px solid var(--border-color);border-radius:6px;padding:0.4rem 0.75rem;color:var(--text-primary);font-size:0.85rem;" />
           </div>
 
           <button class="btn btn-strava" id="btnRegenerateOutdoor">
@@ -1008,7 +1053,9 @@
     <section class="card collapsible-tile" id="cardCoachDebrief">
       <div class="card-header collapsible-tile-header" id="coachDebriefHeader" role="button" tabindex="0" title="Click to collapse or expand AI Coach Daily Debrief" aria-expanded="true">
         <div class="card-header-left">
-          <span class="card-header-icon">🧠</span>
+          <span class="card-header-icon ai-pulse-ring" title="AI Engine Wave Pulse">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2.5-6 4 12 3.5-8 2 4h5"></path></svg>
+          </span>
           <div>
             <span class="card-title">AI Coach Daily Debrief &amp; Forward Outlook</span>
             <div class="card-subtitle collapsible-tile-subtitle" id="debriefSubtitle">
@@ -1049,10 +1096,10 @@
       <div class="collapsible-tile-body" id="coachDebriefBody">
 
       <!-- Subjective Athlete Feedback Bar -->
-      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 1rem;background:rgba(0,0,0,0.25);border-bottom:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">
-        <input type="text" id="inputDebriefUserNote" placeholder="Subjective feedback for coach (e.g., 'RPE felt high on climbs', 'Legs felt fresh', 'Tired from poor sleep')..." style="flex:1;min-width:260px;background:rgba(0,0,0,0.35);border:1px solid var(--border-color);border-radius:6px;padding:0.4rem 0.75rem;color:#fff;font-size:0.8rem;" />
-        <button class="btn btn-primary" style="padding:0.4rem 0.85rem;font-size:0.8rem;" id="btnAnalyzeDebrief">
-          🧠 Assess & Update Forecast
+      <div style="display:flex;align-items:center;gap:0.6rem;padding:0.6rem 1rem;background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;flex-wrap:wrap;">
+        <input type="text" id="inputDebriefUserNote" placeholder="Subjective feedback for coach (e.g., 'RPE felt high on climbs', 'Legs felt fresh', 'Tired from poor sleep')..." style="flex:1;min-width:260px;background:#F4F7FA;border:1px solid var(--border-color);border-radius:6px;padding:0.45rem 0.75rem;color:var(--text-primary);font-size:0.8rem;" />
+        <button class="btn btn-primary" style="padding:0.45rem 0.85rem;font-size:0.8rem;" id="btnAnalyzeDebrief">
+          ⚡ Assess &amp; Update Forecast
         </button>
       </div>
 
@@ -1068,7 +1115,7 @@
             </h3>
             <div id="debriefSessionsBreakdown" style="display:none;margin-top:0.45rem;display:flex;gap:0.4rem;flex-wrap:wrap;align-items:center;"></div>
           </div>
-          <div id="debriefVerdictBadge" class="badge-status" style="font-size:0.8rem;padding:0.25rem 0.75rem;color:#10b981;border-color:rgba(16,185,129,0.3);">
+          <div id="debriefVerdictBadge" class="badge-status" style="font-size:0.8rem;padding:0.25rem 0.75rem;color:#00C896;border-color:rgba(0,200,150,0.35);">
             🎯 Evaluating Compliance
           </div>
         </div>
@@ -1083,7 +1130,7 @@
           <div class="debrief-metric-box">
             <span class="debrief-metric-lbl">Power vs Target</span>
             <span class="debrief-metric-val" id="debriefMetricWatts">-- W</span>
-            <span class="debrief-metric-sub" id="debriefMetricTargetWatts">Target: -- W</span>
+            <span class="debrief-metric-sub" id="debriefMetricTargetWatts" style="color:#FF5E00;font-weight:600;">Target: -- W</span>
           </div>
           <div class="debrief-metric-box">
             <span class="debrief-metric-lbl">Moving Time</span>
@@ -1092,7 +1139,7 @@
           </div>
           <div class="debrief-metric-box">
             <span class="debrief-metric-lbl">Cardiovascular Load</span>
-            <span class="debrief-metric-val" id="debriefMetricTss" style="color:var(--accent-amber);">-- TSS</span>
+            <span class="debrief-metric-val" id="debriefMetricTss" style="color:var(--accent-orange);">-- TSS</span>
             <span class="debrief-metric-sub" id="debriefMetricHr">-- bpm avg</span>
           </div>
         </div>
@@ -1101,7 +1148,9 @@
         <div class="strain-system-debrief-card" id="debriefStrainSystemCard">
           <div class="strain-debrief-header">
             <div class="strain-debrief-title-row">
-              <span class="strain-debrief-icon">⚡</span>
+              <span class="strain-debrief-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#FF5E00" stroke="#FF5E00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              </span>
               <span class="strain-debrief-title">3-Tier Physiological Strain &amp; W' Battery</span>
             </div>
             <div class="strain-debrief-meta-row">
@@ -1135,14 +1184,16 @@
               <span class="battery-meter-label" id="debriefBatteryLabel">100% Remaining (0% Depleted)</span>
             </div>
             <div class="w-bal-battery-meter">
-              <div id="debriefBatteryFill" class="w-bal-battery-fill" style="width:100%;background:linear-gradient(90deg, #10b981, #06b6d4);"></div>
+              <div id="debriefBatteryFill" class="w-bal-battery-fill" style="width:100%;background:linear-gradient(90deg, #00C896, #0052FF);"></div>
             </div>
           </div>
         </div>
 
         <!-- Coach Plain-English Assessment -->
-        <div class="coach-bubble" style="border-left-color:var(--accent-cyan);margin:0.75rem 0;">
-          <div class="coach-icon">🔬</div>
+        <div class="coach-bubble ai-race-briefing-banner" style="border-left-color:var(--accent-cyan);margin:0.75rem 0;">
+          <div class="coach-icon ai-pulse-ring">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2.5-6 4 12 3.5-8 2 4h5"></path></svg>
+          </div>
           <div class="coach-text">
             <h4 style="color:var(--accent-cyan);">Sports-Science Assessment</h4>
             <p id="debriefAssessmentText">
@@ -1155,7 +1206,7 @@
       <!-- Tab Content 2: 3-Day Forward Outlook -->
       <div id="debriefTabOutlook" class="debrief-tab-panel" style="display:none;">
         <div style="font-size:0.8rem;color:var(--text-secondary);margin-bottom:0.75rem;">
-          Forecast modeled on acute fatigue decay (&tau; &approx; 3.0 days), athlete weekly schedule preferences, and macrocycle target of <b id="outlookWeeklyTargetTss" style="color:var(--accent-cyan);">360 TSS</b>:
+          Forecast modeled on acute fatigue decay (&tau; &approx; 3.0 days), athlete weekly schedule preferences, and macrocycle target of <b id="outlookWeeklyTargetTss" style="color:#FF5E00;">360 TSS</b>:
         </div>
         <div class="outlook-grid" id="outlookCardsGrid">
           <!-- Populated dynamically by app.js -->
@@ -1165,22 +1216,22 @@
       <!-- Tab Content 3: Tonight's Recovery Directive -->
       <div id="debriefTabProtocol" class="debrief-tab-panel" style="display:none;">
         <div class="recovery-protocol-grid">
-          <div class="protocol-card" style="border-color:rgba(139,92,246,0.25);background:rgba(139,92,246,0.04);">
+          <div class="protocol-card" style="border-color:rgba(0,82,255,0.22);background:#FFFFFF;">
             <div style="font-size:1.3rem;">🛌</div>
-            <div class="protocol-title" style="color:#a78bfa;">Sleep Target Tonight</div>
-            <div class="protocol-val" id="protocolSleepVal" style="color:#a78bfa;">8.0 hrs</div>
+            <div class="protocol-title" style="color:#0052FF;">Sleep Target Tonight</div>
+            <div class="protocol-val" id="protocolSleepVal" style="color:#0052FF;">8.0 hrs</div>
             <p class="protocol-desc" id="protocolSleepDesc">Aim for restorative sleep to clear sleep debt and release growth hormone.</p>
           </div>
-          <div class="protocol-card" style="border-color:rgba(16,185,129,0.25);background:rgba(16,185,129,0.04);">
+          <div class="protocol-card" style="border-color:rgba(0,200,150,0.25);background:#FFFFFF;">
             <div style="font-size:1.3rem;">🥗</div>
-            <div class="protocol-title" style="color:#10b981;" id="protocolNutritionTitle">Glycogen Replenishment</div>
-            <div class="protocol-val" id="protocolNutritionVal" style="color:#10b981;">Carbs + Protein</div>
+            <div class="protocol-title" style="color:#00C896;" id="protocolNutritionTitle">Glycogen Replenishment</div>
+            <div class="protocol-val" id="protocolNutritionVal" style="color:#00C896;">Carbs + Protein</div>
             <p class="protocol-desc" id="protocolNutritionDesc">Consume complex carbs with 25-30g lean protein to restock muscle glycogen.</p>
           </div>
-          <div class="protocol-card" style="border-color:rgba(6,182,212,0.25);background:rgba(6,182,212,0.04);">
+          <div class="protocol-card" style="border-color:rgba(255,94,0,0.22);background:#FFFFFF;">
             <div style="font-size:1.3rem;">💧</div>
-            <div class="protocol-title" style="color:#06b6d4;">Hydration & Autonomic Balance</div>
-            <div class="protocol-val" style="color:#06b6d4;">Electrolytes</div>
+            <div class="protocol-title" style="color:#FF5E00;">Hydration &amp; Autonomic Balance</div>
+            <div class="protocol-val" style="color:#FF5E00;">Electrolytes</div>
             <p class="protocol-desc" id="protocolHydrationDesc">Drink water with sodium/magnesium before bed to optimize nocturnal HRV recovery.</p>
           </div>
         </div>
@@ -1252,7 +1303,7 @@
           <div>
             <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
               <span class="card-title">Power Spiderweb &amp; Fitness Profile</span>
-              <span class="tag tag-focus" id="spiderwebPhenotypeBadge" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.3);font-weight:700;">🎯 All-Rounder</span>
+              <span class="tag tag-focus" id="spiderwebPhenotypeBadge" style="background:rgba(0,82,255,0.1);color:var(--accent-cyan);border:1px solid rgba(0,82,255,0.28);font-weight:700;">🎯 All-Rounder</span>
             </div>
             <div class="card-subtitle collapsible-tile-subtitle" id="spiderwebSubtitle">
               Multi-duration power signature &amp; progress over time (Strava &amp; Xert model)
@@ -1309,7 +1360,7 @@
           <div class="spiderweb-goal-progress-wrap">
             <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.75rem;">
               <span style="color:var(--text-muted);" id="spiderwebGoalProgressLabel">Goal Progress: 0% achieved</span>
-              <span style="font-weight:700;color:#10b981;" id="spiderwebGoalRemainingLabel">0W remaining</span>
+              <span style="font-weight:700;color:#00C896;" id="spiderwebGoalRemainingLabel">0W remaining</span>
             </div>
             <div class="spiderweb-goal-progress-bar-bg">
               <div class="spiderweb-goal-progress-bar-fill" id="spiderwebGoalProgressBar" style="width:0%;"></div>
@@ -1343,16 +1394,16 @@
               <svg id="spiderwebSvg" viewBox="0 0 500 395" preserveAspectRatio="xMidYMid meet">
                 <defs>
                   <radialGradient id="radarCurrentGradient" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.35" />
-                    <stop offset="100%" stop-color="#0891b2" stop-opacity="0.15" />
+                    <stop offset="0%" stop-color="#0052FF" stop-opacity="0.32" />
+                    <stop offset="100%" stop-color="#0052FF" stop-opacity="0.10" />
                   </radialGradient>
                   <radialGradient id="radarPreviousGradient" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.18" />
-                    <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.05" />
+                    <stop offset="0%" stop-color="#FF5E00" stop-opacity="0.22" />
+                    <stop offset="100%" stop-color="#FF5E00" stop-opacity="0.06" />
                   </radialGradient>
                   <radialGradient id="radarGoalGradient" cx="50%" cy="50%" r="50%">
-                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.35" />
-                    <stop offset="100%" stop-color="#059669" stop-opacity="0.10" />
+                    <stop offset="0%" stop-color="#00C896" stop-opacity="0.32" />
+                    <stop offset="100%" stop-color="#00C896" stop-opacity="0.08" />
                   </radialGradient>
                 </defs>
               </svg>
@@ -1399,7 +1450,7 @@
               <div style="display:flex;align-items:center;gap:0.45rem;flex-wrap:wrap;">
                 <span style="font-size:1rem;">🎯</span>
                 <span class="spiderweb-section-title" style="margin:0;">Target Changes &amp; Goal Planner</span>
-                <span class="spiderweb-goal-badge" id="plannerMacrocycleSyncBadge" style="font-size:0.7rem;background:rgba(6,182,212,0.14);color:var(--accent-cyan);border:1px solid rgba(6,182,212,0.35);">
+                <span class="spiderweb-goal-badge" id="plannerMacrocycleSyncBadge" style="font-size:0.7rem;background:rgba(0,82,255,0.1);color:var(--accent-cyan);border:1px solid rgba(0,82,255,0.28);">
                   🔄 Synced with Long-Term Macrocycle Program
                 </span>
               </div>
@@ -1476,7 +1527,7 @@
             <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
               <span class="card-title" id="programGoalTitle">Threshold &amp; FTP Booster</span>
               <span class="phase-badge" id="programPhaseBadge">Build Phase</span>
-              <span class="phase-badge" id="programSpiderwebBadge" style="display:none;background:rgba(16,185,129,0.15);color:#10b981;border:1px solid rgba(16,185,129,0.35);">🎯 Spiderweb Target</span>
+              <span class="phase-badge" id="programSpiderwebBadge" style="display:none;background:rgba(0,200,150,0.12);color:#00C896;border:1px solid rgba(0,200,150,0.3);">🎯 Spiderweb Target</span>
             </div>
             <div class="card-subtitle collapsible-tile-subtitle" id="programGoalDesc">
               Targeting sustained 20-min power output with structured sweet spot &amp; threshold progressions.
@@ -1486,7 +1537,7 @@
               <span class="tag tag-focus" id="collapsedProgramPhase">Build Phase</span>
               <span class="tag tag-dur" id="collapsedProgramWeek">Week 4 of 8</span>
               <span class="tag tag-tss" id="collapsedProgramCompliance">85% Compliance</span>
-              <span class="tag" id="collapsedProgramFtpDelta" style="background:rgba(6,182,212,0.15);color:var(--accent-cyan);border:1px solid var(--accent-cyan);">+15W FTP Target</span>
+              <span class="tag" id="collapsedProgramFtpDelta" style="background:rgba(255,94,0,0.12);color:#FF5E00;border:1px solid rgba(255,94,0,0.35);">+15W FTP Target</span>
             </div>
           </div>
         </div>
@@ -1528,14 +1579,14 @@
 
         <!-- High-Signal Program Metrics -->
         <div class="program-stats-grid">
-          <div class="program-stat-box">
+          <div class="program-stat-box" style="border-color:rgba(255,94,0,0.3);background:rgba(255,94,0,0.03);">
             <div class="program-stat-label">
-              <span>Target FTP</span>
-              <span style="color:var(--accent-cyan);font-weight:700;" id="programFtpDelta">+15W</span>
+              <span style="color:#FF5E00;font-weight:700;">Target FTP</span>
+              <span style="color:#FF5E00;font-weight:800;" id="programFtpDelta">+15W</span>
             </div>
-            <div class="program-stat-value">
+            <div class="program-stat-value" style="color:#FF5E00;">
               <span id="programTargetFtpVal">265</span>
-              <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span>
+              <span style="font-size:0.85rem;color:#FF5E00;font-weight:700;">W</span>
             </div>
             <div class="program-stat-sub">
               Current: <span id="programCurrentFtpVal">250W</span>
@@ -1555,15 +1606,15 @@
               <div class="mini-meter-fill" id="programTssMeterFill" style="width: 85%;"></div>
             </div>
             <div class="program-stat-sub" style="margin-top:0.35rem;display:flex;justify-content:space-between;align-items:center;">
-              <span>⚡ Strain: <b id="programWeeklyXssActual" style="color:#a78bfa;">312</b> / <span id="programWeeklyXssTarget">360</span> XSS</span>
-              <span id="programXssCompliancePct" style="color:#a78bfa;font-weight:600;">87%</span>
+              <span>⚡ Strain: <b id="programWeeklyXssActual" style="color:#0052FF;">312</b> / <span id="programWeeklyXssTarget">360</span> XSS</span>
+              <span id="programXssCompliancePct" style="color:#0052FF;font-weight:600;">87%</span>
             </div>
           </div>
 
           <div class="program-stat-box program-stat-box-wide">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.35rem;">
               <div class="program-stat-label">Current Macrocycle Objective</div>
-              <span class="badge-status" id="programFocusDurationBadge" style="font-size:0.7rem;padding:0.15rem 0.45rem;background:rgba(6,182,212,0.12);color:#06b6d4;border-color:rgba(6,182,212,0.25);">
+              <span class="badge-status" id="programFocusDurationBadge" style="font-size:0.7rem;padding:0.15rem 0.45rem;background:rgba(255,94,0,0.1);color:#FF5E00;border-color:rgba(255,94,0,0.3);">
                 Sweet Spot (45:00 Focus)
               </span>
             </div>
@@ -1582,13 +1633,15 @@
     <section class="card collapsible-tile" id="cardAthlete" style="margin-top:1.5rem;">
       <div class="card-header collapsible-tile-header" id="athleteCardHeader" role="button" tabindex="0" title="Click to collapse or expand Athlete Power Profile &amp; Training Zones" aria-expanded="true">
         <div class="card-header-left">
-          <span class="card-header-icon">⚡</span>
+          <span class="card-header-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF5E00" stroke="#FF5E00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </span>
           <div>
             <span class="card-title">Athlete Power Profile &amp; Training Zones</span>
             <!-- Collapsed Summary Chips (Visible when collapsed) -->
             <div class="collapsible-tile-summary" id="athleteCollapsedSummary" style="display:none;margin-top:0.25rem;">
               <span class="tag tag-focus" id="collapsedAthleteFtp">FTP: 250W</span>
-              <span class="tag" id="collapsedAthleteWPrime" style="background:rgba(192,132,252,0.15);color:#c084fc;border:1px solid rgba(192,132,252,0.3);">W': 20.0 kJ</span>
+              <span class="tag" id="collapsedAthleteWPrime" style="background:rgba(0,82,255,0.1);color:#0052FF;border:1px solid rgba(0,82,255,0.28);">W': 20.0 kJ</span>
               <span class="tag tag-dur" id="collapsedAthleteMaxHr">Max HR: 185 bpm</span>
             </div>
           </div>
@@ -1607,15 +1660,15 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:1rem;padding:0.5rem 0;">
           <div>
             <div class="athlete-metric-lbl">THRESHOLD POWER (FTP)</div>
-            <div class="athlete-metric-val" style="color:var(--accent-cyan);" id="valFtpDisplay">250 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span></div>
+            <div class="athlete-metric-val" style="color:#FF5E00;" id="valFtpDisplay">250 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span></div>
           </div>
           <div>
             <div class="athlete-metric-lbl">W' WORK CAPACITY</div>
-            <div class="athlete-metric-val" style="color:#c084fc;" id="valWPrimeDisplay">20.0 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">kJ</span></div>
+            <div class="athlete-metric-val" style="color:#0052FF;" id="valWPrimeDisplay">20.0 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">kJ</span></div>
           </div>
           <div>
             <div class="athlete-metric-lbl">PEAK SPRINT POWER</div>
-            <div class="athlete-metric-val" style="color:#f43f5e;" id="valPeakPowerDisplay">1050 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span></div>
+            <div class="athlete-metric-val" style="color:#FF5E00;" id="valPeakPowerDisplay">1050 <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">W</span></div>
           </div>
           <div>
             <div class="athlete-metric-lbl">MAX HEART RATE</div>
@@ -1625,16 +1678,16 @@
 
         <div class="athlete-zones-preview-grid">
           <div>
-            <div style="color:#38bdf8;font-weight:600;margin-bottom:0.2rem;">Z2 Endurance (56-75%)</div>
-            <div id="rangeZ2" style="font-weight:700;font-size:1rem;color:#fff;">140 - 188 W</div>
+            <div style="color:#0052FF;font-weight:700;margin-bottom:0.2rem;">Z2 Endurance (56-75%)</div>
+            <div id="rangeZ2" style="font-weight:800;font-size:1rem;color:var(--text-primary);font-family:var(--font-display);">140 - 188 W</div>
           </div>
           <div>
-            <div style="color:#f59e0b;font-weight:600;margin-bottom:0.2rem;">Sweet Spot (88-93%)</div>
-            <div id="rangeSweetSpot" style="font-weight:700;font-size:1rem;color:#fff;">220 - 233 W</div>
+            <div style="color:#FF8A00;font-weight:700;margin-bottom:0.2rem;">Z4 Sweet Spot (88-93%)</div>
+            <div id="rangeSweetSpot" style="font-weight:800;font-size:1rem;color:#FF5E00;font-family:var(--font-display);">220 - 233 W</div>
           </div>
           <div>
-            <div style="color:#f43f5e;font-weight:600;margin-bottom:0.2rem;">Z5 VO2 Max (106-120%)</div>
-            <div id="rangeVO2" style="font-weight:700;font-size:1rem;color:#fff;">265 - 300 W</div>
+            <div style="color:#FF5E00;font-weight:700;margin-bottom:0.2rem;">Z5 VO2 Max (106-120%)</div>
+            <div id="rangeVO2" style="font-weight:800;font-size:1rem;color:#FF5E00;font-family:var(--font-display);">265 - 300 W</div>
           </div>
         </div>
       </div>
@@ -1647,16 +1700,21 @@
   <footer class="version-footer">
     <div class="version-footer-content">
       <div class="version-left">
-        <img src="/static/img/logo.jpg?v=12" alt="PowerSync" class="version-logo" />
+        <div class="brand-logo-ring" style="width:32px;height:32px;">
+          <svg class="brand-logo-svg" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="36" height="36" rx="10" fill="url(#veloBrandGrad)"/>
+            <path d="M20.5 6L11.5 19H17.5L15.5 30L24.5 17H18.5L20.5 6Z" fill="#FFFFFF"/>
+          </svg>
+        </div>
         <div class="version-text-block">
           <div class="version-title">
-            <strong>PowerSync</strong>
-            <span class="version-tag" id="footerVersionBadge">v2.4.3</span>
+            <strong>VeloMetrics AI</strong>
+            <span class="version-tag" id="footerVersionBadge">v2.5.0</span>
             <span class="version-status-dot"></span>
-            <span class="version-status-text">Production Ready</span>
+            <span class="version-status-text">Speed &amp; Summit Edition</span>
           </div>
           <div class="version-desc">
-            Whoop v2 Biometrics • Strava Workload • Zwift Apple TV Bridge
+            Data-driven training meets human passion. Your personalized AI coach for every pedal stroke.
           </div>
         </div>
       </div>
@@ -1672,14 +1730,14 @@
           <span class="dot zwift"></span> Zwift Bridge
         </div>
         <div class="version-pill" id="footerPillGemini" title="Google Gemini Sports-Science Intelligence">
-          <span class="dot green" id="footerDotGemini" style="background:#10b981;box-shadow:0 0 6px #10b981;"></span>
+          <span class="dot green" id="footerDotGemini" style="background:#00C896;box-shadow:0 0 6px #00C896;"></span>
           <span id="footerTextGemini">Gemini Connected</span>
         </div>
       </div>
 
       <div class="version-right">
         <button class="btn btn-secondary" id="btnOpenChangelog" style="font-size:0.75rem;padding:0.35rem 0.75rem;">
-          📋 Release Notes & Changelog
+          📋 Release Notes &amp; Changelog
         </button>
       </div>
     </div>
@@ -1689,84 +1747,84 @@
   <div class="modal-overlay" id="settingsModal">
     <div class="modal-dialog">
       <div class="modal-header">
-        <h3>Settings & Connections</h3>
+        <h3>Settings &amp; Connections</h3>
         <button class="modal-close" id="btnCloseSettings" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
       <div class="modal-body">
 
         <!-- Long-Term Fitness Goal & Program (Xert Alternative) -->
-        <div class="form-group" style="background:rgba(6, 182, 212, 0.08);border:1px solid rgba(6, 182, 212, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;align-items:center;gap:0.5rem;">
             <span style="font-size:1.25rem;">🎯</span>
-            <label style="color:#06b6d4;font-weight:700;margin:0;">Long-Term Fitness Goal & Program (Xert Alternative)</label>
+            <label style="color:#0052FF;font-weight:700;margin:0;">Long-Term Fitness Goal &amp; Program (Xert Alternative)</label>
           </div>
-          <p class="form-hint" style="color:#cbd5e1;margin-top:0.35rem;font-size:0.8rem;">
-            PowerSync structures your macrocycles (Base &rarr; Build &rarr; Peak &rarr; Taper) towards your target power output or event date.
+          <p class="form-hint" style="color:var(--text-secondary);margin-top:0.35rem;font-size:0.8rem;">
+            VeloMetrics AI structures your macrocycles (Base &rarr; Build &rarr; Peak &rarr; Taper) towards your target power output or event date.
           </p>
           <div class="settings-form-grid" style="margin-top:0.75rem;">
             <div class="grid-col-span-2">
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Program Focus / Goal Archetype</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Program Focus / Goal Archetype</label>
               <select id="settingProgramGoal">
-                <option value="FTP_BUILD">Threshold & FTP Booster (+15W)</option>
-                <option value="GRAN_FONDO">Gran Fondo & Century Base (+10W)</option>
-                <option value="VO2_CRIT">Punchy Power & Criterium (+12W)</option>
-                <option value="HEALTH_LONGEVITY">Aerobic Health & Longevity (+5W)</option>
+                <option value="FTP_BUILD">Threshold &amp; FTP Booster (+15W)</option>
+                <option value="GRAN_FONDO">Gran Fondo &amp; Century Base (+10W)</option>
+                <option value="VO2_CRIT">Punchy Power &amp; Criterium (+12W)</option>
+                <option value="HEALTH_LONGEVITY">Aerobic Health &amp; Longevity (+5W)</option>
               </select>
             </div>
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Target FTP (Watts)</label>
+              <label style="font-size:0.82rem;font-weight:600;color:#FF5E00;margin-bottom:0.35rem;display:block;">Target FTP (Watts)</label>
               <input type="number" id="settingProgramTargetFtp" placeholder="265" />
             </div>
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Target Event / Completion Date</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Target Event / Completion Date</label>
               <input type="date" id="settingProgramTargetDate" />
             </div>
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Weekly Target TSS</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Weekly Target TSS</label>
               <input type="number" id="settingProgramWeeklyTss" placeholder="360" />
             </div>
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Weekly Target XSS (3-Tier Strain)</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Weekly Target XSS (3-Tier Strain)</label>
               <input type="number" id="settingProgramWeeklyXss" placeholder="360" />
             </div>
           </div>
         </div>
 
         <!-- Athlete Fitness Signature (3-Tier Strain & Xert Equivalent) -->
-        <div class="form-group" style="background:rgba(168, 85, 247, 0.08);border:1px solid rgba(168, 85, 247, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(255, 94, 0, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.25rem;">
             <span style="font-size:1.25rem;">⚡</span>
-            <label style="color:#c084fc;font-weight:700;margin:0;">Athlete Fitness Signature (Xert Equivalent)</label>
+            <label style="color:#FF5E00;font-weight:700;margin:0;">Athlete Fitness Signature (Xert Equivalent)</label>
           </div>
-          <p class="form-hint" style="color:#cbd5e1;margin:0.25rem 0 0.5rem 0;">
+          <p class="form-hint" style="color:var(--text-secondary);margin:0.25rem 0 0.5rem 0;">
             Calibrates your 3-tier physiological strain model (Low, High glycolytic W' depletion, and Peak neuromuscular power).
           </p>
           <div class="settings-form-grid" style="margin-top:0.5rem;">
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Threshold Power (FTP)</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Threshold Power (FTP)</label>
               <input type="number" id="settingFtp" placeholder="250" style="width:100%;box-sizing:border-box;" />
             </div>
             <div>
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
-                <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin:0;">W' Anaerobic Work (kJ)</label>
+                <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin:0;">W' Anaerobic Work (kJ)</label>
                 <button type="button" id="btnToggleWPrimeHelper" style="background:none;border:none;color:var(--accent-cyan);font-size:0.75rem;cursor:pointer;padding:0;text-decoration:underline;display:inline-flex;align-items:center;gap:0.2rem;" title="Open W' Anaerobic Work Estimator">📐 Estimate</button>
               </div>
               <input type="number" step="0.5" id="settingAthleteWPrime" placeholder="20.0" style="width:100%;box-sizing:border-box;" />
             </div>
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Peak Power P_max (W)</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Peak Power P_max (W)</label>
               <input type="number" id="settingAthletePeakPower" placeholder="1050" style="width:100%;box-sizing:border-box;" />
             </div>
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Max Heart Rate (BPM)</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Max Heart Rate (BPM)</label>
               <input type="number" id="settingMaxHr" placeholder="185" style="width:100%;box-sizing:border-box;" />
             </div>
           </div>
 
           <!-- W' Estimator Collapsible Helper -->
-          <div id="wPrimeEstimatorBox" style="display:none;margin-top:0.75rem;padding:0.85rem;background:rgba(15, 23, 42, 0.65);border:1px solid rgba(168, 85, 247, 0.35);border-radius:8px;">
+          <div id="wPrimeEstimatorBox" style="display:none;margin-top:0.75rem;padding:0.85rem;background:#FFFFFF;border:1px solid rgba(0, 82, 255, 0.25);border-radius:8px;">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.45rem;">
-              <span style="font-size:0.8rem;font-weight:700;color:#c084fc;">📐 W' (Anaerobic Capacity) Estimator</span>
+              <span style="font-size:0.8rem;font-weight:700;color:#0052FF;">📐 W' (Anaerobic Capacity) Estimator</span>
               <button type="button" id="btnCloseWPrimeHelper" style="background:none;border:none;color:var(--text-muted);font-size:0.85rem;cursor:pointer;">✕</button>
             </div>
             <p style="font-size:0.74rem;color:var(--text-secondary);margin:0 0 0.55rem 0;line-height:1.45;">
@@ -1792,7 +1850,7 @@
               </div>
               <button type="button" id="btnCalculateWPrime" class="btn btn-secondary" style="font-size:0.74rem;padding:0.4rem 0.75rem;white-space:nowrap;border-color:var(--accent-cyan);color:var(--accent-cyan);">Compute</button>
             </div>
-            <div id="calcWpResult" style="display:none;font-size:0.74rem;padding:0.4rem 0.6rem;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:6px;color:#10b981;margin-bottom:0.55rem;"></div>
+            <div id="calcWpResult" style="display:none;font-size:0.74rem;padding:0.4rem 0.6rem;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.3);border-radius:6px;color:#00C896;margin-bottom:0.55rem;"></div>
 
             <!-- Method 2: Rider Phenotype Quick-Select -->
             <div style="font-size:0.74rem;font-weight:600;color:var(--accent-cyan);margin-bottom:0.35rem;">Option B: Quick-Select by Rider Phenotype</div>
@@ -1806,14 +1864,14 @@
         </div>
 
         <!-- Google Gemini AI Key -->
-        <div class="form-group" style="background:rgba(6, 182, 212, 0.08);border:1px solid rgba(6, 182, 212, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
             <div style="display:flex;align-items:center;gap:0.45rem;">
               <span style="font-size:1.15rem;">✨</span>
-              <label style="color:var(--accent-cyan);font-weight:700;margin:0;">AI Coach Engine</label>
+              <label style="color:var(--accent-cyan);font-weight:700;margin:0;">AI Coach Engine (Directeur Sportive)</label>
             </div>
-            <span id="geminiConnStatus" class="badge-status badge-gemini connected" style="font-size:0.75rem;padding:0.18rem 0.55rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.35);color:#10b981;font-weight:600;">
-              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #10b981;background:#10b981;border-radius:50%;"></span>
+            <span id="geminiConnStatus" class="badge-status badge-gemini connected" style="font-size:0.75rem;padding:0.18rem 0.55rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.35);color:#00C896;font-weight:600;">
+              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #00C896;background:#00C896;border-radius:50%;"></span>
               <span id="txtGeminiConnStatus">Active (Gemini 2.5 Flash)</span>
             </span>
           </div>
@@ -1823,17 +1881,17 @@
         </div>
 
         <!-- Persistent Coaching Preferences & Weekly Schedule Engine -->
-        <div class="form-group" style="background:rgba(14, 165, 233, 0.08);border:1px solid rgba(14, 165, 233, 0.28);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.35rem;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">🎯</span>
-              <label style="color:#38bdf8;font-weight:700;margin:0;">Coaching Preferences &amp; Weekly Schedule</label>
+              <label style="color:#0052FF;font-weight:700;margin:0;">Coaching Preferences &amp; Weekly Schedule</label>
             </div>
-            <button type="button" id="btnResetCoachingPreferences" class="btn btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;color:#f87171;border-color:rgba(239,68,68,0.35);" title="Reset to default preferences">
+            <button type="button" id="btnResetCoachingPreferences" class="btn btn-secondary" style="font-size:0.7rem;padding:0.2rem 0.6rem;color:#ef4444;border-color:rgba(239,68,68,0.35);" title="Reset to default preferences">
               ↺ Reset Defaults
             </button>
           </div>
-          <p class="form-hint" style="color:#cbd5e1;margin:0.25rem 0 0.75rem 0;">
+          <p class="form-hint" style="color:var(--text-secondary);margin:0.25rem 0 0.75rem 0;">
             Persistent preferences engine: Your coach automatically remembers your weekly schedule rules, duration limits, progressive warmup ramps, and custom directives across sessions.
           </p>
 
@@ -1841,39 +1899,39 @@
           <div style="margin-bottom:0.85rem;">
             <label style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;display:block;margin-bottom:0.4rem;">Weekly Target Schedule</label>
             <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.45rem;">
-              <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);padding:0.45rem;border-radius:6px;font-size:0.75rem;">
-                <div style="font-weight:700;color:#38bdf8;">Mon / Tue / Thu</div>
-                <div style="color:#e2e8f0;font-weight:600;">35–45 min</div>
-                <div style="font-size:0.68rem;color:#94a3b8;">Indoor priority / Rest</div>
+              <div style="background:#FFFFFF;border:1px solid var(--border-color);padding:0.45rem;border-radius:6px;font-size:0.75rem;">
+                <div style="font-weight:700;color:#0052FF;">Mon / Tue / Thu</div>
+                <div style="color:var(--text-primary);font-weight:600;">35–45 min</div>
+                <div style="font-size:0.68rem;color:var(--text-muted);">Indoor priority / Rest</div>
               </div>
-              <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);padding:0.45rem;border-radius:6px;font-size:0.75rem;">
-                <div style="font-weight:700;color:#10b981;">Wed &amp; Fri</div>
-                <div style="color:#e2e8f0;font-weight:600;">60+ min (1h+)</div>
-                <div style="font-size:0.68rem;color:#94a3b8;">Outdoor priority</div>
+              <div style="background:#FFFFFF;border:1px solid var(--border-color);padding:0.45rem;border-radius:6px;font-size:0.75rem;">
+                <div style="font-weight:700;color:#00C896;">Wed &amp; Fri</div>
+                <div style="color:var(--text-primary);font-weight:600;">60+ min (1h+)</div>
+                <div style="font-size:0.68rem;color:var(--text-muted);">Outdoor priority</div>
               </div>
-              <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);padding:0.45rem;border-radius:6px;font-size:0.75rem;">
-                <div style="font-weight:700;color:#a855f7;">Saturday</div>
-                <div style="color:#e2e8f0;font-weight:600;">Rest Day</div>
-                <div style="font-size:0.68rem;color:#94a3b8;">Off the bike recovery</div>
+              <div style="background:#FFFFFF;border:1px solid var(--border-color);padding:0.45rem;border-radius:6px;font-size:0.75rem;">
+                <div style="font-weight:700;color:#64748B;">Saturday</div>
+                <div style="color:var(--text-primary);font-weight:600;">Rest Day</div>
+                <div style="font-size:0.68rem;color:var(--text-muted);">Off the bike recovery</div>
               </div>
-              <div style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.08);padding:0.45rem;border-radius:6px;font-size:0.75rem;">
-                <div style="font-weight:700;color:#f59e0b;">Sunday</div>
-                <div style="color:#e2e8f0;font-weight:600;">60–90+ min</div>
-                <div style="font-size:0.68rem;color:#94a3b8;">Outdoor / Long Indoor</div>
+              <div style="background:#FFFFFF;border:1px solid var(--border-color);padding:0.45rem;border-radius:6px;font-size:0.75rem;">
+                <div style="font-weight:700;color:#FF5E00;">Sunday</div>
+                <div style="color:var(--text-primary);font-weight:600;">60–90+ min</div>
+                <div style="font-size:0.68rem;color:var(--text-muted);">Outdoor / Long Indoor</div>
               </div>
             </div>
           </div>
 
           <!-- Warmup & Cooldown Ramp Rules -->
-          <div style="background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06);padding:0.65rem;border-radius:6px;margin-bottom:0.85rem;">
+          <div style="background:#FFFFFF;border:1px solid var(--border-color);padding:0.65rem;border-radius:6px;margin-bottom:0.85rem;">
             <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
               <div>
-                <div style="font-size:0.75rem;font-weight:700;color:#e2e8f0;">⚡ Progressive Wattage Ramps (No Flat Z2 Blocks)</div>
-                <div style="font-size:0.7rem;color:#94a3b8;margin-top:0.15rem;">
+                <div style="font-size:0.75rem;font-weight:700;color:var(--text-primary);">⚡ Progressive Wattage Ramps (No Flat Z2 Blocks)</div>
+                <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">
                   Warmup: <b>45% &rarr; 75% FTP ramp</b> • Cooldown: <b>65% &rarr; 40% FTP ramp</b> • Dynamic Variety: <b>Active</b>
                 </div>
               </div>
-              <span class="badge" style="background:rgba(16,185,129,0.18);color:#10b981;border:1px solid rgba(16,185,129,0.35);font-size:0.68rem;padding:0.2rem 0.5rem;">Active Invariant</span>
+              <span class="badge" style="background:rgba(0,200,150,0.12);color:#00C896;border:1px solid rgba(0,200,150,0.3);font-size:0.68rem;padding:0.2rem 0.5rem;">Active Invariant</span>
             </div>
           </div>
 
@@ -1881,14 +1939,14 @@
           <div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
               <label style="font-size:0.75rem;color:var(--text-secondary);font-weight:600;margin:0;">Active Coaching Directives (Learned Memory)</label>
-              <span style="font-size:0.68rem;color:#94a3b8;">Chat saying <i>"Remember that I prefer..."</i> auto-learns</span>
+              <span style="font-size:0.68rem;color:var(--text-muted);">Chat saying <i>"Remember that I prefer..."</i> auto-learns</span>
             </div>
             <div id="preferencesDirectivesList" style="display:flex;flex-direction:column;gap:0.35rem;margin-bottom:0.6rem;max-height:160px;overflow-y:auto;padding-right:0.2rem;">
               <!-- Populated dynamically -->
             </div>
             <div style="display:flex;gap:0.4rem;">
-              <input type="text" id="inputNewDirective" placeholder="Add custom directive (e.g. 'Prefer outdoor hills on Friday')" style="flex:1;font-size:0.78rem;padding:0.4rem 0.6rem;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;color:#fff;" />
-              <button type="button" id="btnAddDirective" class="btn btn-secondary" style="font-size:0.75rem;padding:0.4rem 0.8rem;white-space:nowrap;color:#38bdf8;border-color:rgba(56,189,248,0.4);">
+              <input type="text" id="inputNewDirective" placeholder="Add custom directive (e.g. 'Prefer outdoor hills on Friday')" style="flex:1;font-size:0.78rem;padding:0.4rem 0.6rem;background:#FFFFFF;border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);" />
+              <button type="button" id="btnAddDirective" class="btn btn-secondary" style="font-size:0.75rem;padding:0.4rem 0.8rem;white-space:nowrap;color:#0052FF;border-color:rgba(0,82,255,0.35);">
                 + Add Directive
               </button>
             </div>
@@ -1896,19 +1954,19 @@
         </div>
 
         <!-- Base Map Overlays & Google Maps API -->
-        <div class="form-group" style="background:rgba(59, 130, 246, 0.08);border:1px solid rgba(59, 130, 246, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">🗺️</span>
-              <label style="color:#60a5fa;font-weight:700;margin:0;">Route Map Overlays & Google Maps</label>
+              <label style="color:#0052FF;font-weight:700;margin:0;">Route Map Overlays &amp; Google Maps</label>
             </div>
-            <a href="https://console.cloud.google.com/google/maps-apis/overview" target="_blank" style="color:#60a5fa;font-size:0.75rem;text-decoration:underline;">Google Cloud Console ↗</a>
+            <a href="https://console.cloud.google.com/google/maps-apis/overview" target="_blank" style="color:#0052FF;font-size:0.75rem;text-decoration:underline;">Google Cloud Console ↗</a>
           </div>
-          <p class="form-hint" style="margin-top:0.25rem;color:#cbd5e1;">
+          <p class="form-hint" style="margin-top:0.25rem;color:var(--text-secondary);">
             Course map views use official <b>Google Maps</b> (Roadmap, Satellite Hybrid, and Terrain). Select your default Google Maps layer below:
           </p>
           <div style="margin-top:0.75rem;">
-            <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Default Google Maps Layer</label>
+            <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Default Google Maps Layer</label>
             <select id="settingPreferredMapLayer">
               <option value="google_roads" selected>🗺️ Google Roadmap (Default)</option>
               <option value="google_hybrid">🛰️ Google Satellite Hybrid</option>
@@ -1918,135 +1976,135 @@
         </div>
 
         <!-- Strava Integration Card -->
-        <div class="form-group" style="background:rgba(252, 82, 0, 0.08);border:1px solid rgba(252, 82, 0, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(255, 94, 0, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">🚴</span>
-              <label style="color:#fc5200;font-weight:700;margin:0;">Strava Integration</label>
+              <label style="color:#FF5E00;font-weight:700;margin:0;">Strava Integration</label>
             </div>
-            <span id="stravaConnStatus" style="font-size:0.8rem;color:#94a3b8;font-weight:600;">Not connected</span>
+            <span id="stravaConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
           </div>
-          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+          <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
             Syncs historical training load, ride GPS tracks, weighted power telemetry, and outdoor route matching.
           </p>
           <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;">
-            <a href="/api/auth/strava/login" id="btnConnectStravaOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#fc5200;color:#fc5200;text-decoration:none;font-weight:600;">
+            <a href="/api/auth/strava/login" id="btnConnectStravaOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#FF5E00;color:#FF5E00;text-decoration:none;font-weight:600;">
               🔗 Connect Strava
             </a>
-            <button type="button" id="btnDisconnectStrava" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#f87171;border-color:rgba(239,68,68,0.3);display:none;">
+            <button type="button" id="btnDisconnectStrava" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#ef4444;border-color:rgba(239,68,68,0.3);display:none;">
               Disconnect
             </button>
           </div>
         </div>
 
         <!-- Whoop Biometrics Card -->
-        <div class="form-group" style="background:rgba(16, 185, 129, 0.08);border:1px solid rgba(16, 185, 129, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 200, 150, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">🔋</span>
-              <label style="color:#10b981;font-weight:700;margin:0;">Whoop Biometrics</label>
+              <label style="color:#00C896;font-weight:700;margin:0;">Whoop Biometrics</label>
             </div>
-            <span id="whoopConnStatus" style="font-size:0.8rem;color:#94a3b8;font-weight:600;">Not connected</span>
+            <span id="whoopConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
           </div>
-          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+          <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
             Syncs real-time Recovery Score, HRV baseline shift, Sleep Performance, and Day Strain rings.
           </p>
           <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;">
-            <a href="/api/auth/whoop/login" id="btnConnectWhoopOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#10b981;color:#10b981;text-decoration:none;font-weight:600;">
+            <a href="/api/auth/whoop/login" id="btnConnectWhoopOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#00C896;color:#00C896;text-decoration:none;font-weight:600;">
               🔗 Connect Whoop
             </a>
-            <button type="button" id="btnDisconnectWhoop" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#f87171;border-color:rgba(239,68,68,0.3);display:none;">
+            <button type="button" id="btnDisconnectWhoop" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#ef4444;border-color:rgba(239,68,68,0.3);display:none;">
               Disconnect
             </button>
           </div>
         </div>
 
         <!-- Zwift & Intervals.icu Cloud Bridge Card -->
-        <div class="form-group" style="background:rgba(252, 103, 25, 0.08);border:1px solid rgba(252, 103, 25, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(255, 94, 0, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">📺</span>
-              <label style="color:#fc6719;font-weight:700;margin:0;">Zwift Direct Sync (Intervals.icu Bridge)</label>
+              <label style="color:#FF5E00;font-weight:700;margin:0;">Zwift Direct Sync (Intervals.icu Bridge)</label>
             </div>
             <div style="display:flex;align-items:center;gap:0.6rem;">
-              <a href="https://intervals.icu/settings" target="_blank" style="color:#fc6719;font-size:0.75rem;text-decoration:underline;">Developer Settings ↗</a>
-              <span id="intervalsConnStatus" style="font-size:0.8rem;color:#94a3b8;font-weight:600;">Not configured</span>
+              <a href="https://intervals.icu/settings" target="_blank" style="color:#FF5E00;font-size:0.75rem;text-decoration:underline;">Developer Settings ↗</a>
+              <span id="intervalsConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not configured</span>
             </div>
           </div>
-          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+          <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
             Bridges daily recommended workouts to Zwift on Apple TV, iPad, or PC without manual file copying.
           </p>
           <div class="settings-form-grid" style="margin-top:0.75rem;">
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Intervals Athlete ID</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Intervals Athlete ID</label>
               <input type="text" id="settingIntervalsAthleteId" placeholder="e.g. i12345" />
             </div>
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Intervals API Key</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Intervals API Key</label>
               <input type="password" id="settingIntervalsApiKey" placeholder="API Key" />
             </div>
           </div>
-          <span class="form-hint" style="margin-top:0.35rem;font-size:0.75rem;color:#94a3b8;display:block;">
+          <span class="form-hint" style="margin-top:0.35rem;font-size:0.75rem;color:var(--text-muted);display:block;">
             Find your Athlete ID (e.g. i12345) and API Key in <b>Intervals.icu &rarr; Settings &rarr; Developer Settings</b> (Free).
           </span>
         </div>
 
         <!-- Primary Athlete Ownership Lock Card -->
-        <div class="form-group" style="background:rgba(6, 182, 212, 0.08);border:1px solid rgba(6, 182, 212, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">👑</span>
-              <label style="color:#06b6d4;font-weight:700;margin:0;">Exclusive Primary Athlete Lock</label>
+              <label style="color:#0052FF;font-weight:700;margin:0;">Exclusive Primary Athlete Lock</label>
             </div>
-            <span id="ownerLockStatusPill" style="font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:12px;background:rgba(16,185,129,0.15);color:#10b981;font-weight:600;">Lock Active</span>
+            <span id="ownerLockStatusPill" style="font-size:0.75rem;padding:0.15rem 0.5rem;border-radius:12px;background:rgba(0,200,150,0.12);color:#00C896;font-weight:600;">Lock Active</span>
           </div>
-          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+          <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
             Restricts the Primary Athlete account (Intervals.icu credentials <code>i748824</code>, master settings, and history) exclusively to your email. All other users receive their own private isolated athlete databases.
           </p>
           <div style="display:flex;gap:0.6rem;margin-top:0.65rem;">
             <input type="email" id="settingPrimaryOwnerEmail" placeholder="e.g. your.email@domain.com" style="flex:1;font-size:0.85rem;" />
-            <button type="button" class="btn btn-primary" id="btnSaveOwnerLock" style="font-size:0.8rem;white-space:nowrap;padding:0.45rem 0.85rem;background:#0891b2;border:none;">
+            <button type="button" class="btn btn-primary" id="btnSaveOwnerLock" style="font-size:0.8rem;white-space:nowrap;padding:0.45rem 0.85rem;background:#0052FF;border:none;">
               🔒 Set Owner
             </button>
           </div>
-          <span class="form-hint" style="margin-top:0.35rem;font-size:0.73rem;color:#94a3b8;display:block;">
+          <span class="form-hint" style="margin-top:0.35rem;font-size:0.73rem;color:var(--text-muted);display:block;">
             You can also configure <code>OWNER_EMAIL</code> in Railway environment variables for immutable server-level locking.
           </span>
         </div>
 
         <!-- Google Sign-In & Multi-User Setup Card -->
-        <div class="form-group" style="background:rgba(66, 133, 244, 0.08);border:1px solid rgba(66, 133, 244, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">🔐</span>
-              <label style="color:#60a5fa;font-weight:700;margin:0;">Google Sign-In & Multi-User Engine</label>
+              <label style="color:#0052FF;font-weight:700;margin:0;">Google Sign-In &amp; Multi-User Engine</label>
             </div>
-            <span id="googleOauthStatusPill" style="font-size:0.8rem;color:#10b981;font-weight:600;">OIDC Ready</span>
+            <span id="googleOauthStatusPill" style="font-size:0.8rem;color:#00C896;font-weight:600;">OIDC Ready</span>
           </div>
-          <p class="form-hint" style="margin-top:0.35rem;color:#cbd5e1;font-size:0.8rem;">
+          <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
             Enables instant 1-click Google Sign-In with complete athlete data isolation. Users each get private Whoop, Strava, and workout databases.
           </p>
           <div class="settings-form-grid" style="margin-top:0.75rem;">
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Google Client ID</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Google Client ID</label>
               <input type="text" id="settingGoogleClientId" placeholder="e.g. 123456789-xyz.apps.googleusercontent.com" />
             </div>
             <div>
-              <label style="font-size:0.82rem;font-weight:600;color:#cbd5e1;margin-bottom:0.35rem;display:block;">Google Client Secret</label>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Google Client Secret</label>
               <input type="password" id="settingGoogleClientSecret" placeholder="••••••••••••" />
             </div>
           </div>
-          <div style="margin-top:0.6rem;font-size:0.75rem;color:#94a3b8;background:rgba(0,0,0,0.25);padding:0.4rem 0.6rem;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
-            <span>Authorized Redirect URI: <code id="googleRedirectUriText" style="color:#38bdf8;">/api/auth/google/callback</code></span>
+          <div style="margin-top:0.6rem;font-size:0.75rem;color:var(--text-muted);background:#FFFFFF;border:1px solid var(--border-color);padding:0.4rem 0.6rem;border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
+            <span>Authorized Redirect URI: <code id="googleRedirectUriText" style="color:#0052FF;">/api/auth/google/callback</code></span>
             <button type="button" class="btn btn-secondary" id="btnCopyGoogleRedirect" style="font-size:0.7rem;padding:0.2rem 0.5rem;">Copy</button>
           </div>
         </div>
 
         <!-- Demo Mode Toggle -->
-        <div class="form-group" style="flex-direction:row;justify-content:space-between;align-items:center;background:rgba(255,255,255,0.03);padding:0.75rem;border-radius:8px;">
+        <div class="form-group" style="flex-direction:row;justify-content:space-between;align-items:center;background:#F4F7FA;border:1px solid var(--border-color);padding:0.75rem;border-radius:8px;">
           <div>
             <label style="margin:0;">Demo / Preview Mode</label>
-            <div class="form-hint">Uses realistic Whoop recovery & Strava training metrics to test features right away.</div>
+            <div class="form-hint">Uses realistic Whoop recovery &amp; Strava training metrics to test features right away.</div>
           </div>
           <input type="checkbox" id="settingDemoMode" style="width:20px;height:20px;cursor:pointer;" />
         </div>
@@ -2073,52 +2131,52 @@
       <div class="modal-body" style="gap:1.25rem;">
         
         <!-- Logged-in Profile Card (Shown when logged in) -->
-        <div id="authProfileCard" style="background:rgba(255,255,255,0.03);border:1px solid var(--border-color);border-radius:12px;padding:1.25rem;display:none;flex-direction:column;gap:1rem;">
+        <div id="authProfileCard" style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:12px;padding:1.25rem;display:none;flex-direction:column;gap:1rem;">
           <div style="display:flex;align-items:center;gap:1rem;">
-            <div id="authProfileAvatar" style="width:48px;height:48px;border-radius:50%;background:rgba(6,182,212,0.2);border:2px solid #06b6d4;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:#06b6d4;overflow:hidden;">
+            <div id="authProfileAvatar" style="width:48px;height:48px;border-radius:50%;background:rgba(0,82,255,0.12);border:2px solid #0052FF;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:#0052FF;overflow:hidden;">
               👤
             </div>
             <div style="overflow:hidden;">
-              <div id="authProfileName" style="font-weight:700;font-size:1.05rem;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Athlete</div>
-              <div id="authProfileEmail" style="font-size:0.8rem;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">athlete@example.com</div>
-              <div id="authProfileBadge" style="font-size:0.72rem;color:#06b6d4;margin-top:0.2rem;">🔒 Private Isolated Athlete Database</div>
+              <div id="authProfileName" style="font-weight:700;font-size:1.05rem;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Athlete</div>
+              <div id="authProfileEmail" style="font-size:0.8rem;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">athlete@example.com</div>
+              <div id="authProfileBadge" style="font-size:0.72rem;color:#0052FF;margin-top:0.2rem;">🔒 Private Isolated Athlete Database</div>
             </div>
           </div>
           <div style="display:flex;gap:0.75rem;margin-top:0.25rem;">
-            <button type="button" class="btn btn-secondary" id="btnClaimDefaultData" style="flex:1;border-color:rgba(6,182,212,0.4);color:#06b6d4;font-size:0.8rem;" title="Import settings, FTP, Intervals credentials, and coaching directives from default athlete">
-              📥 Import Default Settings & Directives
+            <button type="button" class="btn btn-secondary" id="btnClaimDefaultData" style="flex:1;border-color:rgba(0,82,255,0.35);color:#0052FF;font-size:0.8rem;" title="Import settings, FTP, Intervals credentials, and coaching directives from default athlete">
+              📥 Import Default Settings &amp; Directives
             </button>
-            <button type="button" class="btn btn-secondary" id="btnSignOut" style="border-color:rgba(239,68,68,0.4);color:#f87171;font-size:0.8rem;">
+            <button type="button" class="btn btn-secondary" id="btnSignOut" style="border-color:rgba(239,68,68,0.4);color:#ef4444;font-size:0.8rem;">
               Sign Out
             </button>
           </div>
         </div>
 
         <!-- Email Sign-In (Primary Method: Simple, Fast, Zero Setup) -->
-        <div id="authEmailCard" style="display:flex;flex-direction:column;gap:0.75rem;background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:10px;padding:1.1rem;">
+        <div id="authEmailCard" style="display:flex;flex-direction:column;gap:0.75rem;background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:1.1rem;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <div style="font-weight:700;font-size:0.92rem;color:#f8fafc;display:flex;align-items:center;gap:0.4rem;">
+            <div style="font-weight:700;font-size:0.92rem;color:var(--text-primary);display:flex;align-items:center;gap:0.4rem;">
               <span>✉️</span> Sign In with Email
             </div>
-            <span style="font-size:0.7rem;color:#06b6d4;background:rgba(6,182,212,0.1);padding:0.15rem 0.5rem;border-radius:12px;border:1px solid rgba(6,182,212,0.25);">Instant & Isolated</span>
+            <span style="font-size:0.7rem;color:#0052FF;background:rgba(0,82,255,0.08);padding:0.15rem 0.5rem;border-radius:12px;border:1px solid rgba(0,82,255,0.25);">Instant &amp; Isolated</span>
           </div>
-          <p style="font-size:0.75rem;color:#94a3b8;margin:0;line-height:1.4;">
+          <p style="font-size:0.75rem;color:var(--text-muted);margin:0;line-height:1.4;">
             Enter your email to log in or create an isolated athlete profile. No third-party accounts or passwords required.
           </p>
           <form id="formEmailLogin" style="display:flex;flex-direction:column;gap:0.65rem;" onsubmit="return false;">
             <div>
-              <label for="inputAthleteEmail" style="display:block;font-size:0.72rem;font-weight:600;color:#94a3b8;margin-bottom:0.25rem;">Email Address</label>
-              <input type="email" id="inputAthleteEmail" placeholder="you@example.com" required style="width:100%;box-sizing:border-box;font-size:0.85rem;padding:0.55rem 0.75rem;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;color:#fff;" />
+              <label for="inputAthleteEmail" style="display:block;font-size:0.72rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.25rem;">Email Address</label>
+              <input type="email" id="inputAthleteEmail" placeholder="you@example.com" required style="width:100%;box-sizing:border-box;font-size:0.85rem;padding:0.55rem 0.75rem;background:#FFFFFF;border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);" />
             </div>
             <div>
-              <label for="inputAthleteName" style="display:block;font-size:0.72rem;font-weight:600;color:#94a3b8;margin-bottom:0.25rem;">Athlete Name (Optional)</label>
-              <input type="text" id="inputAthleteName" placeholder="e.g. Adam" style="width:100%;box-sizing:border-box;font-size:0.85rem;padding:0.55rem 0.75rem;background:rgba(0,0,0,0.3);border:1px solid var(--border-color);border-radius:6px;color:#fff;" />
+              <label for="inputAthleteName" style="display:block;font-size:0.72rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.25rem;">Athlete Name (Optional)</label>
+              <input type="text" id="inputAthleteName" placeholder="e.g. Adam" style="width:100%;box-sizing:border-box;font-size:0.85rem;padding:0.55rem 0.75rem;background:#FFFFFF;border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);" />
             </div>
-            <label style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.75rem;color:#cbd5e1;cursor:pointer;margin-top:0.1rem;">
+            <label style="display:flex;align-items:flex-start;gap:0.5rem;font-size:0.75rem;color:var(--text-secondary);cursor:pointer;margin-top:0.1rem;">
               <input type="checkbox" id="chkClaimPrimary" checked style="margin-top:0.15rem;" />
               <span>Link as Account Owner (keep my saved Intervals.icu credentials <code>i748824</code> and coaching directives)</span>
             </label>
-            <button type="submit" id="btnEmailLoginSubmit" class="btn btn-primary" style="margin-top:0.35rem;padding:0.65rem;font-weight:700;font-size:0.88rem;display:flex;align-items:center;justify-content:center;gap:0.4rem;background:linear-gradient(135deg, #0891b2, #06b6d4);border:none;border-radius:6px;color:#fff;cursor:pointer;">
+            <button type="submit" id="btnEmailLoginSubmit" class="btn btn-primary" style="margin-top:0.35rem;padding:0.65rem;font-weight:700;font-size:0.88rem;display:flex;align-items:center;justify-content:center;gap:0.4rem;background:linear-gradient(135deg, #0052FF, #FF5E00);border:none;border-radius:6px;color:#fff;cursor:pointer;">
               ⚡ Continue with Email
             </button>
           </form>
@@ -2127,11 +2185,11 @@
         <!-- Quick 1-Click Athletes -->
         <div style="display:flex;flex-direction:column;gap:0.6rem;">
           <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="font-size:0.78rem;font-weight:700;color:#94a3b8;">⭐ Quick 1-Click Athletes</span>
-            <span style="font-size:0.7rem;color:#10b981;">Data Isolated</span>
+            <span style="font-size:0.78rem;font-weight:700;color:var(--text-muted);">⭐ Quick 1-Click Athletes</span>
+            <span style="font-size:0.7rem;color:#00C896;font-weight:600;">Data Isolated</span>
           </div>
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
-            <button type="button" id="btnPrimaryAthleteLogin" class="btn btn-secondary" style="flex:1;min-width:140px;border-color:rgba(6,182,212,0.5);color:#06b6d4;font-size:0.78rem;padding:0.45rem 0.65rem;" title="Sign in as Primary Owner">
+            <button type="button" id="btnPrimaryAthleteLogin" class="btn btn-secondary" style="flex:1;min-width:140px;border-color:rgba(0,82,255,0.45);color:#0052FF;font-size:0.78rem;padding:0.45rem 0.65rem;" title="Sign in as Primary Owner">
               ⭐ Primary Owner (Adam)
             </button>
             <button type="button" class="btn btn-secondary btn-dev-switch" data-email="coach.alex@powersync.app" data-name="Coach Alex" style="font-size:0.75rem;padding:0.45rem 0.65rem;">
@@ -2146,7 +2204,7 @@
         <!-- Optional Google Sign-In (Unobtrusive) -->
         <div id="authGoogleCard" style="border-top:1px solid var(--border-color);padding-top:0.85rem;display:flex;flex-direction:column;gap:0.5rem;">
           <div style="font-size:0.75rem;color:#64748b;text-align:center;">Optional: Sign in with Google Account</div>
-          <a href="/api/auth/google/login" id="btnGoogleSignIn" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;background:#ffffff;color:#1f2937;font-weight:600;font-size:0.85rem;padding:0.55rem 1rem;border-radius:8px;text-decoration:none;box-shadow:0 2px 8px rgba(0,0,0,0.2);transition:all 0.2s ease;">
+          <a href="/api/auth/google/login" id="btnGoogleSignIn" style="display:flex;align-items:center;justify-content:center;gap:0.75rem;background:#ffffff;color:#111625;font-weight:600;font-size:0.85rem;padding:0.55rem 1rem;border-radius:8px;border:1px solid var(--border-color);text-decoration:none;box-shadow:0 2px 6px rgba(17,22,37,0.06);transition:all 0.2s ease;">
             <svg width="16" height="16" viewBox="0 0 48 48">
               <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
               <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -2167,7 +2225,7 @@
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:0.6rem;">
           <span style="font-size:1.3rem;">🚀</span>
-          <h3>PowerSync Version History & Changelog</h3>
+          <h3>VeloMetrics AI Version History &amp; Changelog</h3>
         </div>
         <button class="modal-close" id="btnCloseChangelog" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
@@ -2189,11 +2247,11 @@
       </div>
       <div class="modal-body" style="gap:1.25rem;">
         <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;">
-          Tell the coach about your upcoming target ride. PowerSync will automatically calibrate your daily volume, schedule taper flushes and pre-event primers, and prepare your fueling strategy.
+          Tell the coach about your upcoming target ride. VeloMetrics AI will automatically calibrate your daily volume, schedule taper flushes and pre-event primers, and prepare your fueling strategy.
         </p>
 
         <!-- Natural Language Quick-Describe Bar -->
-        <div class="form-group" style="background:rgba(6,182,212,0.06);border:1px solid rgba(6,182,212,0.25);padding:0.85rem;border-radius:8px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0,82,255,0.25);padding:0.85rem;border-radius:8px;">
           <label style="color:var(--accent-cyan);font-weight:700;">Describe Your Planned Ride</label>
           <div style="display:flex;gap:0.5rem;margin-top:0.35rem;">
             <input type="text" id="inputPlanDescribe" placeholder="e.g. 'a 50 mile ride on Sunday with 3,000 ft climbing' or 'hard 45mi Saturday group ride'" style="flex:1;" />
@@ -2230,14 +2288,14 @@
           <!-- Tab Content: Strava Candidate Selector -->
           <div id="planSourceStrava" class="plan-source-panel" style="display:none;">
             <label style="font-size:0.75rem;">Select from your synced Strava outdoor rides:</label>
-            <select id="selectStravaRouteCandidate" style="width:100%;padding:0.5rem;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:0.82rem;margin-top:0.35rem;">
+            <select id="selectStravaRouteCandidate" style="width:100%;padding:0.5rem;background:#FFFFFF;border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:0.82rem;margin-top:0.35rem;">
               <option value="">-- Choose a Strava Route --</option>
             </select>
           </div>
 
           <!-- Tab Content: GPX Upload -->
           <div id="planSourceGpx" class="plan-source-panel" style="display:none;">
-            <div style="border:2px dashed rgba(255,255,255,0.15);padding:1.25rem;border-radius:8px;text-align:center;background:rgba(0,0,0,0.2);">
+            <div style="border:2px dashed var(--border-color);padding:1.25rem;border-radius:8px;text-align:center;background:#F4F7FA;">
               <input type="file" id="inputPlanGpxFile" accept=".gpx" style="display:none;" />
               <button class="btn btn-secondary" type="button" onclick="document.getElementById('inputPlanGpxFile').click()">
                 📁 Choose .gpx Route File
@@ -2255,7 +2313,7 @@
           </div>
           <div>
             <label style="font-size:0.75rem;">Pacing / Intensity</label>
-            <select id="selectPlanIntensity" style="width:100%;padding:0.5rem;background:#0f172a;border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#fff;font-size:0.82rem;">
+            <select id="selectPlanIntensity" style="width:100%;padding:0.5rem;background:#FFFFFF;border:1px solid var(--border-color);border-radius:6px;color:var(--text-primary);font-size:0.82rem;">
               <option value="Endurance">Zone 2 Aerobic Base</option>
               <option value="Tempo / Group Ride">Moderate Tempo / Group Ride</option>
               <option value="Hard / Race">Hard / Race / Gran Fondo</option>
@@ -2267,7 +2325,7 @@
         <div style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:0.5rem;">
           <button class="btn btn-secondary" id="btnCancelPlanModal">Cancel</button>
           <button class="btn btn-primary" id="btnSubmitUpcomingPlan">
-            🚀 Save Plan & Adapt Schedule
+            🚀 Save Plan &amp; Adapt Schedule
           </button>
         </div>
       </div>
@@ -2280,13 +2338,13 @@
       <div class="modal-header">
         <div style="display:flex;align-items:center;gap:0.6rem;">
           <span style="font-size:1.3rem;">⚡</span>
-          <h3 style="margin:0;">Replace Today's Ride & Generate Fueling Plan</h3>
+          <h3 style="margin:0;">Replace Today's Ride &amp; Generate Fueling Plan</h3>
         </div>
         <button class="modal-close" id="btnCloseReplaceRide" type="button" aria-label="Close" title="Close">&times;</button>
       </div>
       <div class="modal-body" style="gap:1.25rem;">
         <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;">
-          Describe a custom ride or upload a GPX route. PowerSync will replace today's prescription, calculate power targets, and generate an hour-by-hour fueling plan tailored to local weather and your Whoop recovery.
+          Describe a custom ride or upload a GPX route. VeloMetrics AI will replace today's prescription, calculate power targets, and generate an hour-by-hour fueling plan tailored to local weather and your Whoop recovery.
         </p>
 
         <!-- Quick Input -->
@@ -2312,16 +2370,16 @@
         </div>
 
         <!-- Optional GPX Upload -->
-        <div class="form-group" style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);padding:0.75rem;border-radius:6px;">
+        <div class="form-group" style="background:#F4F7FA;border:1px solid var(--border-color);padding:0.75rem;border-radius:6px;">
           <label style="font-size:0.75rem;color:var(--text-secondary);">Or Upload Route File (.GPX)</label>
           <input type="file" id="inputCustomRideGpx" accept=".gpx" style="font-size:0.78rem;margin-top:0.25rem;" />
         </div>
 
         <!-- Whoop Recovery & Trailing Load Context Banner -->
-        <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.22);border-radius:8px;padding:0.75rem 0.85rem;">
+        <div style="background:rgba(0,82,255,0.06);border:1px solid rgba(0,82,255,0.2);border-radius:8px;padding:0.75rem 0.85rem;">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.35rem;margin-bottom:0.3rem;">
-            <div style="font-size:0.78rem;font-weight:700;color:#c7d2fe;display:flex;align-items:center;gap:0.35rem;">
-              <span>🧬</span> Physiological Readiness & Trailing Load
+            <div style="font-size:0.78rem;font-weight:700;color:#0052FF;display:flex;align-items:center;gap:0.35rem;">
+              <span>🧬</span> Physiological Readiness &amp; Trailing Load
             </div>
             <div style="display:flex;gap:0.35rem;" id="modalReplaceRecoveryPills">
               <span class="badge-status" id="modalReplaceBadgeWhoop" style="font-size:0.7rem;">Whoop: Loading...</span>
@@ -2330,14 +2388,14 @@
             </div>
           </div>
           <div style="font-size:0.72rem;color:var(--text-secondary);line-height:1.35;" id="modalReplaceRecoveryNote">
-            PowerSync automatically adjusts pacing targets and adds +12g/hr carbohydrate boost if starting glycogen stores are fatigued.
+            VeloMetrics AI automatically adjusts pacing targets and adds +12g/hr carbohydrate boost if starting glycogen stores are fatigued.
           </div>
         </div>
 
         <!-- Weather Conditions Controls -->
-        <div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);padding:0.85rem;border-radius:8px;">
+        <div style="background:rgba(0,200,150,0.06);border:1px solid rgba(0,200,150,0.22);padding:0.85rem;border-radius:8px;">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.5rem;">
-            <div style="font-size:0.8rem;font-weight:700;color:#10b981;">
+            <div style="font-size:0.8rem;font-weight:700;color:#00C896;">
               🌤️ Outdoor Ambient Weather (Calibrates Sweat &amp; Sodium Loss)
             </div>
             <button class="btn btn-secondary" id="btnFetchModalWeather" type="button" style="padding:0.2rem 0.55rem;font-size:0.72rem;" title="Fetch live weather via browser geolocation">
@@ -2358,8 +2416,8 @@
 
         <div style="display:flex;justify-content:flex-end;gap:0.75rem;margin-top:0.5rem;">
           <button class="btn btn-secondary" id="btnCancelReplaceRide">Cancel</button>
-          <button class="btn btn-primary" id="btnSubmitReplaceRide" style="background:linear-gradient(135deg, #10b981, #059669);">
-            🥪 Replace Ride & Generate Fueling Plan
+          <button class="btn btn-primary" id="btnSubmitReplaceRide" style="background:linear-gradient(135deg, #00C896, #0052FF);">
+            🥪 Replace Ride &amp; Generate Fueling Plan
           </button>
         </div>
       </div>
@@ -2382,10 +2440,10 @@
       <div class="modal-body" style="gap:1rem;">
         
         <!-- Hero Header Card with Recovery & Zone -->
-        <div style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);padding:1rem;border-radius:10px;">
+        <div style="background:#F4F7FA;border:1px solid var(--border-color);padding:1rem;border-radius:10px;">
           <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.6rem;">
             <div>
-              <div id="forecastModalWorkoutName" style="font-size:1.15rem;font-weight:800;color:#fff;">Sweet Spot Sustained Blocks</div>
+              <div id="forecastModalWorkoutName" style="font-size:1.15rem;font-weight:800;color:var(--text-primary);font-family:var(--font-display);">Sweet Spot Sustained Blocks</div>
               <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.4rem;margin-top:0.25rem;">
                 <span id="forecastModalBadgeType" class="badge-status" style="font-size:0.72rem;padding:0.12rem 0.5rem;">Coach Forecast Choice</span>
                 <span id="forecastModalFocusTag" class="tag tag-focus" style="font-size:0.72rem;">Sweet Spot</span>
@@ -2400,28 +2458,28 @@
           </div>
 
           <!-- Quick Metrics Strip -->
-          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(100px, 1fr));gap:0.5rem;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid rgba(255,255,255,0.06);">
-            <div style="background:rgba(0,0,0,0.3);padding:0.5rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(100px, 1fr));gap:0.5rem;margin-top:0.75rem;padding-top:0.75rem;border-top:1px solid var(--border-color);">
+            <div style="background:#FFFFFF;padding:0.5rem 0.6rem;border-radius:6px;border:1px solid var(--border-color);">
               <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Duration</div>
-              <div id="forecastModalDur" style="font-size:1.05rem;font-weight:800;color:#38bdf8;margin-top:0.1rem;">45 min</div>
+              <div id="forecastModalDur" style="font-size:1.05rem;font-weight:800;color:#0052FF;margin-top:0.1rem;font-family:var(--font-display);">45 min</div>
             </div>
-            <div style="background:rgba(0,0,0,0.3);padding:0.5rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+            <div style="background:#FFFFFF;padding:0.5rem 0.6rem;border-radius:6px;border:1px solid var(--border-color);">
               <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Target Strain</div>
-              <div id="forecastModalXss" style="font-size:1.05rem;font-weight:800;color:#c084fc;margin-top:0.1rem;">~50 XSS</div>
+              <div id="forecastModalXss" style="font-size:1.05rem;font-weight:800;color:#FF5E00;margin-top:0.1rem;font-family:var(--font-display);">~50 XSS</div>
             </div>
-            <div style="background:rgba(0,0,0,0.3);padding:0.5rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+            <div style="background:#FFFFFF;padding:0.5rem 0.6rem;border-radius:6px;border:1px solid var(--border-color);">
               <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Target TSS</div>
-              <div id="forecastModalTss" style="font-size:1.05rem;font-weight:800;color:#10b981;margin-top:0.1rem;">48 TSS</div>
+              <div id="forecastModalTss" style="font-size:1.05rem;font-weight:800;color:#00C896;margin-top:0.1rem;font-family:var(--font-display);">48 TSS</div>
             </div>
-            <div style="background:rgba(0,0,0,0.3);padding:0.5rem 0.6rem;border-radius:6px;border:1px solid rgba(255,255,255,0.04);">
+            <div style="background:#FFFFFF;padding:0.5rem 0.6rem;border-radius:6px;border:1px solid var(--border-color);">
               <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;font-weight:600;">Focus Duration</div>
-              <div id="forecastModalFocusDur" style="font-size:0.85rem;font-weight:700;color:#e2e8f0;margin-top:0.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">45:00 Focus</div>
+              <div id="forecastModalFocusDur" style="font-size:0.85rem;font-weight:700;color:var(--text-primary);margin-top:0.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">45:00 Focus</div>
             </div>
           </div>
         </div>
 
         <!-- Interval Power Profile Canvas Wrap -->
-        <div class="interval-graph-wrap" style="padding:0.85rem;background:rgba(0,0,0,0.4);border:1px solid rgba(255,255,255,0.08);border-radius:10px;">
+        <div class="interval-graph-wrap" style="padding:0.85rem;background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.55rem;flex-wrap:wrap;gap:0.4rem;">
             <div style="display:flex;align-items:center;gap:0.4rem;">
               <span style="font-size:0.78rem;font-weight:700;color:var(--accent-cyan);letter-spacing:0.04em;">INTERVAL PROFILE</span>
@@ -2435,9 +2493,9 @@
         </div>
 
         <!-- Structured Steps & Intervals List -->
-        <div id="forecastStepsBox" style="background:rgba(0,0,0,0.25);border:1px solid rgba(255,255,255,0.06);border-radius:10px;padding:0.85rem;">
+        <div id="forecastStepsBox" style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.85rem;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.55rem;">
-            <div style="font-size:0.8rem;font-weight:700;color:#e2e8f0;">⚡ Interval Sequence &amp; Target Wattage</div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--text-primary);">⚡ Interval Sequence &amp; Target Wattage</div>
             <span id="forecastStepsCountBadge" style="font-size:0.72rem;color:var(--accent-cyan);font-weight:600;">4 Steps</span>
           </div>
           <div id="forecastStepsList" style="display:flex;flex-direction:column;gap:0.4rem;max-height:220px;overflow-y:auto;padding-right:0.25rem;">
@@ -2446,21 +2504,21 @@
         </div>
 
         <!-- AI Coach Rationale & Sports-Science Context -->
-        <div style="background:rgba(6, 182, 212, 0.06);border:1px solid rgba(6, 182, 212, 0.22);padding:0.85rem;border-radius:8px;">
+        <div style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:0.85rem;border-radius:8px;">
           <div style="display:flex;align-items:center;gap:0.4rem;margin-bottom:0.35rem;">
             <span style="font-size:1.05rem;">🧠</span>
-            <div style="font-size:0.8rem;font-weight:700;color:var(--accent-cyan);">Coach's Prescription &amp; Weekly Alignment</div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--accent-cyan);">Directeur Sportive Prescription &amp; Alignment</div>
           </div>
-          <div id="forecastModalRationale" style="font-size:0.78rem;color:#cbd5e1;line-height:1.45;"></div>
+          <div id="forecastModalRationale" style="font-size:0.78rem;color:var(--text-secondary);line-height:1.45;"></div>
         </div>
 
         <!-- Action Buttons -->
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;margin-top:0.25rem;padding-top:0.5rem;border-top:1px solid rgba(255,255,255,0.06);">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;margin-top:0.25rem;padding-top:0.5rem;border-top:1px solid var(--border-color);">
           <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
             <button type="button" class="btn btn-zwift" id="btnForecastPushZwift" style="font-size:0.8rem;padding:0.45rem 0.95rem;">
               🚀 Push to Zwift for This Day
             </button>
-            <button type="button" class="btn btn-secondary" id="btnForecastDiscussCoach" style="font-size:0.8rem;padding:0.45rem 0.85rem;color:var(--accent-cyan);border-color:rgba(6,182,212,0.4);">
+            <button type="button" class="btn btn-secondary" id="btnForecastDiscussCoach" style="font-size:0.8rem;padding:0.45rem 0.85rem;color:var(--accent-cyan);border-color:rgba(0,82,255,0.35);">
               💬 Edit in Coach Chat
             </button>
           </div>
@@ -2473,10 +2531,34 @@
     </div>
   </div>
 
+  <!-- Sleek Dynamic Coaching Bottom Sheet (Directeur Sportive Live Pacing Alert) -->
+  <div class="ds-coaching-bottom-sheet" id="dsCoachingBottomSheet" role="status" aria-live="polite">
+    <div class="ds-bottom-sheet-inner">
+      <div class="ds-pulse-avatar ai-pulse-ring" title="Directeur Sportive Live Telemetry">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF5E00" stroke="#FF5E00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+      </div>
+      <div class="ds-bottom-sheet-content">
+        <div class="ds-bottom-sheet-eyebrow">
+          <span>DIRECTEUR SPORTIVE • LIVE PACING INSIGHT</span>
+          <span class="ds-wave-indicator" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </span>
+        </div>
+        <div class="ds-bottom-sheet-message" id="dsLiveCoachingPopupText">
+          <strong>AI Coach:</strong> You're burning matches early. Ease back <span class="ds-highlight-watts">15 watts</span> on this climb to save legs for the final interval.
+        </div>
+      </div>
+      <div class="ds-bottom-sheet-actions">
+        <button type="button" class="btn-ds-sheet-ask" data-open-coach-chat="true" title="Open AI Coach Chat">Ask DS</button>
+        <button type="button" class="btn-ds-sheet-close" id="btnCloseDsBottomSheet" aria-label="Dismiss coaching alert" title="Dismiss">&times;</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Floating Coach Chat Action Button (Mobile & Desktop) -->
-  <button class="floating-coach-fab" id="btnFloatingCoachChat" title="Chat with AI Coach">
+  <button class="floating-coach-fab" id="btnFloatingCoachChat" title="Chat with VeloMetrics AI Coach">
     <span class="fab-icon">💬</span>
-    <span class="fab-label">Chat with Coach</span>
+    <span class="fab-label">Chat with DS</span>
     <span class="fab-pulse-dot"></span>
   </button>
 
@@ -2488,19 +2570,19 @@
     <!-- Drawer Header -->
     <div class="coach-chat-header">
       <div class="coach-chat-header-info">
-        <div class="coach-chat-avatar">
-          <span>🧠</span>
+        <div class="coach-chat-avatar ai-pulse-ring">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2.5-6 4 12 3.5-8 2 4h5"></path></svg>
           <span class="coach-status-dot"></span>
         </div>
         <div class="coach-chat-header-text">
           <div class="coach-chat-title-row">
-            <div class="coach-chat-title">PowerSync AI Coach</div>
+            <div class="coach-chat-title">VeloMetrics AI Coach</div>
             <span class="badge-status badge-gemini connected" id="badgeCoachGeminiStatus">
               <span class="dot green"></span>
               <span id="txtCoachGeminiStatus">Connected</span>
             </span>
           </div>
-          <div class="coach-chat-subtitle" id="coachChatSubtitle">Powered by Google Gemini • Live Telemetry</div>
+          <div class="coach-chat-subtitle" id="coachChatSubtitle">Directeur Sportive • Live Telemetry</div>
         </div>
       </div>
       <div class="coach-chat-header-actions">
@@ -2513,7 +2595,7 @@
     <div class="coach-telemetry-ribbon" id="coachTelemetryRibbon">
       <span class="telemetry-chip chip-recovery" id="chatChipRecovery">🧬 Whoop: --%</span>
       <span class="telemetry-chip chip-ftp" id="chatChipFtp">⚡ FTP: 250W</span>
-      <span class="telemetry-chip" id="chatChipWPrime" style="border-color:rgba(168,85,247,0.4);color:#c084fc;">🔋 W': 20kJ</span>
+      <span class="telemetry-chip" id="chatChipWPrime" style="border-color:rgba(0,82,255,0.35);color:#0052FF;">🔋 W': 20kJ</span>
       <span class="telemetry-chip chip-strain" id="chatChipStrain">🔥 7D Strain: --</span>
       <span class="telemetry-chip chip-workout" id="chatChipWorkout">🎯 Prescription: --</span>
     </div>
@@ -2521,10 +2603,12 @@
     <!-- Scrollable Messages Container -->
     <div class="coach-chat-messages" id="coachChatMessages">
       <div class="chat-msg chat-msg-coach">
-        <div class="chat-msg-avatar">🧠</div>
+        <div class="chat-msg-avatar ai-pulse-ring">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h3l2.5-6 4 12 3.5-8 2 4h5"></path></svg>
+        </div>
         <div class="chat-msg-content">
-          <p><strong>Hey Adam! I'm your PowerSync AI Coach.</strong></p>
-          <p>I have direct live visibility into your Whoop biometrics, Strava history, and macrocycle training plan.</p>
+          <p><strong>Hey Adam! I'm your VeloMetrics AI Directeur Sportive.</strong></p>
+          <p>I have direct live visibility into your Whoop biometrics, Strava power history, and macrocycle training plan.</p>
           <p>Ask me about your workout, recovery, or <strong>tell me about an upcoming ride or event</strong> (e.g. <em>"50-mile ride this Sunday with 3,000 ft climbing"</em>) to automatically adapt your schedule and lead-up taper!</p>
         </div>
       </div>
@@ -2534,17 +2618,17 @@
     <div class="coach-quick-prompts" id="coachQuickPrompts">
       <button class="quick-prompt-pill" data-prompt="📅 I have a 50-mile ride this Sunday with 3,000 ft climbing. Adapt my training schedule.">📅 Plan Upcoming Ride</button>
       <button class="quick-prompt-pill" data-prompt="🎯 How should I train today based on my recovery?">🎯 How should I train today?</button>
-      <button class="quick-prompt-pill" data-prompt="🔋 What is my current 3-tier physiological strain and W' anaerobic battery status?">🔋 3-Tier Strain & W' Battery</button>
+      <button class="quick-prompt-pill" data-prompt="🔋 What is my current 3-tier physiological strain and W' anaerobic battery status?">🔋 3-Tier Strain &amp; W' Battery</button>
       <button class="quick-prompt-pill" data-prompt="🚴 Can you design a 45-minute Sweet Spot session with 3x8m intervals?">🚴 Propose 45m Sweet Spot</button>
       <button class="quick-prompt-pill" data-prompt="🥪 What is my optimal fueling strategy for today?">🥪 Review Fueling Plan</button>
-      <button class="quick-prompt-pill" data-prompt="🧬 How is my Whoop recovery and HRV trending?">🧬 Recovery & HRV</button>
+      <button class="quick-prompt-pill" data-prompt="🧬 How is my Whoop recovery and HRV trending?">🧬 Recovery &amp; HRV</button>
       <button class="quick-prompt-pill" data-prompt="🔮 How is my weekly TSS pacing toward my 360 goal?">🔮 Weekly TSS Check</button>
     </div>
 
     <!-- Input Bar -->
     <div class="coach-chat-input-bar">
       <form id="formCoachChat">
-        <textarea id="inputCoachMessage" rows="1" placeholder="Ask coach anything, or describe an upcoming ride..."></textarea>
+        <textarea id="inputCoachMessage" rows="1" placeholder="Ask your Directeur Sportive anything, or describe an upcoming ride..."></textarea>
         <button type="submit" id="btnSendCoachMessage" class="btn btn-primary btn-chat-send" title="Send message">
           <span>➤</span>
         </button>
@@ -2557,6 +2641,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=116"></script>
+  <script src="/static/js/app.js?v=117"></script>
 </body>
 </html>

@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.4.5",
-        "release_name": "Settings Authentication & Credential Hardening",
+        "version": "2.5.0",
+        "release_name": "VeloMetrics AI — Speed & Summit UI & Brand Identity",
         "build_date": "2026-11-10",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.5.0",
+                "date": "2026-11-10",
+                "title": "VeloMetrics AI — 'Speed & Summit' Design System & UI Rebranding",
+                "items": [
+                    "Brand Identity Rebrand to VeloMetrics AI: Updated application branding, header logo, modals, and footer with the value proposition 'Data-driven training meets human passion. Your personalized AI coach for every pedal stroke.'",
+                    "'Speed & Summit' High-Contrast Palette: Applied Pure White (#FFFFFF) primary background, Ice Frost (#F4F7FA) card containers, Electric Cobalt Blue (#0052FF) primary brand/navigation metrics, Sunset Orange (#FF5E00) high-energy CTAs and peak power alerts, Midnight Carbon (#111625) primary typography, Slate Gray (#64748B) labels, and Mint Teal (#00C896) recovery indicators.",
+                    "Geometric Typography & Custom Iconography: Paired Outfit (Bold/Black weights) for headlines and big wattage metrics with Inter (Regular/Medium) for body copy, alongside custom rounded line icons, filled Sunset Orange lightning bolts, cadence dials, elevation profiles, and glowing AI wave pulses.",
+                    "Directeur Sportif (DS) AI UI Elements: Introduced pulsing dual-tone gradient rings (#0052FF to #FF5E00) around AI insights, Ice Frost AI 'Race Briefing' cards with Sunset Orange FTP/Zone 4 highlights, smooth Blue-to-Orange workout power zone bars, and a sleek live coaching bottom sheet."
+                ]
+            },
             {
                 "version": "v2.4.5",
                 "date": "2026-11-10",

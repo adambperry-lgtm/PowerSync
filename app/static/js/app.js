@@ -1916,22 +1916,22 @@ async function loadWorkout(duration = null, intensity = 0, userNote = "") {
   }
 }
 
-// Helpers for Power Targets & Zones
+// Helpers for Power Targets & Zones (Smooth Blue -> Sunset Orange Progression)
 function getPowerZone(pct) {
   if (pct < 55) {
-    return { name: "Zone 1 Active Recovery (<55%)", short: "Z1 Recovery", color: "#64748b" };
+    return { name: "Zone 1 Active Recovery (<55%)", short: "Z1 Recovery", color: "#60A5FA" };
   } else if (pct <= 75) {
-    return { name: "Zone 2 Endurance Base (56–75%)", short: "Z2 Base", color: "#38bdf8" };
+    return { name: "Zone 2 Endurance Base (56–75%)", short: "Z2 Base", color: "#0052FF" };
   } else if (pct <= 87) {
-    return { name: "Zone 3 Tempo (76–87%)", short: "Z3 Tempo", color: "#10b981" };
+    return { name: "Zone 3 Tempo (76–87%)", short: "Z3 Tempo", color: "#0088FF" };
   } else if (pct <= 93) {
-    return { name: "Sweet Spot Aerobic (88–93%)", short: "Sweet Spot", color: "#f59e0b" };
+    return { name: "Sweet Spot Aerobic (88–93%)", short: "Sweet Spot", color: "#FF8A00" };
   } else if (pct <= 105) {
-    return { name: "Zone 4 Threshold (94–105%)", short: "Z4 Threshold", color: "#ea580c" };
+    return { name: "Zone 4 Threshold (94–105%)", short: "Z4 Threshold", color: "#FF5E00" };
   } else if (pct <= 120) {
-    return { name: "Zone 5 VO2 Max (106–120%)", short: "Z5 VO2 Max", color: "#f43f5e" };
+    return { name: "Zone 5 VO2 Max (106–120%)", short: "Z5 VO2 Max", color: "#E04800" };
   } else {
-    return { name: "Zone 6 Anaerobic / Neuromuscular (>120%)", short: "Z6 Anaerobic", color: "#a855f7" };
+    return { name: "Zone 6 Anaerobic / Neuromuscular (>120%)", short: "Z6 Anaerobic", color: "#C23B00" };
   }
 }
 
@@ -2164,9 +2164,9 @@ function drawWorkoutGraph(workout) {
   const hasSelection = state.selectedIntervalIndex !== null && state.selectedIntervalIndex >= 0 && state.selectedIntervalIndex < canvasSegments.length;
 
   // Draw FTP target reference line (100% FTP)
-  const isLightMode = false;
+  const isLightMode = true;
   const ftpLineY = h - (100 / maxPowerPct) * (h - 20) - 10;
-  ctx.strokeStyle = isLightMode ? "rgba(0, 0, 0, 0.18)" : "rgba(255, 255, 255, 0.15)";
+  ctx.strokeStyle = isLightMode ? "rgba(17, 22, 37, 0.22)" : "rgba(255, 255, 255, 0.15)";
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.moveTo(0, ftpLineY);
@@ -2175,17 +2175,17 @@ function drawWorkoutGraph(workout) {
   ctx.setLineDash([]);
 
   // Draw 100% FTP text
-  ctx.fillStyle = isLightMode ? "rgba(15, 23, 42, 0.55)" : "rgba(255, 255, 255, 0.4)";
-  ctx.font = "10px sans-serif";
+  ctx.fillStyle = isLightMode ? "rgba(17, 22, 37, 0.65)" : "rgba(255, 255, 255, 0.4)";
+  ctx.font = "600 10px Inter, sans-serif";
   ctx.fillText(`100% FTP (${state.ftp}W)`, 6, ftpLineY - 4);
 
   if (canvasSegments.length === 0) {
-    ctx.fillStyle = isLightMode ? "#059669" : "#10b981";
-    ctx.font = "bold 13px sans-serif";
+    ctx.fillStyle = "#00C896";
+    ctx.font = "bold 13px Outfit, Inter, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("🛋️ Rest Day Directive • No Intervals Scheduled (Active Recovery / Off the Bike)", w / 2, h / 2 - 8);
-    ctx.fillStyle = isLightMode ? "rgba(15, 23, 42, 0.6)" : "rgba(255, 255, 255, 0.6)";
-    ctx.font = "12px sans-serif";
+    ctx.fillStyle = "#64748B";
+    ctx.font = "12px Inter, sans-serif";
     ctx.fillText("Select '20-Min Active Recovery Flush' or 'Optional 45m Base' above if you wish to ride.", w / 2, h / 2 + 14);
     ctx.textAlign = "left";
     return;
@@ -2776,20 +2776,27 @@ if (btnSyncWhoop) {
   });
 }
 // ========================================================
-// Permanent Dark Theme
+// VeloMetrics AI — "Speed & Summit" High-Contrast Light Theme
 // ========================================================
-const currentThemeMode = "dark";
+const currentThemeMode = "light";
 
-function applyTheme(mode = "dark", persist = false) {
-  document.documentElement.setAttribute("data-theme", "dark");
-  document.documentElement.setAttribute("data-theme-mode", "dark");
+function applyTheme(mode = "light", persist = false) {
+  document.documentElement.setAttribute("data-theme", "light");
+  document.documentElement.setAttribute("data-theme-mode", "light");
   try {
-    localStorage.setItem("powersync_theme_mode", "dark");
+    localStorage.setItem("powersync_theme_mode", "light");
   } catch (_) {}
 }
 
 function initThemeSystem() {
-  applyTheme("dark", false);
+  applyTheme("light", false);
+  const btnCloseDsBottomSheet = document.getElementById("btnCloseDsBottomSheet");
+  const dsCoachingBottomSheet = document.getElementById("dsCoachingBottomSheet");
+  if (btnCloseDsBottomSheet && dsCoachingBottomSheet) {
+    btnCloseDsBottomSheet.addEventListener("click", () => {
+      dsCoachingBottomSheet.classList.add("is-dismissed");
+    });
+  }
 }
 
 // Coaching Directives & Persistent Preferences UI
@@ -2803,7 +2810,7 @@ function renderCoachingDirectives(directives) {
   }
   directives.forEach((d, idx) => {
     const item = document.createElement("div");
-    item.style.cssText = "display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);padding:0.35rem 0.55rem;border-radius:5px;font-size:0.75rem;color:#e2e8f0;gap:0.5rem;";
+    item.style.cssText = "display:flex;justify-content:space-between;align-items:center;background:#F4F7FA;border:1px solid #DCE4EE;padding:0.35rem 0.55rem;border-radius:6px;font-size:0.75rem;color:#111625;gap:0.5rem;";
     
     const textSpan = document.createElement("span");
     textSpan.style.cssText = "flex:1;line-height:1.35;";
@@ -4271,14 +4278,14 @@ function drawForecastCanvas(item) {
   }
 
   if (flattened.length === 0) {
-    ctx.fillStyle = "rgba(16, 185, 129, 0.08)";
+    ctx.fillStyle = "rgba(0, 200, 150, 0.08)";
     ctx.fillRect(0, 0, w, h);
-    ctx.fillStyle = "#10b981";
-    ctx.font = "bold 13px sans-serif";
+    ctx.fillStyle = "#00C896";
+    ctx.font = "bold 13px Outfit, Inter, sans-serif";
     ctx.textAlign = "center";
     ctx.fillText("🛋️ Rest Day Directive • Rest & Recovery", w / 2, h / 2 - 8);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.65)";
-    ctx.font = "11px sans-serif";
+    ctx.fillStyle = "#64748B";
+    ctx.font = "11px Inter, sans-serif";
     ctx.fillText("Off-the-bike recovery or gentle flush spin (<55% FTP) to support supercompensation.", w / 2, h / 2 + 14);
     ctx.textAlign = "left";
     return;
@@ -4293,7 +4300,7 @@ function drawForecastCanvas(item) {
 
   // Draw 100% FTP line
   const ftpY = h - bottomPadding - (100 / maxPowerPct) * chartHeight;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.18)";
+  ctx.strokeStyle = "rgba(17, 22, 37, 0.22)";
   ctx.setLineDash([4, 4]);
   ctx.beginPath();
   ctx.moveTo(0, ftpY);
@@ -4301,8 +4308,8 @@ function drawForecastCanvas(item) {
   ctx.stroke();
   ctx.setLineDash([]);
 
-  ctx.fillStyle = "rgba(255, 255, 255, 0.45)";
-  ctx.font = "10px sans-serif";
+  ctx.fillStyle = "rgba(17, 22, 37, 0.65)";
+  ctx.font = "600 10px Inter, sans-serif";
   ctx.fillText(`100% FTP (${athleteFtp}W)`, 6, ftpY - 4);
 
   let currentX = 0;
@@ -4352,8 +4359,8 @@ function drawForecastCanvas(item) {
       ctx.strokeRect(currentX, y, segW, segH);
 
       if (segW > 38) {
-        ctx.fillStyle = "#ffffff";
-        ctx.font = "bold 10px sans-serif";
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 10px Outfit, Inter, sans-serif";
         ctx.textAlign = "center";
         const watts = Math.round(athleteFtp * (pct / 100));
         ctx.fillText(`${watts}W`, currentX + segW / 2, y + 14);
@@ -4466,12 +4473,12 @@ function renderForecastSteps(item) {
         <div style="display:flex;align-items:center;gap:0.45rem;min-width:0;flex:1;">
           <span style="font-size:0.68rem;color:var(--text-muted);font-weight:700;min-width:18px;">#${idx + 1}</span>
           <div style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
-            <div style="font-weight:600;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${step.name}</div>
+            <div style="font-weight:600;color:#111625;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${step.name}</div>
             <div style="font-size:0.68rem;color:${zone.color};font-weight:600;">${zone.short} • ⏱️ ${durMins}</div>
           </div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-size:0.75rem;color:#fff;">${powerDisplay}</div>
+          <div style="font-size:0.75rem;color:#111625;">${powerDisplay}</div>
           <div style="font-size:0.68rem;color:var(--text-muted);">${step.cadence || 90} RPM</div>
         </div>
       </div>
@@ -6941,19 +6948,19 @@ function renderSpiderwebSvg(axes, activeGoal) {
   const defsHtml = `
     <defs>
       <radialGradient id="radarCurrentGradient" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.38" />
-        <stop offset="100%" stop-color="#0891b2" stop-opacity="0.14" />
+        <stop offset="0%" stop-color="#0052FF" stop-opacity="0.32" />
+        <stop offset="100%" stop-color="#0052FF" stop-opacity="0.10" />
       </radialGradient>
       <radialGradient id="radarPreviousGradient" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.22" />
-        <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.06" />
+        <stop offset="0%" stop-color="#FF5E00" stop-opacity="0.22" />
+        <stop offset="100%" stop-color="#FF5E00" stop-opacity="0.06" />
       </radialGradient>
       <radialGradient id="radarGoalGradient" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#10b981" stop-opacity="0.28" />
-        <stop offset="100%" stop-color="#059669" stop-opacity="0.08" />
+        <stop offset="0%" stop-color="#00C896" stop-opacity="0.26" />
+        <stop offset="100%" stop-color="#00C896" stop-opacity="0.08" />
       </radialGradient>
       <filter id="radarGlow" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feGaussianBlur stdDeviation="2.5" result="blur" />
         <feComposite in="SourceGraphic" in2="blur" operator="over" />
       </filter>
     </defs>
@@ -6972,7 +6979,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
       const py = cy + (r * lvl) * Math.sin(angle);
       pts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
     }
-    const strokeColor = isOuter ? "rgba(148, 163, 184, 0.45)" : "rgba(148, 163, 184, 0.18)";
+    const strokeColor = isOuter ? "rgba(100, 116, 139, 0.45)" : "rgba(100, 116, 139, 0.22)";
     const strokeW = isOuter ? "1.5" : "1";
     const dash = isOuter ? "none" : "3 3";
     content += `<polygon points="${pts.join(" ")}" fill="none" stroke="${strokeColor}" stroke-width="${strokeW}" stroke-dasharray="${dash}" />`;
@@ -6980,7 +6987,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
     // Percentage tick label along top axis
     if (idx > 0 && idx < levels.length - 1) {
       const labelY = cy - (r * lvl);
-      content += `<text x="${cx + 4}" y="${(labelY + 11).toFixed(1)}" fill="rgba(148,163,184,0.4)" font-size="9" font-family="monospace">${Math.round(lvl * 100)}%</text>`;
+      content += `<text x="${cx + 4}" y="${(labelY + 11).toFixed(1)}" fill="#64748B" font-size="9" font-family="Inter, monospace">${Math.round(lvl * 100)}%</text>`;
     }
   });
 
@@ -6989,7 +6996,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
     const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
     const sx = cx + r * Math.cos(angle);
     const sy = cy + r * Math.sin(angle);
-    content += `<line x1="${cx}" y1="${cy}" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="rgba(148, 163, 184, 0.22)" stroke-width="1" />`;
+    content += `<line x1="${cx}" y1="${cy}" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="rgba(100, 116, 139, 0.25)" stroke-width="1" />`;
   }
 
   // Baseline polygon
@@ -7003,9 +7010,9 @@ function renderSpiderwebSvg(axes, activeGoal) {
     prevPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
     prevCircles.push({ x: px, y: py, axis: axes[i] });
   }
-  content += `<polygon points="${prevPts.join(" ")}" fill="url(#radarPreviousGradient)" stroke="#a78bfa" stroke-width="2" stroke-dasharray="4 3" opacity="0.9" />`;
+  content += `<polygon points="${prevPts.join(" ")}" fill="url(#radarPreviousGradient)" stroke="#FF5E00" stroke-width="2" stroke-dasharray="4 3" opacity="0.92" />`;
   prevCircles.forEach(pt => {
-    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="#a78bfa" stroke="#4c1d95" stroke-width="1.5"><title>Baseline: ${pt.axis.previous_watts || '--'}W</title></circle>`;
+    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="#FF5E00" stroke="#FFFFFF" stroke-width="1.5"><title>Baseline: ${pt.axis.previous_watts || '--'}W</title></circle>`;
   });
 
   // Active Goal Polygon (if active goal set)
@@ -7021,10 +7028,10 @@ function renderSpiderwebSvg(axes, activeGoal) {
       goalPts.push(`${gx.toFixed(1)},${gy.toFixed(1)}`);
       goalDiamonds.push({ x: gx, y: gy, axis: axes[i] });
     }
-    content += `<polygon points="${goalPts.join(" ")}" fill="url(#radarGoalGradient)" stroke="#10b981" stroke-width="2.5" stroke-dasharray="6 3" opacity="0.95" />`;
+    content += `<polygon points="${goalPts.join(" ")}" fill="url(#radarGoalGradient)" stroke="#00C896" stroke-width="2.5" stroke-dasharray="6 3" opacity="0.95" />`;
     goalDiamonds.forEach(pt => {
       content += `
-        <polygon points="${(pt.x).toFixed(1)},${(pt.y - 4.5).toFixed(1)} ${(pt.x + 4.5).toFixed(1)},${(pt.y).toFixed(1)} ${(pt.x).toFixed(1)},${(pt.y + 4.5).toFixed(1)} ${(pt.x - 4.5).toFixed(1)},${(pt.y).toFixed(1)}" fill="#10b981" stroke="#064e3b" stroke-width="1.5">
+        <polygon points="${(pt.x).toFixed(1)},${(pt.y - 4.5).toFixed(1)} ${(pt.x + 4.5).toFixed(1)},${(pt.y).toFixed(1)} ${(pt.x).toFixed(1)},${(pt.y + 4.5).toFixed(1)} ${(pt.x - 4.5).toFixed(1)},${(pt.y).toFixed(1)}" fill="#00C896" stroke="#FFFFFF" stroke-width="1.5">
           <title>Goal Target: ${escapeSpiderwebHtml(pt.axis.name)} @ ${pt.axis.target_watts || '--'}W (${pt.axis.target_w_kg || '--'} W/kg)</title>
         </polygon>
       `;
@@ -7042,9 +7049,9 @@ function renderSpiderwebSvg(axes, activeGoal) {
     curPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
     curCircles.push({ x: px, y: py, axis: axes[i] });
   }
-  content += `<polygon points="${curPts.join(" ")}" fill="url(#radarCurrentGradient)" stroke="#06b6d4" stroke-width="2.5" filter="url(#radarGlow)" />`;
+  content += `<polygon points="${curPts.join(" ")}" fill="url(#radarCurrentGradient)" stroke="#0052FF" stroke-width="2.5" filter="url(#radarGlow)" />`;
   curCircles.forEach(pt => {
-    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="5" fill="#06b6d4" stroke="#ffffff" stroke-width="1.5"><title>${escapeSpiderwebHtml(pt.axis.name)}: ${pt.axis.current_watts}W (${pt.axis.current_w_kg} W/kg)</title></circle>`;
+    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="5" fill="#0052FF" stroke="#FFFFFF" stroke-width="1.5"><title>${escapeSpiderwebHtml(pt.axis.name)}: ${pt.axis.current_watts}W (${pt.axis.current_w_kg} W/kg)</title></circle>`;
   });
 
   // Outer axis labels
@@ -7073,24 +7080,24 @@ function renderSpiderwebSvg(axes, activeGoal) {
     }
 
     const deltaSign = ax.delta_watts > 0 ? "+" : "";
-    const deltaColor = ax.delta_watts > 0 ? "#10b981" : ax.delta_watts < 0 ? "#ef4444" : "#94a3b8";
+    const deltaColor = ax.delta_watts > 0 ? "#00C896" : ax.delta_watts < 0 ? "#EF4444" : "#64748B";
 
     let goalLine = "";
     if (hasGoal && ax.target_watts) {
       if (ax.goal_met) {
-        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 33).toFixed(1)}" text-anchor="${textAnchor}" fill="#10b981" font-size="8.5" font-weight="700">🎯 ${ax.target_watts}W (✓ Met)</text>`;
+        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 33).toFixed(1)}" text-anchor="${textAnchor}" fill="#00C896" font-size="8.5" font-weight="700">🎯 ${ax.target_watts}W (✓ Met)</text>`;
       } else {
-        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 33).toFixed(1)}" text-anchor="${textAnchor}" fill="#f59e0b" font-size="8.5" font-weight="700">🎯 ${ax.target_watts}W (-${ax.goal_remaining_watts}W)</text>`;
+        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 33).toFixed(1)}" text-anchor="${textAnchor}" fill="#FF5E00" font-size="8.5" font-weight="700">🎯 ${ax.target_watts}W (-${ax.goal_remaining_watts}W)</text>`;
       }
     }
 
     content += `
       <g class="spiderweb-svg-axis-label">
-        <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="var(--text-bright, #f8fafc)" font-size="11" font-weight="700">
+        <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="#111625" font-size="11" font-weight="800" font-family="Outfit, Inter, sans-serif">
           ${ax.icon} ${escapeSpiderwebHtml(ax.label)}
         </text>
-        <text x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${textAnchor}" fill="var(--accent-cyan, #06b6d4)" font-size="10" font-weight="600">
-          ${ax.current_watts}W <tspan fill="var(--text-muted, #94a3b8)" font-weight="400">· ${ax.current_w_kg ? ax.current_w_kg.toFixed(1) : '--'} W/kg</tspan>
+        <text x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${textAnchor}" fill="#0052FF" font-size="10" font-weight="700" font-family="Outfit, Inter, sans-serif">
+          ${ax.current_watts}W <tspan fill="#64748B" font-weight="500" font-family="Inter, sans-serif">· ${ax.current_w_kg ? ax.current_w_kg.toFixed(1) : '--'} W/kg</tspan>
         </text>
         <text x="${lx.toFixed(1)}" y="${(ly + 23).toFixed(1)}" text-anchor="${textAnchor}" fill="${deltaColor}" font-size="9" font-weight="700">
           ${deltaSign}${ax.delta_watts}W (${deltaSign}${ax.delta_pct ? ax.delta_pct.toFixed(1) : '0.0'}%)
