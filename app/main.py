@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.5.0",
-        "release_name": "VeloMetrics AI — Speed & Summit UI & Brand Identity",
+        "version": "2.5.1",
+        "release_name": "VeloMetrics AI — iPhone & Mobile Responsive Polish",
         "build_date": "2026-11-10",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.5.1",
+                "date": "2026-11-10",
+                "title": "iPhone & Mobile Viewport Formatting & Light-Theme Contrast Fixes",
+                "items": [
+                    "Mobile Media Query & Telemetry Grid Fix: Fixed a stray closing brace in @media (max-width: 768px) and ensured Whoop, Strava, and AI Race Briefing cards stack cleanly at 100% width on iPhone screens.",
+                    "Sleek 2-Row iPhone Navbar & 3-Column Mode Tabs: Compacted mobile navbar actions onto Row 1 with the Daily/Analysis switcher on Row 2, and formatted 3-tab switchers (#debriefTabGroup, #planSourceTabs) into a balanced 3-column layout.",
+                    "Live Workout Dynamic Coaching Bottom Sheet: Positioned the Directeur Sportive live pacing bottom sheet directly inside the Live Workout Interface with animated 4-bar wave indicators and mobile-friendly actions.",
+                    "Mobile Coach Chat & 3-Tier Strain Contrast: Replaced dark-mode mobile overrides in the Coach Chat drawer, pull-to-reload pill, and 3-Tier Strain / W' Battery readouts with high-contrast Ice Frost (#F4F7FA), Electric Cobalt Blue (#0052FF), and Midnight Carbon (#111625) styles."
+                ]
+            },
             {
                 "version": "v2.5.0",
                 "date": "2026-11-10",

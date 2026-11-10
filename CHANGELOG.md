@@ -5,6 +5,19 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.5.1] - 2026-11-10
+### Fixed & Improved
+- **iPhone & Mobile Viewport Formatting & Responsive Layout**:
+  - Fixed a duplicated CSS rule and stray closing brace inside `@media (max-width: 768px)` in `app/static/css/style.css` that prematurely closed the mobile media query and caused 3-column desktop grid rules to leak onto narrow iPhone screens.
+  - Compacted the top `.navbar` on iPhone screens (`<= 600px`) into a sleek 2-row header: `.brand` and compact icon/badge `.nav-actions` on Row 1, and the full-width `Daily Training` / `Long-Term Analysis` view switcher on Row 2.
+  - Configured `.telemetry-grid` (Whoop Recovery, Strava Load, AI Race Briefing) to stack cleanly as full-width cards on iPhone viewports (`<= 600px`), and updated 3-tab `.mode-tabs` (`#debriefTabGroup` and `#planSourceTabs`) to render in a balanced 3-column grid instead of wrapping an orphaned 3rd tab onto a second row.
+  - Embedded the **Dynamic Coaching Bottom Sheet (`#dsCoachingBottomSheet`)** directly inside the Live Workout Interface beneath the power zone canvas so it never collides with the floating Coach Chat FAB on mobile screens, complete with animated 4-bar Cobalt-to-Orange wave indicators.
+- **Mobile Coach Chat & 3-Tier Strain Light-Theme Contrast**:
+  - Replaced hardcoded dark-mode `!important` mobile backgrounds in `.coach-chat-header`, `.coach-chat-input-bar`, `.pull-to-reload-content`, and `.chat-workout-action-card` with Ice Frost (`#F4F7FA`) and Pure White (`#FFFFFF`) surfaces and Midnight Carbon (`#111625`) text, and styled user chat bubbles in Electric Cobalt Blue (`#0052FF`) with crisp white text.
+  - Updated 3-Tier Strain (`.strain-total-badge`, `.strain-tier-val`) and $W'$ Anaerobic Battery labels (`.battery-meter-label`) from white (`#fff`) to Midnight Carbon (`#111625`) and Electric Cobalt Blue (`#0052FF`) for full legibility on light card backgrounds.
+
+---
+
 ## [2.5.0] - 2026-11-10
 ### Changed & Added
 - **VeloMetrics AI Brand Identity & Value Proposition**:
