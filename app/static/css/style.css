@@ -1635,8 +1635,8 @@ canvas#intervalCanvas {
 
 .athlete-zones-preview-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 0.65rem;
   font-size: 0.8rem;
   background: rgba(0, 0, 0, 0.25);
   padding: 0.85rem;
@@ -1644,10 +1644,77 @@ canvas#intervalCanvas {
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-@media (max-width: 640px) {
-  .strain-tier-badges-grid,
+.athlete-zone-card {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 3.5px solid var(--zone-accent, #64748b);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.athlete-zone-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.athlete-zone-tag {
+  font-size: 0.74rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--zone-accent, var(--text-primary));
+  margin-bottom: 0.15rem;
+}
+
+.athlete-zone-pct {
+  font-size: 0.70rem;
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.athlete-zone-range {
+  font-weight: 800;
+  font-size: 1.05rem;
+  color: var(--text-primary);
+  font-family: var(--font-display);
+  margin-bottom: 0.2rem;
+}
+
+.athlete-zone-desc {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  line-height: 1.25;
+}
+
+.athlete-sweet-spot-callout {
+  margin-top: 0.75rem;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: 6px;
+  padding: 0.55rem 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 768px) {
   .athlete-zones-preview-grid {
-    grid-template-columns: 1fr !important;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)) !important;
+  }
+}
+
+@media (max-width: 500px) {
+  .athlete-zones-preview-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 }
 
@@ -2736,6 +2803,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .forecast-step-row.zone-z4 { border-left-color: #ea580c; }
 .forecast-step-row.zone-z5 { border-left-color: #f43f5e; }
 .forecast-step-row.zone-z6 { border-left-color: #a855f7; }
+.forecast-step-row.zone-z7 { border-left-color: #ec4899; }
 
 .outlook-card-header {
   display: flex;
@@ -4966,10 +5034,33 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 [data-theme="light"] #forecastModalWorkoutName,
 [data-theme="light"] #authProfileName,
+[data-theme="light"] .athlete-zone-range,
+[data-theme="light"] .athlete-zones-preview-grid #rangeZ1,
 [data-theme="light"] .athlete-zones-preview-grid #rangeZ2,
-[data-theme="light"] .athlete-zones-preview-grid #rangeSweetSpot,
-[data-theme="light"] .athlete-zones-preview-grid #rangeVO2 {
+[data-theme="light"] .athlete-zones-preview-grid #rangeZ3,
+[data-theme="light"] .athlete-zones-preview-grid #rangeZ4,
+[data-theme="light"] .athlete-zones-preview-grid #rangeZ5,
+[data-theme="light"] .athlete-zones-preview-grid #rangeVO2,
+[data-theme="light"] .athlete-zones-preview-grid #rangeZ6,
+[data-theme="light"] .athlete-zones-preview-grid #rangeZ7,
+[data-theme="light"] .athlete-zones-preview-grid #rangeSweetSpot {
   color: #0f172a !important;
+}
+
+[data-theme="light"] .athlete-zone-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .athlete-zones-preview-grid {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+[data-theme="light"] .athlete-sweet-spot-callout {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #92400e;
 }
 
 [data-theme="light"] input::placeholder,

@@ -3,6 +3,29 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.7.1] - 2026-11-11
+### Added
+- **Canonical Coggan 7-Zone Power Ribbon**:
+  - Implemented the full, standard Coggan 7-Zone Power System across the athlete dashboard and backend (`get_coggan_power_zones`):
+    - **Zone 1 Active Recovery** (< 55% FTP, < 138W at 250W FTP)
+    - **Zone 2 Endurance** (56–75% FTP, 140–188W)
+    - **Zone 3 Tempo** (76–90% FTP, 190–225W)
+    - **Zone 4 Lactate Threshold** (91–105% FTP, 228–262W)
+    - **Zone 5 VO2 Max** (106–120% FTP, 265–300W)
+    - **Zone 6 Anaerobic Capacity** (121–150% FTP, 302–375W)
+    - **Zone 7 Neuromuscular Power** (> 150% FTP, > 375W up to Peak Sprint Power 1050W)
+  - Added dedicated **Sweet Spot Sub-Zone Callout Banner** (88–94% FTP, 220–235W) properly framing Sweet Spot as the high-density aerobic bridge between upper Tempo (Z3) and lower Threshold (Z4).
+  - Modernized `athlete-zones-preview-grid` with a responsive, color-coded 7-card grid with physiological focus descriptors, distinct theme border accents, and full light/dark mode support.
+  - Updated the Live Workout Interface canvas legend and section breakdown classes to render all 7 Coggan zones plus Sweet Spot without truncation.
+
+### Fixed
+- **Missing Zone 3 and Threshold Power Gap (234–264W)**:
+  - Eliminated the UI bug where the athlete power strip only displayed 3 zones (Z2, "Z4 Sweet Spot", and Z5), which mistakenly skipped Zone 3 Tempo entirely and created a 32-watt void between Sweet Spot (233W) and VO2 Max (265W).
+- **Prescribed Ride Zone Fidelity Verification**:
+  - Audited workout generation and Zwift `.zwo` export engines to confirm that all interval targets are derived directly from explicit percentages of athlete FTP ($P_{\text{target}} = \text{FTP} \times \%_{\text{target}}$) and $W'$, mathematically confirming that athlete prescribed workouts were never compromised by the incomplete 3-tile UI display.
+
+---
+
 ## [2.7.0] - 2026-11-11
 ### Fixed
 - **Physiological Monotonicity & Steady-State Interval Power Floor**:

@@ -3,6 +3,7 @@ import datetime
 from app.database import get_setting, set_setting, get_db_connection, get_current_user_id, get_user_by_id, get_athlete_date
 from app.services.mock_data import get_mock_whoop_data, get_mock_strava_activities, get_mock_weekly_stats
 from app.services.program_service import get_current_program
+from app.services.strain_model_service import get_coggan_power_zones
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -228,7 +229,8 @@ def get_dashboard_data(request: Request = None):
             "ftp": ftp,
             "max_hr": max_hr,
             "w_prime_kj": w_prime_kj,
-            "peak_power_watts": peak_power
+            "peak_power_watts": peak_power,
+            "power_zones": get_coggan_power_zones(ftp, peak_power)
         },
         "integrations": {
             "whoop": {"connected": whoop_connected, "auth_expired": whoop_auth_expired},

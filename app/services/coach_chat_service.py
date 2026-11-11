@@ -52,15 +52,16 @@ def compile_athlete_context() -> Dict[str, Any]:
     today_acts = act_info.get("today_activities", [])
     latest_act = act_info.get("latest_activity", {})
 
-    # Power Zones (Coggan)
+    # Power Zones (Canonical Coggan 7-Zone System)
     power_zones = {
-        "Z1_Recovery": f"< {round(ftp * 0.55)}W",
-        "Z2_Endurance": f"{round(ftp * 0.56)}–{round(ftp * 0.75)}W",
-        "Z3_Tempo": f"{round(ftp * 0.76)}–{round(ftp * 0.87)}W",
-        "Sweet_Spot": f"{round(ftp * 0.88)}–{round(ftp * 0.93)}W",
-        "Z4_Threshold": f"{round(ftp * 0.94)}–{round(ftp * 1.05)}W",
-        "Z5_VO2Max": f"{round(ftp * 1.06)}–{round(ftp * 1.20)}W",
-        "Z6_Anaerobic": f"> {round(ftp * 1.20)}W"
+        "Z1_Active_Recovery": f"< {round(ftp * 0.55)}W (< 55% FTP)",
+        "Z2_Endurance": f"{round(ftp * 0.56)}–{round(ftp * 0.75)}W (56–75% FTP)",
+        "Z3_Tempo": f"{round(ftp * 0.76)}–{round(ftp * 0.90)}W (76–90% FTP)",
+        "Sweet_Spot_Subzone": f"{round(ftp * 0.88)}–{round(ftp * 0.94)}W (88–94% FTP)",
+        "Z4_Lactate_Threshold": f"{round(ftp * 0.91)}–{round(ftp * 1.05)}W (91–105% FTP)",
+        "Z5_VO2Max": f"{round(ftp * 1.06)}–{round(ftp * 1.20)}W (106–120% FTP)",
+        "Z6_Anaerobic_Capacity": f"{round(ftp * 1.21)}–{round(ftp * 1.50)}W (121–150% FTP)",
+        "Z7_Neuromuscular": f"> {round(ftp * 1.50)}W (> 150% FTP)"
     }
 
     # Current Prescribed Workout

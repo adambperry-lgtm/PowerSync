@@ -28,6 +28,113 @@ def get_athlete_fitness_signature(ftp: Optional[int] = None) -> Dict[str, Any]:
         "peak_power_watts": peak_power
     }
 
+def get_coggan_power_zones(ftp: Optional[int] = None, peak_power: Optional[int] = None) -> Dict[str, Any]:
+    """
+    Computes canonical Coggan 7-Zone Power model ranges and sub-zones for a given FTP.
+    Adheres strictly to Coggan / Allen physiological power standards:
+    - Z1 Active Recovery (< 55% FTP)
+    - Z2 Endurance (56–75% FTP)
+    - Z3 Tempo (76–90% FTP)
+      * Sweet Spot Sub-Zone (88–94% FTP)
+    - Z4 Lactate Threshold (91–105% FTP)
+    - Z5 VO2 Max (106–120% FTP)
+    - Z6 Anaerobic Capacity (121–150% FTP)
+    - Z7 Neuromuscular Power (> 150% FTP, up to Peak Sprint Power P_max)
+    """
+    ftp_val = int(ftp) if ftp else int(get_setting("athlete_ftp", 250))
+    p_max = int(peak_power) if peak_power else int(get_setting("athlete_peak_power_watts", 1050))
+    
+    return {
+        "z1": {
+            "name": "Active Recovery",
+            "code": "Z1",
+            "pct_range": "< 55%",
+            "min_pct": 0,
+            "max_pct": 55,
+            "min_watts": 0,
+            "max_watts": round(ftp_val * 0.55),
+            "display": f"< {round(ftp_val * 0.55)} W",
+            "description": "Active recovery, flushing metabolic waste, minimal glycogen drain"
+        },
+        "z2": {
+            "name": "Endurance",
+            "code": "Z2",
+            "pct_range": "56–75%",
+            "min_pct": 56,
+            "max_pct": 75,
+            "min_watts": round(ftp_val * 0.56),
+            "max_watts": round(ftp_val * 0.75),
+            "display": f"{round(ftp_val * 0.56)} – {round(ftp_val * 0.75)} W",
+            "description": "All-day aerobic base, fat oxidation, mitochondrial biogenesis"
+        },
+        "z3": {
+            "name": "Tempo",
+            "code": "Z3",
+            "pct_range": "76–90%",
+            "min_pct": 76,
+            "max_pct": 90,
+            "min_watts": round(ftp_val * 0.76),
+            "max_watts": round(ftp_val * 0.90),
+            "display": f"{round(ftp_val * 0.76)} – {round(ftp_val * 0.90)} W",
+            "description": "Aerobic rhythm pace, carbohydrate oxidation, sustained endurance"
+        },
+        "sweet_spot": {
+            "name": "Sweet Spot",
+            "code": "SS",
+            "pct_range": "88–94%",
+            "min_pct": 88,
+            "max_pct": 94,
+            "min_watts": round(ftp_val * 0.88),
+            "max_watts": round(ftp_val * 0.94),
+            "display": f"{round(ftp_val * 0.88)} – {round(ftp_val * 0.94)} W",
+            "description": "High-density sub-threshold aerobic bridge (upper Tempo to lower Threshold)"
+        },
+        "z4": {
+            "name": "Lactate Threshold",
+            "code": "Z4",
+            "pct_range": "91–105%",
+            "min_pct": 91,
+            "max_pct": 105,
+            "min_watts": round(ftp_val * 0.91),
+            "max_watts": round(ftp_val * 1.05),
+            "display": f"{round(ftp_val * 0.91)} – {round(ftp_val * 1.05)} W",
+            "description": "Maximal lactate steady state (MLSS), sustained 40–60m power ceiling"
+        },
+        "z5": {
+            "name": "VO2 Max",
+            "code": "Z5",
+            "pct_range": "106–120%",
+            "min_pct": 106,
+            "max_pct": 120,
+            "min_watts": round(ftp_val * 1.06),
+            "max_watts": round(ftp_val * 1.20),
+            "display": f"{round(ftp_val * 1.06)} – {round(ftp_val * 1.20)} W",
+            "description": "Maximal oxygen uptake, stroke volume, 3–8m aerobic power"
+        },
+        "z6": {
+            "name": "Anaerobic Capacity",
+            "code": "Z6",
+            "pct_range": "121–150%",
+            "min_pct": 121,
+            "max_pct": 150,
+            "min_watts": round(ftp_val * 1.21),
+            "max_watts": round(ftp_val * 1.50),
+            "display": f"{round(ftp_val * 1.21)} – {round(ftp_val * 1.50)} W",
+            "description": "High glycolytic energy production, rapid W' battery depletion (30s–3m)"
+        },
+        "z7": {
+            "name": "Neuromuscular Power",
+            "code": "Z7",
+            "pct_range": "> 150%",
+            "min_pct": 151,
+            "max_pct": round((p_max / ftp_val) * 100) if p_max > ftp_val else 400,
+            "min_watts": round(ftp_val * 1.51),
+            "max_watts": p_max,
+            "display": f"> {round(ftp_val * 1.50)} W ({p_max} W Peak)",
+            "description": "Maximal ATP-PC sprint snap, peak neuromuscular recruitment (< 15–30s)"
+        }
+    }
+
 def calculate_intervals_strain(
     intervals: List[Dict[str, Any]],
     ftp: Optional[int] = None,

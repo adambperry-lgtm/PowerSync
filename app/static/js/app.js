@@ -74,9 +74,15 @@ const formStatusBadge = document.getElementById("formStatusBadge");
 const formDesc = document.getElementById("formDesc");
 const valFtpDisplay = document.getElementById("valFtpDisplay");
 const valMaxHrDisplay = document.getElementById("valMaxHrDisplay");
+const rangeZ1 = document.getElementById("rangeZ1");
 const rangeZ2 = document.getElementById("rangeZ2");
+const rangeZ3 = document.getElementById("rangeZ3");
 const rangeSweetSpot = document.getElementById("rangeSweetSpot");
+const rangeZ4 = document.getElementById("rangeZ4");
+const rangeZ5 = document.getElementById("rangeZ5");
 const rangeVO2 = document.getElementById("rangeVO2");
+const rangeZ6 = document.getElementById("rangeZ6");
+const rangeZ7 = document.getElementById("rangeZ7");
 const recentActivitiesBody = document.getElementById("recentActivitiesBody");
 
 // Mode Switcher DOM
@@ -538,9 +544,32 @@ function renderAthleteProfile() {
     valPeakPowerEl.innerHTML = `${state.athletePeakPower !== undefined ? state.athletePeakPower : 1050} <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">W</span>`;
   }
 
-  rangeZ2.textContent = `${Math.round(state.ftp * 0.56)} - ${Math.round(state.ftp * 0.75)} W`;
-  rangeSweetSpot.textContent = `${Math.round(state.ftp * 0.88)} - ${Math.round(state.ftp * 0.93)} W`;
-  rangeVO2.textContent = `${Math.round(state.ftp * 1.06)} - ${Math.round(state.ftp * 1.20)} W`;
+  const ftp = state.ftp || 250;
+  const peak = state.athletePeakPower || 1050;
+
+  const elZ1 = document.getElementById("rangeZ1");
+  if (elZ1) elZ1.textContent = `< ${Math.round(ftp * 0.55)} W`;
+
+  const elZ2 = document.getElementById("rangeZ2");
+  if (elZ2) elZ2.textContent = `${Math.round(ftp * 0.56)} – ${Math.round(ftp * 0.75)} W`;
+
+  const elZ3 = document.getElementById("rangeZ3");
+  if (elZ3) elZ3.textContent = `${Math.round(ftp * 0.76)} – ${Math.round(ftp * 0.90)} W`;
+
+  const elSS = document.getElementById("rangeSweetSpot");
+  if (elSS) elSS.textContent = `${Math.round(ftp * 0.88)} – ${Math.round(ftp * 0.94)} W`;
+
+  const elZ4 = document.getElementById("rangeZ4");
+  if (elZ4) elZ4.textContent = `${Math.round(ftp * 0.91)} – ${Math.round(ftp * 1.05)} W`;
+
+  const elZ5 = document.getElementById("rangeZ5") || document.getElementById("rangeVO2");
+  if (elZ5) elZ5.textContent = `${Math.round(ftp * 1.06)} – ${Math.round(ftp * 1.20)} W`;
+
+  const elZ6 = document.getElementById("rangeZ6");
+  if (elZ6) elZ6.textContent = `${Math.round(ftp * 1.21)} – ${Math.round(ftp * 1.50)} W`;
+
+  const elZ7 = document.getElementById("rangeZ7");
+  if (elZ7) elZ7.textContent = `> ${Math.round(ftp * 1.50)} W (${peak} W)`;
 
   // Update collapsed summary for athlete profile
   const collapsedFtp = document.getElementById("collapsedAthleteFtp");
@@ -1941,22 +1970,28 @@ async function loadWorkout(duration = null, intensity = 0, userNote = "") {
   }
 }
 
-// Helpers for Power Targets & Zones (Smooth Blue -> Sunset Orange Progression)
+// Helpers for Power Targets & Zones (Canonical Coggan 7-Zone Power System)
 function getPowerZone(pct) {
   if (pct < 55) {
-    return { name: "Zone 1 Active Recovery (<55%)", short: "Z1 Recovery", color: "#60A5FA" };
+    return { name: "Zone 1 Active Recovery (< 55%)", short: "Z1 Recovery", color: "#64748b", zoneNum: 1 };
   } else if (pct <= 75) {
-    return { name: "Zone 2 Endurance Base (56–75%)", short: "Z2 Base", color: "#0052FF" };
-  } else if (pct <= 87) {
-    return { name: "Zone 3 Tempo (76–87%)", short: "Z3 Tempo", color: "#0088FF" };
-  } else if (pct <= 93) {
-    return { name: "Sweet Spot Aerobic (88–93%)", short: "Sweet Spot", color: "#FF8A00" };
+    return { name: "Zone 2 Endurance (56–75%)", short: "Z2 Base", color: "#0052FF", zoneNum: 2 };
+  } else if (pct <= 90) {
+    if (pct >= 88) {
+      return { name: "Zone 3 Tempo / Sweet Spot (88–90%)", short: "Sweet Spot", color: "#10B981", zoneNum: 3, isSweetSpot: true };
+    }
+    return { name: "Zone 3 Tempo (76–90%)", short: "Z3 Tempo", color: "#10B981", zoneNum: 3 };
   } else if (pct <= 105) {
-    return { name: "Zone 4 Threshold (94–105%)", short: "Z4 Threshold", color: "#FF5E00" };
+    if (pct <= 94) {
+      return { name: "Zone 4 Threshold / Sweet Spot (91–94%)", short: "Z4 Sweet Spot", color: "#F59E0B", zoneNum: 4, isSweetSpot: true };
+    }
+    return { name: "Zone 4 Lactate Threshold (91–105%)", short: "Z4 Threshold", color: "#F59E0B", zoneNum: 4 };
   } else if (pct <= 120) {
-    return { name: "Zone 5 VO2 Max (106–120%)", short: "Z5 VO2 Max", color: "#E04800" };
+    return { name: "Zone 5 VO2 Max (106–120%)", short: "Z5 VO2 Max", color: "#FF5E00", zoneNum: 5 };
+  } else if (pct <= 150) {
+    return { name: "Zone 6 Anaerobic Capacity (121–150%)", short: "Z6 Anaerobic", color: "#8B5CF6", zoneNum: 6 };
   } else {
-    return { name: "Zone 6 Anaerobic / Neuromuscular (>120%)", short: "Z6 Anaerobic", color: "#C23B00" };
+    return { name: "Zone 7 Neuromuscular Power (> 150%)", short: "Z7 Sprint", color: "#EC4899", zoneNum: 7 };
   }
 }
 
@@ -4503,11 +4538,11 @@ function renderForecastSteps(item) {
 
     if (avgPct < 55) zoneClass = "zone-z1";
     else if (avgPct <= 75) zoneClass = "zone-z2";
-    else if (avgPct <= 87) zoneClass = "zone-z3";
-    else if (avgPct <= 93) zoneClass = "zone-ss";
-    else if (avgPct <= 105) zoneClass = "zone-z4";
+    else if (avgPct <= 90) zoneClass = (avgPct >= 88) ? "zone-ss" : "zone-z3";
+    else if (avgPct <= 105) zoneClass = (avgPct <= 94) ? "zone-ss" : "zone-z4";
     else if (avgPct <= 120) zoneClass = "zone-z5";
-    else zoneClass = "zone-z6";
+    else if (avgPct <= 150) zoneClass = "zone-z6";
+    else zoneClass = "zone-z7";
 
     if (step.is_ramp) {
       const lowW = Math.round(athleteFtp * (step.power_low_pct / 100));

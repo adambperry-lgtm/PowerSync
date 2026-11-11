@@ -128,8 +128,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.7.0",
-        "release_name": "Physiological Monotonicity & Interval Sustained Power Calibration",
+        "version": "2.7.1",
+        "release_name": "Canonical Coggan 7-Zone Power Ribbon & Prescription Fidelity",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -139,6 +139,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.7.1",
+                "date": "2026-11-11",
+                "title": "Canonical Coggan 7-Zone Power Ribbon & Prescription Fidelity",
+                "items": [
+                    "Full Coggan 7-Zone Ribbon: Upgraded athlete profile with all 7 scientific Coggan power zones (Z1 Recovery through Z7 Neuromuscular) and eliminated the missing Zone 3 and Threshold wattage gap.",
+                    "Sweet Spot Sub-Zone Architecture: Formally framed Sweet Spot (88-94% FTP) as the high-density sub-zone bridging upper Tempo and lower Threshold with a dedicated callout banner.",
+                    "Prescription Integrity Verification: Mathematically verified that workout intervals and Zwift .zwo targets are derived directly from explicit percentages of athlete FTP, guaranteeing prescribed training was never impacted by UI zone omissions.",
+                    "Responsive Zone Cards & Legend: Redesigned zone cards with physiological descriptors, dynamic wattage scaling, and full light/dark theme contrast."
+                ]
+            },
             {
                 "version": "v2.7.0",
                 "date": "2026-11-11",

@@ -777,11 +777,13 @@
               Live Workout Interface • Power Zones (% FTP)
             </span>
             <div class="graph-legend">
-              <div class="legend-item"><span class="legend-color" style="background:#60A5FA;"></span> Z1 Recovery</div>
+              <div class="legend-item"><span class="legend-color" style="background:#64748b;"></span> Z1 Recovery</div>
               <div class="legend-item"><span class="legend-color" style="background:#0052FF;"></span> Z2 Base</div>
-              <div class="legend-item"><span class="legend-color" style="background:#0088FF;"></span> Z3 Tempo</div>
-              <div class="legend-item"><span class="legend-color" style="background:#FF8A00;"></span> Z4 Sweet Spot</div>
+              <div class="legend-item"><span class="legend-color" style="background:#10B981;"></span> Z3 Tempo</div>
+              <div class="legend-item"><span class="legend-color" style="background:#F59E0B;"></span> Z4 Threshold</div>
               <div class="legend-item"><span class="legend-color" style="background:#FF5E00;"></span> Z5 VO2 Max</div>
+              <div class="legend-item"><span class="legend-color" style="background:#8B5CF6;"></span> Z6 Anaerobic</div>
+              <div class="legend-item"><span class="legend-color" style="background:#EC4899;"></span> Z7 Sprint</div>
             </div>
           </div>
 
@@ -1713,18 +1715,62 @@
           </div>
         </div>
 
+        <!-- Coggan 7-Zone System Power Ribbon -->
         <div class="athlete-zones-preview-grid">
-          <div>
-            <div style="color:#0052FF;font-weight:700;margin-bottom:0.2rem;">Z2 Endurance (56-75%)</div>
-            <div id="rangeZ2" style="font-weight:800;font-size:1rem;color:var(--text-primary);font-family:var(--font-display);">140 - 188 W</div>
+          <div class="athlete-zone-card" style="--zone-accent:#64748b;">
+            <div class="athlete-zone-tag"><span class="zone-badge-dot" style="background:#64748b;"></span> Z1 Active Recovery</div>
+            <div class="athlete-zone-pct">&lt; 55% FTP</div>
+            <div class="athlete-zone-range" id="rangeZ1">&lt; 138 W</div>
+            <div class="athlete-zone-desc">Flushing &amp; recovery</div>
           </div>
-          <div>
-            <div style="color:#FF8A00;font-weight:700;margin-bottom:0.2rem;">Z4 Sweet Spot (88-93%)</div>
-            <div id="rangeSweetSpot" style="font-weight:800;font-size:1rem;color:#FF5E00;font-family:var(--font-display);">220 - 233 W</div>
+          <div class="athlete-zone-card" style="--zone-accent:#0052FF;">
+            <div class="athlete-zone-tag"><span class="zone-badge-dot" style="background:#0052FF;"></span> Z2 Endurance</div>
+            <div class="athlete-zone-pct">56 – 75% FTP</div>
+            <div class="athlete-zone-range" id="rangeZ2">140 – 188 W</div>
+            <div class="athlete-zone-desc">Aerobic base &amp; fat ox</div>
           </div>
-          <div>
-            <div style="color:#FF5E00;font-weight:700;margin-bottom:0.2rem;">Z5 VO2 Max (106-120%)</div>
-            <div id="rangeVO2" style="font-weight:800;font-size:1rem;color:#FF5E00;font-family:var(--font-display);">265 - 300 W</div>
+          <div class="athlete-zone-card" style="--zone-accent:#10B981;">
+            <div class="athlete-zone-tag"><span class="zone-badge-dot" style="background:#10B981;"></span> Z3 Tempo</div>
+            <div class="athlete-zone-pct">76 – 90% FTP</div>
+            <div class="athlete-zone-range" id="rangeZ3">190 – 225 W</div>
+            <div class="athlete-zone-desc">Aerobic rhythm &amp; speed</div>
+          </div>
+          <div class="athlete-zone-card" style="--zone-accent:#F59E0B;">
+            <div class="athlete-zone-tag"><span class="zone-badge-dot" style="background:#F59E0B;"></span> Z4 Lactate Threshold</div>
+            <div class="athlete-zone-pct">91 – 105% FTP</div>
+            <div class="athlete-zone-range" id="rangeZ4">228 – 263 W</div>
+            <div class="athlete-zone-desc">MLSS &amp; lactate clearance</div>
+          </div>
+          <div class="athlete-zone-card" style="--zone-accent:#FF5E00;">
+            <div class="athlete-zone-tag"><span class="zone-badge-dot" style="background:#FF5E00;"></span> Z5 VO2 Max</div>
+            <div class="athlete-zone-pct">106 – 120% FTP</div>
+            <div class="athlete-zone-range" id="rangeZ5">265 – 300 W</div>
+            <div class="athlete-zone-desc">Maximal oxygen uptake</div>
+          </div>
+          <div class="athlete-zone-card" style="--zone-accent:#8B5CF6;">
+            <div class="athlete-zone-tag"><span class="zone-badge-dot" style="background:#8B5CF6;"></span> Z6 Anaerobic Capacity</div>
+            <div class="athlete-zone-pct">121 – 150% FTP</div>
+            <div class="athlete-zone-range" id="rangeZ6">303 – 375 W</div>
+            <div class="athlete-zone-desc">Glycolytic power &amp; W'</div>
+          </div>
+          <div class="athlete-zone-card" style="--zone-accent:#EC4899;">
+            <div class="athlete-zone-tag"><span class="zone-badge-dot" style="background:#EC4899;"></span> Z7 Neuromuscular</div>
+            <div class="athlete-zone-pct">&gt; 150% FTP</div>
+            <div class="athlete-zone-range" id="rangeZ7">&gt; 375 W</div>
+            <div class="athlete-zone-desc">Sprint snap &amp; ATP-PC</div>
+          </div>
+        </div>
+
+        <!-- Sweet Spot Sub-Zone Callout -->
+        <div class="athlete-sweet-spot-callout">
+          <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            <span style="font-size:0.95rem;">🎯</span>
+            <span style="font-weight:700;color:#F59E0B;">Sweet Spot Sub-Zone:</span>
+            <span style="font-weight:800;color:var(--text-primary);font-family:var(--font-display);" id="rangeSweetSpot">220 – 235 W</span>
+            <span style="color:var(--text-secondary);font-size:0.75rem;font-weight:600;">(88–94% FTP)</span>
+          </div>
+          <div style="color:var(--text-muted);font-size:0.73rem;">
+            Bridges upper Tempo (Z3) and lower Threshold (Z4) for optimal aerobic density with sustainable autonomic recovery.
           </div>
         </div>
       </div>
@@ -1746,7 +1792,7 @@
         <div class="version-text-block">
           <div class="version-title">
             <strong>PowerSync</strong>
-            <span class="version-tag" id="footerVersionBadge">v2.5.3</span>
+            <span class="version-tag" id="footerVersionBadge">v2.7.1</span>
             <span class="version-status-dot"></span>
             <span class="version-status-text">Speed &amp; Summit Edition</span>
           </div>
