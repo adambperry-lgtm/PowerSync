@@ -146,15 +146,15 @@ def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require
     if is_valid_secret(payload.whoop_client_secret):
         set_setting("whoop_client_secret", payload.whoop_client_secret.strip())
     if payload.program_goal is not None:
-        set_setting("program_goal", payload.program_goal)
+        set_setting("program_goal", payload.program_goal, user_id=uid)
     if payload.program_target_ftp is not None:
-        set_setting("program_target_ftp", payload.program_target_ftp)
+        set_setting("program_target_ftp", payload.program_target_ftp, user_id=uid)
     if payload.program_target_date is not None:
-        set_setting("program_target_date", payload.program_target_date)
+        set_setting("program_target_date", payload.program_target_date, user_id=uid)
     if payload.program_weekly_tss_target is not None:
-        set_setting("program_weekly_tss_target", payload.program_weekly_tss_target)
+        set_setting("program_weekly_tss_target", payload.program_weekly_tss_target, user_id=uid)
     if payload.program_weekly_xss_target is not None:
-        set_setting("program_weekly_xss_target", payload.program_weekly_xss_target)
+        set_setting("program_weekly_xss_target", payload.program_weekly_xss_target, user_id=uid)
 
     # Bidirectional Sync: Keep Spiderweb Target Envelope aligned with Long-Term Fitness Goal & Program
     if payload.program_goal is not None or payload.program_target_ftp is not None or payload.athlete_ftp is not None:
@@ -162,7 +162,8 @@ def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require
             from app.services.power_profile_service import sync_spiderweb_goal_from_program
             sync_spiderweb_goal_from_program(
                 program_goal=payload.program_goal,
-                program_target_ftp=payload.program_target_ftp
+                program_target_ftp=payload.program_target_ftp,
+                user_id=uid
             )
         except Exception:
             pass

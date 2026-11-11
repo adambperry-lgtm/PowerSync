@@ -397,6 +397,67 @@ class TestPowerSpiderweb(unittest.TestCase):
                 self.assertIsNone(s.get("weighted_watts"))
                 self.assertIsNone(s.get("pct_ftp"))
 
+    def test_rider_type_drives_long_term_program_and_periodization(self):
+        """
+        Verify that Rider Type selection and spiderweb goals drive the long-term
+        target envelope, target FTP, and periodization macrocycle absent a specific event,
+        and cleanly transition to race taper when an event is present.
+        """
+        from app.services.program_service import get_current_program, update_program_goal
+        from app.services.power_profile_service import set_active_spiderweb_goal, clear_active_spiderweb_goal
+        from app.database import save_target_plan, clear_active_target_plans
+
+        # Ensure no active target plan exists initially
+        clear_active_target_plans(self.user_id)
+        clear_active_spiderweb_goal(self.user_id)
+
+        # 1. Set Rider Type goal to Pursuiter
+        set_active_spiderweb_goal({
+            "goal_type": "phenotype",
+            "target_key": "Pursuiter"
+        }, user_id=self.user_id)
+
+        prog = get_current_program(user_id=self.user_id)
+        self.assertFalse(prog["has_specific_event"])
+        self.assertIn("Pursuiter", prog["goal_title"])
+        self.assertIn("target_envelope", prog)
+        self.assertIn("5m", prog["target_envelope"])
+        self.assertEqual(prog["phase_4_label"], "4. Mastery & Test")
+        self.assertGreater(prog["target_ftp"], prog["current_ftp"])
+        self.assertEqual(prog["target_ftp"], 272)
+
+        # 2. Update program goal via settings dropdown to Climber
+        update_program_goal("CLIMBER", user_id=self.user_id)
+        prog_climber = get_current_program(user_id=self.user_id)
+        self.assertFalse(prog_climber["has_specific_event"])
+        self.assertIn("Climber", prog_climber["goal_title"])
+        self.assertEqual(prog_climber["phase_4_label"], "4. Mastery & Test")
+        self.assertIn("20m", prog_climber["target_envelope"])
+
+        # 3. Simulate adding a specific event target plan
+        future_date = (datetime.date.today() + datetime.timedelta(days=42)).isoformat()
+        save_target_plan({
+            "title": "State Championship Road Race",
+            "target_date": future_date,
+            "description": "A-priority peak road race",
+            "distance_miles": 65.0,
+            "elevation_gain_ft": 4500.0,
+            "estimated_duration_min": 180,
+            "estimated_tss": 210,
+            "intensity_type": "Threshold",
+            "is_active": 1
+        }, user_id=self.user_id)
+
+        prog_event = get_current_program(user_id=self.user_id)
+        self.assertTrue(prog_event["has_specific_event"])
+        self.assertEqual(prog_event["event_title"], "State Championship Road Race")
+        self.assertEqual(prog_event["phase_4_label"], "4. Taper & Fresh")
+
+        # Cleanup
+        clear_active_target_plans(self.user_id)
+        clear_active_spiderweb_goal(self.user_id)
+
 
 if __name__ == "__main__":
     unittest.main()
+

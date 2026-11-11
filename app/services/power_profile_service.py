@@ -829,8 +829,14 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
     synced_target_ftp = int(explicit_target_ftp or get_setting("program_target_ftp", ftp + 15, user_id=uid))
     anchor_ftp = max(ftp, synced_target_ftp) if preserve_program_settings else ftp
 
-    # Archetype weekly load baselines (aligned with program_service.DEFAULT_GOALS)
+    # Archetype weekly load baselines (aligned directly with program_service.DEFAULT_GOALS)
     program_load_baselines = {
+        "PURSUITER": {"gain": 12, "tss": 360, "xss": 360},
+        "CLIMBER": {"gain": 15, "tss": 380, "xss": 380},
+        "ROULEUR": {"gain": 15, "tss": 400, "xss": 400},
+        "PUNCHEUR": {"gain": 12, "tss": 350, "xss": 350},
+        "SPRINTER": {"gain": 8, "tss": 320, "xss": 320},
+        "ALL_ROUNDER": {"gain": 12, "tss": 380, "xss": 380},
         "FTP_BUILD": {"gain": 15, "tss": 360, "xss": 360},
         "GRAN_FONDO": {"gain": 10, "tss": 420, "xss": 420},
         "VO2_CRIT": {"gain": 12, "tss": 340, "xss": 340},
@@ -882,16 +888,8 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
 
         # Automatically align program_goal & program_target_ftp so Macrocycle & Spiderweb never conflict
         if not preserve_program_settings:
-            program_goal_map = {
-                "Puncheur": "VO2_CRIT",
-                "Pursuiter": "VO2_CRIT",
-                "Rouleur": "FTP_BUILD",
-                "Climber": "FTP_BUILD",
-                "Sprinter": "VO2_CRIT",
-                "All-Rounder": "GRAN_FONDO"
-            }
-            synced_program_goal = program_goal_map.get(pheno_def["id"], "FTP_BUILD")
-            baseline_cfg = program_load_baselines[synced_program_goal]
+            synced_program_goal = pheno_def["id"].upper()
+            baseline_cfg = program_load_baselines.get(synced_program_goal, {"gain": 12, "tss": 360, "xss": 360})
             derived_ftp = max(
                 ftp + baseline_cfg["gain"],
                 round(target_envelope["20m"] * 0.95),
@@ -1031,36 +1029,75 @@ def sync_spiderweb_goal_from_program(
         set_setting("spiderweb_goal", existing, user_id=uid)
         return existing
 
+    p_goal_upper = str(p_goal).upper()
+    pheno_match = next((p for p in RIDER_PHENOTYPE_DEFINITIONS if p["id"].upper() == p_goal_upper), None)
+    if pheno_match:
+        return set_active_spiderweb_goal(
+            {
+                "goal_type": "phenotype",
+                "target_key": pheno_match["id"],
+                "preserve_program_settings": True,
+                "explicit_target_ftp": p_target_ftp
+            },
+            user_id=uid
+        )
+
     # Otherwise, build a freshly aligned Spiderweb Goal from p_goal and p_target_ftp while preserving explicit Settings inputs
-    if p_goal == "FTP_BUILD":
-        target_20m = max(cur_envelope.get("20m", 240) + 5, round(p_target_ftp / 0.95))
+    if p_goal_upper in ("FTP_BUILD", "ROULEUR"):
         return set_active_spiderweb_goal(
             {
-                "goal_type": "duration",
-                "target_key": "20m",
-                "target_watts": target_20m,
+                "goal_type": "phenotype",
+                "target_key": "Rouleur",
                 "preserve_program_settings": True,
                 "explicit_target_ftp": p_target_ftp
             },
             user_id=uid
         )
-    elif p_goal == "GRAN_FONDO":
-        target_60m = max(cur_envelope.get("60m", 210) + 5, round(p_target_ftp * 0.94))
+    elif p_goal_upper in ("GRAN_FONDO", "ALL_ROUNDER"):
         return set_active_spiderweb_goal(
             {
-                "goal_type": "duration",
-                "target_key": "60m",
-                "target_watts": target_60m,
+                "goal_type": "phenotype",
+                "target_key": "All-Rounder",
                 "preserve_program_settings": True,
                 "explicit_target_ftp": p_target_ftp
             },
             user_id=uid
         )
-    elif p_goal == "VO2_CRIT":
+    elif p_goal_upper in ("VO2_CRIT", "PUNCHEUR"):
         return set_active_spiderweb_goal(
             {
                 "goal_type": "phenotype",
                 "target_key": "Puncheur",
+                "preserve_program_settings": True,
+                "explicit_target_ftp": p_target_ftp
+            },
+            user_id=uid
+        )
+    elif p_goal_upper == "PURSUITER":
+        return set_active_spiderweb_goal(
+            {
+                "goal_type": "phenotype",
+                "target_key": "Pursuiter",
+                "preserve_program_settings": True,
+                "explicit_target_ftp": p_target_ftp
+            },
+            user_id=uid
+        )
+    elif p_goal_upper == "CLIMBER":
+        return set_active_spiderweb_goal(
+            {
+                "goal_type": "phenotype",
+                "target_key": "Climber",
+                "preserve_program_settings": True,
+                "explicit_target_ftp": p_target_ftp
+            },
+            user_id=uid
+        )
+    elif p_goal_upper == "SPRINTER":
+        return set_active_spiderweb_goal(
+            {
+                "goal_type": "phenotype",
+                "target_key": "Sprinter",
                 "preserve_program_settings": True,
                 "explicit_target_ftp": p_target_ftp
             },

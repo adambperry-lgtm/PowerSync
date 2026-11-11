@@ -1626,6 +1626,17 @@
             </div>
           </div>
         </div>
+
+        <!-- Target Power Envelope Strip (Rider Type Driven) -->
+        <div class="program-envelope-strip" id="programEnvelopeStrip" style="margin-top:0.75rem;padding:0.6rem 0.85rem;background:#FFFFFF;border:1px solid var(--border-color);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+          <div style="display:flex;align-items:center;gap:0.4rem;">
+            <span style="font-size:0.9rem;">🕸️</span>
+            <span style="font-size:0.75rem;font-weight:700;color:var(--text-primary);text-transform:uppercase;letter-spacing:0.04em;" id="programEnvelopeLabel">Long-Term Target Envelope:</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;" id="programEnvelopeChips">
+            <!-- Dynamically populated chips for 5s, 1m, 5m, 20m, 60m -->
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1765,10 +1776,20 @@
             <div class="grid-col-span-2">
               <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Program Focus / Goal Archetype</label>
               <select id="settingProgramGoal">
-                <option value="FTP_BUILD">Threshold &amp; FTP Booster (+15W)</option>
-                <option value="GRAN_FONDO">Gran Fondo &amp; Century Base (+10W)</option>
-                <option value="VO2_CRIT">Punchy Power &amp; Criterium (+12W)</option>
-                <option value="HEALTH_LONGEVITY">Aerobic Health &amp; Longevity (+5W)</option>
+                <optgroup label="Rider Type Transformation &amp; Target Envelope">
+                  <option value="PURSUITER">🫁 Pursuiter / VO2 Specialist (+12W • 5m MAP &amp; High Ceiling)</option>
+                  <option value="CLIMBER">⛰️ Climber (+15W • High Sustained W/kg &amp; Alpine Repeats)</option>
+                  <option value="ROULEUR">⏱️ Rouleur / TT Specialist (+15W • 20m–60m Sustained Threshold)</option>
+                  <option value="PUNCHEUR">🥊 Puncheur (+12W • 1m–3m Attacks &amp; Anaerobic W')</option>
+                  <option value="SPRINTER">⚡ Sprinter (+8W • 5s Neuromuscular Burst &amp; Peak P_max)</option>
+                  <option value="ALL_ROUNDER">🎯 All-Rounder (+12W • Multi-System Polarized Mastery)</option>
+                </optgroup>
+                <optgroup label="General Program Archetypes">
+                  <option value="FTP_BUILD">Threshold &amp; FTP Booster (Rouleur +15W)</option>
+                  <option value="GRAN_FONDO">Gran Fondo &amp; Century Base (All-Rounder +10W)</option>
+                  <option value="VO2_CRIT">Punchy Power &amp; Criterium (Puncheur +12W)</option>
+                  <option value="HEALTH_LONGEVITY">Aerobic Health &amp; Longevity (+5W)</option>
+                </optgroup>
               </select>
             </div>
             <div>

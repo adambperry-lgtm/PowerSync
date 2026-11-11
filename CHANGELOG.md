@@ -3,6 +3,26 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.4] - 2026-11-11
+### Added
+- **Unified Rider Type Target Envelope & Periodization Integration**:
+  - Elevated all 6 Rider Types (`PURSUITER`, `CLIMBER`, `ROULEUR`, `PUNCHEUR`, `SPRINTER`, `ALL_ROUNDER`) to first-class goal definitions across the Long-Term Goal Setting engine and Settings modal.
+  - Introduced bidirectional synchronization between the Power Spiderweb / Fitness Profile Target Planner and the Long-Term Fitness Goal & Periodization card (`#cardProgram`).
+  - Added visible 5-axis target envelope chip display in the Long-Term Program card (`#programEnvelopeStrip`), surfacing target wattages across all durations (`5s`, `1m`, `5m`, `20m`, `60m`).
+  - Implemented `update_program_goal` service function to seamlessly synchronize rider types, weekly load baselines, and spiderweb envelopes.
+
+### Changed
+- **Phenotype Adaptation Macrocycle Absent a Specific Event**:
+  - Resolved conflict between the target planner and the macrocycle card: when no specific race/event is scheduled, the macrocycle transitions from arbitrary event taper into a structured 4-phase **Phenotype Adaptation & Specialization Macrocycle**:
+    1. Base Phase (Aerobic Base & Muscular Durability)
+    2. Build Phase (Threshold & Progressive Power Density)
+    3. Specialty Phase (Signature Weapon Development for target Rider Type)
+    4. Mastery & Benchmark Test (`4. Mastery & Test`: 5-Axis Target Envelope Testing & Breakthrough Validation).
+  - When an event is scheduled (via `target_plans`), the macrocycle automatically pivots Phase 4 to `4. Taper & Fresh` with race openers and freshness priming.
+  - Dynamically drives long-term Target FTP from the spiderweb 20-minute target (`max(current_ftp + 5, round(target_envelope['20m'] * 0.95))`) rather than static legacy offsets.
+
+---
+
 ## [2.6.3] - 2026-11-11
 ### Fixed
 - **Scientific Coggan Elite Benchmark Ceiling Calibration**:

@@ -1005,6 +1005,12 @@ function renderProgram(p) {
     plannerSyncBadge.textContent = `🔄 Synced: ${p.phase || "Build Phase"} • Target FTP ${p.target_ftp || 265}W (${p.weekly_xss_target || p.weekly_tss_target || 360} XSS/wk)`;
   }
 
+  // Macrocycle column labels (Event taper vs Phenotype mastery absent event)
+  const phaseColTaper = document.getElementById("phaseColTaper");
+  if (phaseColTaper) phaseColTaper.textContent = p.phase_4_label || (p.has_specific_event ? "4. Taper & Fresh" : "4. Mastery & Test");
+  const phaseColPeak = document.getElementById("phaseColPeak");
+  if (phaseColPeak) phaseColPeak.textContent = p.has_specific_event ? "3. Peak (VO2)" : "3. Specialty";
+
   // Highlight active column in macrocycle
   const phaseStr = (p.phase || "").toLowerCase();
   const cols = ["phaseColBase", "phaseColBuild", "phaseColPeak", "phaseColTaper"];
@@ -1014,12 +1020,12 @@ function renderProgram(p) {
   });
   if (phaseStr.includes("base")) document.getElementById("phaseColBase")?.classList.add("active");
   else if (phaseStr.includes("build")) document.getElementById("phaseColBuild")?.classList.add("active");
-  else if (phaseStr.includes("peak")) document.getElementById("phaseColPeak")?.classList.add("active");
-  else if (phaseStr.includes("taper")) document.getElementById("phaseColTaper")?.classList.add("active");
+  else if (phaseStr.includes("specialty") || phaseStr.includes("peak")) document.getElementById("phaseColPeak")?.classList.add("active");
+  else if (phaseStr.includes("taper") || phaseStr.includes("mastery") || phaseStr.includes("test")) document.getElementById("phaseColTaper")?.classList.add("active");
 
   if (macrocycleFillBar) macrocycleFillBar.style.width = `${Math.min(100, Math.max(5, p.progress_pct || 0))}%`;
   if (programWeekInfo) programWeekInfo.textContent = `Week ${p.current_week || 1} of ${p.total_weeks || 8} • ${p.phase}`;
-  if (programDaysInfo) programDaysInfo.textContent = `${p.days_remaining || 0} Days Remaining`;
+  if (programDaysInfo) programDaysInfo.textContent = p.has_specific_event ? `${p.days_remaining || 0} Days to Event` : `${p.days_remaining || 0} Days Remaining in Block`;
 
   if (programFtpDelta) {
     const delta = p.ftp_delta || 0;
@@ -1043,6 +1049,23 @@ function renderProgram(p) {
 
   if (programPhaseFocus) programPhaseFocus.textContent = p.phase_focus || "";
   if (programPhaseDetail) programPhaseDetail.textContent = p.phase_desc || "";
+
+  // Render Target Power Envelope chips strip
+  const envChipsEl = document.getElementById("programEnvelopeChips");
+  if (envChipsEl) {
+    const env = p.target_envelope || {};
+    const durKeys = ["5s", "1m", "5m", "20m", "60m"];
+    const validDurs = durKeys.filter(k => env[k] !== undefined);
+    if (validDurs.length > 0) {
+      envChipsEl.innerHTML = validDurs.map(k => `
+        <span class="tag" style="background:rgba(0,82,255,0.08);color:#0052FF;border:1px solid rgba(0,82,255,0.22);font-weight:700;font-size:0.75rem;">
+          ${k}: ${env[k]}W
+        </span>
+      `).join("");
+    } else {
+      envChipsEl.innerHTML = `<span style="font-size:0.75rem;color:var(--text-muted);">Syncing from 5-axis profile...</span>`;
+    }
+  }
 
   // Update collapsed summary for program card
   const collapsedPhase = document.getElementById("collapsedProgramPhase");
@@ -2917,7 +2940,13 @@ function openSettingsModal() {
       document.getElementById("settingDemoMode").checked = s.demo_mode;
       
       const progGoalEl = document.getElementById("settingProgramGoal");
-      if (progGoalEl) progGoalEl.value = s.program_goal || "FTP_BUILD";
+      if (progGoalEl) {
+        const currentGoal = (s.program_goal || "ALL_ROUNDER").toUpperCase();
+        progGoalEl.value = currentGoal;
+        if (!progGoalEl.value && progGoalEl.options.length > 0) {
+          progGoalEl.selectedIndex = 0;
+        }
+      }
       const progTargetFtpEl = document.getElementById("settingProgramTargetFtp");
       if (progTargetFtpEl) progTargetFtpEl.value = s.program_target_ftp || 265;
       const progTargetDateEl = document.getElementById("settingProgramTargetDate");
@@ -3246,6 +3275,12 @@ const settingProgramWeeklyXssEl = document.getElementById("settingProgramWeeklyX
 const settingFtpEl = document.getElementById("settingFtp");
 
 const PROGRAM_GOAL_ARCHETYPES = {
+  "PURSUITER": { gain: 12, tss: 360, xss: 360 },
+  "CLIMBER": { gain: 15, tss: 380, xss: 380 },
+  "ROULEUR": { gain: 15, tss: 400, xss: 400 },
+  "PUNCHEUR": { gain: 12, tss: 350, xss: 350 },
+  "SPRINTER": { gain: 8, tss: 320, xss: 320 },
+  "ALL_ROUNDER": { gain: 12, tss: 380, xss: 380 },
   "FTP_BUILD": { gain: 15, tss: 360, xss: 360 },
   "GRAN_FONDO": { gain: 10, tss: 420, xss: 420 },
   "VO2_CRIT": { gain: 12, tss: 340, xss: 340 },

@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.3",
-        "release_name": "Coggan Elite Physiological Benchmarks & Ceiling Calibration",
+        "version": "2.6.4",
+        "release_name": "Unified Rider Type Target Envelope & Periodization Macrocycle",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.4",
+                "date": "2026-11-11",
+                "title": "Unified Rider Type Target Envelope & Periodization Macrocycle",
+                "items": [
+                    "First-Class Rider Types: Pursuiter, Climber, Rouleur, Puncheur, Sprinter, and All-Rounder are now first-class goals across Settings and the Long-Term Program card.",
+                    "Spiderweb Drives Long-Term Envelope: The 5-axis target envelope directly defines the athlete's target power profile and Target FTP absent a specific event.",
+                    "Phenotype Adaptation Periodization: Without a scheduled race, the macrocycle follows a 4-phase adaptation progression culminating in Phase 4: Mastery & Benchmark Test rather than an artificial race taper.",
+                    "Visible Target Envelope Chips: Added #programEnvelopeStrip displaying the 5-axis target wattages (5s, 1m, 5m, 20m, 60m) directly within the Long-Term Goal card."
+                ]
+            },
             {
                 "version": "v2.6.3",
                 "date": "2026-11-11",
