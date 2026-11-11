@@ -116,7 +116,7 @@ def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = Non
     for a in activities:
         act_id = str(a.get("id"))
         name = a.get("name", "Activity")
-        sport = a.get("type", "Ride")
+        sport = a.get("sport_type") or a.get("type", "Ride")
         start_date = resolve_strava_local_start(a, user_id=uid) or a.get("start_date", "")
         moving_time = a.get("moving_time", 0)
         dist = a.get("distance", 0.0)

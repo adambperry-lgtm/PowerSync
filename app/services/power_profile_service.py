@@ -11,7 +11,7 @@ from app.database import (
     get_athlete_date,
     resolve_strava_local_start
 )
-from app.services.strain_model_service import get_athlete_fitness_signature
+from app.services.strain_model_service import get_athlete_fitness_signature, is_cycling_sport
 
 RADAR_DURATIONS = [
     {"key": "5s", "label": "5s Sprint", "sec": 5, "name": "Sprint (5s)", "icon": "⚡", "energy": "Neuromuscular"},
@@ -262,7 +262,13 @@ def calculate_activity_peak_powers(
     Computes realistic peak power profile (5s, 30s, 1m, 5m, 20m, 60m) for an activity.
     Uses power meter telemetry (device_watts, max_watts), interval laps and segments,
     and applies physiological duration gating with Morton CP / W' intensity attenuation.
+    Guarantees non-cycling activities (runs, swims, gym) never produce cycling power data.
     """
+    sport = act.get("sport_type") or act.get("type", "")
+    act_name = act.get("name", "")
+    if not is_cycling_sport(sport, act_name):
+        return {"5s": 0, "30s": 0, "1m": 0, "5m": 0, "20m": 0, "60m": 0}
+
     moving_sec = int(act.get("moving_time_sec") or 0)
     avg_w = float(act.get("average_watts") or 0.0)
     np_w = float(act.get("weighted_average_watts") or avg_w)
@@ -460,7 +466,14 @@ def get_power_spiderweb_profile(
         act_copy = dict(act)
         act_copy["act_date"] = act_d
         act_copy["act_date_str"] = s_date_str
-        act_copy["peaks"] = calculate_activity_peak_powers(act_copy, ftp, w_prime_kj, peak_power)
+        sport = act.get("sport_type") or act.get("type", "")
+        is_cycling = is_cycling_sport(sport, act.get("name", ""))
+        act_copy["is_cycling"] = is_cycling
+
+        if is_cycling:
+            act_copy["peaks"] = calculate_activity_peak_powers(act_copy, ftp, w_prime_kj, peak_power)
+        else:
+            act_copy["peaks"] = {"5s": 0, "30s": 0, "1m": 0, "5m": 0, "20m": 0, "60m": 0}
 
         all_acts.append(act_copy)
         if act_d >= cur_start:
@@ -468,12 +481,16 @@ def get_power_spiderweb_profile(
         elif act_d >= prev_start:
             prev_acts.append(act_copy)
 
+    # Cycling-specific activity subsets for power curve analytics
+    cur_cycling = [a for a in cur_acts if a.get("is_cycling", False)]
+    prev_cycling = [a for a in prev_acts if a.get("is_cycling", False)]
+    all_cycling = [a for a in all_acts if a.get("is_cycling", False)]
+
     # If previous period has 0 activities (e.g. athlete joined recently), fallback to historical split
-    if not prev_acts and len(all_acts) > len(cur_acts):
-        prev_acts = [a for a in all_acts if a not in cur_acts]
-    elif not prev_acts and all_acts:
-        # Create modeled baseline from athlete FTP profile
-        prev_acts = []
+    if not prev_cycling and len(all_cycling) > len(cur_cycling):
+        prev_cycling = [a for a in all_cycling if a not in cur_cycling]
+    elif not prev_cycling and all_cycling:
+        prev_cycling = []
 
     # Calculate peak power envelope for each duration
     dur_keys = ["5s", "1m", "5m", "20m", "60m"]
@@ -501,20 +518,20 @@ def get_power_spiderweb_profile(
     all_time_envelope = {}
 
     for k in dur_keys:
-        # Current period peak
-        cur_vals = [a["peaks"].get(k, 0) for a in cur_acts if a["peaks"].get(k, 0) > 0]
+        # Current period peak (strictly cycling activities)
+        cur_vals = [a["peaks"].get(k, 0) for a in cur_cycling if a["peaks"].get(k, 0) > 0]
         cur_envelope[k] = max(cur_vals) if cur_vals else modeled_baseline[k]
 
-        # Previous period peak
+        # Previous period peak (strictly cycling activities)
         if timeframe == "all_time":
-            all_vals = [a["peaks"].get(k, 0) for a in all_acts if a["peaks"].get(k, 0) > 0]
+            all_vals = [a["peaks"].get(k, 0) for a in all_cycling if a["peaks"].get(k, 0) > 0]
             prev_envelope[k] = max(all_vals) if all_vals else modeled_baseline[k]
         else:
-            prev_vals = [a["peaks"].get(k, 0) for a in prev_acts if a["peaks"].get(k, 0) > 0]
+            prev_vals = [a["peaks"].get(k, 0) for a in prev_cycling if a["peaks"].get(k, 0) > 0]
             prev_envelope[k] = max(prev_vals) if prev_vals else int(modeled_baseline[k] * 0.95)
 
-        # All-time PR peak
-        all_vals = [a["peaks"].get(k, 0) for a in all_acts if a["peaks"].get(k, 0) > 0]
+        # All-time PR peak (strictly cycling activities)
+        all_vals = [a["peaks"].get(k, 0) for a in all_cycling if a["peaks"].get(k, 0) > 0]
         all_time_envelope[k] = max(all_vals) if all_vals else modeled_baseline[k]
 
     # Retrieve athlete's active training goal if configured
@@ -634,10 +651,15 @@ def get_power_spiderweb_profile(
         b["workout_count"] += 1
         b["total_sec"] += int(act.get("moving_time_sec") or 0)
         b["total_tss"] += int(act.get("suffer_score") or 0)
-        for dur in dur_keys:
-            p_val = act["peaks"].get(dur, 0)
-            if p_val > b[f"peak_{dur}"]:
-                b[f"peak_{dur}"] = p_val
+
+        if act.get("is_cycling", False):
+            b["cycling_count"] = b.get("cycling_count", 0) + 1
+            for dur in dur_keys:
+                p_val = act["peaks"].get(dur, 0)
+                if p_val > b[f"peak_{dur}"]:
+                    b[f"peak_{dur}"] = p_val
+        else:
+            b["cross_training_count"] = b.get("cross_training_count", 0) + 1
 
     # Sort chronological
     sorted_bucket_keys = sorted(bucket_map.keys())
@@ -646,15 +668,15 @@ def get_power_spiderweb_profile(
         b["total_hours"] = round(b["total_sec"] / 3600.0, 1)
         timeline_buckets.append(b)
 
-    # Highlight PR breakthroughs across history
+    # Highlight PR breakthroughs across history (strictly cycling activities)
     breakthroughs = []
     best_5s_so_far = 0
     best_5m_so_far = 0
     best_20m_so_far = 0
 
-    # Chronological scan of all activities
-    chronological_acts = sorted(all_acts, key=lambda a: a["act_date_str"])
-    for act in chronological_acts:
+    # Chronological scan of cycling activities ONLY
+    chronological_cycling = sorted([a for a in all_acts if a.get("is_cycling", False)], key=lambda a: a["act_date_str"])
+    for act in chronological_cycling:
         p_5 = act["peaks"].get("5s", 0)
         p_5m = act["peaks"].get("5m", 0)
         p_20 = act["peaks"].get("20m", 0)
@@ -739,8 +761,10 @@ def get_power_spiderweb_profile(
         "progression_timeline": timeline_buckets,
         "recent_breakthroughs": breakthroughs,
         "activities_count": {
-            "current_period": len(cur_acts),
-            "previous_period": len(prev_acts),
+            "current_period": len(cur_cycling),
+            "previous_period": len(prev_cycling),
+            "total_cycling": len(all_cycling),
+            "total_cross_training": len([a for a in all_acts if not a.get("is_cycling", False)]),
             "total_analyzed": len(all_acts)
         }
     }

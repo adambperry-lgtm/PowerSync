@@ -101,7 +101,7 @@ def get_candidate_outdoor_rides() -> List[Dict[str, Any]]:
                    average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
             FROM strava_activities
             WHERE user_id = ?
-              AND (sport_type = 'Ride' OR sport_type != 'VirtualRide')
+              AND sport_type IN ('Ride', 'MountainBikeRide', 'GravelRide', 'EBikeRide', 'OutdoorRide')
               AND moving_time_sec >= 1200
             ORDER BY start_date DESC
             LIMIT 40

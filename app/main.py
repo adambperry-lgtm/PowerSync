@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.0",
-        "release_name": "Power Spiderweb & Multi-Axis Coggan Phenotype Profiling Engine",
+        "version": "2.6.1",
+        "release_name": "Cross-Training Isolation & Cycling Power Telemetry Integrity",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.1",
+                "date": "2026-11-11",
+                "title": "Cross-Training Isolation & Cycling Power Telemetry Integrity",
+                "items": [
+                    "Cycling Power Isolation: Strictly quarantined cycling power duration models, peak power calculation, 5-axis radar spiderwebs, and PR breakthroughs from non-cycling activities (running, swimming, weight training, rowing, hiking).",
+                    "PR Breakthroughs Integrity: PR breakthroughs in the breakthroughs feed now scan authentic cycling rides exclusively, preventing non-cycling workouts from claiming cycling power PR breakthroughs.",
+                    "Cross-Training Fitness & Fatigue: Enhanced calculate_activity_strain to convert non-cycling cardiovascular training stress (Strava Suffer Score / Relative Effort, heart rate intensity, duration) into systemic aerobic strain (Low XSS and Total XSS) and acute fatigue without depleting cycling pedal W' balance.",
+                    "Holistic Sports Science Debriefs: Debrief engine now natively identifies cross-training days, presenting conditioning summaries without comparing running or gym watts against cycling FTP."
+                ]
+            },
             {
                 "version": "v2.6.0",
                 "date": "2026-11-11",

@@ -8,6 +8,7 @@ from app.services.mock_data import get_mock_whoop_data, get_mock_strava_activiti
 from app.services.program_service import get_current_program
 from app.services.strava_service import get_strava_trailing_stats
 from app.services.whoop_service import get_trailing_whoop_stats
+from app.services.strain_model_service import is_cycling_sport
 
 def get_activity_date_str(a: Optional[Dict[str, Any]], user_id: Optional[str] = None) -> str:
     """Extracts local calendar date YYYY-MM-DD from an activity dictionary."""
@@ -974,16 +975,29 @@ def build_daily_review_and_outlook_local(
         # Sort chronologically so session 1 is first effort of the day
         sorted_acts = sorted(evaluated_acts, key=lambda a: a.get("start_date") or "")
 
-        # Identify primary session (highest work / suffer score / moving time)
-        primary_act = max(
-            evaluated_acts,
-            key=lambda a: (
-                (a.get("kilojoules") or 0)
-                or (int(a.get("moving_time_sec", 0) or 0) * float(a.get("weighted_average_watts") or a.get("average_watts") or 0.0))
-                or int(a.get("suffer_score") or 0)
-                or int(a.get("moving_time_sec", 0) or 0)
+        # Categorize cycling vs cross-training activities
+        cycling_acts = [a for a in evaluated_acts if is_cycling_sport(a.get("sport_type") or a.get("type", ""), a.get("name", ""))]
+        has_cycling = bool(cycling_acts)
+
+        # Identify primary session (prioritize primary cycling effort if cycling took place)
+        if has_cycling:
+            primary_act = max(
+                cycling_acts,
+                key=lambda a: (
+                    (a.get("kilojoules") or 0)
+                    or (int(a.get("moving_time_sec", 0) or 0) * float(a.get("weighted_average_watts") or a.get("average_watts") or 0.0))
+                    or int(a.get("suffer_score") or 0)
+                    or int(a.get("moving_time_sec", 0) or 0)
+                )
             )
-        )
+        else:
+            primary_act = max(
+                evaluated_acts,
+                key=lambda a: (
+                    int(a.get("suffer_score") or 0)
+                    or int(a.get("moving_time_sec", 0) or 0)
+                )
+            )
 
         # Collective duration, distance, elevation, suffer score
         act_sec = sum(int(a.get("moving_time_sec", 0) or 0) for a in evaluated_acts)
@@ -992,19 +1006,29 @@ def build_daily_review_and_outlook_local(
         act_elev_m = sum(int(a.get("total_elevation_gain", 0) or 0) for a in evaluated_acts)
         act_suffer = sum(int(a.get("suffer_score") or 0) for a in evaluated_acts)
 
-        # Coggan 4th-power normalized power across all sessions
-        total_weighted_p4 = 0.0
-        total_p_dur = 0
-        for a in evaluated_acts:
-            dur = int(a.get("moving_time_sec", 0) or 0)
-            w = float(a.get("weighted_average_watts") or a.get("average_watts") or 0.0)
-            if dur > 0 and w > 0:
-                total_weighted_p4 += dur * (w ** 4)
-                total_p_dur += dur
-        if total_p_dur > 0 and total_weighted_p4 > 0:
-            act_watts = round((total_weighted_p4 / total_p_dur) ** 0.25)
+        # Coggan 4th-power normalized power across CYCLING sessions only
+        if has_cycling:
+            total_weighted_p4 = 0.0
+            total_p_dur = 0
+            for a in cycling_acts:
+                dur = int(a.get("moving_time_sec", 0) or 0)
+                w = float(a.get("weighted_average_watts") or a.get("average_watts") or 0.0)
+                if dur > 0 and w > 0:
+                    total_weighted_p4 += dur * (w ** 4)
+                    total_p_dur += dur
+            if total_p_dur > 0 and total_weighted_p4 > 0:
+                act_watts = round((total_weighted_p4 / total_p_dur) ** 0.25)
+            else:
+                act_watts = round(primary_act.get("weighted_average_watts") or primary_act.get("average_watts") or 0.0)
+
+            pct_ftp = round((act_watts / max(1, ftp)) * 100) if act_watts > 0 else 65
+            primary_watts = round(primary_act.get("weighted_average_watts") or primary_act.get("average_watts") or 0.0)
+            primary_pct_ftp = round((primary_watts / max(1, ftp)) * 100) if primary_watts > 0 else 65
         else:
-            act_watts = round(primary_act.get("weighted_average_watts") or primary_act.get("average_watts") or 0.0)
+            act_watts = 0
+            pct_ftp = 0
+            primary_watts = 0
+            primary_pct_ftp = 0
 
         # Time-weighted average Heart Rate across all sessions
         total_hr_dur = 0
@@ -1020,10 +1044,6 @@ def build_daily_review_and_outlook_local(
         else:
             act_hr = round(primary_act.get("average_heartrate") or 0)
 
-        pct_ftp = round((act_watts / max(1, ftp)) * 100) if act_watts > 0 else 65
-        primary_watts = round(primary_act.get("weighted_average_watts") or primary_act.get("average_watts") or 0.0)
-        primary_pct_ftp = round((primary_watts / max(1, ftp)) * 100) if primary_watts > 0 else 65
-
         # Individual session breakdown and cumulative 3-tier strain
         sessions_list = []
         total_power_tss = 0
@@ -1035,15 +1055,16 @@ def build_daily_review_and_outlook_local(
         min_w_bal_pct = 100.0
 
         for a in sorted_acts:
+            s_is_cycling = is_cycling_sport(a.get("sport_type") or a.get("type", ""), a.get("name", ""))
             s_sec = int(a.get("moving_time_sec", 0) or 0)
             s_min = s_sec // 60
-            s_watts = round(a.get("weighted_average_watts") or a.get("average_watts") or 0.0)
+            s_watts = round(a.get("weighted_average_watts") or a.get("average_watts") or 0.0) if s_is_cycling else 0
             s_hr = round(a.get("average_heartrate") or 0)
             s_dist_km = round(float(a.get("distance_meters", 0) or 0) / 1000.0, 1)
             s_elev_m = int(a.get("total_elevation_gain", 0) or 0)
             s_suffer = int(a.get("suffer_score") or 0)
 
-            if s_sec > 0 and s_watts > 0 and ftp > 0:
+            if s_is_cycling and s_sec > 0 and s_watts > 0 and ftp > 0:
                 s_if = s_watts / ftp
                 s_p_tss = round((s_sec * s_watts * s_if) / (ftp * 3600.0) * 100)
             else:
@@ -1051,7 +1072,7 @@ def build_daily_review_and_outlook_local(
 
             s_strain = calculate_activity_strain(a, ftp=ftp)
             s_tot_xss = float(s_strain.get("total_xss", 0.0))
-            s_calc_tss = s_p_tss if s_p_tss > 0 else (s_suffer if s_suffer > 0 else int(s_tot_xss))
+            s_calc_tss = s_p_tss if (s_is_cycling and s_p_tss > 0) else (s_suffer if s_suffer > 0 else int(s_tot_xss))
 
             total_power_tss += s_p_tss
             total_calculated_tss += s_calc_tss
@@ -1064,8 +1085,10 @@ def build_daily_review_and_outlook_local(
 
             sessions_list.append({
                 "id": a.get("id"),
-                "name": a.get("name", "Ride"),
+                "name": a.get("name", "Ride" if s_is_cycling else "Cross-Training"),
                 "is_primary": (a is primary_act),
+                "is_cross_training": not s_is_cycling,
+                "sport_type": a.get("sport_type") or a.get("type", "Ride" if s_is_cycling else "Cross-Training"),
                 "moving_time_sec": s_sec,
                 "moving_time_min": s_min,
                 "moving_time_formatted": f"{s_min // 60}h {s_min % 60}m" if s_min >= 60 else f"{s_min}m",
@@ -1073,11 +1096,11 @@ def build_daily_review_and_outlook_local(
                 "distance_miles": round(s_dist_km * 0.621371, 1),
                 "elevation_m": s_elev_m,
                 "elevation_ft": int(s_elev_m * 3.28084),
-                "weighted_watts": s_watts,
+                "weighted_watts": s_watts if s_is_cycling else None,
                 "avg_hr": s_hr,
                 "suffer_score": s_suffer,
                 "tss": s_calc_tss,
-                "pct_ftp": round((s_watts / max(1, ftp)) * 100) if s_watts > 0 else 0,
+                "pct_ftp": round((s_watts / max(1, ftp)) * 100) if (s_is_cycling and s_watts > 0) else None,
                 "total_xss": round(s_tot_xss, 1),
                 "focus_duration": s_strain.get("focus_duration", "Endurance")
             })
@@ -1101,9 +1124,9 @@ def build_daily_review_and_outlook_local(
         if len(evaluated_acts) > 1:
             other_names = [a.get("name", "Ride") for a in sorted_acts if a is not primary_act]
             if len(sorted_acts) == 2:
-                act_name = f"2 Sessions: {primary_act.get('name', 'Main Ride')} + {other_names[0]}"
+                act_name = f"2 Sessions: {primary_act.get('name', 'Main Session')} + {other_names[0]}"
             else:
-                act_name = f"{len(sorted_acts)} Sessions: {primary_act.get('name', 'Main Ride')} (+{len(other_names)} more)"
+                act_name = f"{len(sorted_acts)} Sessions: {primary_act.get('name', 'Main Session')} (+{len(other_names)} more)"
         else:
             act_name = evaluated_acts[0].get("name", "Ride")
 
@@ -1163,7 +1186,27 @@ def build_daily_review_and_outlook_local(
 
         is_multi = len(evaluated_acts) > 1
 
-        if diff_pct <= 8:
+        if not has_cycling:
+            verdict = "Cross-Training Completed"
+            verdict_badge = "🏃 Cross-Training"
+            verdict_color = "emerald"
+            compliance_score = 95
+            sport_label = primary_act.get("sport_type") or primary_act.get("type", "Cross-Training")
+            if is_multi:
+                assessment_text = (
+                    f"Completed {len(evaluated_acts)} cross-training sessions on {date_display} ({relative_day_label}) "
+                    f"({act_min}m combined, {calculated_tss} TSS, {workout_strain:.1f} Whoop strain). This aerobic cross-training stimulus "
+                    f"developed cardiovascular fitness and overall conditioning while sparing cycling pedal musculature. "
+                    f"Systemic fatigue is factored into your recovery ({today_recovery}% today)."
+                )
+            else:
+                assessment_text = (
+                    f"Completed cross-training session '{act_name}' ({act_min}m, {calculated_tss} TSS, {act_hr} bpm avg HR, "
+                    f"{workout_strain:.1f} Whoop strain). This non-cycling {sport_label} workout stimulated cardiovascular conditioning "
+                    f"and aerobic endurance while giving cycling-specific pedal musculature an active absorption stimulus. "
+                    f"Systemic fatigue has been factored into your recovery ({today_recovery}% today)."
+                )
+        elif diff_pct <= 8:
             verdict = "Execution Bullseye"
             verdict_badge = "🎯 Target Mastered"
             verdict_color = "emerald"

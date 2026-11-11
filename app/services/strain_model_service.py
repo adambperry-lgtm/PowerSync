@@ -150,6 +150,74 @@ def calculate_intervals_strain(
         "w_bal_curve": w_bal_samples[:60] # Downsampled curve for UI sparklines
     }
 
+CYCLING_SPORT_TYPES = {
+    "ride",
+    "virtualride",
+    "mountainbikeride",
+    "gravelride",
+    "ebikeride",
+    "emountainbikeride",
+    "handcycle",
+    "velomobile",
+    "cycling",
+    "outdoorride"
+}
+
+NON_CYCLING_SPORT_TYPES = {
+    "run", "virtualrun", "trailrun",
+    "swim",
+    "walk", "hike",
+    "weighttraining", "workout", "crossfit", "hiit",
+    "rowing", "kayaking", "canoeing", "standuppaddling", "surfing",
+    "alpineski", "backcountryski", "nordicski", "snowboard", "snowshoe",
+    "yoga", "pilates",
+    "rockclimbing",
+    "elliptical", "stairstepper",
+    "soccer", "tennis", "pickleball", "squash", "badminton", "golf",
+    "skateboard", "inlineskate"
+}
+
+NON_CYCLING_KEYWORDS = (
+    "run", "jog", "trail", "marathon", "5k", "10k",
+    "swim", "pool",
+    "walk", "hike", "trek",
+    "gym", "strength", "weights", "lift", "hypertrophy", "crossfit",
+    "rowing", "kayak", "canoe", "paddle",
+    "pilates", "yoga", "stretch",
+    "ski", "snowboard"
+)
+
+CYCLING_KEYWORDS = (
+    "ride", "bike", "cycling", "zwift", "trainerroad", "rouvy", "peloton",
+    "sufferfest", "crit", "velo", "spin", "sweet spot", "over-under",
+    "ftp", "tempo", "pedal", "cadence", "microburst", "intervals", "rpm"
+)
+
+def is_cycling_sport(sport_type: Optional[str], activity_name: Optional[str] = None) -> bool:
+    """
+    Returns True if the sport is a cycling discipline, False if it is a cross-training
+    or non-cycling discipline (e.g. running, swimming, weight training, rowing, hiking).
+    Protects cycling power profiles and analytics from non-cycling data.
+    """
+    s = (sport_type or "").strip().lower()
+    if s in CYCLING_SPORT_TYPES:
+        return True
+    if s in NON_CYCLING_SPORT_TYPES:
+        return False
+
+    name = (activity_name or "").strip().lower()
+    if any(k in name for k in NON_CYCLING_KEYWORDS):
+        return False
+    if any(k in name for k in CYCLING_KEYWORDS):
+        return True
+
+    # If sport_type was omitted/empty, default to True in this cycling coach ecosystem
+    # unless non-cycling keywords matched above
+    if not s:
+        return True
+
+    return False
+
 def calculate_activity_strain(
     activity: Dict[str, Any],
     ftp: Optional[int] = None,
@@ -157,13 +225,12 @@ def calculate_activity_strain(
     peak_power_watts: Optional[int] = None
 ) -> Dict[str, Any]:
     """
-    Computes 3-tier strain for a completed ride.
+    Computes 3-tier strain for a completed activity.
+    If the activity is cycling, uses power meter / modeled W' dynamics.
+    If the activity is cross-training (e.g. Run, Swim, Gym, Row, Hike),
+    computes cardiovascular training strain and fatigue from suffer score (Relative Effort),
+    heart rate, and duration, without using power for cycling fitness assessment.
     """
-    sig = get_athlete_fitness_signature(ftp)
-    cp = float(ftp or sig["tp"])
-    w_prime = float((w_prime_kj or sig["w_prime_kj"]) * 1000.0)
-    p_max = float(peak_power_watts or sig["peak_power_watts"])
-
     moving_time_sec = float(activity.get("moving_time_sec") or 0)
     if moving_time_sec <= 0:
         return {
@@ -173,10 +240,78 @@ def calculate_activity_strain(
             "total_xss": 0.0,
             "min_w_bal_pct": 100.0,
             "focus_duration": "Active Recovery",
-            "battery_depleted_pct": 0.0
+            "battery_depleted_pct": 0.0,
+            "is_cross_training": False
         }
 
     dur_h = moving_time_sec / 3600.0
+    sport = activity.get("sport_type") or activity.get("type", "")
+    act_name = activity.get("name", "")
+
+    # Handle cross-training activities (running, swimming, gym, hiking, rowing, etc.)
+    if not is_cycling_sport(sport, act_name):
+        s_suffer = float(activity.get("suffer_score") or 0.0)
+        avg_hr = float(activity.get("average_heartrate") or 0.0)
+
+        # Determine total cardiovascular strain (XSS / TSS)
+        # 1. Strava Suffer Score (Relative Effort / TRIMP) is gold-standard heart rate training load
+        if s_suffer > 0:
+            total_xss = s_suffer
+        elif avg_hr > 0:
+            # Heart rate reserve / HRSS model
+            athlete_max_hr = float(get_setting("athlete_max_hr", 185))
+            hr_intensity = min(1.0, avg_hr / max(100.0, athlete_max_hr))
+            # 1 hour at 75% max HR (~aerobic) ~ 50-60 TSS; at 90% max HR ~ 90-100 TSS
+            total_xss = dur_h * 100.0 * (hr_intensity ** 2.2)
+        else:
+            # Fallback by sport-specific MET metabolic load per hour
+            s_low = (sport or "").lower()
+            if any(k in s_low for k in ("run", "trail")):
+                hourly_rate = 65.0
+            elif "swim" in s_low:
+                hourly_rate = 55.0
+            elif "row" in s_low:
+                hourly_rate = 60.0
+            elif any(k in s_low for k in ("weight", "gym", "strength", "crossfit")):
+                hourly_rate = 45.0
+            elif any(k in s_low for k in ("walk", "hike")):
+                hourly_rate = 30.0
+            else:
+                hourly_rate = 40.0
+            total_xss = dur_h * hourly_rate
+
+        total_xss = round(max(3.0, total_xss), 1)
+
+        # Cross-training load partition:
+        # Predominantly Low Strain (Aerobic / Cardiovascular Conditioning & Systemic Fatigue)
+        # High Strain captures acute glycolytic / cardiovascular fatigue when intensity was elevated
+        is_high_intensity = (s_suffer > 0 and (s_suffer / max(0.5, dur_h)) >= 85) or (avg_hr > 0 and (avg_hr / 185.0) >= 0.82)
+        if is_high_intensity:
+            high_fraction = min(0.30, 0.15 + (0.15 * min(1.0, (s_suffer / max(1.0, dur_h * 100.0)))))
+            high_xss = round(total_xss * high_fraction, 1)
+            low_xss = round(total_xss - high_xss, 1)
+        else:
+            high_xss = round(total_xss * 0.05, 1) if total_xss >= 50 else 0.0
+            low_xss = round(total_xss - high_xss, 1)
+
+        peak_xss = 0.0
+        sport_display = sport or "Cross-Training"
+
+        return {
+            "low_xss": low_xss,
+            "high_xss": high_xss,
+            "peak_xss": peak_xss,
+            "total_xss": total_xss,
+            "min_w_bal_pct": 100.0,
+            "battery_depleted_pct": 0.0,
+            "focus_duration": f"Cross-Training ({sport_display})",
+            "is_cross_training": True
+        }
+
+    sig = get_athlete_fitness_signature(ftp)
+    cp = float(ftp or sig["tp"])
+    w_prime = float((w_prime_kj or sig["w_prime_kj"]) * 1000.0)
+    p_max = float(peak_power_watts or sig["peak_power_watts"])
     p_avg = float(activity.get("average_watts") or 0.0)
     p_np = float(activity.get("weighted_average_watts") or p_avg)
     p_max_act = float(activity.get("max_watts") or activity.get("max_heartrate") or 0.0)
@@ -244,7 +379,8 @@ def calculate_activity_strain(
         "total_xss": total_xss,
         "min_w_bal_pct": round(min_w_bal_pct, 1),
         "battery_depleted_pct": round(100.0 - min_w_bal_pct, 1),
-        "focus_duration": focus
+        "focus_duration": focus,
+        "is_cross_training": False
     }
 
 def calculate_trailing_strain_systems(

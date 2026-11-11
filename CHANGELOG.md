@@ -3,6 +3,23 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.1] - 2026-11-11
+### Added
+- **Cross-Training Physiological Load Analysis**:
+  - Implemented `is_cycling_sport` helper classifying activities into cycling vs. cross-training disciplines (running, swimming, weight training, rowing, hiking, etc.).
+  - Added dedicated cross-training strain evaluation in `calculate_activity_strain`: converts cardiovascular load (Strava Relative Effort / Suffer Score, heart rate intensity, duration) into aerobic training strain (Low XSS and Total XSS) and systemic fatigue.
+  - Sparing Cycling $W'$: Cross-training activities accurately accumulate training load and fatigue without depleting cycling-specific pedal $W'$ balance or triggering false sprint/glycolytic depletion warnings.
+
+### Fixed
+- **Cycling Power Telemetry Isolation & PR Breakthrough Protection**:
+  - Strictly blocked non-cycling power telemetry (e.g. Stryd/Garmin running watts, gym power meter outputs) from cycling fitness assessment and analytics.
+  - Refined `calculate_activity_peak_powers()` to immediately return 0W across all durations for non-cycling activities.
+  - Filtered `get_power_spiderweb_profile()` so that the 5-axis power radar envelope, monthly timeline power bars, and Coggan phenotype classification are calculated strictly from cycling activities.
+  - Guaranteed that PR Breakthroughs in the Breakthroughs feed (`recent_breakthroughs`) only scan authentic cycling rides, preventing non-cycling workouts (like runs or gym sessions) from logging cycling power PRs.
+  - Updated Sports Science Debrief (`build_daily_review_and_outlook_local`) so cross-training days provide holistic conditioning debriefs without comparing running or gym watts against cycling FTP.
+
+---
+
 ## [2.6.0] - 2026-11-11
 ### Added
 - **Unified Multi-Axis Coggan Phenotype Profiling Engine**:

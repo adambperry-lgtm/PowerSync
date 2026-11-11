@@ -301,6 +301,98 @@ class TestPowerSpiderweb(unittest.TestCase):
 
         clear_active_spiderweb_goal(user_id=self.user_id)
 
+    def test_non_cycling_power_exclusion_from_spiderweb_and_breakthroughs(self):
+        """
+        Verify that non-cycling cross-training activities (e.g. running, swimming, gym)
+        are analyzed for fitness and fatigue, but their power telemetry is NEVER used for
+        cycling peak power envelopes, radar profile axes, or PR breakthroughs.
+        """
+        from app.services.strain_model_service import calculate_activity_strain, is_cycling_sport
+
+        # 1. Verify sport classification helper
+        self.assertTrue(is_cycling_sport("Ride", "Morning Group Ride"))
+        self.assertTrue(is_cycling_sport("VirtualRide", "Zwift - The Pretzel"))
+        self.assertTrue(is_cycling_sport("GravelRide", "Gravel Exploration"))
+        self.assertFalse(is_cycling_sport("Run", "Morning 10k Tempo Run"))
+        self.assertFalse(is_cycling_sport("WeightTraining", "Leg Day Hypertrophy"))
+        self.assertFalse(is_cycling_sport("Swim", "Master's Swim Intervals"))
+
+        # 2. Activity with running power meter telemetry (e.g. Stryd/Garmin 380W)
+        run_act = {
+            "id": "act_run_stryd_1",
+            "name": "Tempo 10k Run",
+            "sport_type": "Run",
+            "moving_time_sec": 3000,
+            "average_watts": 380,
+            "weighted_average_watts": 410,
+            "max_watts": 580,
+            "average_heartrate": 165,
+            "suffer_score": 85,
+            "raw_json": json.dumps({"max_watts": 580, "device_watts": True})
+        }
+
+        # Peak powers must be 0 for all durations
+        peaks = calculate_activity_peak_powers(run_act, ftp=260)
+        self.assertEqual(peaks["5s"], 0)
+        self.assertEqual(peaks["1m"], 0)
+        self.assertEqual(peaks["5m"], 0)
+        self.assertEqual(peaks["20m"], 0)
+        self.assertEqual(peaks["60m"], 0)
+
+        # But cross-training MUST be analyzed for fitness and fatigue (XSS / cardiovascular load)
+        run_strain = calculate_activity_strain(run_act, ftp=260)
+        self.assertTrue(run_strain["is_cross_training"])
+        self.assertGreater(run_strain["total_xss"], 50.0) # Suffer score 85 accounted for
+        self.assertGreater(run_strain["low_xss"], 0.0)
+        self.assertEqual(run_strain["min_w_bal_pct"], 100.0) # Cycling W' battery preserved
+
+        # 3. Insert running activity into database for user
+        conn = get_db_connection()
+        c = conn.cursor()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        yesterday_date = (now - datetime.timedelta(days=1)).isoformat()
+        c.execute("""
+            INSERT INTO strava_activities (
+                id, user_id, name, sport_type, distance_meters, moving_time_sec,
+                elapsed_time_sec, total_elevation_gain, start_date,
+                average_watts, weighted_average_watts, suffer_score, kilojoules, raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            "act_run_db_1", self.user_id, "Massive 10k Run PR", "Run", 10000, 3000,
+            3000, 100, yesterday_date, 380, 410, 85, 950, json.dumps({"max_watts": 580})
+        ))
+        conn.commit()
+        conn.close()
+
+        # Query profile and verify breakthroughs do not include the run
+        profile = get_power_spiderweb_profile(user_id=self.user_id, timeframe="30d")
+        breakthroughs = profile.get("recent_breakthroughs", [])
+        for b in breakthroughs:
+            self.assertNotEqual(b["activity_name"], "Massive 10k Run PR")
+            self.assertNotIn("Run", b["activity_name"])
+
+        # Verify activity breakdown includes cross-training count
+        counts = profile.get("activities_count", {})
+        self.assertGreaterEqual(counts.get("total_cross_training", 0), 1)
+
+    def test_cross_training_debrief_without_cycling_ftp_distortion(self):
+        """
+        Verify that sports science debrief on a cross-training day evaluates
+        the session as cross-training and does not treat running/gym power
+        as cycling FTP overreach.
+        """
+        from app.services.review_coach import generate_ai_review_and_outlook
+
+        # Query debrief for user (where recent activity includes the 10k Run)
+        debrief = generate_ai_review_and_outlook()
+        self.assertIsNotNone(debrief)
+        # Should not crash and session list should flag cross-training
+        for s in debrief.get("sessions_list", []):
+            if s.get("sport_type") == "Run":
+                self.assertTrue(s.get("is_cross_training"))
+                self.assertIsNone(s.get("weighted_watts"))
+                self.assertIsNone(s.get("pct_ftp"))
+
 
 if __name__ == "__main__":
     unittest.main()
