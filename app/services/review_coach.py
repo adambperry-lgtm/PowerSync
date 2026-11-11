@@ -1115,8 +1115,10 @@ def build_daily_review_and_outlook_local(
         try:
             act_d = datetime.date.fromisoformat(act_date_str)
             days_ago = (today - act_d).days
+            date_display = act_d.strftime("%A, %b ") + str(act_d.day)
         except Exception:
             days_ago = 0 if is_today else (1 if is_yesterday else 2)
+            date_display = act_date_str
 
         if is_today:
             relative_day_label = "Today"
@@ -1184,7 +1186,7 @@ def build_daily_review_and_outlook_local(
                     )
                 else:
                     assessment_text = (
-                        f"Disciplined multi-session training across {len(evaluated_acts)} workouts from {relative_day_label} "
+                        f"Disciplined multi-session training across {len(evaluated_acts)} workouts on {date_display} ({relative_day_label}) "
                         f"({act_min}m combined, {act_watts}W combined NP, {calculated_tss} TSS, {workout_strain:.1f} Whoop strain). "
                         f"Today's recovery sits at {today_recovery}%."
                     )
@@ -1205,7 +1207,7 @@ def build_daily_review_and_outlook_local(
                     )
                 else:
                     assessment_text = (
-                        f"Disciplined pacing in '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP, "
+                        f"Disciplined pacing in '{act_name}' on {date_display} ({relative_day_label}) ({act_min}m, {act_watts}W avg, {pct_ftp}% FTP, "
                         f"{workout_strain:.1f} strain on {workout_recovery}% recovery). Today's recovery sits at {today_recovery}%."
                     )
         elif primary_pct_ftp > target_pct_ftp + 8:
@@ -1229,7 +1231,7 @@ def build_daily_review_and_outlook_local(
                     )
                 else:
                     assessment_text = (
-                        f"High-intensity multi-session load from {relative_day_label} ({act_min}m, {calculated_tss} TSS, {workout_strain:.1f} strain). "
+                        f"High-intensity multi-session load on {date_display} ({relative_day_label}) ({act_min}m, {calculated_tss} TSS, {workout_strain:.1f} strain). "
                         f"Today's recovery sits at {today_recovery}%."
                     )
             else:
@@ -1252,7 +1254,7 @@ def build_daily_review_and_outlook_local(
                     )
                 else:
                     assessment_text = (
-                        f"In '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W, {pct_ftp}% FTP), power was pushed {diff_pct}% "
+                        f"In '{act_name}' on {date_display} ({relative_day_label}) ({act_min}m, {act_watts}W, {pct_ftp}% FTP), power was pushed {diff_pct}% "
                         f"above your prescribed {target_zone_name} target ({calculated_tss} TSS logged, {workout_strain:.1f} Whoop strain on "
                         f"{workout_recovery}% recovery). Today's recovery sits at {today_recovery}% with {today_strain:.1f} daytime strain."
                     )
@@ -1274,7 +1276,7 @@ def build_daily_review_and_outlook_local(
                     )
                 else:
                     assessment_text = (
-                        f"Conservative multi-session volume from {relative_day_label} ({act_min}m combined, {calculated_tss} TSS). "
+                        f"Conservative multi-session volume on {date_display} ({relative_day_label}) ({act_min}m combined, {calculated_tss} TSS). "
                         f"Today's recovery sits at {today_recovery}%."
                     )
             else:
@@ -1292,7 +1294,7 @@ def build_daily_review_and_outlook_local(
                     )
                 else:
                     assessment_text = (
-                        f"Controlled session in '{act_name}' from {relative_day_label} ({act_min}m, {act_watts}W, {pct_ftp}% FTP, "
+                        f"Controlled session in '{act_name}' on {date_display} ({relative_day_label}) ({act_min}m, {act_watts}W, {pct_ftp}% FTP, "
                         f"{workout_strain:.1f} strain on {workout_recovery}% recovery). Today's recovery sits at {today_recovery}%."
                     )
 
@@ -1302,6 +1304,7 @@ def build_daily_review_and_outlook_local(
             "is_yesterday": is_yesterday,
             "relative_day_label": relative_day_label,
             "date": act_date_str,
+            "date_display": date_display,
             "moving_time_formatted": f"{act_min // 60}h {act_min % 60}m" if act_min >= 60 else f"{act_min}m",
             "moving_time_min": act_min,
             "distance_km": act_dist_km,
@@ -1351,6 +1354,7 @@ def build_daily_review_and_outlook_local(
             "is_yesterday": False,
             "relative_day_label": "Today",
             "date": today_iso,
+            "date_display": "Today",
             "moving_time_formatted": "0m",
             "moving_time_min": 0,
             "compliance_score": 100,
@@ -1665,6 +1669,25 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
                     else:
                         clean_insights = ""
                 if len(clean_insights) > 25:
+                    sess_info = base_review.get("today_assessment", {})
+                    is_td = sess_info.get("is_today")
+                    is_yd = sess_info.get("is_yesterday")
+                    if not is_td and not is_yd:
+                        import re
+                        r_lbl = sess_info.get("relative_day_label") or "previous"
+                        d_disp = sess_info.get("date_display") or sess_info.get("date") or "previous session"
+                        date_phrase = f"your session on {d_disp} ({r_lbl.lower()})" if d_disp != r_lbl else f"your session from {r_lbl.lower()}"
+                        clean_insights = re.sub(r'\bYesterday was\b', f"{date_phrase.capitalize()} was", clean_insights, flags=re.IGNORECASE)
+                        clean_insights = re.sub(r'\bYesterday\'s\b', f"{date_phrase}'s", clean_insights, flags=re.IGNORECASE)
+                        clean_insights = re.sub(r'\bin yesterday\b', f"in {date_phrase}", clean_insights, flags=re.IGNORECASE)
+                        clean_insights = re.sub(r'\bduring yesterday\b', f"during {date_phrase}", clean_insights, flags=re.IGNORECASE)
+                    elif is_td:
+                        import re
+                        clean_insights = re.sub(r'\bYesterday was\b', "Today's session was", clean_insights, flags=re.IGNORECASE)
+                        clean_insights = re.sub(r'\bYesterday\'s\b', "Today's", clean_insights, flags=re.IGNORECASE)
+                        clean_insights = re.sub(r'\bin yesterday\b', "in today's session", clean_insights, flags=re.IGNORECASE)
+                        clean_insights = re.sub(r'\bduring yesterday\b', "during today's session", clean_insights, flags=re.IGNORECASE)
+
                     base_review["today_assessment"]["assessment_text"] = clean_insights
                     base_review["today_assessment"]["ai_coach_insights"] = clean_insights
                 if custom_prompt and "Athlete Note:" not in base_review["today_assessment"]["assessment_text"]:
@@ -1689,13 +1712,35 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
     """Invokes Google Gemini to generate natural-sounding qualitative coach feedback."""
     models_to_try = ["gemini-3-flash-preview", "gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"]
     sess = review_data["today_assessment"]
+    is_today = bool(sess.get("is_today"))
+    is_yesterday = bool(sess.get("is_yesterday"))
+    act_date = sess.get("date") or "recently"
+    rel_label = sess.get("relative_day_label") or "Recently"
+    date_display = sess.get("date_display") or act_date
     
-    temporal_context = (
-        f"Session was completed TODAY: '{sess.get('title')}' on today's {sess.get('workout_recovery')}% recovery baseline ({sess.get('workout_strain')} Whoop day strain)."
-        if sess.get("is_today") else
-        f"Session was completed YESTERDAY ({sess.get('date')}): '{sess.get('title')}' on yesterday's {sess.get('workout_recovery')}% recovery baseline ({sess.get('workout_strain')} Whoop day strain). "
-        f"Note: TODAY's recovery is {sess.get('today_recovery')}% with {sess.get('today_strain')} daytime strain accumulated so far, as a direct consequence of yesterday's effort. Do NOT attribute today's {sess.get('today_strain')} strain to yesterday's ride."
-    )
+    if is_today:
+        temporal_context = (
+            f"Session was completed TODAY ({act_date}): '{sess.get('title')}' on today's "
+            f"{sess.get('workout_recovery')}% recovery baseline ({sess.get('workout_strain')} Whoop day strain). "
+            f"CRITICAL TIMELINE RULE: Refer to this workout strictly as taking place today."
+        )
+    elif is_yesterday:
+        temporal_context = (
+            f"Session was completed YESTERDAY ({act_date}): '{sess.get('title')}' on yesterday's "
+            f"{sess.get('workout_recovery')}% recovery baseline ({sess.get('workout_strain')} Whoop day strain). "
+            f"Note: TODAY's recovery is {sess.get('today_recovery')}% with {sess.get('today_strain')} daytime strain accumulated so far, "
+            f"which reflects recovery decay and adaptation following yesterday's effort. Do NOT attribute today's {sess.get('today_strain')} strain to yesterday's ride."
+        )
+    else:
+        temporal_context = (
+            f"CRITICAL TIMELINE NOTICE: The evaluated session was completed on {date_display} ({rel_label}, date: {act_date}), NOT yesterday and NOT today. "
+            f"Session: '{sess.get('title')}' on that day's {sess.get('workout_recovery')}% recovery baseline ({sess.get('workout_strain')} Whoop day strain). "
+            f"TODAY'S SEPARATE RECOVERY BASELINE: Today is a subsequent day where recovery sits at {sess.get('today_recovery')}% with {sess.get('today_strain')} daytime strain so far. "
+            f"Several absorption/rest days have elapsed since this {rel_label.lower()} workout. "
+            f"CRITICAL MANDATORY INSTRUCTION: You MUST NOT refer to this session as 'yesterday' or 'yesterday's session'. "
+            f"Refer to it accurately as your previous session on {date_display} ({rel_label.lower()}) or 'in your session from {rel_label.lower()}'. "
+            f"Do NOT describe today's {sess.get('today_recovery')}% recovery as an immediate day-after consequence of that workout, because days have elapsed since."
+        )
 
     from app.services.preferences_service import get_coaching_preferences
     prefs = get_coaching_preferences()

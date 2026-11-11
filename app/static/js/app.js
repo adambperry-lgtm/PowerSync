@@ -3670,7 +3670,7 @@ function renderDebrief(data) {
       } else if (assessment.is_yesterday) {
         debriefActivityMeta.textContent = `COLLECTIVE EVALUATION OF ${sessCount} YESTERDAY (${assessment.date || "OCT 11"})`;
       } else {
-        debriefActivityMeta.textContent = `COLLECTIVE EVALUATION OF ${sessCount} (${assessment.date || "PREVIOUS"})`;
+        debriefActivityMeta.textContent = `COLLECTIVE EVALUATION OF ${sessCount} (${assessment.date_display || assessment.date || "PREVIOUS"})`;
       }
     } else {
       if (assessment.is_today) {
@@ -3678,7 +3678,7 @@ function renderDebrief(data) {
       } else if (assessment.is_yesterday) {
         debriefActivityMeta.textContent = `EVALUATION OF YESTERDAY'S SESSION (${assessment.date || "OCT 11"})`;
       } else {
-        debriefActivityMeta.textContent = `EVALUATION OF RECENT SESSION (${assessment.date || "PREVIOUS"})`;
+        debriefActivityMeta.textContent = `EVALUATION OF RECENT SESSION (${assessment.date_display || assessment.date || "PREVIOUS"})`;
       }
     }
   }
@@ -3699,11 +3699,21 @@ function renderDebrief(data) {
   const debriefSubtitle = document.getElementById("debriefSubtitle");
   if (debriefSubtitle) {
     if (isMultiSession) {
-      debriefSubtitle.textContent = `Collectively assessing all ${assessment.sessions.length} sessions completed on ${assessment.relative_day_label || "this day"}`;
+      if (assessment.is_today) {
+        debriefSubtitle.textContent = `Collectively assessing all ${assessment.sessions.length} sessions completed today`;
+      } else if (assessment.is_yesterday) {
+        debriefSubtitle.textContent = `Collectively assessing all ${assessment.sessions.length} sessions completed yesterday (${assessment.date})`;
+      } else {
+        const dLabel = assessment.date_display ? `${assessment.date_display} (${assessment.relative_day_label || assessment.date})` : (assessment.relative_day_label || assessment.date || "this day");
+        debriefSubtitle.textContent = `Collectively assessing all ${assessment.sessions.length} sessions completed on ${dLabel}`;
+      }
+    } else if (assessment.is_today) {
+      debriefSubtitle.textContent = "Assessing today's session against prescriptions, goals, and recovery";
     } else if (assessment.is_yesterday) {
       debriefSubtitle.textContent = `Assessing yesterday's session (${assessment.date}) and how it shaped today's recovery`;
     } else {
-      debriefSubtitle.textContent = "Assessing completed sessions against prescriptions, goals, and recovery decay";
+      const dLabel = assessment.date_display ? `${assessment.date_display} (${assessment.relative_day_label || assessment.date})` : (assessment.relative_day_label || assessment.date || "previous session");
+      debriefSubtitle.textContent = `Assessing previous session from ${dLabel} against prescriptions and goals`;
     }
   }
 

@@ -3,6 +3,16 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.5.6] - 2026-11-11
+### Fixed
+- **Debrief Workout Timeline Accuracy & Past Session Attribution**:
+  - Corrected temporal attribution in the Sports-Science Assessment debrief so older workouts (e.g. from several days ago or last week) are never falsely described as "yesterday" or linked as immediate day-after causes of today's Whoop recovery score.
+  - Enforced strict timeline directives in `call_gemini_coach_review` (`app/services/review_coach.py`), explicitly separating today's baseline recovery from past session dates (e.g. Wednesday, Nov 4 / 6 Days Ago) and forbidding "yesterday" hallucination when reviewing older sessions.
+  - Implemented automated timeline post-processing to replace any hallucinated "yesterday" phrases in coach debriefs with accurate date and relative day labels.
+  - Enhanced debrief activity metadata and subtitles in `app/static/js/app.js` to format friendly date displays (e.g. "Wednesday, Nov 4 (6 Days Ago)") for single and multi-session historical reviews.
+
+---
+
 ## [2.5.5] - 2026-11-11
 ### Changed
 - **Renamed "AI Race Briefing" to "Ride Briefing"**:

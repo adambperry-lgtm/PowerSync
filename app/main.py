@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.5.5",
-        "release_name": "PowerSync — Ride Briefing Terminology Update",
+        "version": "2.5.6",
+        "release_name": "PowerSync — Debrief Workout Timeline Accuracy",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.5.6",
+                "date": "2026-11-11",
+                "title": "Debrief Workout Timeline Accuracy & Past Session Attribution",
+                "items": [
+                    "Debrief Workout Timeline Accuracy: Corrected temporal attribution in the Sports-Science Assessment debrief so older workouts (e.g. from several days ago or last week) are never falsely described as 'yesterday' or linked as immediate day-after causes of today's Whoop recovery score.",
+                    "Gemini Coach Prompt Engineering: Enforced strict timeline directives in call_gemini_coach_review, explicitly separating today's baseline recovery from past session dates (e.g., Wednesday, Nov 4 / 6 Days Ago) and forbidding 'yesterday' hallucination when reviewing older sessions.",
+                    "Defense-in-Depth Sanitization: Implemented automated timeline post-processing to replace any hallucinated 'yesterday' phrases in coach debriefs with accurate date and relative day labels.",
+                    "UI Debrief Headers & Subtitles: Enhanced debrief activity metadata and subtitles to format friendly date displays (e.g., 'Wednesday, Nov 4 (6 Days Ago)') for single and multi-session historical reviews."
+                ]
+            },
             {
                 "version": "v2.5.5",
                 "date": "2026-11-11",
