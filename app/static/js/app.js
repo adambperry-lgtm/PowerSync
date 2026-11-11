@@ -3218,6 +3218,18 @@ btnSaveSettings.addEventListener("click", async () => {
     preferred_map_layer: preferredMapLayerVal
   };
 
+  const oldGoal = (state.program?.goal_id || "").toUpperCase();
+  const newGoal = (payload.program_goal || "").toUpperCase();
+  let resetBlock = false;
+  if (newGoal && oldGoal && newGoal !== oldGoal) {
+    const goalSelect = document.getElementById("settingProgramGoal");
+    const goalName = (goalSelect && goalSelect.selectedOptions && goalSelect.selectedOptions[0]) ? goalSelect.selectedOptions[0].text : newGoal;
+    resetBlock = confirm(
+      `You changed your rider type / long-term goal to ${goalName}.\n\nWould you like to reset your macrocycle block to Week 1 (8-week adaptation cycle)?\n\n• Click OK to reset the block to Week 1 (Base Phase)\n• Click Cancel to maintain your current block timeline`
+    );
+  }
+  payload.reset_block = resetBlock;
+
   if (intervalsApiKeyVal && !intervalsApiKeyVal.includes("•")) {
     payload.intervals_icu_api_key = intervalsApiKeyVal;
   }
@@ -7580,10 +7592,21 @@ function renderPlannerDurationView() {
       const type = btn.dataset.type;
       const key = btn.dataset.key;
       const watts = parseInt(btn.dataset.watts, 10);
+      const activeGoal = currentTargetAnalysisData?.active_goal;
+      const isChanging = (!activeGoal || activeGoal.target_key !== key || activeGoal.target_watts !== watts);
+
+      let resetBlock = false;
+      if (isChanging) {
+        resetBlock = confirm(
+          `You are selecting a new duration target: ${key} @ ${watts}W.\n\nWould you like to reset your macrocycle block to Week 1 (8-week adaptation cycle)?\n\n• Click OK to reset the block to Week 1 (Base Phase)\n• Click Cancel to maintain your current block timeline`
+        );
+      }
+
       await submitSpiderwebGoal({
         goal_type: type,
         target_key: key,
-        target_watts: watts
+        target_watts: watts,
+        reset_block: resetBlock
       });
     });
   });
@@ -7639,7 +7662,7 @@ function renderPlannerPhenotypeView() {
         <div style="font-size:0.75rem;color:var(--text-muted);margin-top:0.25rem;">
           <strong>Prescribed Protocol:</strong> ${escapeSpiderwebHtml((p.recommended_workouts || [])[0] || '')}
         </div>
-        <button type="button" class="btn-set-goal" data-type="phenotype" data-key="${p.id}" style="margin-top:0.5rem;${isGoalActive ? 'background:rgba(16,185,129,0.2);border-color:#10b981;color:#10b981;' : ''}">
+        <button type="button" class="btn-set-goal" data-type="phenotype" data-key="${p.id}" data-title="${escapeSpiderwebHtml(p.title)}" style="margin-top:0.5rem;${isGoalActive ? 'background:rgba(16,185,129,0.2);border-color:#10b981;color:#10b981;' : ''}">
           ${isGoalActive ? '✓ Active Goal (Synced to Macrocycle Program)' : '🎯 ' + (isCurrent ? 'Deepen Focus on ' + escapeSpiderwebHtml(p.title) + ' (+5% Specialty Overload)' : 'Transform to ' + escapeSpiderwebHtml(p.title))}
         </button>
       </div>
@@ -7650,9 +7673,27 @@ function renderPlannerPhenotypeView() {
     btn.addEventListener("click", async () => {
       const type = btn.dataset.type;
       const key = btn.dataset.key;
+      const title = btn.dataset.title || key;
+
+      const currentGoalKey = String(state.program?.goal_id || "").toLowerCase();
+      const currentSpiderwebKey = String(state.power_spiderweb?.active_goal?.target_key || "").toLowerCase();
+      const isChangingGoal = (key.toLowerCase() !== currentGoalKey && key.toLowerCase() !== currentSpiderwebKey);
+
+      let resetBlock = false;
+      if (isChangingGoal) {
+        resetBlock = confirm(
+          `You are changing your rider type goal to ${title}.\n\nWould you like to reset your macrocycle block to Week 1 (8-week adaptation cycle)?\n\n• Click OK to reset the block to Week 1 (Base Phase)\n• Click Cancel to maintain your current block timeline`
+        );
+      } else {
+        resetBlock = confirm(
+          `Reset macrocycle block to Week 1 (8-week adaptation cycle) for ${title}?`
+        );
+      }
+
       await submitSpiderwebGoal({
         goal_type: type,
-        target_key: key
+        target_key: key,
+        reset_block: resetBlock
       });
     });
   });

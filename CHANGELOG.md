@@ -3,6 +3,15 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.6] - 2026-11-11
+### Added
+- **Rider Type Change Macrocycle Reset Confirmation**:
+  - Prompt athlete confirmation before resetting the periodization macrocycle block upon rider type or target changes across the Fitness Profile Target Planner and Settings modal.
+  - Granular Choice: Clicking 'OK' resets the block timeline to Week 1 (Base Phase, 8-week adaptation cycle); clicking 'Cancel' adopts the new rider type / target envelope while preserving the existing macrocycle block schedule without disruption.
+  - Added `reset_block` parameter support to `POST /api/power/spiderweb/goal` and `POST /api/settings`.
+
+---
+
 ## [2.6.5] - 2026-11-11
 ### Added
 - **Macrocycle Block Timeline Reset on Goal Activation**:

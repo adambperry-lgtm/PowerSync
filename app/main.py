@@ -128,8 +128,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.5",
-        "release_name": "Macrocycle Block Timeline Reset on Goal Activation",
+        "version": "2.6.6",
+        "release_name": "Rider Type Change Macrocycle Reset Confirmation",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -139,6 +139,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.6",
+                "date": "2026-11-11",
+                "title": "Rider Type Change Macrocycle Reset Confirmation",
+                "items": [
+                    "User Confirmation on Goal Change: Prompts athlete confirmation before resetting the macrocycle block timeline when selecting or changing rider types or targets.",
+                    "Athlete Agency: Clicking OK resets the block to Week 1 (56 days, Base Phase); clicking Cancel updates the target phenotype and envelope while keeping the existing macrocycle schedule intact.",
+                    "Dual-Planner & Settings Integration: Confirmation flows seamlessly through both the Fitness Profile Target Planner and the Settings modal."
+                ]
+            },
             {
                 "version": "v2.6.5",
                 "date": "2026-11-11",

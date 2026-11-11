@@ -481,10 +481,24 @@ class TestPowerSpiderweb(unittest.TestCase):
         self.assertEqual(old_prog["days_remaining"], 8)
         self.assertEqual(old_prog["current_week"], 7)
 
-        # 2. Select new rider type goal: Rouleur
+        # 2. Select new rider type goal with reset_block=False (athlete declines block reset)
         set_active_spiderweb_goal({
             "goal_type": "phenotype",
-            "target_key": "Rouleur"
+            "target_key": "Rouleur",
+            "reset_block": False
+        }, user_id=self.user_id)
+
+        prog_declined = get_current_program(user_id=self.user_id)
+        self.assertIn("Rouleur", prog_declined["goal_title"])
+        # Timeline remains unchanged because reset was declined
+        self.assertEqual(prog_declined["days_remaining"], 8)
+        self.assertEqual(prog_declined["current_week"], 7)
+
+        # 3. Select new rider type goal with reset_block=True (athlete confirms block reset)
+        set_active_spiderweb_goal({
+            "goal_type": "phenotype",
+            "target_key": "Rouleur",
+            "reset_block": True
         }, user_id=self.user_id)
 
         new_prog = get_current_program(user_id=self.user_id)
@@ -493,7 +507,7 @@ class TestPowerSpiderweb(unittest.TestCase):
         self.assertEqual(new_prog["current_week"], 1)
         self.assertEqual(new_prog["phase"], "Base Phase")
 
-        # 3. Test explicit reset endpoint
+        # 4. Test explicit reset endpoint
         # Artificially shift dates again
         set_setting("program_target_date", old_target, user_id=self.user_id)
         res = self.client.post("/api/program/reset-block", json={"block_weeks": 8}, headers={"X-User-ID": self.user_id})

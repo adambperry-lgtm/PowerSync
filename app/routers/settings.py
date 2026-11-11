@@ -50,6 +50,7 @@ class SettingsUpdate(BaseModel):
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
     primary_owner_email: Optional[str] = None
+    reset_block: Optional[bool] = None
 
 def is_valid_secret(secret: Optional[str]) -> bool:
     if not secret or not secret.strip():
@@ -163,7 +164,8 @@ def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require
             sync_spiderweb_goal_from_program(
                 program_goal=payload.program_goal,
                 program_target_ftp=payload.program_target_ftp,
-                user_id=uid
+                user_id=uid,
+                reset_block=bool(payload.reset_block) if payload.reset_block is not None else False
             )
         except Exception:
             pass

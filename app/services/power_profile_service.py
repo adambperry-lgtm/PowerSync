@@ -949,8 +949,10 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
     from app.database import get_active_target_plan, get_athlete_date
     active_event = get_active_target_plan(uid)
     has_specific_event = bool(active_event and not active_event.get("is_past", False))
-    should_reset_block = payload.get("reset_block", True if not preserve_program_settings else False)
-    if should_reset_block and not has_specific_event:
+    should_reset_block = payload.get("reset_block")
+    if should_reset_block is None:
+        should_reset_block = True if not preserve_program_settings else False
+    if bool(should_reset_block) and not has_specific_event:
         today = get_athlete_date(uid)
         block_weeks = int(payload.get("block_weeks", 8))
         set_setting("program_start_date", today.isoformat(), user_id=uid)
