@@ -1,5 +1,5 @@
 :root {
-  /* VeloMetrics AI — "Speed & Summit" Color Palette */
+  /* PowerSync — "Speed & Summit" Color Palette */
   --bg-primary: #FFFFFF;
   --bg-secondary: #F4F7FA;
   --bg-card: #F4F7FA;
@@ -4514,7 +4514,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* ========================================================
-   Light Mode Theme — VeloMetrics AI "Speed & Summit"
+   Light Mode Theme — PowerSync "Speed & Summit"
    ======================================================== */
 [data-theme="light"] {
   --bg-primary: #FFFFFF;
@@ -6005,7 +6005,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 /* ==========================================================================
-   VeloMetrics AI — "Speed & Summit" Brand Identity & UI Components
+   PowerSync — "Speed & Summit" Brand Identity & UI Components
    ========================================================================== */
 
 /* Brand Logo Dual-Tone Gradient Ring & AI Pill */

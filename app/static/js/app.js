@@ -2776,7 +2776,7 @@ if (btnSyncWhoop) {
   });
 }
 // ========================================================
-// VeloMetrics AI — "Speed & Summit" High-Contrast Light Theme
+// PowerSync — "Speed & Summit" High-Contrast Light Theme
 // ========================================================
 const currentThemeMode = "light";
 

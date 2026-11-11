@@ -1,7 +1,14 @@
-# VeloMetrics AI (PowerSync) Version History & Changelog
+# PowerSync Version History & Changelog
 
-All notable changes to the VeloMetrics AI (formerly PowerSync) Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
+All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
+
+---
+
+## [2.5.2] - 2026-11-11
+### Changed
+- **Restored "PowerSync" Application Name**:
+  - Changed the application brand name back to **PowerSync** across the top navigation bar, page title, PWA metadata, Coach Chat drawer, modals, version footer, and local launcher files (`PowerSync.html` and `AeroSync.html`), while retaining the "Speed & Summit" UI design system and typography.
 
 ---
 

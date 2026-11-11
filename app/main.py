@@ -122,9 +122,9 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.5.1",
-        "release_name": "VeloMetrics AI — iPhone & Mobile Responsive Polish",
-        "build_date": "2026-11-10",
+        "version": "2.5.2",
+        "release_name": "PowerSync — Speed & Summit Edition",
+        "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -133,6 +133,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.5.2",
+                "date": "2026-11-11",
+                "title": "Restored 'PowerSync' Brand Name on Speed & Summit UI",
+                "items": [
+                    "PowerSync Brand Restoration: Changed the application name back to PowerSync across the navigation bar, browser title, iOS PWA title, Coach Chat drawer, modals, footer, and launcher pages while preserving the Speed & Summit design system."
+                ]
+            },
             {
                 "version": "v2.5.1",
                 "date": "2026-11-10",
