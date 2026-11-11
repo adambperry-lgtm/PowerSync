@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.1",
-        "release_name": "Cross-Training Isolation & Cycling Power Telemetry Integrity",
+        "version": "2.6.2",
+        "release_name": "Long-Term Fitness Goal & Periodization Color Palette Alignment",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.2",
+                "date": "2026-11-11",
+                "title": "Long-Term Fitness Goal & Periodization Color Palette Alignment",
+                "items": [
+                    "Card & Elevation Harmony: Aligned .program-card with Speed & Summit palette (#F4F7FA card background, #DCE4EE borders, soft elevation), eliminating dark navy backgrounds and contrast clashes.",
+                    "Macrocycle Timeline: Modernized periodization track with #E2E8F0 rail and Speed & Summit gradient (#0052FF -> #00C896 -> #FF5E00).",
+                    "Crisp Badges & Typography: Phase badges updated to cobalt blue (#0052FF on light blue pill) and active timeline column highlighting.",
+                    "Target FTP Callout: Dedicated .program-stat-box-target styling with high-contrast Speed Orange (#FF5E00) metric value and subtle accent borders."
+                ]
+            },
             {
                 "version": "v2.6.1",
                 "date": "2026-11-11",

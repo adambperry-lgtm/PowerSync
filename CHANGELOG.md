@@ -3,6 +3,17 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.2] - 2026-11-11
+### Changed
+- **Long-Term Fitness Goal & Periodization Color Palette Alignment**:
+  - Aligned `.program-card` / `#cardProgram` with the modern Speed & Summit light palette (`#F4F7FA` card background, `#DCE4EE` borders, soft `rgba(17, 22, 37, 0.035)` elevation), eliminating dark navy backgrounds and high-contrast color clashes.
+  - Replaced legacy dark phase badges (`color: #c4b5fd`, dark purple background) with crisp high-contrast cobalt blue accents (`background: rgba(0, 82, 255, 0.08)`, `color: #0052FF`, `border: 1px solid rgba(0, 82, 255, 0.22)`).
+  - Modernized the Macrocycle Periodization timeline track with clean `#E2E8F0` tracks and a cohesive Speed & Summit gradient fill (`linear-gradient(90deg, #0052FF 0%, #00C896 60%, #FF5E00 100%)`).
+  - Restyled program stat boxes (`.program-stat-box`) with clean white backgrounds (`#FFFFFF`) and dedicated `.program-stat-box-target` styling for the Target FTP metric (subtle `#FF5E00` accent border, soft orange wash, and bright Speed Orange wattage value).
+  - Updated timeline phase column states and info typography for optimal contrast and readability across light theme modes.
+
+---
+
 ## [2.6.1] - 2026-11-11
 ### Added
 - **Cross-Training Physiological Load Analysis**:

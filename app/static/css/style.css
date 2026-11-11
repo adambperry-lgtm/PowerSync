@@ -769,10 +769,10 @@ h1, h2, h3, h4,
   background: linear-gradient(90deg, #06b6d4 0%, #8b5cf6 50%, #10b981 100%);
 }
 
-/* 4. Fitness Goal & Periodization: Macrocycle Violet -> Progression Cyan -> Target Emerald */
+/* 4. Fitness Goal & Periodization: Macrocycle Blue -> Target Emerald -> Speed Orange */
 .program-card::before,
 #cardProgram::before {
-  background: linear-gradient(90deg, #8b5cf6 0%, #06b6d4 50%, #10b981 100%);
+  background: linear-gradient(90deg, #0052FF 0%, #00C896 50%, #FF5E00 100%);
 }
 
 /* 5. Upcoming Target Event & Taper: Event Amber/Gold -> Roadmap Cyan -> Race Emerald */
@@ -2025,7 +2025,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
    Long-Term Fitness Goal & Periodization Card (Xert Alternative)
    ========================================================================== */
 .program-card {
-  background: linear-gradient(135deg, rgba(24, 32, 48, 0.95) 0%, rgba(18, 23, 34, 0.98) 100%);
+  background-color: var(--bg-card);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 1.5rem 1.75rem;
@@ -2034,7 +2034,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 1.25rem;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 18px rgba(17, 22, 37, 0.035);
 }
 
 .program-top-bar {
@@ -2065,9 +2065,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: 9999px;
   font-size: 0.8rem;
   font-weight: 700;
-  background: rgba(139, 92, 246, 0.15);
-  border: 1px solid rgba(139, 92, 246, 0.4);
-  color: #c4b5fd;
+  background: rgba(0, 82, 255, 0.08);
+  border: 1px solid rgba(0, 82, 255, 0.22);
+  color: #0052FF;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -2090,16 +2090,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .macrocycle-labels .phase-col {
   text-align: center;
   transition: color 0.2s ease;
+  color: var(--text-muted);
 }
 
 .macrocycle-labels .phase-col.active {
-  color: var(--accent-cyan);
-  font-weight: 700;
+  color: #0052FF;
+  font-weight: 800;
 }
 
 .macrocycle-track {
   height: 8px;
-  background: rgba(255, 255, 255, 0.08);
+  background: #E2E8F0;
   border-radius: 9999px;
   position: relative;
   overflow: hidden;
@@ -2107,10 +2108,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .macrocycle-fill {
   height: 100%;
-  background: linear-gradient(90deg, #8b5cf6, #06b6d4, #10b981);
+  background: linear-gradient(90deg, #0052FF 0%, #00C896 60%, #FF5E00 100%);
   border-radius: 9999px;
   transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 0 10px rgba(6, 182, 212, 0.5);
+  box-shadow: 0 1px 3px rgba(0, 82, 255, 0.25);
 }
 
 .macrocycle-info-row {
@@ -2118,6 +2119,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   justify-content: space-between;
   font-size: 0.75rem;
   color: var(--text-secondary);
+  font-weight: 500;
 }
 
 /* Program Stats Grid */
@@ -2128,13 +2130,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .program-stat-box {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: #FFFFFF;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  box-shadow: 0 2px 6px rgba(17, 22, 37, 0.03);
+  transition: all 0.2s ease;
+}
+
+.program-stat-box-target {
+  background: rgba(255, 94, 0, 0.04);
+  border-color: rgba(255, 94, 0, 0.3);
+}
+
+.program-stat-box-target .program-stat-value {
+  color: #FF5E00;
 }
 
 .program-stat-box-wide {
@@ -2174,7 +2187,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .mini-meter-track {
   height: 5px;
-  background: rgba(255, 255, 255, 0.08);
+  background: #E2E8F0;
   border-radius: 9999px;
   overflow: hidden;
   margin-top: 0.35rem;
@@ -4671,6 +4684,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-color: #DCE4EE;
 }
 
+[data-theme="light"] .program-card,
+[data-theme="light"] #cardProgram,
 [data-theme="light"] .upcoming-plan-card {
   background-color: #F4F7FA;
   border-color: #DCE4EE;
@@ -6191,6 +6206,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* Comprehensive High-Contrast Light Overrides for Nested Cards & Text */
 .card,
 .workout-stage,
+.program-card,
+#cardProgram,
 .upcoming-plan-card {
   background-color: #F4F7FA;
   border-color: #DCE4EE;
@@ -6220,6 +6237,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background-color: #FFFFFF !important;
   border-color: #DCE4EE !important;
   color: #111625 !important;
+}
+
+.program-stat-box.program-stat-box-target,
+.program-stat-box-target {
+  background-color: rgba(255, 94, 0, 0.04) !important;
+  border-color: rgba(255, 94, 0, 0.3) !important;
+}
+
+.program-stat-box-target .program-stat-value {
+  color: #FF5E00 !important;
 }
 
 .workout-option-card.active {
