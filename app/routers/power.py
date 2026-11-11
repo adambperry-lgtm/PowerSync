@@ -74,3 +74,21 @@ def delete_spiderweb_goal_endpoint():
         "program": program,
         "message": "Active spiderweb training goal cleared"
     }
+
+@router.post("/program/reset-block")
+def reset_program_block_endpoint(payload: Optional[Dict[str, Any]] = None):
+    """
+    Resets the athlete's periodization macrocycle block to Week 1 starting today.
+    """
+    uid = get_current_user_id()
+    block_weeks = int((payload or {}).get("block_weeks", 8))
+    from app.services.program_service import reset_program_block
+    program = reset_program_block(user_id=uid, block_weeks=block_weeks)
+    profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
+    return {
+        "success": True,
+        "program": program,
+        "profile": profile,
+        "message": f"Macrocycle block reset to Week 1 (Base Phase, {block_weeks} weeks)."
+    }
+

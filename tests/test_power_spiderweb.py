@@ -457,7 +457,57 @@ class TestPowerSpiderweb(unittest.TestCase):
         clear_active_target_plans(self.user_id)
         clear_active_spiderweb_goal(self.user_id)
 
+    def test_new_goal_resets_macrocycle_block_timeline(self):
+        """
+        Verify that selecting a new Rider Type goal resets an old block countdown
+        (e.g. 8 days remaining) to Week 1 (56 days remaining, Base Phase),
+        and verify the /api/program/reset-block endpoint.
+        """
+        from app.database import set_setting, clear_active_target_plans
+        from app.services.power_profile_service import set_active_spiderweb_goal, clear_active_spiderweb_goal
+        from app.services.program_service import get_current_program
+
+        clear_active_target_plans(self.user_id)
+        clear_active_spiderweb_goal(self.user_id)
+
+        # 1. Simulate an old block that is almost finished (8 days remaining)
+        today = datetime.date.today()
+        old_target = (today + datetime.timedelta(days=8)).isoformat()
+        old_start = (today - datetime.timedelta(days=48)).isoformat()
+        set_setting("program_target_date", old_target, user_id=self.user_id)
+        set_setting("program_start_date", old_start, user_id=self.user_id)
+
+        old_prog = get_current_program(user_id=self.user_id)
+        self.assertEqual(old_prog["days_remaining"], 8)
+        self.assertEqual(old_prog["current_week"], 7)
+
+        # 2. Select new rider type goal: Rouleur
+        set_active_spiderweb_goal({
+            "goal_type": "phenotype",
+            "target_key": "Rouleur"
+        }, user_id=self.user_id)
+
+        new_prog = get_current_program(user_id=self.user_id)
+        self.assertEqual(new_prog["days_remaining"], 56)
+        self.assertEqual(new_prog["total_weeks"], 8)
+        self.assertEqual(new_prog["current_week"], 1)
+        self.assertEqual(new_prog["phase"], "Base Phase")
+
+        # 3. Test explicit reset endpoint
+        # Artificially shift dates again
+        set_setting("program_target_date", old_target, user_id=self.user_id)
+        res = self.client.post("/api/program/reset-block", json={"block_weeks": 8}, headers={"X-User-ID": self.user_id})
+        self.assertEqual(res.status_code, 200)
+        res_data = res.json()
+        self.assertTrue(res_data["success"])
+        self.assertEqual(res_data["program"]["days_remaining"], 56)
+        self.assertEqual(res_data["program"]["current_week"], 1)
+
+        # Cleanup
+        clear_active_spiderweb_goal(self.user_id)
+
 
 if __name__ == "__main__":
     unittest.main()
+
 

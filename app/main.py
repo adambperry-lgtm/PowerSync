@@ -1,4 +1,5 @@
 import os
+from typing import Optional, Dict, Any
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -119,11 +120,16 @@ def serve_index():
 def health_check():
     return {"status": "ok", "app": "PowerSync"}
 
+@app.post("/api/program/reset-block")
+def reset_program_block_api(payload: Optional[dict] = None):
+    from app.routers.power import reset_program_block_endpoint
+    return reset_program_block_endpoint(payload)
+
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.4",
-        "release_name": "Unified Rider Type Target Envelope & Periodization Macrocycle",
+        "version": "2.6.5",
+        "release_name": "Macrocycle Block Timeline Reset on Goal Activation",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +139,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.5",
+                "date": "2026-11-11",
+                "title": "Macrocycle Block Timeline Reset on Goal Activation",
+                "items": [
+                    "Automatic Block Reset: Selecting a new Rider Type or Spiderweb Goal absent a scheduled race now automatically resets the periodization macrocycle to Week 1 (8-week adaptation block).",
+                    "Eliminated Trailing Block Expiration: Prevents new training goals from inheriting an old block's countdown (e.g. 8 days remaining in block), resetting days remaining to 56 days in Base Phase.",
+                    "1-Click 'Reset Block' Action: Added #btnResetProgramBlock to the Long-Term Program card and POST /api/program/reset-block endpoint for instant manual block calibration.",
+                    "Settings Goal Synchronization: update_program_goal now automatically recalibrates start and target dates for new phenotype blocks."
+                ]
+            },
             {
                 "version": "v2.6.4",
                 "date": "2026-11-11",

@@ -944,6 +944,18 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
             set_setting("program_weekly_tss_target", baseline_cfg["tss"], user_id=uid)
             set_setting("program_weekly_xss_target", baseline_cfg["xss"], user_id=uid)
 
+    # When setting/activating a training goal absent a specific scheduled event,
+    # reset the periodization macrocycle block timeline to Week 1 for the new goal
+    from app.database import get_active_target_plan, get_athlete_date
+    active_event = get_active_target_plan(uid)
+    has_specific_event = bool(active_event and not active_event.get("is_past", False))
+    should_reset_block = payload.get("reset_block", True if not preserve_program_settings else False)
+    if should_reset_block and not has_specific_event:
+        today = get_athlete_date(uid)
+        block_weeks = int(payload.get("block_weeks", 8))
+        set_setting("program_start_date", today.isoformat(), user_id=uid)
+        set_setting("program_target_date", (today + datetime.timedelta(days=max(14, block_weeks * 7))).isoformat(), user_id=uid)
+
     goal_obj = {
         "id": f"spiderweb_goal_{int(datetime.datetime.now().timestamp())}",
         "goal_type": goal_type,
@@ -967,7 +979,8 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
 def sync_spiderweb_goal_from_program(
     program_goal: Optional[str] = None,
     program_target_ftp: Optional[int] = None,
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    reset_block: bool = False
 ) -> Dict[str, Any]:
     """
     Synchronizes the active Spiderweb Goal when the athlete updates
@@ -979,6 +992,14 @@ def sync_spiderweb_goal_from_program(
     weight_kg = float(get_setting("athlete_weight_kg", 70.0, user_id=uid))
     p_goal = program_goal or str(get_setting("program_goal", "FTP_BUILD", user_id=uid))
     p_target_ftp = int(program_target_ftp or get_setting("program_target_ftp", ftp + 15, user_id=uid))
+
+    from app.database import get_active_target_plan, get_athlete_date
+    active_event = get_active_target_plan(uid)
+    has_specific_event = bool(active_event and not active_event.get("is_past", False))
+    if reset_block and not has_specific_event:
+        today = get_athlete_date(uid)
+        set_setting("program_start_date", today.isoformat(), user_id=uid)
+        set_setting("program_target_date", (today + datetime.timedelta(days=56)).isoformat(), user_id=uid)
 
     existing = get_active_spiderweb_goal(user_id=uid)
     profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")

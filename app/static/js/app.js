@@ -7384,6 +7384,33 @@ function setupSpiderwebPlannerNav() {
     });
   }
 
+  const btnResetBlock = document.getElementById("btnResetProgramBlock");
+  if (btnResetBlock) {
+    btnResetBlock.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const goalTitle = state.program?.goal_title || "your active goal";
+      if (!confirm(`Reset macrocycle block to Week 1 (8-week adaptation cycle) for ${goalTitle}?`)) return;
+      try {
+        const res = await fetch("/api/program/reset-block", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ block_weeks: 8 })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          showToast("🚀 Macrocycle block reset to Week 1 (Base Phase)");
+          if (data.program) renderProgram(data.program);
+          if (data.profile) renderPowerSpiderweb(data.profile);
+        } else {
+          showToast("Failed to reset block", "error");
+        }
+      } catch (err) {
+        console.error("Error resetting block:", err);
+        showToast("Error resetting block", "error");
+      }
+    });
+  }
+
   const programSpiderwebBadge = document.getElementById("programSpiderwebBadge");
   if (programSpiderwebBadge) {
     programSpiderwebBadge.style.cursor = "pointer";

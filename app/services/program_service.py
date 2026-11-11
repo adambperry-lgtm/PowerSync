@@ -370,16 +370,49 @@ def get_current_program(
     }
 
 
-def update_program_goal(goal_key: str, user_id: Optional[str] = None) -> Dict[str, Any]:
+def reset_program_block(user_id: Optional[str] = None, block_weeks: int = 8) -> Dict[str, Any]:
+    """
+    Resets the athlete's periodization macrocycle block to Week 1 starting today.
+    Calibrates the target date to block_weeks (default: 8 weeks / 56 days) absent a specific event.
+    """
+    from app.database import get_athlete_date, get_current_user_id, set_setting, get_active_target_plan
+    uid = user_id or get_current_user_id()
+    today = get_athlete_date(uid)
+    active_event = get_active_target_plan(uid)
+    has_specific_event = bool(active_event and not active_event.get("is_past", False))
+
+    set_setting("program_start_date", today.isoformat(), user_id=uid)
+    if not has_specific_event:
+        target_date = today + datetime.timedelta(days=max(14, block_weeks * 7))
+        set_setting("program_target_date", target_date.isoformat(), user_id=uid)
+    return get_current_program(user_id=uid)
+
+
+def update_program_goal(
+    goal_key: str,
+    user_id: Optional[str] = None,
+    reset_block: bool = True,
+    block_weeks: int = 8
+) -> Dict[str, Any]:
     """
     Updates the athlete's program goal and synchronizes the spiderweb target envelope.
+    Optionally resets the periodization block timeline to Week 1 (default: True).
     """
+    from app.database import get_current_user_id, set_setting, get_active_target_plan, get_athlete_date
     uid = user_id or get_current_user_id()
     clean_goal = str(goal_key).upper().strip()
     set_setting("program_goal", clean_goal, user_id=uid)
+
+    active_event = get_active_target_plan(uid)
+    has_specific_event = bool(active_event and not active_event.get("is_past", False))
+    if reset_block and not has_specific_event:
+        today = get_athlete_date(uid)
+        set_setting("program_start_date", today.isoformat(), user_id=uid)
+        set_setting("program_target_date", (today + datetime.timedelta(days=max(14, block_weeks * 7))).isoformat(), user_id=uid)
+
     try:
         from app.services.power_profile_service import sync_spiderweb_goal_from_program
-        sync_spiderweb_goal_from_program(program_goal=clean_goal, user_id=uid)
+        sync_spiderweb_goal_from_program(program_goal=clean_goal, user_id=uid, reset_block=reset_block)
     except Exception:
         pass
     return get_current_program(user_id=uid)

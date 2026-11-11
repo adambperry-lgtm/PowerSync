@@ -3,6 +3,16 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.5] - 2026-11-11
+### Added
+- **Macrocycle Block Timeline Reset on Goal Activation**:
+  - Automatically resets the periodization macrocycle block timeline to Week 1 (`Base Phase`, 8-week / 56-day duration) whenever an athlete selects or updates a Rider Type or Spiderweb Goal absent a specific scheduled event.
+  - Eliminated trailing block expiration where newly activated training goals inherited countdowns from prior expired blocks (e.g. 8 days remaining).
+  - Added 1-click **🔄 Reset Block** action button (`#btnResetProgramBlock`) in the Long-Term Program card and `POST /api/program/reset-block` endpoint to allow manual macrocycle recalibration at any time.
+  - Enhanced `update_program_goal` to automatically recalculate start and target dates for phenotype blocks.
+
+---
+
 ## [2.6.4] - 2026-11-11
 ### Added
 - **Unified Rider Type Target Envelope & Periodization Integration**:
