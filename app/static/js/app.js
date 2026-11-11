@@ -6978,8 +6978,11 @@ function renderPowerSpiderweb(data) {
   // Duration metrics grid
   renderSpiderwebDurationsGrid(data.axes);
 
-  // Historical Timeline
-  renderSpiderwebTimeline(data.progression_timeline);
+  // 3-Line Power Duration Curve Chart (Current, Previous, All-Time / Target)
+  renderPowerCurveTimelineChart(data.axes, data.active_goal);
+
+  // Historical Timeline (with Mini-Spiderwebs)
+  renderSpiderwebTimeline(data.progression_timeline, data.axes);
 
   // Breakthrough PRs
   renderSpiderwebBreakthroughs(data.recent_breakthroughs);
@@ -7201,33 +7204,251 @@ function renderSpiderwebDurationsGrid(axes) {
   }).join("");
 }
 
-function renderSpiderwebTimeline(timeline) {
+function renderPowerCurveTimelineChart(axes, activeGoal) {
+  const svg = document.getElementById("powerCurveTimelineSvg");
+  if (!svg || !axes || axes.length === 0) return;
+
+  const w = 540;
+  const h = 185;
+  const padLeft = 46;
+  const padRight = 32;
+  const padTop = 22;
+  const padBottom = 32;
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
+
+  const orderKeys = ["5s", "1m", "5m", "20m", "60m"];
+  const sortedAxes = orderKeys.map(k => axes.find(a => a.key === k) || { key: k, current_watts: 0, previous_watts: 0, all_time_pr_watts: 0, target_watts: 0, name: k });
+
+  const curWatts = sortedAxes.map(a => a.current_watts || 0);
+  const prevWatts = sortedAxes.map(a => a.previous_watts || Math.round(a.current_watts * 0.95) || 0);
+  const targetEnvelope = activeGoal?.target_envelope || {};
+  const peakWatts = sortedAxes.map(a => targetEnvelope[a.key] || a.target_watts || a.all_time_pr_watts || a.current_watts || 0);
+
+  const allVals = [...curWatts, ...prevWatts, ...peakWatts].filter(v => v > 0);
+  const maxW = allVals.length > 0 ? Math.max(...allVals) * 1.12 : 1000;
+  const minW = allVals.length > 0 ? Math.max(0, Math.min(...allVals) * 0.75) : 100;
+  const valRange = Math.max(10, maxW - minW);
+
+  const getX = (idx) => padLeft + (idx * (chartW / (sortedAxes.length - 1)));
+  const getY = (val) => padTop + chartH * (1 - (Math.max(minW, val) - minW) / valRange);
+
+  const curPts = curWatts.map((val, idx) => ({ x: getX(idx), y: getY(val), val, name: sortedAxes[idx].name }));
+  const prevPts = prevWatts.map((val, idx) => ({ x: getX(idx), y: getY(val), val, name: sortedAxes[idx].name }));
+  const peakPts = peakWatts.map((val, idx) => ({ x: getX(idx), y: getY(val), val, name: sortedAxes[idx].name }));
+
+  const getSmoothPath = (pts) => {
+    if (pts.length === 0) return "";
+    let d = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i === 0 ? 0 : i - 1];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+      d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+    return d;
+  };
+
+  const curPath = getSmoothPath(curPts);
+  const prevPath = getSmoothPath(prevPts);
+  const peakPath = getSmoothPath(peakPts);
+
+  const bottomY = padTop + chartH;
+  const curArea = `${curPath} L ${curPts[curPts.length - 1].x.toFixed(1)},${bottomY} L ${curPts[0].x.toFixed(1)},${bottomY} Z`;
+
+  // Grid lines
+  const gridLevels = [0.25, 0.5, 0.75, 1.0];
+  let gridHtml = "";
+  gridLevels.forEach(lvl => {
+    const wVal = Math.round(minW + lvl * valRange);
+    const yPos = getY(wVal);
+    gridHtml += `
+      <line x1="${padLeft}" y1="${yPos.toFixed(1)}" x2="${padLeft + chartW}" y2="${yPos.toFixed(1)}" stroke="rgba(148,163,184,0.18)" stroke-width="1" stroke-dasharray="3 3" />
+      <text x="${padLeft - 6}" y="${(yPos + 3).toFixed(1)}" fill="#64748B" font-size="9" text-anchor="end" font-family="monospace">${wVal}W</text>
+    `;
+  });
+
+  // X Axis Labels
+  const durLabels = ["5s", "1m", "5m", "20m", "60m"];
+  let xLabelsHtml = "";
+  durLabels.forEach((label, idx) => {
+    const xPos = getX(idx);
+    const axisName = sortedAxes[idx].name || "";
+    xLabelsHtml += `
+      <line x1="${xPos.toFixed(1)}" y1="${padTop}" x2="${xPos.toFixed(1)}" y2="${bottomY}" stroke="rgba(148,163,184,0.12)" stroke-width="1" />
+      <text x="${xPos.toFixed(1)}" y="${bottomY + 14}" fill="var(--text-primary)" font-size="10" font-weight="700" text-anchor="middle">${label}</text>
+      <text x="${xPos.toFixed(1)}" y="${bottomY + 25}" fill="var(--text-muted)" font-size="8" text-anchor="middle">${axisName.replace(/\s*\(.*\)/, '')}</text>
+    `;
+  });
+
+  // Circles & labels
+  const peakCircles = peakPts.map(pt => `
+    <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="#FF5E00" stroke="#FFFFFF" stroke-width="1.5" />
+    <text x="${pt.x.toFixed(1)}" y="${(pt.y - 7).toFixed(1)}" fill="#FF5E00" font-size="9" font-weight="700" text-anchor="middle">${pt.val}W</text>
+  `).join("");
+
+  const prevCircles = prevPts.map(pt => `
+    <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3" fill="#8B5CF6" opacity="0.8" />
+  `).join("");
+
+  const curCircles = curPts.map((pt) => `
+    <circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4.5" fill="#0052FF" stroke="#FFFFFF" stroke-width="2" />
+    <text x="${pt.x.toFixed(1)}" y="${(pt.y + 16).toFixed(1)}" fill="#0052FF" font-size="10" font-weight="800" text-anchor="middle">${pt.val}W</text>
+  `).join("");
+
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="curveCurGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="#0052FF" stop-opacity="0.25" />
+        <stop offset="100%" stop-color="#0052FF" stop-opacity="0.02" />
+      </linearGradient>
+    </defs>
+    ${gridHtml}
+    ${xLabelsHtml}
+    <path d="${curArea}" fill="url(#curveCurGrad)" />
+    <!-- Line 2: Previous Period -->
+    <path d="${prevPath}" fill="none" stroke="#8B5CF6" stroke-width="2" stroke-dasharray="4 3" opacity="0.85" />
+    ${prevCircles}
+    <!-- Line 3: All-Time PR / Target -->
+    <path d="${peakPath}" fill="none" stroke="#FF5E00" stroke-width="2.2" opacity="0.9" />
+    ${peakCircles}
+    <!-- Line 1: Current Period -->
+    <path d="${curPath}" fill="none" stroke="#0052FF" stroke-width="2.8" />
+    ${curCircles}
+  `;
+}
+
+function generateMiniSpiderwebSvg(item, bmMap) {
+  const cx = 42;
+  const cy = 42;
+  const r = 32;
+  const keys = ["5s", "1m", "5m", "20m", "60m"];
+  const n = keys.length;
+
+  const outerPts = [];
+  const midPts = [];
+  for (let i = 0; i < n; i++) {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+    outerPts.push(`${(cx + r * Math.cos(angle)).toFixed(1)},${(cy + r * Math.sin(angle)).toFixed(1)}`);
+    midPts.push(`${(cx + (r * 0.5) * Math.cos(angle)).toFixed(1)},${(cy + (r * 0.5) * Math.sin(angle)).toFixed(1)}`);
+  }
+
+  const polyPts = [];
+  for (let i = 0; i < n; i++) {
+    const k = keys[i];
+    const val = item[`peak_${k}`] || 0;
+    const bm = (bmMap && bmMap[k]) ? bmMap[k] : 1000;
+    const pct = Math.min(1.0, Math.max(0.18, val / (bm || 1)));
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+    const px = cx + (r * pct) * Math.cos(angle);
+    const py = cy + (r * pct) * Math.sin(angle);
+    polyPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+  }
+
+  let spokes = "";
+  for (let i = 0; i < n; i++) {
+    const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
+    const sx = cx + r * Math.cos(angle);
+    const sy = cy + r * Math.sin(angle);
+    spokes += `<line x1="${cx}" y1="${cy}" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="rgba(148,163,184,0.2)" stroke-width="0.8" />`;
+  }
+
+  return `
+    <svg viewBox="0 0 84 84" width="76" height="76" style="overflow:visible;">
+      <polygon points="${outerPts.join(" ")}" fill="rgba(15,23,42,0.15)" stroke="rgba(148,163,184,0.3)" stroke-width="1" />
+      <polygon points="${midPts.join(" ")}" fill="none" stroke="rgba(148,163,184,0.18)" stroke-width="0.8" stroke-dasharray="2 2" />
+      ${spokes}
+      <polygon points="${polyPts.join(" ")}" fill="rgba(0, 82, 255, 0.28)" stroke="#0052FF" stroke-width="1.6" />
+      ${polyPts.map(pt => {
+        const [x, y] = pt.split(",");
+        return `<circle cx="${x}" cy="${y}" r="2" fill="#0052FF" />`;
+      }).join("")}
+    </svg>
+  `;
+}
+
+function initTimelineViewSwitcher() {
+  const btnAll = document.getElementById("btnTimelineToggleAll");
+  const btnCurve = document.getElementById("btnTimelineToggleCurve");
+  const btnRadar = document.getElementById("btnTimelineToggleRadar");
+  const curveWrap = document.getElementById("timelineCurveChartWrap");
+  const gridWrap = document.getElementById("spiderwebTimelineGrid");
+
+  const setView = (mode) => {
+    [btnAll, btnCurve, btnRadar].forEach(b => b?.classList.remove("active"));
+    if (mode === "all") {
+      btnAll?.classList.add("active");
+      if (curveWrap) curveWrap.style.display = "block";
+      if (gridWrap) gridWrap.style.display = "grid";
+    } else if (mode === "curve") {
+      btnCurve?.classList.add("active");
+      if (curveWrap) curveWrap.style.display = "block";
+      if (gridWrap) gridWrap.style.display = "none";
+    } else if (mode === "radar") {
+      btnRadar?.classList.add("active");
+      if (curveWrap) curveWrap.style.display = "none";
+      if (gridWrap) gridWrap.style.display = "grid";
+    }
+  };
+
+  btnAll?.addEventListener("click", () => setView("all"));
+  btnCurve?.addEventListener("click", () => setView("curve"));
+  btnRadar?.addEventListener("click", () => setView("radar"));
+}
+
+let hasInitTimelineSwitcher = false;
+
+function renderSpiderwebTimeline(timeline, axes) {
   const container = document.getElementById("spiderwebTimelineGrid");
   if (!container) return;
+
+  if (!hasInitTimelineSwitcher) {
+    initTimelineViewSwitcher();
+    hasInitTimelineSwitcher = true;
+  }
 
   if (!timeline || timeline.length === 0) {
     container.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:1rem;">No monthly progression data recorded yet.</div>`;
     return;
   }
 
-  container.innerHTML = timeline.map(item => `
-    <div class="spiderweb-timeline-card">
-      <div class="timeline-card-header">
-        <span class="timeline-month">${escapeSpiderwebHtml(item.label)}</span>
-        <span class="timeline-count">${item.workout_count} rides · ${item.total_hours}h</span>
+  const bmMap = {};
+  (axes || []).forEach(a => {
+    bmMap[a.key] = a.benchmark_ceiling_watts || a.all_time_pr_watts || 1000;
+  });
+
+  container.innerHTML = timeline.map(item => {
+    const miniSvg = generateMiniSpiderwebSvg(item, bmMap);
+    return `
+      <div class="spiderweb-timeline-card">
+        <div class="timeline-card-header">
+          <span class="timeline-month">${escapeSpiderwebHtml(item.label)}</span>
+          <span class="timeline-count" style="font-size:0.68rem;color:var(--text-muted);">${item.workout_count} rides · ${item.total_hours}h</span>
+        </div>
+        <div class="timeline-card-body">
+          <div class="timeline-mini-radar-wrap" title="Monthly 5-Axis Spiderweb Shape">
+            ${miniSvg}
+          </div>
+          <div class="timeline-power-list">
+            <div class="timeline-power-pill"><span class="lbl">5s</span> <strong>${item.peak_5s || '--'}W</strong></div>
+            <div class="timeline-power-pill"><span class="lbl">1m</span> <strong>${item.peak_1m || '--'}W</strong></div>
+            <div class="timeline-power-pill"><span class="lbl">5m</span> <strong>${item.peak_5m || '--'}W</strong></div>
+            <div class="timeline-power-pill"><span class="lbl">20m</span> <strong>${item.peak_20m || '--'}W</strong></div>
+            <div class="timeline-power-pill" style="grid-column: span 2;"><span class="lbl">60m</span> <strong>${item.peak_60m || '--'}W</strong></div>
+          </div>
+        </div>
+        <div class="timeline-card-footer" style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:var(--text-muted);border-top:1px solid rgba(255,255,255,0.05);padding-top:0.35rem;margin-top:0.15rem;">
+          <span>Work: <strong style="color:var(--accent-cyan);">${item.total_tss || 0} TSS</strong></span>
+          <span>${item.cycling_count || item.workout_count} rides</span>
+        </div>
       </div>
-      <div class="timeline-power-row">
-        <span class="timeline-power-metric"><span class="lbl">5s</span> <strong>${item.peak_5s || '--'}W</strong></span>
-        <span class="timeline-power-metric"><span class="lbl">1m</span> <strong>${item.peak_1m || '--'}W</strong></span>
-        <span class="timeline-power-metric"><span class="lbl">5m</span> <strong>${item.peak_5m || '--'}W</strong></span>
-        <span class="timeline-power-metric"><span class="lbl">20m</span> <strong>${item.peak_20m || '--'}W</strong></span>
-        <span class="timeline-power-metric"><span class="lbl">60m</span> <strong>${item.peak_60m || '--'}W</strong></span>
-      </div>
-      <div class="timeline-card-footer">
-        <span>Total Work: ${item.total_tss || 0} TSS</span>
-      </div>
-    </div>
-  `).join("");
+    `;
+  }).join("");
 }
 
 function renderSpiderwebBreakthroughs(breakthroughs) {

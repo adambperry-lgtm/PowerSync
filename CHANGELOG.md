@@ -3,6 +3,26 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.7] - 2026-11-11
+### Added
+- **Visual 3-Line Power Duration Curve (PDC) Progression Chart**:
+  - Transformed the Power Spiderweb "Power Curve Progress Over Time" section from text numbers into an interactive, multi-series Power Duration Curve chart (`#powerCurveTimelineSvg`).
+  - Renders 3 distinct physiological power curves across 5 key benchmark durations (`5s`, `1m`, `5m`, `20m`, `60m`):
+    - **Current Period**: Cobalt Blue (`#0052FF`) curve with gradient area shading and prominent peak wattage callouts.
+    - **Previous Period**: Slate Purple (`#8B5CF6`) dashed comparison curve showing macrocycle adaptation trajectory.
+    - **All-Time PR / Target Envelope**: Speed Orange (`#FF5E00`) benchmark ceiling illustrating headroom to career bests and target envelope.
+  - Native inline SVG rendering with wattage grid lines, duration labels, and full dark / Speed & Summit light theme support.
+- **Monthly Mini-Spiderweb Snapshots (Compact Phenotype Radars)**:
+  - Rendered native 5-axis SVG mini-radar charts inside each monthly card, normalizing peak power across durations to visually expose phenotypic shape changes over time.
+  - Redesigned monthly cards pairing mini-spiderweb polygons with duration wattage pills, total cycling hours, workout counts, and cumulative TSS.
+- **Interactive Timeline View Switcher**:
+  - Added a dedicated view toggle bar (`.timeline-view-switcher`) allowing athletes to toggle between:
+    - `📊 All`: Combined 3-line PDC curve and monthly mini-spiderwebs.
+    - `📈 3-Line Curve`: Focused multi-period power duration curve comparison.
+    - `🕸️ Mini-Spiderwebs`: Compact monthly phenotype radar cards.
+
+---
+
 ## [2.6.6] - 2026-11-11
 ### Added
 - **Rider Type Change Macrocycle Reset Confirmation**:

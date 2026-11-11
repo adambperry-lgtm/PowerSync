@@ -128,8 +128,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.6",
-        "release_name": "Rider Type Change Macrocycle Reset Confirmation",
+        "version": "2.6.7",
+        "release_name": "Visual Power Curve Progression & Monthly Mini-Spiderwebs",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -139,6 +139,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.7",
+                "date": "2026-11-11",
+                "title": "Visual Power Curve Progression & Monthly Mini-Spiderwebs",
+                "items": [
+                    "3-Line Power Duration Curve: Interactive SVG chart comparing Current Period (Cobalt Blue), Previous Period (Slate Purple dashed), and All-Time PR / Target Envelope (Speed Orange) across 5s, 1m, 5m, 20m, and 60m.",
+                    "Monthly Mini-Spiderwebs: Native 5-axis mini-radar charts embedded in monthly progression cards to visualize phenotype evolution and duration balance over time.",
+                    "Interactive Timeline View Switcher: 3-way toggle between All, 3-Line Curve, and Mini-Spiderwebs with responsive theme styling."
+                ]
+            },
             {
                 "version": "v2.6.6",
                 "date": "2026-11-11",
