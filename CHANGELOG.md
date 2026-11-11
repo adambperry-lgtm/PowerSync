@@ -3,6 +3,28 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.0] - 2026-11-11
+### Added
+- **Unified Multi-Axis Coggan Phenotype Profiling Engine**:
+  - Replaced the order-dependent `if/elif` waterfall with a scientific, multi-axis power profile classification model (`classify_athlete_phenotype`).
+  - Evaluates relative energy system strengths across all 5 durations (5s sprint, 1m glycolytic, 5m VO2 Max, 20m threshold, 60m stamina) against Coggan power profiling principles, preventing premature cascade trapping (e.g. labeling an athlete as Puncheur when their true physiological strength is Pursuiter or All-Rounder).
+  - Evaluates standard deviation and spread across normalized energy systems to identify true All-Rounder equilibrium vs. specialist dominance.
+  - Returns continuous phenotype affinity scores and readiness percentages (0–100%) for all archetypes.
+
+### Changed
+- **Transformation Target Overload & 0W Gap Elimination**:
+  - Eliminated the defect where transformation goals into existing capabilities generated a 0W gap and marked goals as 100% achieved immediately.
+  - Implemented progressive adaptation overload (+5% stimulus on archetype signature axes when current fitness is already at or near baseline) so transformation goals always provide real, actionable training stimuli.
+  - Updated transformation cards in the UI (`renderPlannerPhenotypeView`) to display `🎯 Current Classification (X% Match)` for the active archetype and clear progressive readiness for transformation goals.
+
+### Fixed
+- **Physiological Duration Gating & Activity Peak Power Accuracy**:
+  - Refined `calculate_activity_peak_powers()` to enforce strict minimum moving times (e.g. 20m and 60m require genuine ride durations of at least 15m and 50m respectively), preventing artificial peak power generation on short rides.
+  - Integrated power meter `device_watts`, `max_watts` adherence, and interval lap / segment peak extraction from activity telemetry.
+  - Replaced uncalibrated all-out sprint assumptions with intensity-modulated Morton CP / $W'$ contribution.
+
+---
+
 ## [2.5.7] - 2026-11-11
 ### Removed
 - **Directeur Sportif Static In-Ride Pacing Bottom Sheet**:

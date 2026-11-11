@@ -7546,8 +7546,8 @@ function renderPlannerPhenotypeView() {
     const statusText = isGoalActive
       ? "🎯 Active Program Goal"
       : isCurrent
-      ? "Current Rider Type"
-      : `${p.completion_pct}% Met (${p.total_delta_watts}W gap)`;
+      ? `🎯 Current Classification (${p.completion_pct}% Match)`
+      : `${p.completion_pct}% Readiness (${p.total_delta_watts}W gap)`;
 
     const axesRows = (p.axis_gaps || []).map(ax => {
       const icon = ax.is_met ? "✓" : "▲";
@@ -7578,7 +7578,7 @@ function renderPlannerPhenotypeView() {
           <strong>Prescribed Protocol:</strong> ${escapeSpiderwebHtml((p.recommended_workouts || [])[0] || '')}
         </div>
         <button type="button" class="btn-set-goal" data-type="phenotype" data-key="${p.id}" style="margin-top:0.5rem;${isGoalActive ? 'background:rgba(16,185,129,0.2);border-color:#10b981;color:#10b981;' : ''}">
-          ${isGoalActive ? '✓ Active Goal (Synced to Macrocycle Program)' : '🎯 ' + (isCurrent ? 'Keep Focus on ' + escapeSpiderwebHtml(p.title) : 'Transform to ' + escapeSpiderwebHtml(p.title))}
+          ${isGoalActive ? '✓ Active Goal (Synced to Macrocycle Program)' : '🎯 ' + (isCurrent ? 'Deepen Focus on ' + escapeSpiderwebHtml(p.title) + ' (+5% Specialty Overload)' : 'Transform to ' + escapeSpiderwebHtml(p.title))}
         </button>
       </div>
     `;

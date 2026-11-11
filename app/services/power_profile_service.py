@@ -21,6 +21,237 @@ RADAR_DURATIONS = [
     {"key": "60m", "label": "60m Stamina", "sec": 3600, "name": "Stamina (60m)", "icon": "🚴", "energy": "Aerobic Endurance"},
 ]
 
+# --- Rider Phenotype Definitions (Coggan Power Profiling Model) ---
+
+RIDER_PHENOTYPE_DEFINITIONS: List[Dict[str, Any]] = [
+    {
+        "id": "Puncheur",
+        "title": "Puncheur",
+        "badge": "🥊 Puncheur",
+        "icon": "🥊",
+        "description": "High-octane anaerobic battery (W') capable of violent steep hill attacks and sharp short climbs.",
+        "primary_strength": "1m–3m Glycolytic Power & Attack Repeatability",
+        "growth_focus": "Sub-Threshold Glycogen Sparing",
+        "focus_energy_system": "1m–3m Glycolytic Capacity & Anaerobic Power (W')",
+        "signature_axes": ["1m", "5m"],
+        "recommended_workouts": [
+            "30/30s High-Cadence VO2 Microbursts (120% FTP / 50% recovery)",
+            "5x 2-Min Steep Anaerobic Hill Repeats (125-130% FTP)",
+            "Tabata High-Torque Acceleration Blocks"
+        ],
+        "requirements": {
+            "5s_ratio": 2.80,
+            "1m_ratio": 1.72,
+            "5m_ratio": 1.22,
+            "20m_ratio": 0.98,
+            "60m_ratio": 0.86
+        }
+    },
+    {
+        "id": "Rouleur",
+        "title": "Rouleur / TT Specialist",
+        "badge": "⏱️ Rouleur",
+        "icon": "⏱️",
+        "description": "Diesel engine with massive sustained aerobic power and fatigue resistance over prolonged durations.",
+        "primary_strength": "20m–60m Sustained Lactate Threshold",
+        "growth_focus": "High-Intensity Neuromuscular Snap",
+        "focus_energy_system": "Lactate Clearance & Aerobic Threshold (FTP)",
+        "signature_axes": ["20m", "60m"],
+        "recommended_workouts": [
+            "2x 20-Min Progressive Sweet Spot (88–94% FTP)",
+            "3x 12-Min Threshold Over-Unders (95% / 105% FTP)",
+            "75-Min Aerobic Tempo Density Ride"
+        ],
+        "requirements": {
+            "5s_ratio": 2.40,
+            "1m_ratio": 1.45,
+            "5m_ratio": 1.16,
+            "20m_ratio": 1.04,
+            "60m_ratio": 0.94
+        }
+    },
+    {
+        "id": "Climber",
+        "title": "Climber",
+        "badge": "⛰️ Climber",
+        "icon": "⛰️",
+        "description": "Exceptional power-to-weight ratio over extended elevation gradients and sustained mountain passes.",
+        "primary_strength": "High Sustained W/kg Output on Gradients",
+        "growth_focus": "Flat Wind Sprint Snap",
+        "focus_energy_system": "Sustained W/kg & High Aerobic Ceiling",
+        "signature_axes": ["20m", "5m"],
+        "recommended_workouts": [
+            "4x 10-Min High-Cadence Alpine Threshold Repeats (96–102% FTP)",
+            "5x 4-Min VO2 Max Climbing Ladders (110–115% FTP)",
+            "2-Hour Endurance Mountain Simulation"
+        ],
+        "requirements": {
+            "5s_ratio": 2.50,
+            "1m_ratio": 1.50,
+            "5m_ratio": 1.25,
+            "20m_ratio": 1.04,
+            "60m_ratio": 0.90,
+            "min_20m_wkg": 3.85,
+            "min_5m_wkg": 4.90
+        }
+    },
+    {
+        "id": "Sprinter",
+        "title": "Sprinter",
+        "badge": "⚡ Sprinter",
+        "icon": "⚡",
+        "description": "Explosive neuromuscular recruitment and fast-twitch power. Dominates final kicks and short accelerations.",
+        "primary_strength": "5s Sprint & Max Neuromuscular Burst",
+        "growth_focus": "Aerobic Threshold Extension (20m+)",
+        "focus_energy_system": "Neuromuscular Recruitment & Peak Sprint P_max",
+        "signature_axes": ["5s", "1m"],
+        "recommended_workouts": [
+            "6x 15s All-Out Standing Start Sprints with 4m Recovery",
+            "3 Blocks of 30s High-Torque Acceleration Spin-Ups",
+            "Heavy Resistance Squat & Plyometric Priming"
+        ],
+        "requirements": {
+            "5s_ratio": 3.45,
+            "1m_ratio": 1.72,
+            "5m_ratio": 1.15,
+            "20m_ratio": 0.95,
+            "60m_ratio": 0.82
+        }
+    },
+    {
+        "id": "Pursuiter",
+        "title": "Pursuiter / VO2 Specialist",
+        "badge": "🫁 Pursuiter",
+        "icon": "🫁",
+        "description": "Huge maximal aerobic ceiling (MAP). Excels at bridge attempts, breakaway pacing, and 3-8 minute climbs.",
+        "primary_strength": "5m Maximal Aerobic Power (MAP)",
+        "growth_focus": "Neuromuscular Peak Sprint P_max",
+        "focus_energy_system": "Maximal Aerobic Power (MAP) & Stroke Volume",
+        "signature_axes": ["5m", "1m"],
+        "recommended_workouts": [
+            "5x 4-Min Maximal Aerobic Power (MAP @ 112–118% FTP)",
+            "4x 5-Min VO2 Max Extenders with 1:1 Recovery",
+            "40/20s High-Intensity Interval Sets"
+        ],
+        "requirements": {
+            "5s_ratio": 2.65,
+            "1m_ratio": 1.60,
+            "5m_ratio": 1.28,
+            "20m_ratio": 0.98,
+            "60m_ratio": 0.88
+        }
+    },
+    {
+        "id": "All-Rounder",
+        "title": "All-Rounder",
+        "badge": "🎯 All-Rounder",
+        "icon": "🎯",
+        "description": "Well-balanced spiderweb with harmonious capabilities across sprint, anaerobic capacity, and sustained threshold.",
+        "primary_strength": "Versatile Energy System Equilibrium",
+        "growth_focus": "Specialized Peak Power Polarization",
+        "focus_energy_system": "Harmonious Multi-System Progression (+5% Envelope Lift)",
+        "signature_axes": ["5s", "1m", "5m", "20m", "60m"],
+        "recommended_workouts": [
+            "Weekly Polarized Mix: 1x VO2 Intervals, 1x Sweet Spot, 2x Z2 Base",
+            "Over-Under Threshold Ladders",
+            "Weekend Long Aerobic Simulation"
+        ],
+        "requirements": {
+            "5s_ratio": 2.85,
+            "1m_ratio": 1.58,
+            "5m_ratio": 1.20,
+            "20m_ratio": 1.00,
+            "60m_ratio": 0.88
+        }
+    }
+]
+
+
+def classify_athlete_phenotype(cur_envelope: Dict[str, int], ftp: int, weight_kg: float) -> Dict[str, Any]:
+    """
+    Evaluates multi-axis power profile distribution to classify athlete phenotype
+    (Sprinter, Puncheur, Pursuiter, Rouleur, Climber, All-Rounder) based on Coggan
+    power profiling principles and relative energy system balance.
+    """
+    safe_ftp = max(1.0, float(ftp))
+    safe_weight = max(40.0, float(weight_kg))
+    wkg_20m = cur_envelope.get("20m", 0) / safe_weight
+    wkg_5m = cur_envelope.get("5m", 0) / safe_weight
+
+    pheno_map = {p["id"]: p for p in RIDER_PHENOTYPE_DEFINITIONS}
+
+    # Neutral reference ratios across the 5 domains (population baseline)
+    neutral_ratios = {"5s": 2.80, "1m": 1.58, "5m": 1.20, "20m": 1.00, "60m": 0.88}
+    r_vals = [cur_envelope.get(k, 0) / (safe_ftp * neutral_ratios[k]) for k in neutral_ratios]
+    mean_r = sum(r_vals) / len(r_vals)
+    variance = sum((x - mean_r) ** 2 for x in r_vals) / len(r_vals)
+    std_dev = math.sqrt(variance)
+
+    scores: Dict[str, float] = {}
+    readiness_map: Dict[str, float] = {}
+
+    for pheno in RIDER_PHENOTYPE_DEFINITIONS:
+        p_id = pheno["id"]
+        reqs = pheno["requirements"]
+        sig_axes = pheno.get("signature_axes", [])
+
+        # Calculate axis fulfillments
+        axis_scores = []
+        axis_readiness = []
+        weights = []
+
+        for k in ["5s", "1m", "5m", "20m", "60m"]:
+            req_w = safe_ftp * reqs.get(f"{k}_ratio", 1.0)
+            curr_w = cur_envelope.get(k, 0)
+            fulf = min(1.15, curr_w / max(1.0, req_w))
+            w = 2.5 if k in sig_axes else 1.0
+            axis_scores.append(fulf * w)
+            axis_readiness.append(min(100.0, (curr_w / max(1.0, req_w)) * 100.0) * w)
+            weights.append(w)
+
+        base_score = sum(axis_scores) / sum(weights)
+        readiness = sum(axis_readiness) / sum(weights)
+
+        # Signature weapon bonus:
+        if sig_axes:
+            primary_sig = sig_axes[0]
+            sig_req_w = safe_ftp * reqs.get(f"{primary_sig}_ratio", 1.0)
+            sig_ratio = cur_envelope.get(primary_sig, 0) / max(1.0, sig_req_w)
+            if sig_ratio >= 1.0:
+                base_score += (sig_ratio - 1.0) * 0.45 + 0.03
+
+        # Climber W/kg addition
+        if p_id == "Climber":
+            wkg_fulf = (min(1.15, wkg_20m / 3.85) + min(1.15, wkg_5m / 4.90)) / 2.0
+            base_score = base_score * 0.4 + wkg_fulf * 0.6
+            readiness = readiness * 0.4 + ((min(1.0, wkg_20m / 3.85) + min(1.0, wkg_5m / 4.90)) / 2.0 * 100.0) * 0.6
+            if wkg_20m >= 3.85 and wkg_5m >= 4.90:
+                base_score += ((wkg_20m / 3.85 - 1.0) + (wkg_5m / 4.90 - 1.0)) * 0.45 + 0.05
+
+        # All-Rounder equilibrium bonus
+        if p_id == "All-Rounder":
+            if std_dev <= 0.075:
+                base_score += (0.075 - std_dev) * 0.8 + 0.02
+
+        scores[p_id] = round(base_score, 4)
+        readiness_map[p_id] = round(min(100.0, readiness), 1)
+
+    best_id = max(scores, key=scores.get)
+    best_pheno = pheno_map[best_id]
+
+    return {
+        "title": best_pheno["title"],
+        "badge": best_pheno["badge"],
+        "icon": best_pheno["icon"],
+        "description": best_pheno["description"],
+        "primary_strength": best_pheno["primary_strength"],
+        "growth_focus": best_pheno.get("growth_focus", "Harmonious Multi-System Progression"),
+        "affinity_scores": scores,
+        "readiness_map": readiness_map,
+        "std_dev": round(std_dev, 3)
+    }
+
+
 def calculate_activity_peak_powers(
     act: Dict[str, Any],
     ftp: int = 250,
@@ -28,9 +259,9 @@ def calculate_activity_peak_powers(
     peak_power_watts: int = 1050
 ) -> Dict[str, int]:
     """
-    Computes peak power profile (5s, 30s, 1m, 5m, 20m, 60m) for an activity.
-    Combines raw stream telemetry (if available) with Morton's 3-parameter CP model
-    and Coggan power profiling anchored to activity NP, average watts, max watts, and duration.
+    Computes realistic peak power profile (5s, 30s, 1m, 5m, 20m, 60m) for an activity.
+    Uses power meter telemetry (device_watts, max_watts), interval laps and segments,
+    and applies physiological duration gating with Morton CP / W' intensity attenuation.
     """
     moving_sec = int(act.get("moving_time_sec") or 0)
     avg_w = float(act.get("average_watts") or 0.0)
@@ -38,49 +269,93 @@ def calculate_activity_peak_powers(
 
     raw_json = act.get("raw_json")
     max_w = 0.0
+    device_watts = False
+    laps_peaks: Dict[str, float] = {}
+
     if raw_json:
         try:
             raw_parsed = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
             if isinstance(raw_parsed, dict):
                 max_w = float(raw_parsed.get("max_watts") or 0.0)
+                device_watts = bool(raw_parsed.get("device_watts", False))
+                # Check recorded laps and segment efforts for real interval peaks
+                for lap in raw_parsed.get("laps") or []:
+                    l_sec = int(lap.get("moving_time") or lap.get("elapsed_time") or 0)
+                    l_w = float(lap.get("average_watts") or 0.0)
+                    if 45 <= l_sec <= 90 and l_w > laps_peaks.get("1m", 0):
+                        laps_peaks["1m"] = l_w
+                    if 240 <= l_sec <= 360 and l_w > laps_peaks.get("5m", 0):
+                        laps_peaks["5m"] = l_w
+                    if 1000 <= l_sec <= 1400 and l_w > laps_peaks.get("20m", 0):
+                        laps_peaks["20m"] = l_w
+                for seg in raw_parsed.get("segment_efforts") or []:
+                    s_sec = int(seg.get("moving_time") or seg.get("elapsed_time") or 0)
+                    s_w = float(seg.get("average_watts") or 0.0)
+                    if 45 <= s_sec <= 90 and s_w > laps_peaks.get("1m", 0):
+                        laps_peaks["1m"] = s_w
+                    if 240 <= s_sec <= 360 and s_w > laps_peaks.get("5m", 0):
+                        laps_peaks["5m"] = s_w
+                    if 1000 <= s_sec <= 1400 and s_w > laps_peaks.get("20m", 0):
+                        laps_peaks["20m"] = s_w
         except Exception:
             pass
 
-    if max_w <= 0:
-        max_w = float(act.get("max_heartrate") or 0.0)
-    if max_w < np_w:
-        max_w = np_w * 1.45
-
-    if moving_sec <= 0 or np_w <= 0:
+    if moving_sec < 5 or (np_w <= 0 and avg_w <= 0 and max_w <= 0):
         return {"5s": 0, "30s": 0, "1m": 0, "5m": 0, "20m": 0, "60m": 0}
 
     w_prime_j = w_prime_kj * 1000.0
+    intensity = max(0.40, min(1.15, np_w / max(1.0, float(ftp))))
 
-    # 1. 5s Sprint: Max burst from activity or high neuromuscular estimate
-    p_5s = round(max(max_w, np_w * 1.55, ftp * 2.2))
+    # 1. 5s Sprint: True burst from power meter or intensity-calibrated sprint
+    if max_w > 0:
+        p_5s = round(min(max_w, max_w * 0.96))
+        if not device_watts and max_w < np_w:
+            p_5s = round(max(max_w, np_w * 1.35))
+    else:
+        p_5s = round(min(float(peak_power_watts), np_w * 1.45))
 
     # 2. 30s Burst: High anaerobic capacity
-    p_30s = round(min(p_5s * 0.82, np_w * 1.40 + (w_prime_j / 30.0) * 0.45))
+    if moving_sec < 30:
+        p_30s = 0
+    else:
+        est_30s = np_w * 1.25 + (w_prime_j / 30.0) * 0.40 * intensity
+        p_30s = round(min(p_5s * 0.85, max(np_w * 1.15, est_30s))) if p_5s > 0 else round(est_30s)
 
-    # 3. 1m Anaerobic: Glycolytic peak
-    p_1m = round(min(p_30s * 0.88, np_w * 1.30 + (w_prime_j / 60.0) * 0.55))
+    # 3. 1m Anaerobic: Glycolytic peak (respects real intervals and intensity)
+    if moving_sec < 60:
+        p_1m = 0
+    else:
+        est_1m = np_w * 1.15 + (w_prime_j / 60.0) * 0.45 * intensity
+        capped_1m = min(p_30s * 0.88, est_1m) if p_30s > 0 else est_1m
+        p_1m = round(max(capped_1m, laps_peaks.get("1m", 0.0)))
 
     # 4. 5m VO2 Max: Maximal Aerobic Power (MAP)
-    p_5m = round(min(p_1m * 0.82, np_w * 1.15 + (w_prime_j / 300.0) * 0.70))
-
-    # 5. 20m Threshold: If ride was at least 15 min
-    if moving_sec >= 900:
-        p_20m = round(min(p_5m * 0.90, np_w * 1.02))
+    if moving_sec < 300:
+        p_5m = 0
     else:
-        p_20m = round(np_w * 0.92)
+        est_5m = np_w * 1.05 + (w_prime_j / 300.0) * 0.60 * intensity
+        capped_5m = min(p_1m * 0.88, est_5m) if p_1m > 0 else est_5m
+        p_5m = round(max(capped_5m, laps_peaks.get("5m", 0.0)))
 
-    # 6. 60m Stamina: If ride was at least 40 min
-    if moving_sec >= 2400:
-        p_60m = round(min(p_20m * 0.93, max(avg_w * 0.98, np_w * 0.94)))
+    # 5. 20m Threshold: If ride was at least 15 min (900 sec)
+    if moving_sec < 900:
+        p_20m = 0
     elif moving_sec >= 1200:
-        p_60m = round(avg_w * 0.90)
+        est_20m = min(p_5m * 0.92, max(avg_w, np_w * 0.98)) if p_5m > 0 else max(avg_w, np_w * 0.98)
+        p_20m = round(max(est_20m, laps_peaks.get("20m", 0.0)))
     else:
-        p_60m = round(avg_w * 0.80)
+        est_20m = max(avg_w, np_w * 0.93)
+        p_20m = round(max(est_20m, laps_peaks.get("20m", 0.0)))
+
+    # 6. 60m Stamina: If ride was at least 50 min (3000 sec)
+    if moving_sec < 3000:
+        p_60m = 0
+    elif moving_sec >= 3600:
+        est_60m = min(p_20m * 0.95, max(avg_w, np_w * 0.94)) if p_20m > 0 else avg_w
+        p_60m = round(est_60m)
+    else:
+        est_60m = min(p_20m * 0.92, avg_w * 0.96) if p_20m > 0 else avg_w * 0.92
+        p_60m = round(est_60m)
 
     return {
         "5s": p_5s,
@@ -327,49 +602,13 @@ def get_power_spiderweb_profile(
             else:
                 active_goal["progress_pct"] = 0.0
 
-    # Classify Rider Phenotype (Xert & Coggan Model)
-    sprint_ratio = cur_envelope["5s"] / max(1, ftp)
-    anaerobic_ratio = cur_envelope["1m"] / max(1, ftp)
-    vo2_ratio = cur_envelope["5m"] / max(1, ftp)
-    threshold_ratio = cur_envelope["20m"] / max(1, ftp)
-    stamina_ratio = cur_envelope["60m"] / max(1, ftp)
-
-    if sprint_ratio >= 3.4 and anaerobic_ratio >= 1.70:
-        phenotype = "Sprinter"
-        phenotype_badge = "⚡ Sprinter"
-        phenotype_desc = "Explosive neuromuscular recruitment and fast-twitch power. Dominates final kicks and short accelerations."
-        primary_strength = "5s Sprint & Max Neuromuscular Burst"
-        growth_focus = "Aerobic Threshold Extension (20m+)"
-    elif anaerobic_ratio >= 1.65 and vo2_ratio >= 1.20:
-        phenotype = "Puncheur"
-        phenotype_badge = "🥊 Puncheur"
-        phenotype_desc = "High-octane anaerobic battery (W') capable of violent steep hill attacks and sharp short climbs."
-        primary_strength = "1m–3m Glycolytic Power & Attack Repeatability"
-        growth_focus = "Sub-Threshold Glycogen Sparing"
-    elif vo2_ratio >= 1.22:
-        phenotype = "Pursuiter / VO2 Specialist"
-        phenotype_badge = "🫁 Pursuiter"
-        phenotype_desc = "Huge maximal aerobic ceiling (MAP). Excels at bridge attempts, breakaway pacing, and 3-8 minute climbs."
-        primary_strength = "5m Maximal Aerobic Power (MAP)"
-        growth_focus = "Neuromuscular Peak Sprint P_max"
-    elif threshold_ratio >= 0.92 and stamina_ratio >= 0.85:
-        phenotype = "Rouleur / TT Specialist"
-        phenotype_badge = "⏱️ Rouleur"
-        phenotype_desc = "Diesel engine with massive sustained aerobic power and fatigue resistance over prolonged durations."
-        primary_strength = "20m–60m Sustained Lactate Threshold"
-        growth_focus = "High-Intensity Neuromuscular Snap"
-    elif (cur_envelope["20m"] / max(1.0, weight_kg)) >= 3.6 and vo2_ratio >= 1.18:
-        phenotype = "Climber"
-        phenotype_badge = "⛰️ Climber"
-        phenotype_desc = "Exceptional power-to-weight ratio over extended elevation gradients."
-        primary_strength = "High Sustained W/kg Output"
-        growth_focus = "Flat Wind Sprint Snap"
-    else:
-        phenotype = "All-Rounder"
-        phenotype_badge = "🎯 All-Rounder"
-        phenotype_desc = "Well-balanced spiderweb with harmonious capabilities across sprint, anaerobic capacity, and sustained threshold."
-        primary_strength = "Versatile Energy System Equilibrium"
-        growth_focus = "Specialized Peak Power Polarization"
+    # Classify Rider Phenotype (Unified Multi-Axis Scoring Model)
+    phenotype_eval = classify_athlete_phenotype(cur_envelope, ftp, weight_kg)
+    phenotype = phenotype_eval["title"]
+    phenotype_badge = phenotype_eval["badge"]
+    phenotype_desc = phenotype_eval["description"]
+    primary_strength = phenotype_eval["primary_strength"]
+    growth_focus = phenotype_eval["growth_focus"]
 
     # Historical Progression Timeline (Month-by-Month Buckets)
     timeline_buckets = []
@@ -482,7 +721,10 @@ def get_power_spiderweb_profile(
             "badge": phenotype_badge,
             "description": phenotype_desc,
             "primary_strength": primary_strength,
-            "growth_focus": growth_focus
+            "growth_focus": growth_focus,
+            "affinity_scores": phenotype_eval.get("affinity_scores", {}),
+            "readiness_map": phenotype_eval.get("readiness_map", {}),
+            "std_dev": phenotype_eval.get("std_dev", 0.0)
         },
         "has_active_goal": bool(active_goal),
         "active_goal": active_goal,
@@ -506,136 +748,7 @@ def get_power_spiderweb_profile(
 
 # --- Spiderweb Training Goals & Target Improvement Planning ---
 
-RIDER_PHENOTYPE_DEFINITIONS: List[Dict[str, Any]] = [
-    {
-        "id": "Puncheur",
-        "title": "Puncheur",
-        "badge": "🥊 Puncheur",
-        "icon": "🥊",
-        "description": "High-octane anaerobic battery (W') capable of violent steep hill attacks and sharp short climbs.",
-        "primary_strength": "1m–3m Glycolytic Power & Attack Repeatability",
-        "focus_energy_system": "1m–3m Glycolytic Capacity & Anaerobic Power (W')",
-        "recommended_workouts": [
-            "30/30s High-Cadence VO2 Microbursts (120% FTP / 50% recovery)",
-            "5x 2-Min Steep Anaerobic Hill Repeats (125-130% FTP)",
-            "Tabata High-Torque Acceleration Blocks"
-        ],
-        "requirements": {
-            "5s_ratio": 2.80,
-            "1m_ratio": 1.70,
-            "5m_ratio": 1.22,
-            "20m_ratio": 0.95,
-            "60m_ratio": 0.85
-        }
-    },
-    {
-        "id": "Rouleur",
-        "title": "Rouleur / TT Specialist",
-        "badge": "⏱️ Rouleur",
-        "icon": "⏱️",
-        "description": "Diesel engine with massive sustained aerobic power and fatigue resistance over prolonged durations.",
-        "primary_strength": "20m–60m Sustained Lactate Threshold",
-        "focus_energy_system": "Lactate Clearance & Aerobic Threshold (FTP)",
-        "recommended_workouts": [
-            "2x 20-Min Progressive Sweet Spot (88–94% FTP)",
-            "3x 12-Min Threshold Over-Unders (95% / 105% FTP)",
-            "75-Min Aerobic Tempo Density Ride"
-        ],
-        "requirements": {
-            "5s_ratio": 2.40,
-            "1m_ratio": 1.45,
-            "5m_ratio": 1.15,
-            "20m_ratio": 1.02,
-            "60m_ratio": 0.92
-        }
-    },
-    {
-        "id": "Climber",
-        "title": "Climber",
-        "badge": "⛰️ Climber",
-        "icon": "⛰️",
-        "description": "Exceptional power-to-weight ratio over extended elevation gradients and sustained mountain passes.",
-        "primary_strength": "High Sustained W/kg Output on Gradients",
-        "focus_energy_system": "Sustained W/kg & High Aerobic Ceiling",
-        "recommended_workouts": [
-            "4x 10-Min High-Cadence Alpine Threshold Repeats (96–102% FTP)",
-            "5x 4-Min VO2 Max Climbing Ladders (110–115% FTP)",
-            "2-Hour Endurance Mountain Simulation"
-        ],
-        "requirements": {
-            "5s_ratio": 2.50,
-            "1m_ratio": 1.50,
-            "5m_ratio": 1.24,
-            "20m_ratio": 1.04,
-            "60m_ratio": 0.90,
-            "min_20m_wkg": 3.75,
-            "min_5m_wkg": 4.90
-        }
-    },
-    {
-        "id": "Sprinter",
-        "title": "Sprinter",
-        "badge": "⚡ Sprinter",
-        "icon": "⚡",
-        "description": "Explosive neuromuscular recruitment and fast-twitch power. Dominates final kicks and short accelerations.",
-        "primary_strength": "5s Sprint & Max Neuromuscular Burst",
-        "focus_energy_system": "Neuromuscular Recruitment & Peak Sprint P_max",
-        "recommended_workouts": [
-            "6x 15s All-Out Standing Start Sprints with 4m Recovery",
-            "3 Blocks of 30s High-Torque Acceleration Spin-Ups",
-            "Heavy Resistance Squat & Plyometric Priming"
-        ],
-        "requirements": {
-            "5s_ratio": 3.45,
-            "1m_ratio": 1.75,
-            "5m_ratio": 1.15,
-            "20m_ratio": 0.90,
-            "60m_ratio": 0.82
-        }
-    },
-    {
-        "id": "Pursuiter",
-        "title": "Pursuiter / VO2 Specialist",
-        "badge": "🫁 Pursuiter",
-        "icon": "🫁",
-        "description": "Huge maximal aerobic ceiling (MAP). Excels at bridge attempts, breakaway pacing, and 3-8 minute climbs.",
-        "primary_strength": "5m Maximal Aerobic Power (MAP)",
-        "focus_energy_system": "Maximal Aerobic Power (MAP) & Stroke Volume",
-        "recommended_workouts": [
-            "5x 4-Min Maximal Aerobic Power (MAP @ 112–118% FTP)",
-            "4x 5-Min VO2 Max Extenders with 1:1 Recovery",
-            "40/20s High-Intensity Interval Sets"
-        ],
-        "requirements": {
-            "5s_ratio": 2.60,
-            "1m_ratio": 1.58,
-            "5m_ratio": 1.26,
-            "20m_ratio": 0.96,
-            "60m_ratio": 0.86
-        }
-    },
-    {
-        "id": "All-Rounder",
-        "title": "All-Rounder",
-        "badge": "🎯 All-Rounder",
-        "icon": "🎯",
-        "description": "Well-balanced spiderweb with harmonious capabilities across sprint, anaerobic capacity, and sustained threshold.",
-        "primary_strength": "Versatile Energy System Equilibrium",
-        "focus_energy_system": "Harmonious Multi-System Progression (+5% Envelope Lift)",
-        "recommended_workouts": [
-            "Weekly Polarized Mix: 1x VO2 Intervals, 1x Sweet Spot, 2x Z2 Base",
-            "Over-Under Threshold Ladders",
-            "Weekend Long Aerobic Simulation"
-        ],
-        "requirements": {
-            "5s_ratio": 2.90,
-            "1m_ratio": 1.55,
-            "5m_ratio": 1.18,
-            "20m_ratio": 0.96,
-            "60m_ratio": 0.86
-        }
-    }
-]
+# (RIDER_PHENOTYPE_DEFINITIONS is defined above in the Coggan Power Profiling Model section)
 
 
 def get_active_spiderweb_goal(user_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
@@ -693,26 +806,43 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
         if not pheno_def:
             pheno_def = RIDER_PHENOTYPE_DEFINITIONS[0] # Default Puncheur
 
+        cur_pheno_title = profile.get("phenotype", {}).get("title", "")
+        is_deepening = (cur_pheno_title.lower() == pheno_def["title"].lower() or cur_pheno_title.lower() == pheno_def["id"].lower())
+
         target_key = pheno_def["id"]
-        target_title = f"Transform into {pheno_def['title']}"
+        target_title = f"{'Deepen Focus on' if is_deepening else 'Transform into'} {pheno_def['title']}"
         target_badge = f"{pheno_def['icon']} {pheno_def['title']} Target"
         focus_system = pheno_def["focus_energy_system"]
         rec_workouts = pheno_def["recommended_workouts"]
 
         reqs = pheno_def["requirements"]
-        target_envelope["5s"] = max(cur_envelope.get("5s", 600), round(anchor_ftp * reqs["5s_ratio"]))
-        target_envelope["1m"] = max(cur_envelope.get("1m", 400), round(anchor_ftp * reqs["1m_ratio"]))
-        target_envelope["5m"] = max(cur_envelope.get("5m", 300), round(anchor_ftp * reqs["5m_ratio"]))
-        target_envelope["20m"] = max(cur_envelope.get("20m", 240), round(anchor_ftp * reqs["20m_ratio"]))
-        target_envelope["60m"] = max(cur_envelope.get("60m", 210), round(anchor_ftp * reqs["60m_ratio"]))
+        sig_axes = pheno_def.get("signature_axes", [])
+
+        # Build target envelope: progressive adaptation overload on signature axes
+        for k in ["5s", "1m", "5m", "20m", "60m"]:
+            base_req = round(anchor_ftp * reqs.get(f"{k}_ratio", 1.0))
+            cur_w = cur_envelope.get(k, base_req)
+            if k in sig_axes:
+                if cur_w >= round(base_req * 0.97):
+                    target_envelope[k] = max(base_req, round(cur_w * 1.05))
+                else:
+                    target_envelope[k] = base_req
+            else:
+                target_envelope[k] = max(cur_w, base_req)
 
         # Check climber specific W/kg minimums
         if "min_20m_wkg" in reqs:
             wkg_target_20m = round(weight_kg * reqs["min_20m_wkg"])
-            target_envelope["20m"] = max(target_envelope["20m"], wkg_target_20m)
+            if cur_envelope.get("20m", 0) >= round(wkg_target_20m * 0.97):
+                target_envelope["20m"] = max(target_envelope.get("20m", 0), round(cur_envelope.get("20m", 0) * 1.05))
+            else:
+                target_envelope["20m"] = max(target_envelope.get("20m", 0), wkg_target_20m)
         if "min_5m_wkg" in reqs:
             wkg_target_5m = round(weight_kg * reqs["min_5m_wkg"])
-            target_envelope["5m"] = max(target_envelope["5m"], wkg_target_5m)
+            if cur_envelope.get("5m", 0) >= round(wkg_target_5m * 0.97):
+                target_envelope["5m"] = max(target_envelope.get("5m", 0), round(cur_envelope.get("5m", 0) * 1.05))
+            else:
+                target_envelope["5m"] = max(target_envelope.get("5m", 0), wkg_target_5m)
 
         # Automatically align program_goal & program_target_ftp so Macrocycle & Spiderweb never conflict
         if not preserve_program_settings:
@@ -1025,30 +1155,46 @@ def calculate_spiderweb_target_changes(
 
     # 2. Rider Type Transformation Analysis
     rider_type_targets = []
+    cur_pheno_title = cur_phenotype.get("title", "")
+
     for pheno in RIDER_PHENOTYPE_DEFINITIONS:
         reqs = pheno["requirements"]
-        target_5s = max(cur_envelope.get("5s", 0), round(ftp * reqs["5s_ratio"]))
-        target_1m = max(cur_envelope.get("1m", 0), round(ftp * reqs["1m_ratio"]))
-        target_5m = max(cur_envelope.get("5m", 0), round(ftp * reqs["5m_ratio"]))
-        target_20m = max(cur_envelope.get("20m", 0), round(ftp * reqs["20m_ratio"]))
-        target_60m = max(cur_envelope.get("60m", 0), round(ftp * reqs["60m_ratio"]))
+        sig_axes = pheno.get("signature_axes", [])
+
+        # Build progressive target envelope
+        target_env = {}
+        for dur_meta in RADAR_DURATIONS:
+            dur_k = dur_meta["key"]
+            base_req = round(ftp * reqs.get(f"{dur_k}_ratio", 1.0))
+            curr_val = cur_envelope.get(dur_k, 0)
+            if dur_k in sig_axes:
+                # Hallmark signature duration for this archetype:
+                # If current power is near or exceeds archetype baseline, challenge with a +5% progressive stimulus
+                if curr_val >= round(base_req * 0.97):
+                    target_env[dur_k] = max(base_req, round(curr_val * 1.05))
+                else:
+                    target_env[dur_k] = base_req
+            else:
+                # Non-signature axes: maintain current power or archetype baseline
+                target_env[dur_k] = max(curr_val, base_req)
 
         if "min_20m_wkg" in reqs:
-            target_20m = max(target_20m, round(weight_kg * reqs["min_20m_wkg"]))
+            wkg_tgt = round(weight_kg * reqs["min_20m_wkg"])
+            if cur_envelope.get("20m", 0) >= round(wkg_tgt * 0.97):
+                target_env["20m"] = max(target_env.get("20m", 0), round(cur_envelope.get("20m", 0) * 1.05))
+            else:
+                target_env["20m"] = max(target_env.get("20m", 0), wkg_tgt)
         if "min_5m_wkg" in reqs:
-            target_5m = max(target_5m, round(weight_kg * reqs["min_5m_wkg"]))
-
-        target_env = {
-            "5s": target_5s,
-            "1m": target_1m,
-            "5m": target_5m,
-            "20m": target_20m,
-            "60m": target_60m
-        }
+            wkg_tgt_5 = round(weight_kg * reqs["min_5m_wkg"])
+            if cur_envelope.get("5m", 0) >= round(wkg_tgt_5 * 0.97):
+                target_env["5m"] = max(target_env.get("5m", 0), round(cur_envelope.get("5m", 0) * 1.05))
+            else:
+                target_env["5m"] = max(target_env.get("5m", 0), wkg_tgt_5)
 
         axis_gaps = []
-        met_count = 0
         total_delta = 0
+        readiness_accum = 0.0
+        total_weight = 0.0
 
         for ax_meta in RADAR_DURATIONS:
             dur_k = ax_meta["key"]
@@ -1056,9 +1202,14 @@ def calculate_spiderweb_target_changes(
             tgt_val = target_env[dur_k]
             gap = max(0, tgt_val - curr_val)
             is_met = (curr_val >= tgt_val)
-            if is_met:
-                met_count += 1
             total_delta += gap
+
+            # Continuous readiness relative to required archetype baseline
+            base_req = round(ftp * reqs.get(f"{dur_k}_ratio", 1.0))
+            axis_readiness = min(100.0, (curr_val / max(1.0, float(base_req))) * 100.0) if base_req > 0 else 100.0
+            ax_weight = 2.5 if dur_k in sig_axes else 1.0
+            readiness_accum += axis_readiness * ax_weight
+            total_weight += ax_weight
 
             axis_gaps.append({
                 "key": dur_k,
@@ -1073,8 +1224,8 @@ def calculate_spiderweb_target_changes(
                 "is_met": is_met
             })
 
-        is_current_type = (pheno["id"].lower() == cur_phenotype["title"].lower())
-        completion_pct = 100.0 if is_current_type else round((met_count / 5.0) * 100.0, 1)
+        is_current_type = (pheno["id"].lower() == cur_pheno_title.lower() or pheno["title"].lower() == cur_pheno_title.lower())
+        completion_pct = round(readiness_accum / max(1.0, total_weight), 1)
 
         rider_type_targets.append({
             "id": pheno["id"],
@@ -1084,6 +1235,7 @@ def calculate_spiderweb_target_changes(
             "description": pheno["description"],
             "primary_strength": pheno["primary_strength"],
             "focus_energy_system": pheno["focus_energy_system"],
+            "signature_axes": sig_axes,
             "is_current_type": is_current_type,
             "completion_pct": completion_pct,
             "total_delta_watts": total_delta,

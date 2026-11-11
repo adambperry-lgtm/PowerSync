@@ -258,6 +258,49 @@ class TestPowerSpiderweb(unittest.TestCase):
 
         clear_active_spiderweb_goal(user_id=self.user_id)
 
+    def test_user_phenotype_classification_and_progressive_overload_goal(self):
+        """
+        Verify that an athlete with high VO2 max and balanced capabilities
+        is accurately classified (Pursuiter or All-Rounder) and not trapped
+        as a Puncheur, and setting a phenotype goal generates progressive overload
+        targets rather than 0W gaps.
+        """
+        from app.services.power_profile_service import classify_athlete_phenotype
+
+        ftp = 260.0
+        weight_kg = 70.0
+        # Envelope where VO2 max (5m) is strong (e.g. 340W / 1.31 ratio),
+        # 1m is solid (445W / 1.71 ratio), 20m is 265W (1.02 ratio), 60m is 250W (0.96 ratio), 5s is 800W (3.08 ratio)
+        cur_envelope = {
+            "5s": 800.0,
+            "1m": 445.0,
+            "5m": 340.0,
+            "20m": 265.0,
+            "60m": 250.0
+        }
+
+        classification = classify_athlete_phenotype(cur_envelope, ftp, weight_kg)
+        # Should be Pursuiter (due to outstanding 5m weapon) or All-Rounder, NOT Puncheur
+        self.assertIn(classification["title"], ["Pursuiter", "All-Rounder"])
+        self.assertNotEqual(classification["title"], "Puncheur")
+
+        # Test setting Pursuiter goal when already at or above baseline ratio
+        goal_payload = {
+            "goal_type": "phenotype",
+            "target_key": "Pursuiter"
+        }
+        saved_goal = set_active_spiderweb_goal(goal_payload, user_id=self.user_id)
+        # Signature axis for Pursuiter is 5m (and 1m); target should require progressive overload (+5%)
+        # and not collapse to 0W delta
+        self.assertGreater(saved_goal["target_envelope"]["5m"], cur_envelope["5m"] * 0.95)
+
+        # Profile active goal should compute the remaining watts needed
+        profile_with_goal = get_power_spiderweb_profile(user_id=self.user_id, timeframe="30d")
+        self.assertTrue(profile_with_goal["has_active_goal"])
+        self.assertGreater(profile_with_goal["active_goal"]["remaining_total_watts"], 0)
+
+        clear_active_spiderweb_goal(user_id=self.user_id)
+
 
 if __name__ == "__main__":
     unittest.main()

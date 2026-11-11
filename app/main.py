@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.5.7",
-        "release_name": "PowerSync — Removed Static Live Pacing Bottom Sheet",
+        "version": "2.6.0",
+        "release_name": "Power Spiderweb & Multi-Axis Coggan Phenotype Profiling Engine",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,18 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.0",
+                "date": "2026-11-11",
+                "title": "Power Spiderweb & Multi-Axis Coggan Phenotype Profiling Engine",
+                "items": [
+                    "Unified Multi-Axis Coggan Phenotype Profiling: Replaced the order-dependent if/elif waterfall with a scientific, multi-axis power profile classification model (classify_athlete_phenotype). Evaluates relative energy system strengths across all 5 durations (5s sprint, 1m glycolytic, 5m VO2 Max, 20m threshold, 60m stamina) to classify phenotypes (All-Rounder, Pursuiter, Puncheur, Rouleur, Climber, Sprinter) without cascade pre-emption.",
+                    "Continuous Phenotype Readiness & Affinity Scoring: Computes smooth, weighted readiness percentages (0–100%) and multi-axis affinity scores, ending conflicting 100% qualifications across disparate archetypes.",
+                    "Transformation Goal Progression & 0W Gap Elimination: Signature axes for target phenotypes now challenge athletes with a progressive +5% adaptation overload when baseline requirements are already met, ensuring transformation targets always provide positive, actionable wattage goals instead of instant 0W completion.",
+                    "Physiological Duration Gating & Activity Peak Power Accuracy: Refined calculate_activity_peak_powers to enforce strict minimum moving times (e.g. 20m and 60m require genuine ride durations), honor power meter max_watts telemetry, extract lap/segment interval peaks, and calibrate anaerobic W' contribution to ride intensity.",
+                    "Planner UI Status & Card Polish: Updated rider archetype cards to show '🎯 Current Classification (X% Match)' for the active phenotype and clear progressive readiness for transformation goals."
+                ]
+            },
             {
                 "version": "v2.5.7",
                 "date": "2026-11-11",
