@@ -443,6 +443,7 @@ function renderStrava(strava) {
 
   if (ws.form_status) {
     formStatusBadge.textContent = ws.form_status;
+    formStatusBadge.title = ws.form_status;
   }
   if (ws.form_description) {
     formDesc.textContent = ws.form_description;
@@ -783,6 +784,7 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
         subtext.innerHTML = '<span style="color:#10b981;font-weight:600;">✓ Synced to Zwift 🚀</span>';
       } else if (w.badge) {
         subtext.textContent = w.badge;
+        subtext.title = w.badge;
         subtext.style.color = isRest ? "#10b981" : "var(--accent-cyan)";
       } else {
         subtext.textContent = `Whoop: ${whoopRec}% Recovery`;

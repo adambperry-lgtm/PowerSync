@@ -206,7 +206,7 @@
               </div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
+          <div class="card-header-actions" style="display:flex;align-items:center;gap:0.4rem;">
             <button class="btn btn-secondary" style="padding:0.2rem 0.5rem;font-size:0.75rem;" id="btnSyncWhoop">🔄 Sync Whoop</button>
             <span class="badge-status" id="whoopDateBadge">Today</span>
             <button class="btn btn-secondary btn-stage-collapse" id="btnToggleWhoopCard" type="button" aria-label="Collapse or expand Whoop biometrics">
@@ -312,7 +312,7 @@
               </div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
+          <div class="card-header-actions" style="display:flex;align-items:center;gap:0.4rem;">
             <span class="badge-status" id="formStatusBadge" style="color:#00C896;border-color:#00C896;">Optimal / Fresh</span>
             <button class="btn btn-secondary btn-stage-collapse" id="btnToggleStravaCard" type="button" aria-label="Collapse or expand Strava training load">
               <span id="stravaToggleIcon">▲</span>
@@ -370,7 +370,7 @@
               </div>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:0.5rem;">
+          <div class="card-header-actions" style="display:flex;align-items:center;gap:0.4rem;">
             <span class="badge-status badge-gemini connected" id="badgeCardGeminiStatus" title="Directeur Sportive AI Intelligence" style="font-size:0.68rem;padding:0.16rem 0.5rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.35);color:#00C896;font-weight:600;flex-shrink:0;">
               <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #00C896;background:#00C896;border-radius:50%;"></span>
               <span id="txtCardGeminiStatus">DS Live</span>
@@ -416,9 +416,9 @@
             Outstanding discipline holding power within your Zone 2 aerobic base ceiling on a 45% recovery day. Cardiac cost remained flat with 7.7 Whoop day strain.
           </div>
 
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.75rem;padding-top:0.35rem;border-top:1px solid var(--border-color);">
-            <span id="coachCardFooterSubtext" style="color:#00C896;font-weight:700;font-size:0.78rem;">Bullseye 🎯</span>
-            <a href="#cardCoachDebrief" id="coachCardJumpLink" style="color:#0052FF;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:0.25rem;">
+          <div class="coach-card-footer" style="display:flex;justify-content:space-between;align-items:center;margin-top:auto;font-size:0.75rem;padding-top:0.35rem;border-top:1px solid var(--border-color);gap:0.4rem;min-width:0;">
+            <span id="coachCardFooterSubtext" style="color:#00C896;font-weight:700;font-size:0.76rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 auto;">Bullseye 🎯</span>
+            <a href="#cardCoachDebrief" id="coachCardJumpLink" style="color:#0052FF;text-decoration:none;font-weight:700;display:inline-flex;align-items:center;gap:0.25rem;flex-shrink:0;">
               Full Debrief ↓
             </a>
           </div>

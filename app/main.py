@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.5.3",
-        "release_name": "PowerSync — Speed & Summit Edition",
+        "version": "2.5.4",
+        "release_name": "PowerSync — UI Formatting & Responsive Text Collision Polish",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.5.4",
+                "date": "2026-11-11",
+                "title": "Card Header Layout & Text Bubble Collision Fixes",
+                "items": [
+                    "Telemetry Grid Header Layout & Wrapping: Fixed card-header flex wrapping and prevented title wrapping under icons by enforcing nowrap in card-header-left and setting a resilient minimum width on header titles. Sub-status badges and collapse controls now wrap cleanly without overlapping card titles.",
+                    "AI Coach Narrative Overflow & Scrollbar: Added overflow-y: auto and box-sizing to #coachCardNarrative with a sleek thin scrollbar, ensuring long briefing texts (e.g., forecast confirmation explanations) never spill over or collide with footer jump links.",
+                    "Ellipsis Protection & Title Tooltips: Added text-overflow: ellipsis and full title hover tooltips for formStatusBadge and coachCardFooterSubtext to safeguard against multi-line text running across adjacent controls."
+                ]
+            },
             {
                 "version": "v2.5.3",
                 "date": "2026-11-11",

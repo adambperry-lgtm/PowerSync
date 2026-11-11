@@ -3,6 +3,17 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.5.4] - 2026-11-11
+### Fixed
+- **Telemetry Card Header Layout & Overlap Prevention**:
+  - Enforced `flex-wrap: nowrap` on `.card-header-left` so card icons and titles are never severed across different lines.
+  - Implemented resilient `.telemetry-grid .card-title` font sizing (`0.92rem !important`) and min-width boundaries on the title box, preventing titles like "Strava Training Load (7 Days)" from being crushed down into narrow vertical stacks.
+  - Styled `.card-header-actions` to wrap cleanly to line 2 on narrow containers without overlapping or invading the title boundaries.
+  - Added text-overflow protection and ellipsis clipping (`max-width: 170px`) with full-title hover tooltips for long status badges such as `Supercompensated / Fresh`.
+- **AI Race Briefing Narrative Overflow & Footer Collision Fix**:
+  - Replaced unconstrained `max-height: 85px` on `.telemetry-grid #coachCardNarrative` with `overflow-y: auto`, `box-sizing: border-box`, and a discrete 4px custom scrollbar. Long coach directives (such as detailed forward forecast confirmations) scroll smoothly inside the white narrative bubble without overflowing onto footer jump links or buttons.
+  - Standardized `.coach-card-footer` and `#coachCardFooterSubtext` with flexible text truncation and ellipsis handling to prevent coach badges from colliding with action links.
+
 ---
 
 ## [2.5.3] - 2026-11-11

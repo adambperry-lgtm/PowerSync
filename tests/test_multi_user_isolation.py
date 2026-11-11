@@ -470,10 +470,9 @@ class TestMultiUserHTTPServer(unittest.TestCase):
         self.assertFalse(me["authenticated"])
         self.assertEqual(me["id"], "usr_guest")
 
-        # Guest viewing settings: private credentials must NOT be leaked
-        settings = guest_client.get("/api/settings").json()
-        self.assertNotEqual(settings.get("intervals_athlete_id"), "i748824_SECRET")
-        self.assertTrue(settings.get("demo_mode"))
+        # Guest viewing settings: private credentials must NOT be leaked (enforced via 401 in v2.4.5+)
+        res = guest_client.get("/api/settings")
+        self.assertEqual(res.status_code, 401)
 
     def test_04_primary_login_and_dev_user_non_adoption(self):
         """Verify primary-login signs into usr_default, and dev switching does NOT adopt usr_default."""

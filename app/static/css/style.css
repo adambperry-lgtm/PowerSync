@@ -510,13 +510,33 @@ h1, h2, h3, h4,
 }
 
 .telemetry-grid .card-header {
-  margin-bottom: 0.15rem;
-  gap: 0.4rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.55rem;
+  margin-bottom: 0.25rem;
 }
 
 .telemetry-grid .card-header-left {
-  min-width: 0;
+  min-width: 160px;
+  flex: 1 1 auto;
   gap: 0.5rem;
+  flex-wrap: nowrap;
+}
+
+.telemetry-grid .card-header-left > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.telemetry-grid .card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  margin-left: auto;
 }
 
 .telemetry-grid .card-header-icon {
@@ -527,10 +547,32 @@ h1, h2, h3, h4,
   flex-shrink: 0;
 }
 
+.telemetry-grid .card-header .card-title,
 .telemetry-grid .card-title {
-  font-size: 0.88rem;
-  font-weight: 700;
+  font-size: 0.92rem !important;
+  font-weight: 700 !important;
   letter-spacing: -0.01em;
+  line-height: 1.25 !important;
+  display: block !important;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.telemetry-grid .badge-status {
+  font-size: 0.7rem !important;
+  padding: 0.18rem 0.5rem !important;
+  max-width: 170px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.25;
+}
+
+.telemetry-grid .btn-stage-collapse {
+  padding: 0.2rem 0.5rem !important;
+  font-size: 0.72rem !important;
+  line-height: 1.25;
+  white-space: nowrap;
 }
 
 /* Whoop 3-Ring Telemetry Card as Smaller Box */
@@ -632,12 +674,55 @@ h1, h2, h3, h4,
   line-height: 1.25;
 }
 
+.telemetry-grid #coachCardBody {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: space-between;
+}
+
 .telemetry-grid #coachCardNarrative {
-  font-size: 0.74rem;
-  line-height: 1.4;
-  padding: 0.45rem 0.65rem;
-  max-height: 85px;
-  border-radius: 6px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  padding: 0.55rem 0.7rem;
+  max-height: 98px;
+  overflow-y: auto;
+  border-radius: 8px;
+  box-sizing: border-box;
+  word-break: normal;
+  overflow-wrap: break-word;
+  margin-top: 0.2rem;
+  margin-bottom: 0.4rem;
+  scrollbar-width: thin;
+}
+
+.telemetry-grid #coachCardNarrative::-webkit-scrollbar {
+  width: 4px;
+}
+
+.telemetry-grid #coachCardNarrative::-webkit-scrollbar-thumb {
+  background: rgba(0, 82, 255, 0.25);
+  border-radius: 4px;
+}
+
+.telemetry-grid .coach-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--border-color);
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.telemetry-grid #coachCardFooterSubtext {
+  font-size: 0.76rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .card {
@@ -729,9 +814,14 @@ h1, h2, h3, h4,
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  flex-wrap: wrap;
-  flex: 1;
-  min-width: 200px;
+  flex-wrap: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.card-header-left > div {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .card-header-icon,
