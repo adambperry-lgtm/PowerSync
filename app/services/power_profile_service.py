@@ -320,56 +320,73 @@ def calculate_activity_peak_powers(
     w_prime_j = w_prime_kj * 1000.0
     intensity = max(0.40, min(1.15, np_w / max(1.0, float(ftp))))
 
-    # 1. 5s Sprint: True burst from power meter or intensity-calibrated sprint
-    if max_w > 0:
-        p_5s = round(min(max_w, max_w * 0.96))
-        if not device_watts and max_w < np_w:
-            p_5s = round(max(max_w, np_w * 1.35))
-    else:
-        p_5s = round(min(float(peak_power_watts), np_w * 1.45))
+    # Base sustained power floor from activity telemetry
+    base_sustained_w = max(avg_w, np_w)
 
-    # 2. 30s Burst: High anaerobic capacity
-    if moving_sec < 30:
-        p_30s = 0
+    # 6. 60m Stamina: If ride was at least 50 min (3000 sec)
+    if moving_sec < 3000:
+        p_60m = 0
+    elif moving_sec >= 3600:
+        est_60m = max(avg_w, np_w * 0.94)
+        p_60m = round(est_60m)
     else:
-        est_30s = np_w * 1.25 + (w_prime_j / 30.0) * 0.40 * intensity
-        p_30s = round(min(p_5s * 0.85, max(np_w * 1.15, est_30s))) if p_5s > 0 else round(est_30s)
+        est_60m = max(avg_w * 0.96, np_w * 0.92)
+        p_60m = round(est_60m)
 
-    # 3. 1m Anaerobic: Glycolytic peak (respects real intervals and intensity)
-    if moving_sec < 60:
-        p_1m = 0
+    # 5. 20m Threshold: If ride was at least 15 min (900 sec)
+    if moving_sec < 900:
+        p_20m = 0
+    elif moving_sec >= 1200:
+        est_20m = max(avg_w, np_w * 0.98, p_60m)
+        p_20m = round(max(est_20m, laps_peaks.get("20m", 0.0)))
     else:
-        est_1m = np_w * 1.15 + (w_prime_j / 60.0) * 0.45 * intensity
-        capped_1m = min(p_30s * 0.88, est_1m) if p_30s > 0 else est_1m
-        p_1m = round(max(capped_1m, laps_peaks.get("1m", 0.0)))
+        est_20m = max(avg_w, np_w * 0.93, p_60m)
+        p_20m = round(max(est_20m, laps_peaks.get("20m", 0.0)))
 
     # 4. 5m VO2 Max: Maximal Aerobic Power (MAP)
     if moving_sec < 300:
         p_5m = 0
     else:
         est_5m = np_w * 1.05 + (w_prime_j / 300.0) * 0.60 * intensity
-        capped_5m = min(p_1m * 0.88, est_5m) if p_1m > 0 else est_5m
-        p_5m = round(max(capped_5m, laps_peaks.get("5m", 0.0)))
+        p_5m = round(max(est_5m, base_sustained_w, p_20m, laps_peaks.get("5m", 0.0)))
 
-    # 5. 20m Threshold: If ride was at least 15 min (900 sec)
-    if moving_sec < 900:
-        p_20m = 0
-    elif moving_sec >= 1200:
-        est_20m = min(p_5m * 0.92, max(avg_w, np_w * 0.98)) if p_5m > 0 else max(avg_w, np_w * 0.98)
-        p_20m = round(max(est_20m, laps_peaks.get("20m", 0.0)))
+    # 3. 1m Anaerobic: Glycolytic peak (respects real intervals and sustained intensity)
+    if moving_sec < 60:
+        p_1m = 0
     else:
-        est_20m = max(avg_w, np_w * 0.93)
-        p_20m = round(max(est_20m, laps_peaks.get("20m", 0.0)))
+        est_1m = np_w * 1.15 + (w_prime_j / 60.0) * 0.45 * intensity
+        p_1m = round(max(est_1m, p_5m * 1.04, base_sustained_w * 1.08, laps_peaks.get("1m", 0.0)))
 
-    # 6. 60m Stamina: If ride was at least 50 min (3000 sec)
-    if moving_sec < 3000:
-        p_60m = 0
-    elif moving_sec >= 3600:
-        est_60m = min(p_20m * 0.95, max(avg_w, np_w * 0.94)) if p_20m > 0 else avg_w
-        p_60m = round(est_60m)
+    # 2. 30s Burst: High anaerobic capacity
+    if moving_sec < 30:
+        p_30s = 0
     else:
-        est_60m = min(p_20m * 0.92, avg_w * 0.96) if p_20m > 0 else avg_w * 0.92
-        p_60m = round(est_60m)
+        est_30s = np_w * 1.25 + (w_prime_j / 30.0) * 0.40 * intensity
+        p_30s = round(max(est_30s, p_1m * 1.06, base_sustained_w * 1.15))
+
+    # 1. 5s Sprint: True burst from power meter or intensity-calibrated sprint
+    if max_w > 0:
+        raw_5s = min(max_w, max_w * 0.98)
+        if not device_watts and max_w < np_w:
+            raw_5s = max(max_w, np_w * 1.35)
+        p_5s = round(max(raw_5s, p_30s * 1.05, max_w * 0.95))
+    else:
+        raw_5s = min(float(peak_power_watts), max(np_w * 1.35, p_30s * 1.08))
+        p_5s = round(max(raw_5s, p_30s))
+
+    # Physiological Monotonicity Guarantee:
+    # A shorter duration MUST NEVER have a lower maximum power than a longer duration
+    # P(5s) >= P(30s) >= P(1m) >= P(5m) >= P(20m) >= P(60m)
+    if p_20m > 0 and p_60m > p_20m:
+        p_20m = p_60m
+    if p_5m > 0 and p_20m > p_5m:
+        p_5m = p_20m
+    if p_1m > 0 and p_5m > p_1m:
+        p_1m = p_5m
+    if p_30s > 0 and p_1m > p_30s:
+        p_30s = p_1m
+    if p_5s > 0 and p_30s > p_5s:
+        p_5s = p_30s
 
     return {
         "5s": p_5s,

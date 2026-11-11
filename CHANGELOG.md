@@ -3,6 +3,15 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.7.0] - 2026-11-11
+### Fixed
+- **Physiological Monotonicity & Steady-State Interval Power Floor**:
+  - Eliminated the backwards downward duration capping formula (`min(p_1m * 0.88, est_5m)`) that artificially degraded steady-state and ERG-mode trainer workouts lacking an all-out sprint (such as 14-minute blocks at 215W+) down to 163W at 1 minute and 143W at 5 minutes.
+  - Enforced fundamental cycling physics and mathematical monotonicity ($P(5s) \ge P(30s) \ge P(1m) \ge P(5m) \ge P(20m) \ge P(60m)$): a shorter duration can never yield lower maximum power than a longer sustained duration.
+  - Established empirical power floors anchored to normalized power ($NP$), average power, and interval lap telemetry: sustained efforts (e.g. 14 minutes at 215W+) now correctly propagate to all shorter durations ($5m \ge 215\text{W}$, $1m \ge 225\text{W}$, $30s \ge 235\text{W}$, $5s \ge 245\text{W}$).
+
+---
+
 ## [2.6.9] - 2026-11-11
 ### Fixed
 - **Ride Count Consistency in Mini-Spiderwebs**:

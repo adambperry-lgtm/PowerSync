@@ -128,8 +128,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.9",
-        "release_name": "Cycling Activity Detection Telemetry & Consistent Ride Counts",
+        "version": "2.7.0",
+        "release_name": "Physiological Monotonicity & Interval Sustained Power Calibration",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -139,6 +139,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.7.0",
+                "date": "2026-11-11",
+                "title": "Physiological Monotonicity & Interval Sustained Power Calibration",
+                "items": [
+                    "Physiological Monotonicity: Enforced P(5s) >= P(30s) >= P(1m) >= P(5m) >= P(20m) >= P(60m) so shorter durations can never have lower power than longer durations.",
+                    "Sustained Interval Floors: Eliminated downward sprint-decay capping that artificially degraded steady trainer workouts (e.g. 14m @ 215W+) down to 143W at 5m and 163W at 1m.",
+                    "Telemetry-Driven Durations: Anchored 5m, 1m, and sprint intervals to normalized power (NP), average power, and lap telemetry for accurate anaerobic and VO2 representation."
+                ]
+            },
             {
                 "version": "v2.6.9",
                 "date": "2026-11-11",
