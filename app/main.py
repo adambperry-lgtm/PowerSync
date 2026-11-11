@@ -128,8 +128,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.7",
-        "release_name": "Visual Power Curve Progression & Monthly Mini-Spiderwebs",
+        "version": "2.6.8",
+        "release_name": "Refined Mini-Spiderweb Hero Radars & 5-Column Power Strip",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -139,6 +139,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.8",
+                "date": "2026-11-11",
+                "title": "Refined Mini-Spiderweb Hero Radars & 5-Column Power Strip",
+                "items": [
+                    "Hero Mini-Spiderweb Centerpiece: Enlarged 105px radar canvas with 5 clearly labeled duration vertices (5s, 1m, 5m, 20m, 60m), concentric rings, and interactive tooltips.",
+                    "Full-Width 5-Column Power Strip: Replaced cramped side-by-side pills with a structured 5-column metric strip that perfectly aligns with card boundaries and never overflows.",
+                    "Zero Border Clipping: Applied overflow: hidden and box-sizing: border-box across timeline cards and power cells for flawless rendering across all screen sizes."
+                ]
+            },
             {
                 "version": "v2.6.7",
                 "date": "2026-11-11",

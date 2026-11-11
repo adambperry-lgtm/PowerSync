@@ -7324,21 +7324,24 @@ function renderPowerCurveTimelineChart(axes, activeGoal) {
 }
 
 function generateMiniSpiderwebSvg(item, bmMap) {
-  const cx = 42;
-  const cy = 42;
-  const r = 32;
+  const cx = 80;
+  const cy = 54;
+  const r = 34;
   const keys = ["5s", "1m", "5m", "20m", "60m"];
   const n = keys.length;
 
   const outerPts = [];
   const midPts = [];
+  const innerPts = [];
   for (let i = 0; i < n; i++) {
     const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
     outerPts.push(`${(cx + r * Math.cos(angle)).toFixed(1)},${(cy + r * Math.sin(angle)).toFixed(1)}`);
-    midPts.push(`${(cx + (r * 0.5) * Math.cos(angle)).toFixed(1)},${(cy + (r * 0.5) * Math.sin(angle)).toFixed(1)}`);
+    midPts.push(`${(cx + (r * 0.6) * Math.cos(angle)).toFixed(1)},${(cy + (r * 0.6) * Math.sin(angle)).toFixed(1)}`);
+    innerPts.push(`${(cx + (r * 0.3) * Math.cos(angle)).toFixed(1)},${(cy + (r * 0.3) * Math.sin(angle)).toFixed(1)}`);
   }
 
   const polyPts = [];
+  const polyNodes = [];
   for (let i = 0; i < n; i++) {
     const k = keys[i];
     const val = item[`peak_${k}`] || 0;
@@ -7348,6 +7351,7 @@ function generateMiniSpiderwebSvg(item, bmMap) {
     const px = cx + (r * pct) * Math.cos(angle);
     const py = cy + (r * pct) * Math.sin(angle);
     polyPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
+    polyNodes.push({ x: px, y: py, val, key: k });
   }
 
   let spokes = "";
@@ -7358,16 +7362,34 @@ function generateMiniSpiderwebSvg(item, bmMap) {
     spokes += `<line x1="${cx}" y1="${cy}" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="rgba(148,163,184,0.2)" stroke-width="0.8" />`;
   }
 
+  const labelConfigs = [
+    { key: "5s", x: cx, y: 11, anchor: "middle" },
+    { key: "1m", x: 120, y: 45, anchor: "start" },
+    { key: "5m", x: 106, y: 95, anchor: "start" },
+    { key: "20m", x: 54, y: 95, anchor: "end" },
+    { key: "60m", x: 40, y: 45, anchor: "end" }
+  ];
+
+  let labelsHtml = "";
+  labelConfigs.forEach(cfg => {
+    labelsHtml += `<text x="${cfg.x}" y="${cfg.y}" text-anchor="${cfg.anchor}" fill="var(--text-muted)" font-size="8.5" font-weight="700" font-family="Outfit, Inter, sans-serif">${cfg.key}</text>`;
+  });
+
+  const nodeCircles = polyNodes.map(node => `
+    <circle cx="${node.x.toFixed(1)}" cy="${node.y.toFixed(1)}" r="2.5" fill="#0052FF" stroke="#FFFFFF" stroke-width="1">
+      <title>${node.key}: ${node.val ? node.val + 'W' : '--'}</title>
+    </circle>
+  `).join("");
+
   return `
-    <svg viewBox="0 0 84 84" width="76" height="76" style="overflow:visible;">
-      <polygon points="${outerPts.join(" ")}" fill="rgba(15,23,42,0.15)" stroke="rgba(148,163,184,0.3)" stroke-width="1" />
+    <svg viewBox="0 0 160 110" style="width:100%;height:100%;max-height:105px;display:block;overflow:visible;">
+      <polygon points="${outerPts.join(" ")}" fill="rgba(15,23,42,0.12)" stroke="rgba(148,163,184,0.28)" stroke-width="0.9" />
       <polygon points="${midPts.join(" ")}" fill="none" stroke="rgba(148,163,184,0.18)" stroke-width="0.8" stroke-dasharray="2 2" />
+      <polygon points="${innerPts.join(" ")}" fill="none" stroke="rgba(148,163,184,0.12)" stroke-width="0.7" />
       ${spokes}
-      <polygon points="${polyPts.join(" ")}" fill="rgba(0, 82, 255, 0.28)" stroke="#0052FF" stroke-width="1.6" />
-      ${polyPts.map(pt => {
-        const [x, y] = pt.split(",");
-        return `<circle cx="${x}" cy="${y}" r="2" fill="#0052FF" />`;
-      }).join("")}
+      ${labelsHtml}
+      <polygon points="${polyPts.join(" ")}" fill="rgba(0, 82, 255, 0.22)" stroke="#0052FF" stroke-width="1.8" />
+      ${nodeCircles}
     </svg>
   `;
 }
@@ -7428,21 +7450,34 @@ function renderSpiderwebTimeline(timeline, axes) {
       <div class="spiderweb-timeline-card">
         <div class="timeline-card-header">
           <span class="timeline-month">${escapeSpiderwebHtml(item.label)}</span>
-          <span class="timeline-count" style="font-size:0.68rem;color:var(--text-muted);">${item.workout_count} rides · ${item.total_hours}h</span>
+          <span class="timeline-count-badge">${item.workout_count} rides · ${item.total_hours}h</span>
         </div>
-        <div class="timeline-card-body">
-          <div class="timeline-mini-radar-wrap" title="Monthly 5-Axis Spiderweb Shape">
-            ${miniSvg}
+        <div class="timeline-mini-radar-container" title="Monthly 5-Axis Phenotype Radar (${escapeSpiderwebHtml(item.label)})">
+          ${miniSvg}
+        </div>
+        <div class="timeline-power-strip">
+          <div class="timeline-power-cell">
+            <span class="cell-label">5s</span>
+            <span class="cell-val">${item.peak_5s ? item.peak_5s + 'W' : '--'}</span>
           </div>
-          <div class="timeline-power-list">
-            <div class="timeline-power-pill"><span class="lbl">5s</span> <strong>${item.peak_5s || '--'}W</strong></div>
-            <div class="timeline-power-pill"><span class="lbl">1m</span> <strong>${item.peak_1m || '--'}W</strong></div>
-            <div class="timeline-power-pill"><span class="lbl">5m</span> <strong>${item.peak_5m || '--'}W</strong></div>
-            <div class="timeline-power-pill"><span class="lbl">20m</span> <strong>${item.peak_20m || '--'}W</strong></div>
-            <div class="timeline-power-pill" style="grid-column: span 2;"><span class="lbl">60m</span> <strong>${item.peak_60m || '--'}W</strong></div>
+          <div class="timeline-power-cell">
+            <span class="cell-label">1m</span>
+            <span class="cell-val">${item.peak_1m ? item.peak_1m + 'W' : '--'}</span>
+          </div>
+          <div class="timeline-power-cell">
+            <span class="cell-label">5m</span>
+            <span class="cell-val">${item.peak_5m ? item.peak_5m + 'W' : '--'}</span>
+          </div>
+          <div class="timeline-power-cell">
+            <span class="cell-label">20m</span>
+            <span class="cell-val">${item.peak_20m ? item.peak_20m + 'W' : '--'}</span>
+          </div>
+          <div class="timeline-power-cell">
+            <span class="cell-label">60m</span>
+            <span class="cell-val">${item.peak_60m ? item.peak_60m + 'W' : '--'}</span>
           </div>
         </div>
-        <div class="timeline-card-footer" style="display:flex;justify-content:space-between;align-items:center;font-size:0.68rem;color:var(--text-muted);border-top:1px solid rgba(255,255,255,0.05);padding-top:0.35rem;margin-top:0.15rem;">
+        <div class="timeline-card-footer">
           <span>Work: <strong style="color:var(--accent-cyan);">${item.total_tss || 0} TSS</strong></span>
           <span>${item.cycling_count || item.workout_count} rides</span>
         </div>

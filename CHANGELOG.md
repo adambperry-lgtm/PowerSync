@@ -3,6 +3,17 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.8] - 2026-11-11
+### Fixed
+- **Mini-Spiderweb Text Bubble Overflow & Format Redesign**:
+  - Resolved horizontal border overflow where narrow card containers caused 2-column duration wattage pills to spill outside the card border.
+  - Redesigned monthly timeline cards with a balanced vertical hierarchy:
+    - **Hero Mini-Spiderweb Centerpiece**: Dedicated centered 105px radar canvas (`viewBox="0 0 160 110"`) featuring 5 labeled duration spokes (`5s`, `1m`, `5m`, `20m`, `60m`), concentric capacity guide rings, monthly power polygon, and interactive vertex node tooltips.
+    - **Full-Width 5-Column Power Strip (`.timeline-power-strip`)**: Positioned cleanly below the radar, displaying all 5 durations in a structured grid with stacked duration labels and bold wattage values that strictly respect card boundaries.
+    - **Robust Container Clipping**: Applied `overflow: hidden`, `min-width: 0`, and `box-sizing: border-box` to `.spiderweb-timeline-card` and inner cells to guarantee zero border overflow across all screen resolutions and zoom levels.
+
+---
+
 ## [2.6.7] - 2026-11-11
 ### Added
 - **Visual 3-Line Power Duration Curve (PDC) Progression Chart**:
