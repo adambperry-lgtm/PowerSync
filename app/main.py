@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.5.4",
-        "release_name": "PowerSync — UI Formatting & Responsive Text Collision Polish",
+        "version": "2.5.5",
+        "release_name": "PowerSync — Ride Briefing Terminology Update",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.5.5",
+                "date": "2026-11-11",
+                "title": "Renamed AI Race Briefing to Ride Briefing",
+                "items": [
+                    "Ride Briefing Terminology: Updated card title, collapse header, and directive banners across top telemetry cards, indoor structured stages, and outdoor route previews from 'AI Race Briefing' to 'Ride Briefing' for a more natural daily training experience."
+                ]
+            },
             {
                 "version": "v2.5.4",
                 "date": "2026-11-11",

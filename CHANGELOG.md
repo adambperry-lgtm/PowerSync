@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.5.5] - 2026-11-11
+### Changed
+- **Renamed "AI Race Briefing" to "Ride Briefing"**:
+  - Updated the top telemetry directive card title (`#coachCardTitle`), tooltip and accessible labels from "AI Race Briefing" to "Ride Briefing" across the dashboard.
+  - Updated pre-ride briefing banner headers in both the Indoor Structured Workout view and Outdoor Route Match preview from "AI Race Briefing" to "Ride Briefing".
+
+---
+
 ## [2.5.4] - 2026-11-11
 ### Fixed
 - **Telemetry Card Header Layout & Overlap Prevention**:

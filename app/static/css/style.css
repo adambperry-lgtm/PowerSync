@@ -6156,7 +6156,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: block;
 }
 
-/* AI "Race Briefing" Cards — Ice Frost (#F4F7FA) with Subtle Electric Cobalt Blue (#0052FF) Border */
+/* Ride Briefing Cards — Ice Frost (#F4F7FA) with Subtle Electric Cobalt Blue (#0052FF) Border */
 .ai-race-briefing-card {
   background: #F4F7FA !important;
   border: 1.5px solid rgba(0, 82, 255, 0.32) !important;
@@ -6489,7 +6489,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     min-height: 34px !important;
   }
 
-  /* 2. Full-Width Stacked Telemetry Cards on iPhone (Whoop, Strava, AI Race Briefing) */
+  /* 2. Full-Width Stacked Telemetry Cards on iPhone (Whoop, Strava, Ride Briefing) */
   .telemetry-grid {
     grid-template-columns: 1fr !important;
     gap: 0.85rem !important;
