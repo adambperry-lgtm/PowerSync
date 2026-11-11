@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.5.7] - 2026-11-11
+### Removed
+- **Directeur Sportif Static In-Ride Pacing Bottom Sheet**:
+  - Removed the simulated in-ride pacing bottom sheet (`#dsCoachingBottomSheet`, *"DIRECTEUR SPORTIVE • LIVE PACING INSIGHT"*) from the indoor workout stage. Since in-ride telemetry is not live during pre-ride planning and prescription, the static alert ("burning matches early...") was non-functional and confusing.
+  - Cleaned up bottom sheet DOM elements, event listeners in `app/static/js/app.js`, and associated CSS rules from `app/static/css/style.css`.
+
+---
+
 ## [2.5.6] - 2026-11-11
 ### Fixed
 - **Debrief Workout Timeline Accuracy & Past Session Attribution**:

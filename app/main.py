@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.5.6",
-        "release_name": "PowerSync — Debrief Workout Timeline Accuracy",
+        "version": "2.5.7",
+        "release_name": "PowerSync — Removed Static Live Pacing Bottom Sheet",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.5.7",
+                "date": "2026-11-11",
+                "title": "Removed Static Live In-Ride Pacing Bottom Sheet",
+                "items": [
+                    "Directeur Sportif Live Pacing Removal: Removed the static simulated in-ride pacing bottom sheet ('DIRECTEUR SPORTIVE • LIVE PACING INSIGHT') from the workout interface since in-ride telemetry is not live during pre-ride workout planning.",
+                    "Cleaned DOM & Styles: Removed the bottom sheet markup, event listeners, and unused CSS rules across mobile and desktop styles."
+                ]
+            },
             {
                 "version": "v2.5.6",
                 "date": "2026-11-11",

@@ -2792,13 +2792,6 @@ function applyTheme(mode = "light", persist = false) {
 
 function initThemeSystem() {
   applyTheme("light", false);
-  const btnCloseDsBottomSheet = document.getElementById("btnCloseDsBottomSheet");
-  const dsCoachingBottomSheet = document.getElementById("dsCoachingBottomSheet");
-  if (btnCloseDsBottomSheet && dsCoachingBottomSheet) {
-    btnCloseDsBottomSheet.addEventListener("click", () => {
-      dsCoachingBottomSheet.classList.add("is-dismissed");
-    });
-  }
 }
 
 // Coaching Directives & Persistent Preferences UI
