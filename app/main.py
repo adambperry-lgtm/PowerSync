@@ -122,7 +122,7 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.5.2",
+        "version": "2.5.3",
         "release_name": "PowerSync — Speed & Summit Edition",
         "build_date": "2026-11-11",
         "services": {
@@ -133,6 +133,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.5.3",
+                "date": "2026-11-11",
+                "title": "Default Opening Tab Set to Daily Training View",
+                "items": [
+                    "Default Daily View on Startup: Configured initMainViewSwitcher() so PowerSync always opens on the Daily Training ('daily') tab by default when launching or refreshing the app."
+                ]
+            },
             {
                 "version": "v2.5.2",
                 "date": "2026-11-11",

@@ -5,6 +5,13 @@ From version 2.2.0 forward, this changelog and the in-app version endpoint (`/ap
 
 ---
 
+## [2.5.3] - 2026-11-11
+### Changed
+- **Default Opening Tab Set to "Daily Training" View**:
+  - Updated `initMainViewSwitcher()` in `app/static/js/app.js` so the dashboard always opens on the **Daily Training (`daily`)** tab by default on page load or refresh, rather than restoring a previously cached `analysis` tab from `localStorage` or `#analysis` URL hash.
+
+---
+
 ## [2.5.2] - 2026-11-11
 ### Changed
 - **Restored "PowerSync" Application Name**:

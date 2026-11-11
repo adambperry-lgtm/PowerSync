@@ -7704,17 +7704,14 @@ function initMainViewSwitcher() {
   tabDaily?.addEventListener("click", () => switchMainDashboardView("daily"));
   tabAnalysis?.addEventListener("click", () => switchMainDashboardView("analysis"));
 
-  // Check URL hash or localStorage for initial view
-  let initialView = "daily";
-  const hash = window.location.hash.toLowerCase();
-  if (hash.includes("analysis") || hash.includes("spiderweb") || hash.includes("program") || hash.includes("athlete")) {
-    initialView = "analysis";
-  } else {
-    try {
-      const saved = localStorage.getItem("powersync_main_view");
-      if (saved === "analysis") initialView = "analysis";
-    } catch (_) {}
-  }
+  // Always default to opening on the Daily Training view ("daily") on startup
+  const initialView = "daily";
+  try {
+    localStorage.setItem("powersync_main_view", "daily");
+    if (window.location.hash && window.location.hash.toLowerCase() === "#analysis") {
+      history.replaceState(null, "", "#daily");
+    }
+  } catch (_) {}
 
   switchMainDashboardView(initialView, false);
 
