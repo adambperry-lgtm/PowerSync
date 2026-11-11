@@ -165,6 +165,10 @@ class TestPowerSpiderweb(unittest.TestCase):
             self.assertIn("tier3_benchmark", d)
             self.assertGreater(d["tier1_progressive"]["target_watts"], d["current_watts"])
             self.assertGreater(d["tier2_transformative"]["target_watts"], d["tier1_progressive"]["target_watts"])
+            self.assertGreater(d["tier3_benchmark"]["target_watts"], d["tier2_transformative"]["target_watts"])
+            self.assertGreater(d["tier3_benchmark"]["target_watts"], d["current_watts"])
+            self.assertGreater(d["benchmark_watts"], d["current_watts"])
+            self.assertGreater(d["tier3_benchmark"]["delta_watts"], 0)
 
         self.assertIn("rider_type_transformation_targets", targets)
         self.assertEqual(len(targets["rider_type_transformation_targets"]), 6)

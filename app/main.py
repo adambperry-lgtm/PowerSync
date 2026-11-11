@@ -122,8 +122,8 @@ def health_check():
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.2",
-        "release_name": "Long-Term Fitness Goal & Periodization Color Palette Alignment",
+        "version": "2.6.3",
+        "release_name": "Coggan Elite Physiological Benchmarks & Ceiling Calibration",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -133,6 +133,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.3",
+                "date": "2026-11-11",
+                "title": "Coggan Elite Physiological Benchmarks & Ceiling Calibration",
+                "items": [
+                    "Scientific Elite Benchmarks: Calibrated duration benchmarks against Coggan Category 1 / Elite power-to-weight (W/kg) standards and athlete body weight (5s: 20.5, 1m: 9.6, 5m: 6.1, 20m: 5.0, 60m: 4.6 W/kg).",
+                    "Dynamic Ceiling Protection: Guaranteed that benchmark ceilings dynamically scale to exceed athlete current bests and all-time PRs (max(coggan_elite, cur_watts * 1.15, all_time_pr * 1.10)).",
+                    "Monotonic Duration Tiers: Tier 3 Benchmark Ceiling targets are mathematically guaranteed to sit above Tier 1 (+5%), Tier 2 (+10%), and current bests, preventing inverted targets.",
+                    "High-Contrast Light Theme Accents: Updated Tier 3 duration planner cards to crisp #7C3AED accent pills and readable typography."
+                ]
+            },
             {
                 "version": "v2.6.2",
                 "date": "2026-11-11",

@@ -495,15 +495,6 @@ def get_power_spiderweb_profile(
     # Calculate peak power envelope for each duration
     dur_keys = ["5s", "1m", "5m", "20m", "60m"]
 
-    # Benchmark caps for radar scale normalization (100% outer ring)
-    benchmarks = {
-        "5s": max(900, int(ftp * 3.8)),
-        "1m": max(440, int(ftp * 1.85)),
-        "5m": max(310, int(ftp * 1.28)),
-        "20m": max(260, int(ftp * 1.08)),
-        "60m": max(240, int(ftp * 0.96))
-    }
-
     # Fallback baseline powers based on athlete's FTP and fitness signature
     modeled_baseline = {
         "5s": round(max(peak_power * 0.72, ftp * 2.7)),
@@ -533,6 +524,27 @@ def get_power_spiderweb_profile(
         # All-time PR peak (strictly cycling activities)
         all_vals = [a["peaks"].get(k, 0) for a in all_cycling if a["peaks"].get(k, 0) > 0]
         all_time_envelope[k] = max(all_vals) if all_vals else modeled_baseline[k]
+
+    # Benchmark caps for radar scale normalization (100% outer ring)
+    # Calibrated against Coggan Category 1 / Elite W/kg physiological standards,
+    # body mass, and dynamically scaled so benchmark ceiling is NEVER below current bests or all-time PRs.
+    safe_weight = max(40.0, float(weight_kg))
+    coggan_elite_benchmarks = {
+        "5s": max(1200, round(safe_weight * 20.5), round(max(peak_power, ftp * 3.8) * 1.15)),
+        "1m": max(580, round(safe_weight * 9.6), round(ftp * 2.2)),
+        "5m": max(380, round(safe_weight * 6.1), round(ftp * 1.45)),
+        "20m": max(320, round(safe_weight * 5.0), round(ftp * 1.22)),
+        "60m": max(290, round(safe_weight * 4.6), round(ftp * 1.12)),
+    }
+
+    benchmarks = {
+        k: max(
+            coggan_elite_benchmarks[k],
+            round(cur_envelope.get(k, 0) * 1.15),
+            round(all_time_envelope.get(k, 0) * 1.10)
+        )
+        for k in dur_keys
+    }
 
     # Retrieve athlete's active training goal if configured
     active_goal = get_active_spiderweb_goal(user_id=uid)
@@ -1136,10 +1148,10 @@ def calculate_spiderweb_target_changes(
         tier2_delta = tier2_w - cur_w
         tier2_wkg = round(tier2_w / max(40.0, weight_kg), 2)
 
-        # Tier 3: Benchmark Ceiling
-        tier3_w = bm_w
-        tier3_delta = max(0, bm_w - cur_w)
-        tier3_wkg = round(bm_w / max(40.0, weight_kg), 2)
+        # Tier 3: Benchmark Ceiling (Elite)
+        tier3_w = max(bm_w, round(cur_w * 1.15), tier2_w + 5)
+        tier3_delta = tier3_w - cur_w
+        tier3_wkg = round(tier3_w / max(40.0, weight_kg), 2)
 
         duration_targets.append({
             "key": k,

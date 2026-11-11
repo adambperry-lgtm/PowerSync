@@ -7495,12 +7495,12 @@ function renderPlannerDurationView() {
     <div class="planner-tier-card" style="${isTierActive(t3.target_watts) ? 'border-color:#10b981;box-shadow:0 0 12px rgba(16,185,129,0.2);' : ''}">
       <div class="tier-card-header">
         <span class="tier-title">${escapeSpiderwebHtml(t3.label)}</span>
-        <span class="tier-delta-chip" style="color:var(--accent-purple);border-color:rgba(167,139,250,0.3);background:rgba(167,139,250,0.15);">
+        <span class="tier-delta-chip" style="color:#7C3AED;border-color:rgba(124,58,237,0.3);background:rgba(124,58,237,0.08);">
           +${t3.delta_watts}W (+${t3.delta_pct}%)
         </span>
       </div>
       <div class="tier-power-row">
-        <span class="tier-target-watts" style="color:#c084fc;">${t3.target_watts}W</span>
+        <span class="tier-target-watts" style="color:#7C3AED;">${t3.target_watts}W</span>
         <span style="font-size:0.85rem;color:var(--text-muted);">${t3.target_w_kg} W/kg</span>
       </div>
       <div class="tier-stimulus-text">

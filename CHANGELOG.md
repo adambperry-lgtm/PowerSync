@@ -3,6 +3,16 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.3] - 2026-11-11
+### Fixed
+- **Scientific Coggan Elite Benchmark Ceiling Calibration**:
+  - Replaced legacy artificial benchmark caps (e.g. 60m capped at `0.96 * FTP` / 240W, 20m at `1.08 * FTP` / 260W) with genuine Coggan Category 1 / Elite physiological W/kg standards scaled by athlete body mass (`5s: 20.5 W/kg`, `1m: 9.6 W/kg`, `5m: 6.1 W/kg`, `20m: 5.0 W/kg`, `60m: 4.6 W/kg`).
+  - Enforced dynamic physiological boundary protections: benchmark ceilings and Tier 3 targets (`calculate_spiderweb_target_changes`) now dynamically evaluate against athlete current bests and all-time PRs (`max(coggan_elite, cur_watts * 1.15, all_time_pr * 1.10)`).
+  - Guaranteed monotonic progression across duration target tiers (`Current Best < Tier 1 (+5%) < Tier 2 (+10%) < Tier 3 Benchmark Ceiling`), eliminating inverted targets where Tier 3 displayed lower wattages than current bests.
+  - Aligned Tier 3 duration planner cards in `app/static/js/app.js` with crisp, accessible high-contrast styling (`#7C3AED` accent pill and wattage readout).
+
+---
+
 ## [2.6.2] - 2026-11-11
 ### Changed
 - **Long-Term Fitness Goal & Periodization Color Palette Alignment**:
