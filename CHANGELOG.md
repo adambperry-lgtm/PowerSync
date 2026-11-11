@@ -3,6 +3,22 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.6.9] - 2026-11-11
+### Fixed
+- **Ride Count Consistency in Mini-Spiderwebs**:
+  - Eliminated contradictory ride counts on monthly timeline cards where the header previously reported total mixed workouts while the footer reported cycling rides (e.g. November showing "6 rides" in header and "1 rides" in footer; October showing "26 rides" and "25 rides").
+  - Synchronized header and footer to display canonical cycling ride counts (`X rides · Y.Zh`), clearly distinguishing non-cycling sessions as `+N cross` without inflating the ride count.
+- **Indoor Cycling Classification & Power Telemetry**:
+  - Enhanced `is_cycling_sport` to properly identify indoor cycling sessions, smart trainer workouts, and virtual rides that Strava/Garmin/Wahoo categorize as generic "Workout" or "IndoorCycling".
+  - Incorporated power meter telemetry validation: activities with recorded mechanical power (`average_watts > 0`, `weighted_average_watts > 0`, `kilojoules > 0`, or `device_watts: True`) that are not explicitly non-cycling (run, swim, walk, gym) are accurately classified as cycling rides.
+  - Refined non-cycling keyword matching with word-boundary regex to prevent false negatives on cycling titles.
+- **Interval Block Peak Power Extraction**:
+  - Enhanced `calculate_activity_peak_powers` to analyze sustained interval blocks (e.g. 10–25 minute efforts such as 3x14m @ 215W+), ensuring intervals accurately populate 5m VO2 Max and 20m Threshold power envelopes.
+- **Live Strava Auto-Sync on Spiderweb Access**:
+  - Added auto-sync check to `get_power_spiderweb_profile` ensuring newly completed Strava/Zwift rides are ingested and analyzed immediately when opening the Power Spiderweb.
+
+---
+
 ## [2.6.8] - 2026-11-11
 ### Fixed
 - **Mini-Spiderweb Text Bubble Overflow & Format Redesign**:

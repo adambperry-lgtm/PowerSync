@@ -7446,11 +7446,19 @@ function renderSpiderwebTimeline(timeline, axes) {
 
   container.innerHTML = timeline.map(item => {
     const miniSvg = generateMiniSpiderwebSvg(item, bmMap);
+    const rideCount = item.cycling_count !== undefined ? item.cycling_count : (item.workout_count || 0);
+    const hours = item.cycling_hours || item.total_hours || 0;
+    const crossCount = item.cross_training_count || 0;
+    const crossBadge = crossCount > 0 ? ` · +${crossCount} cross` : '';
+    const rideText = `${rideCount} ${rideCount === 1 ? 'ride' : 'rides'}`;
+
     return `
       <div class="spiderweb-timeline-card">
         <div class="timeline-card-header">
           <span class="timeline-month">${escapeSpiderwebHtml(item.label)}</span>
-          <span class="timeline-count-badge">${item.workout_count} rides · ${item.total_hours}h</span>
+          <span class="timeline-count-badge" title="${rideText} (${hours}h)${crossCount > 0 ? ' plus ' + crossCount + ' cross-training sessions' : ''}">
+            ${rideText} · ${hours}h${crossBadge}
+          </span>
         </div>
         <div class="timeline-mini-radar-container" title="Monthly 5-Axis Phenotype Radar (${escapeSpiderwebHtml(item.label)})">
           ${miniSvg}
@@ -7479,7 +7487,7 @@ function renderSpiderwebTimeline(timeline, axes) {
         </div>
         <div class="timeline-card-footer">
           <span>Work: <strong style="color:var(--accent-cyan);">${item.total_tss || 0} TSS</strong></span>
-          <span>${item.cycling_count || item.workout_count} rides</span>
+          <span>${rideText}</span>
         </div>
       </div>
     `;

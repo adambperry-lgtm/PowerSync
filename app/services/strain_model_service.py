@@ -1,5 +1,7 @@
 import math
 import datetime
+import re
+import json
 from typing import Dict, Any, List, Optional
 from app.database import get_setting, get_db_connection, get_current_user_id, get_athlete_date
 
@@ -153,21 +155,34 @@ def calculate_intervals_strain(
 CYCLING_SPORT_TYPES = {
     "ride",
     "virtualride",
+    "virtualcycling",
     "mountainbikeride",
+    "mountainbike",
+    "mtb",
     "gravelride",
+    "gravelcycling",
+    "gravel",
     "ebikeride",
     "emountainbikeride",
+    "ebike",
     "handcycle",
     "velomobile",
     "cycling",
-    "outdoorride"
+    "outdoorride",
+    "indoorride",
+    "indoorcycling",
+    "roadride",
+    "roadbiking",
+    "spinning",
+    "spin",
+    "trainer"
 }
 
 NON_CYCLING_SPORT_TYPES = {
-    "run", "virtualrun", "trailrun",
-    "swim",
+    "run", "virtualrun", "trailrun", "treadmill",
+    "swim", "pool", "openwaterswim",
     "walk", "hike",
-    "weighttraining", "workout", "crossfit", "hiit",
+    "weighttraining", "strengthtraining", "crossfit", "hiit",
     "rowing", "kayaking", "canoeing", "standuppaddling", "surfing",
     "alpineski", "backcountryski", "nordicski", "snowboard", "snowshoe",
     "yoga", "pilates",
@@ -177,43 +192,71 @@ NON_CYCLING_SPORT_TYPES = {
     "skateboard", "inlineskate"
 }
 
-NON_CYCLING_KEYWORDS = (
-    "run", "jog", "trail", "marathon", "5k", "10k",
-    "swim", "pool",
-    "walk", "hike", "trek",
-    "gym", "strength", "weights", "lift", "hypertrophy", "crossfit",
-    "rowing", "kayak", "canoe", "paddle",
-    "pilates", "yoga", "stretch",
-    "ski", "snowboard"
+NON_CYCLING_NAME_PATTERN = re.compile(
+    r'\b(run|running|jog|jogging|trail\s*run|marathon|5k|10k|swim|swimming|pool|walk|walking|hike|hiking|gym|strength|weights|lifting|hypertrophy|crossfit|rowing|kayak|canoe|paddle|pilates|yoga|stretch|stretching|ski|skiing|snowboard)\b',
+    re.IGNORECASE
 )
 
-CYCLING_KEYWORDS = (
-    "ride", "bike", "cycling", "zwift", "trainerroad", "rouvy", "peloton",
-    "sufferfest", "crit", "velo", "spin", "sweet spot", "over-under",
-    "ftp", "tempo", "pedal", "cadence", "microburst", "intervals", "rpm"
+CYCLING_NAME_PATTERN = re.compile(
+    r'\b(ride|bike|biking|cycling|cyclist|zwift|trainerroad|rouvy|peloton|sufferfest|crit|velo|spin|spinning|sweet\s*spot|over-under|ftp|tempo|pedal|pedaling|cadence|microburst|intervals|rpm|watts|wattage|trainer|blocks|indoor|roller|rollers|gravel|mtb|climb|fondo|group\s*ride)\b',
+    re.IGNORECASE
 )
 
-def is_cycling_sport(sport_type: Optional[str], activity_name: Optional[str] = None) -> bool:
+def is_cycling_sport(
+    sport_type: Optional[str],
+    activity_name: Optional[str] = None,
+    activity: Optional[Dict[str, Any]] = None,
+    **kwargs
+) -> bool:
     """
     Returns True if the sport is a cycling discipline, False if it is a cross-training
     or non-cycling discipline (e.g. running, swimming, weight training, rowing, hiking).
-    Protects cycling power profiles and analytics from non-cycling data.
+    Protects cycling power profiles and analytics from non-cycling data while correctly
+    recognizing indoor trainer blocks, virtual rides, and power meter telemetry.
     """
-    s = (sport_type or "").strip().lower()
-    if s in CYCLING_SPORT_TYPES:
-        return True
-    if s in NON_CYCLING_SPORT_TYPES:
-        return False
+    s_raw = (sport_type or "").strip().lower()
+    s = s_raw.replace(" ", "").replace("_", "").replace("-", "")
 
-    name = (activity_name or "").strip().lower()
-    if any(k in name for k in NON_CYCLING_KEYWORDS):
-        return False
-    if any(k in name for k in CYCLING_KEYWORDS):
+    # 1. Direct match on recognized cycling sport types
+    if s in CYCLING_SPORT_TYPES or s_raw in CYCLING_SPORT_TYPES:
         return True
 
-    # If sport_type was omitted/empty, default to True in this cycling coach ecosystem
-    # unless non-cycling keywords matched above
-    if not s:
+    # 2. Direct match on explicit non-cycling sport types (runs, swims, walks, gym, etc.)
+    if s in NON_CYCLING_SPORT_TYPES or s_raw in NON_CYCLING_SPORT_TYPES:
+        return False
+
+    name = (activity_name or "").strip()
+
+    # 3. Check for explicit non-cycling keywords in activity title (e.g. "Morning Run", "Leg Day Gym")
+    if NON_CYCLING_NAME_PATTERN.search(name):
+        return False
+
+    # 4. Check for explicit cycling keywords in activity title (e.g. "3 blocks of ~14 min at 215+", "Tempo Laps")
+    if CYCLING_NAME_PATTERN.search(name):
+        return True
+
+    # 5. Check power meter telemetry on generic "Workout" / indoor sessions
+    act = activity or {}
+    avg_w = float(act.get("average_watts") or kwargs.get("average_watts") or 0.0)
+    np_w = float(act.get("weighted_average_watts") or kwargs.get("weighted_average_watts") or 0.0)
+    kj = float(act.get("kilojoules") or kwargs.get("kilojoules") or 0.0)
+    raw_str = act.get("raw_json")
+    has_device_watts = False
+    if raw_str:
+        try:
+            parsed = json.loads(raw_str) if isinstance(raw_str, str) else raw_str
+            if isinstance(parsed, dict) and (parsed.get("device_watts") or parsed.get("has_power_meter")):
+                has_device_watts = True
+        except Exception:
+            pass
+
+    # If telemetry recorded mechanical cycling power or kilojoules, classify as cycling
+    if has_device_watts or avg_w > 0 or np_w > 0 or kj > 0:
+        return True
+
+    # 6. Default fallback: in this dedicated cycling ecosystem, generic or unspecified
+    # activities without non-cycling tags default to cycling
+    if not s or s in ("workout", "training", "activity", "fitnessequipment", "other"):
         return True
 
     return False

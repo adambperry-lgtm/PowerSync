@@ -266,7 +266,7 @@ def calculate_activity_peak_powers(
     """
     sport = act.get("sport_type") or act.get("type", "")
     act_name = act.get("name", "")
-    if not is_cycling_sport(sport, act_name):
+    if not is_cycling_sport(sport, act_name, activity=act):
         return {"5s": 0, "30s": 0, "1m": 0, "5m": 0, "20m": 0, "60m": 0}
 
     moving_sec = int(act.get("moving_time_sec") or 0)
@@ -288,20 +288,28 @@ def calculate_activity_peak_powers(
                 for lap in raw_parsed.get("laps") or []:
                     l_sec = int(lap.get("moving_time") or lap.get("elapsed_time") or 0)
                     l_w = float(lap.get("average_watts") or 0.0)
-                    if 45 <= l_sec <= 90 and l_w > laps_peaks.get("1m", 0):
+                    if 45 <= l_sec <= 180 and l_w > laps_peaks.get("1m", 0):
                         laps_peaks["1m"] = l_w
-                    if 240 <= l_sec <= 360 and l_w > laps_peaks.get("5m", 0):
+                    if l_sec >= 240 and l_w > laps_peaks.get("5m", 0):
                         laps_peaks["5m"] = l_w
-                    if 1000 <= l_sec <= 1400 and l_w > laps_peaks.get("20m", 0):
+                    if 720 <= l_sec <= 1600:
+                        est_lap_20 = l_w if l_sec >= 1000 else (l_w * 0.96)
+                        if est_lap_20 > laps_peaks.get("20m", 0):
+                            laps_peaks["20m"] = est_lap_20
+                    elif l_sec >= 1600 and l_w > laps_peaks.get("20m", 0):
                         laps_peaks["20m"] = l_w
                 for seg in raw_parsed.get("segment_efforts") or []:
                     s_sec = int(seg.get("moving_time") or seg.get("elapsed_time") or 0)
                     s_w = float(seg.get("average_watts") or 0.0)
-                    if 45 <= s_sec <= 90 and s_w > laps_peaks.get("1m", 0):
+                    if 45 <= s_sec <= 180 and s_w > laps_peaks.get("1m", 0):
                         laps_peaks["1m"] = s_w
-                    if 240 <= s_sec <= 360 and s_w > laps_peaks.get("5m", 0):
+                    if s_sec >= 240 and s_w > laps_peaks.get("5m", 0):
                         laps_peaks["5m"] = s_w
-                    if 1000 <= s_sec <= 1400 and s_w > laps_peaks.get("20m", 0):
+                    if 720 <= s_sec <= 1600:
+                        est_seg_20 = s_w if s_sec >= 1000 else (s_w * 0.96)
+                        if est_seg_20 > laps_peaks.get("20m", 0):
+                            laps_peaks["20m"] = est_seg_20
+                    elif s_sec >= 1600 and s_w > laps_peaks.get("20m", 0):
                         laps_peaks["20m"] = s_w
         except Exception:
             pass
@@ -386,6 +394,22 @@ def get_power_spiderweb_profile(
     peak_power = int(get_setting("athlete_peak_power_watts", 1050, user_id=uid))
     weight_kg = float(get_setting("athlete_weight_kg", 70.0, user_id=uid))
 
+    # Auto-sync live Strava activities if athlete has connected tokens and >60s elapsed since last sync
+    strava_tokens = get_setting("strava_tokens", {}, user_id=uid)
+    if not strava_tokens and uid == "usr_guest":
+        strava_tokens = get_setting("strava_tokens", {}, user_id="usr_default")
+    if strava_tokens:
+        last_sync_key = "last_strava_sync_timestamp"
+        last_sync_time = float(get_setting(last_sync_key, 0.0, user_id=uid))
+        now_ts = datetime.datetime.now().timestamp()
+        if (now_ts - last_sync_time > 60):
+            try:
+                from app.services.strava_service import fetch_recent_strava_activities
+                fetch_recent_strava_activities(limit=25, user_id=uid)
+                set_setting(last_sync_key, now_ts, user_id=uid)
+            except Exception:
+                pass
+
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
@@ -467,7 +491,7 @@ def get_power_spiderweb_profile(
         act_copy["act_date"] = act_d
         act_copy["act_date_str"] = s_date_str
         sport = act.get("sport_type") or act.get("type", "")
-        is_cycling = is_cycling_sport(sport, act.get("name", ""))
+        is_cycling = is_cycling_sport(sport, act.get("name", ""), activity=act)
         act_copy["is_cycling"] = is_cycling
 
         if is_cycling:
@@ -651,8 +675,12 @@ def get_power_spiderweb_profile(
                 "key": b_key,
                 "label": b_label,
                 "workout_count": 0,
+                "cycling_count": 0,
+                "cross_training_count": 0,
                 "total_sec": 0,
+                "cycling_sec": 0,
                 "total_tss": 0,
+                "cycling_tss": 0,
                 "peak_5s": 0,
                 "peak_1m": 0,
                 "peak_5m": 0,
@@ -660,12 +688,16 @@ def get_power_spiderweb_profile(
                 "peak_60m": 0
             }
         b = bucket_map[b_key]
+        moving_sec = int(act.get("moving_time_sec") or 0)
+        suffer = int(act.get("suffer_score") or 0)
         b["workout_count"] += 1
-        b["total_sec"] += int(act.get("moving_time_sec") or 0)
-        b["total_tss"] += int(act.get("suffer_score") or 0)
+        b["total_sec"] += moving_sec
+        b["total_tss"] += suffer
 
         if act.get("is_cycling", False):
             b["cycling_count"] = b.get("cycling_count", 0) + 1
+            b["cycling_sec"] = b.get("cycling_sec", 0) + moving_sec
+            b["cycling_tss"] = b.get("cycling_tss", 0) + suffer
             for dur in dur_keys:
                 p_val = act["peaks"].get(dur, 0)
                 if p_val > b[f"peak_{dur}"]:
@@ -678,6 +710,7 @@ def get_power_spiderweb_profile(
     for b_k in sorted_bucket_keys:
         b = bucket_map[b_k]
         b["total_hours"] = round(b["total_sec"] / 3600.0, 1)
+        b["cycling_hours"] = round(b.get("cycling_sec", 0) / 3600.0, 1) if b.get("cycling_sec", 0) > 0 else b["total_hours"]
         timeline_buckets.append(b)
 
     # Highlight PR breakthroughs across history (strictly cycling activities)

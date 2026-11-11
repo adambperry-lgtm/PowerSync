@@ -128,8 +128,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.6.8",
-        "release_name": "Refined Mini-Spiderweb Hero Radars & 5-Column Power Strip",
+        "version": "2.6.9",
+        "release_name": "Cycling Activity Detection Telemetry & Consistent Ride Counts",
         "build_date": "2026-11-11",
         "services": {
             "whoop": "v2 REST API",
@@ -139,6 +139,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.6.9",
+                "date": "2026-11-11",
+                "title": "Cycling Activity Detection Telemetry & Consistent Ride Counts",
+                "items": [
+                    "Ride Count Consistency: Synchronized monthly card header and footer ride counts, accurately attributing non-cycling sessions as cross-training (+N cross) without inflating ride tallies.",
+                    "Power Telemetry & Indoor Recognition: Enhanced is_cycling_sport to detect smart trainer intervals, indoor rides, and power meter telemetry (watts/kilojoules) regardless of generic 'Workout' tagging.",
+                    "Interval Block Peak Extraction: Updated peak power calculations to analyze sustained 10-25m interval blocks (e.g. 3x14m @ 215W+) for accurate 5m and 20m curve modeling.",
+                    "Live Strava Auto-Sync: Automatically syncs recent Strava activities when accessing the Power Spiderweb to guarantee same-day rides appear immediately."
+                ]
+            },
             {
                 "version": "v2.6.8",
                 "date": "2026-11-11",

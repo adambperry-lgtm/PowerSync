@@ -520,6 +520,56 @@ class TestPowerSpiderweb(unittest.TestCase):
         # Cleanup
         clear_active_spiderweb_goal(self.user_id)
 
+    def test_is_cycling_sport_indoor_intervals_and_telemetry(self):
+        from app.services.strain_model_service import is_cycling_sport
+        # Test 1: Ride with 3 blocks of ~14 minutes at 215+
+        self.assertTrue(is_cycling_sport("Workout", "3 blocks of ~14 minutes at 215+", average_watts=218))
+        self.assertTrue(is_cycling_sport("IndoorCycling", "3 blocks of ~14 minutes at 215+"))
+        self.assertTrue(is_cycling_sport("VirtualRide", "Watopia Flat Route"))
+        self.assertTrue(is_cycling_sport("Ride", "Morning Coffee Spin"))
+        self.assertTrue(is_cycling_sport("Spinning", "Peloton 45 min Power Zone"))
+        self.assertTrue(is_cycling_sport("workout", "Indoor Trainer Session", average_watts=215, kilojoules=720))
+
+        # Test 2: Non-cycling activities must be excluded
+        self.assertFalse(is_cycling_sport("Run", "Morning 5k Run"))
+        self.assertFalse(is_cycling_sport("Workout", "Leg Day Gym Workout"))
+        self.assertFalse(is_cycling_sport("Swim", "Pool Laps"))
+        self.assertFalse(is_cycling_sport("Walk", "Evening Dog Walk"))
+
+    def test_interval_blocks_peak_power_calculation(self):
+        # 3 blocks of 14 minutes (840s) at 218W
+        laps = [
+            {"moving_time": 840, "average_watts": 218.0},
+            {"moving_time": 180, "average_watts": 120.0},
+            {"moving_time": 840, "average_watts": 222.0},
+            {"moving_time": 180, "average_watts": 120.0},
+            {"moving_time": 840, "average_watts": 215.0}
+        ]
+        activity = {
+            "name": "3 blocks of ~14 minutes at 215+",
+            "sport_type": "Workout",
+            "moving_time_sec": 2900,
+            "average_watts": 195.0,
+            "weighted_average_watts": 212.0,
+            "raw_json": json.dumps({"laps": laps, "device_watts": True, "max_watts": 450})
+        }
+        peaks = calculate_activity_peak_powers(activity, ftp=250)
+        # 5m power should reflect the >215W sustained block
+        self.assertGreaterEqual(peaks["5m"], 215)
+        # 20m power should reflect the ~215W interval load
+        self.assertGreaterEqual(peaks["20m"], 205)
+
+    def test_timeline_buckets_consistent_ride_counts(self):
+        # Test profile generation timeline buckets
+        profile = get_power_spiderweb_profile(user_id=self.user_id, timeframe="all_time")
+        timeline = profile.get("progression_timeline", [])
+        self.assertGreater(len(timeline), 0)
+        for b in timeline:
+            self.assertIn("cycling_count", b)
+            self.assertIn("cycling_hours", b)
+            self.assertIn("cross_training_count", b)
+            self.assertEqual(b["workout_count"], b["cycling_count"] + b["cross_training_count"])
+
 
 if __name__ == "__main__":
     unittest.main()
