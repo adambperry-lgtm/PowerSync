@@ -128,9 +128,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.7.1",
-        "release_name": "Canonical Coggan 7-Zone Power Ribbon & Prescription Fidelity",
-        "build_date": "2026-11-11",
+        "version": "2.7.2",
+        "release_name": "Spiderweb Active Goal & Target Planner Progress Synchronization",
+        "build_date": "2026-11-12",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -139,6 +139,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.7.2",
+                "date": "2026-11-12",
+                "title": "Spiderweb Active Goal & Target Planner Progress Synchronization",
+                "items": [
+                    "All-Time PRs Progress Fix: Eliminated the bug causing 0% progress in All-Time PRs by replacing the flawed period-delta formula with the unified continuous archetype readiness model.",
+                    "Spiderweb & Target Planner Alignment: Synchronized active goal progress calculation across the spiderweb banner and Target Planner cards, ensuring identical completion percentages (e.g. 96.8% readiness).",
+                    "Continuous Archetype Readiness: Evaluates athlete power against archetype targets across all 5 durations (5s, 1m, 5m, 20m, 60m) with 2.5x weighting on phenotype signature axes and 1.0x on supporting axes.",
+                    "Active Goal Card Badge Alignment: Harmonized planner card badges to clearly indicate active status with exact readiness percentages and watt gaps."
+                ]
+            },
             {
                 "version": "v2.7.1",
                 "date": "2026-11-11",

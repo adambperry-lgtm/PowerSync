@@ -7928,7 +7928,7 @@ function renderPlannerPhenotypeView() {
       ? "background:rgba(6,182,212,0.15);color:var(--accent-cyan);border-color:rgba(6,182,212,0.3);"
       : "background:rgba(16,185,129,0.15);color:#10b981;border-color:rgba(16,185,129,0.3);";
     const statusText = isGoalActive
-      ? "🎯 Active Program Goal"
+      ? (p.total_delta_watts === 0 ? "🎯 Active Goal (100% Achieved)" : `🎯 Active Goal (${p.completion_pct}% Readiness • ${p.total_delta_watts}W gap)`)
       : isCurrent
       ? `🎯 Current Classification (${p.completion_pct}% Match)`
       : `${p.completion_pct}% Readiness (${p.total_delta_watts}W gap)`;

@@ -32,10 +32,11 @@ def get_spiderweb_target_analysis_endpoint(timeframe: Optional[str] = Query("30d
     return calculate_spiderweb_target_changes(user_id=uid, timeframe=timeframe or "30d")
 
 @router.get("/spiderweb/goal")
-def get_spiderweb_goal_endpoint():
+def get_spiderweb_goal_endpoint(timeframe: Optional[str] = Query("30d")):
     """Returns the athlete's active spiderweb training goal and current progress."""
     uid = get_current_user_id()
-    goal = get_active_spiderweb_goal(user_id=uid)
+    profile = get_power_spiderweb_profile(user_id=uid, timeframe=timeframe or "30d")
+    goal = profile.get("active_goal")
     return {"has_active_goal": bool(goal), "goal": goal}
 
 @router.post("/spiderweb/goal")

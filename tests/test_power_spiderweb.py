@@ -571,6 +571,55 @@ class TestPowerSpiderweb(unittest.TestCase):
             self.assertEqual(b["workout_count"], b["cycling_count"] + b["cross_training_count"])
 
 
+    def test_all_time_prs_goal_progress_matches_target_changes(self):
+        """
+        Verifies that in 'all_time' (All-Time PRs) timeframe, the active spiderweb goal
+        does NOT show 0% progress when power data exists, and matches the exact
+        readiness percentage calculated in target changes & goal planner.
+        """
+        # Set Rouleur phenotype goal
+        goal_payload = {
+            "goal_type": "phenotype",
+            "target_key": "Rouleur"
+        }
+        set_active_spiderweb_goal(goal_payload, user_id=self.user_id)
+
+        # 1. Fetch profile with All-Time PRs timeframe
+        profile_all_time = get_power_spiderweb_profile(user_id=self.user_id, timeframe="all_time")
+        active_goal = profile_all_time.get("active_goal")
+        self.assertIsNotNone(active_goal)
+
+        # Progress must NOT be 0%
+        prog_pct = active_goal.get("progress_pct", 0.0)
+        self.assertGreater(prog_pct, 50.0, f"Expected goal progress to be > 50%, got {prog_pct}%")
+
+        # 2. Fetch target analysis for All-Time PRs timeframe
+        target_analysis = calculate_spiderweb_target_changes(user_id=self.user_id, timeframe="all_time")
+        rouleur_target = next(
+            (p for p in target_analysis.get("rider_type_transformation_targets", []) if p["id"].lower() == "rouleur"),
+            None
+        )
+        self.assertIsNotNone(rouleur_target)
+        self.assertEqual(prog_pct, rouleur_target["completion_pct"],
+                         f"Spiderweb goal progress ({prog_pct}%) must exactly match target changes completion ({rouleur_target['completion_pct']}%)")
+
+        # 3. Verify duration goal as well
+        dur_payload = {
+            "goal_type": "duration",
+            "target_key": "20m",
+            "target_watts": 280
+        }
+        set_active_spiderweb_goal(dur_payload, user_id=self.user_id)
+        profile_dur = get_power_spiderweb_profile(user_id=self.user_id, timeframe="all_time")
+        dur_goal = profile_dur.get("active_goal")
+        self.assertIsNotNone(dur_goal)
+        dur_prog = dur_goal.get("progress_pct", 0.0)
+        self.assertGreater(dur_prog, 50.0, f"Expected duration goal progress to be > 50%, got {dur_prog}%")
+
+        # Clear goal
+        clear_active_spiderweb_goal(user_id=self.user_id)
+
+
 if __name__ == "__main__":
     unittest.main()
 

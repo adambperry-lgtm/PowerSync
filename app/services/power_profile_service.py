@@ -656,21 +656,66 @@ def get_power_spiderweb_profile(
             "declined": delta_w < 0
         })
 
-    # Evaluate active goal progression percentage
+    # Evaluate active goal progression percentage (100% unified with Target Changes & Goal Planner)
     if active_goal:
         all_axes_met = all(ax.get("goal_met", True) for ax in axes_data if ax.get("target_watts") is not None)
+        active_goal["remaining_total_watts"] = total_goal_remaining_gap
+
         if all_axes_met:
             active_goal["progress_pct"] = 100.0
             active_goal["is_achieved"] = True
             active_goal["remaining_total_watts"] = 0
         else:
             active_goal["is_achieved"] = False
-            active_goal["remaining_total_watts"] = total_goal_remaining_gap
-            if total_goal_initial_gap > 0:
-                prog = max(0.0, min(99.0, ((total_goal_initial_gap - total_goal_remaining_gap) / total_goal_initial_gap) * 100.0))
-                active_goal["progress_pct"] = round(prog, 1)
+            g_type = active_goal.get("goal_type", "phenotype")
+            target_key = str(active_goal.get("target_key", "")).lower()
+
+            if g_type == "phenotype":
+                # Aligns 100% with calculate_spiderweb_target_changes archetype readiness
+                pheno_def = next(
+                    (p for p in RIDER_PHENOTYPE_DEFINITIONS if p["id"].lower() == target_key or p["title"].lower() == target_key),
+                    None
+                )
+                if not pheno_def:
+                    pheno_def = next(
+                        (p for p in RIDER_PHENOTYPE_DEFINITIONS if p["id"].lower() in str(active_goal.get("target_title", "")).lower() or p["title"].lower() in str(active_goal.get("target_title", "")).lower()),
+                        None
+                    )
+
+                if pheno_def:
+                    reqs = pheno_def.get("requirements", {})
+                    sig_axes = pheno_def.get("signature_axes", [])
+                    readiness_accum = 0.0
+                    total_weight = 0.0
+
+                    for ax_meta in RADAR_DURATIONS:
+                        dur_k = ax_meta["key"]
+                        curr_val = cur_envelope.get(dur_k, 0)
+                        base_req = round(ftp * reqs.get(f"{dur_k}_ratio", 1.0))
+                        axis_readiness = min(100.0, (curr_val / max(1.0, float(base_req))) * 100.0) if base_req > 0 else 100.0
+                        ax_weight = 2.5 if dur_k in sig_axes else 1.0
+                        readiness_accum += axis_readiness * ax_weight
+                        total_weight += ax_weight
+
+                    prog = round(readiness_accum / max(1.0, total_weight), 1)
+                    active_goal["progress_pct"] = min(100.0, max(0.0, prog))
+                else:
+                    tot_target = sum(int(goal_envelope.get(k, 0)) for k in goal_envelope)
+                    tot_cur = sum(min(int(goal_envelope.get(k, 0)), cur_envelope.get(k, 0)) for k in goal_envelope)
+                    prog = round((tot_cur / max(1.0, float(tot_target))) * 100.0, 1) if tot_target > 0 else 0.0
+                    active_goal["progress_pct"] = min(100.0, max(0.0, prog))
             else:
-                active_goal["progress_pct"] = 0.0
+                # Duration target (e.g. 20m @ 260W): current watts achieved relative to target wattage
+                tgt_w = active_goal.get("target_watts") or goal_envelope.get(target_key, 0)
+                cur_w = cur_envelope.get(target_key, 0)
+                if tgt_w > 0:
+                    prog = round(min(100.0, max(0.0, (cur_w / float(tgt_w)) * 100.0)), 1)
+                    active_goal["progress_pct"] = prog
+                else:
+                    tot_target = sum(int(goal_envelope.get(k, 0)) for k in goal_envelope)
+                    tot_cur = sum(min(int(goal_envelope.get(k, 0)), cur_envelope.get(k, 0)) for k in goal_envelope)
+                    prog = round((tot_cur / max(1.0, float(tot_target))) * 100.0, 1) if tot_target > 0 else 0.0
+                    active_goal["progress_pct"] = min(100.0, max(0.0, prog))
 
     # Classify Rider Phenotype (Unified Multi-Axis Scoring Model)
     phenotype_eval = classify_athlete_phenotype(cur_envelope, ftp, weight_kg)

@@ -3,6 +3,21 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.7.2] - 2026-11-12
+### Fixed
+- **Spiderweb Active Goal & Target Planner Progress Synchronization**:
+  - Eliminated the bug where the All-Time PRs spiderweb displayed `0% progress` despite the Target Changes & Goal Planner showing high completion (e.g. 96.8% readiness).
+  - Resolved the mathematical flaw in `get_power_spiderweb_profile` where `all_time` set `prev_envelope` identical to `cur_envelope` (`cur_w == prev_w`), creating an artificial zero initial-to-remaining gap difference `((gap - gap) / gap = 0%)`.
+  - Replaced the flawed period-delta formula with the unified continuous archetype readiness model, guaranteeing that `active_goal.progress_pct` on the spiderweb header banner perfectly matches `completion_pct` on the Target Changes & Goal Planner cards.
+- **Continuous Archetype Readiness Metric**:
+  - Evaluates athlete power against archetype envelope targets across all 5 durations (5s, 1m, 5m, 20m, 60m) with 2.5× weighting on phenotype signature axes and 1.0× on supporting axes.
+  - Duration-specific goals evaluate current duration power directly against target wattage (`(cur_w / target_w) * 100.0`).
+  - Removed artificial ceilings, allowing completed goals to properly indicate 100% achievement.
+- **Active Goal Planner Badge Harmonization**:
+  - Updated Target Planner phenotype cards so the active goal badge displays `🎯 Active Goal (${p.completion_pct}% Readiness • ${p.total_delta_watts}W gap)` or `🎯 Active Goal (100% Achieved)`, creating complete UI consistency.
+
+---
+
 ## [2.7.1] - 2026-11-11
 ### Added
 - **Canonical Coggan 7-Zone Power Ribbon**:
