@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.1",
-        "release_name": "Exact Zwift Target Wattage Precision",
+        "version": "2.9.2",
+        "release_name": "Whole-Ride NP Target Alignment",
         "build_date": "2026-11-13",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.2",
+                "date": "2026-11-13",
+                "title": "Whole-Ride NP Target Alignment",
+                "items": [
+                    "Whole-Ride Normalized Power Targets: Updated resolve_day_prescribed_target() to compute expected Coggan 30s rolling Normalized Power across all prescribed intervals (including Warmup, Cooldown, Rest, and Repeats blocks) so Power vs Target matches an exact ERG ride.",
+                    "Primary Zone Preservation: Preserved accurate physiological zone labels (e.g., Zone 3 Tempo, VO2 Max) from the main work intervals even when recovery valleys lower the whole-ride NP."
+                ]
+            },
             {
                 "version": "v2.9.1",
                 "date": "2026-11-13",

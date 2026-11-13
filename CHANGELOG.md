@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.2] - 2026-11-13
+### Fixed
+- **Whole-Ride Normalized Power Target Alignment**:
+  - Updated `resolve_day_prescribed_target` in `app/services/review_coach.py` via `_estimate_workout_np_and_work_pct()` to calculate the expected whole-ride Normalized Power (Coggan 30-second rolling NP) across **all** prescribed intervals (`Warmup`, `Cooldown`, `Ramp`, `SteadyState`, `Rest`, and `Repeats` blocks) instead of only averaging main work blocks.
+  - Eliminates the systematic upward bias where "Power vs Target" showed a higher wattage than what an exact ERG ride actually produces once warmup, cooldown, and recovery valleys are included, while preserving the primary training zone label (e.g., `Zone 3 Tempo`, `VO2 Max`) from the work intervals.
+
 ## [2.9.1] - 2026-11-13
 ### Fixed
 - **Exact Zwift & Intervals.icu Target Wattage Precision**:

@@ -123,5 +123,67 @@ class TestPrescribedTargetFidelity(unittest.TestCase):
         self.assertIn("strava", debrief)
         self.assertIn("recent_activities", debrief["strava"])
 
+    def test_tempo_cadence_ladders_uses_whole_ride_np_target(self):
+        """
+        Verifies that prescribed workouts with Warmup/Cooldown/Recovery valleys compute
+        target_pct_ftp as expected whole-ride Normalized Power rather than work-block average,
+        while preserving the primary Zone 3 Tempo classification.
+        """
+        from app.services.workout_catalog import build_tempo_cadence_ladders
+
+        today = get_athlete_date(self.user_id)
+        yesterday_iso = (today - datetime.timedelta(days=1)).isoformat()
+        workout = build_tempo_cadence_ladders(60, 250)
+
+        save_athlete_planned_session(yesterday_iso, workout, user_id=self.user_id)
+
+        target = resolve_day_prescribed_target(
+            date_str=yesterday_iso,
+            workout_recovery=75,
+            ftp=250,
+            user_id=self.user_id,
+            is_today=False
+        )
+
+        self.assertEqual(target["source"], "prescribed_intervals")
+        self.assertEqual(target["target_zone"], "Zone 3 Tempo")
+        # Whole-ride NP is ~76% FTP (190W @ 250W FTP), vs old work-only 79% (197W)
+        self.assertLessEqual(target["target_pct_ftp"], 77)
+        self.assertGreaterEqual(target["target_pct_ftp"], 75)
+
+    def test_repeats_workout_uses_whole_ride_np_and_preserves_vo2_zone(self):
+        """
+        Verifies that Repeats workouts (e.g. 5x3m VO2 Max @ 115% FTP) compute whole-ride NP
+        for target_pct_ftp while preserving the VO2 Max zone label from the work intervals.
+        """
+        today = get_athlete_date(self.user_id)
+        yesterday_iso = (today - datetime.timedelta(days=1)).isoformat()
+
+        vo2_workout = {
+            "title": "55-Min VO2 Max 5x3m",
+            "focus_area": "VO2 Max",
+            "duration_minutes": 55,
+            "intervals": [
+                {"type": "Warmup", "duration_sec": 480, "power_low_pct": 45, "power_high_pct": 78},
+                {"type": "Repeats", "repeat": 5, "on_duration_sec": 180, "off_duration_sec": 180, "on_power_pct": 115, "off_power_pct": 50},
+                {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 65, "power_high_pct": 40},
+            ]
+        }
+        save_athlete_planned_session(yesterday_iso, vo2_workout, user_id=self.user_id)
+
+        target = resolve_day_prescribed_target(
+            date_str=yesterday_iso,
+            workout_recovery=85,
+            ftp=250,
+            user_id=self.user_id,
+            is_today=False
+        )
+
+        self.assertEqual(target["source"], "prescribed_intervals")
+        self.assertEqual(target["target_zone"], "VO2 Max")
+        # Whole-ride NP of 5x3m @ 115% / 3m @ 50% + warmup/cooldown is ~91% FTP, not 110-115%
+        self.assertLess(target["target_pct_ftp"], 98)
+        self.assertGreater(target["target_pct_ftp"], 85)
+
 if __name__ == "__main__":
     unittest.main()

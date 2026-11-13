@@ -742,6 +742,105 @@ def build_preference_aligned_outlook_days(
 
     return outlook_days
 
+def _estimate_workout_np_and_work_pct(intervals: List[Dict[str, Any]], ftp: int = 250) -> Optional[Dict[str, float]]:
+    """
+    Computes the expected whole-ride Normalized Power (% FTP) across all intervals
+    (Warmup, Cooldown, Ramp, SteadyState, Rest, and Repeats) using Coggan 30s rolling NP,
+    plus the work-block average % FTP for accurate zone classification.
+    """
+    if not intervals:
+        return None
+
+    safe_ftp = max(1, int(ftp or 250))
+    pct_stream: List[float] = []
+    work_blocks: List[tuple] = []  # (duration_sec, power_pct)
+
+    def _to_pct(pct_val: Any, watts_val: Any, default_pct: float) -> float:
+        if watts_val is not None and float(watts_val) > 0:
+            return (float(watts_val) / safe_ftp) * 100.0
+        if pct_val is not None and float(pct_val) > 0:
+            return float(pct_val)
+        return default_pct
+
+    for iv in intervals:
+        if not isinstance(iv, dict):
+            continue
+        seg_type = str(iv.get("type", "SteadyState")).lower()
+
+        if seg_type in ("repeats", "intervalblock", "intervals"):
+            repeat = max(1, int(iv.get("repeat", 1) or 1))
+            on_dur = max(0, int(iv.get("on_duration_sec", 0) or 0))
+            off_dur = max(0, int(iv.get("off_duration_sec", 0) or 0))
+            on_pct = _to_pct(iv.get("on_power_pct"), iv.get("on_watts"), 95.0)
+            off_pct = _to_pct(iv.get("off_power_pct"), iv.get("off_watts"), 55.0)
+            for _ in range(repeat):
+                if on_dur > 0:
+                    pct_stream.extend([on_pct] * on_dur)
+                if off_dur > 0:
+                    pct_stream.extend([off_pct] * off_dur)
+            if on_dur > 0 and on_pct > 40:
+                work_blocks.append((repeat * on_dur, on_pct))
+        elif seg_type in ("warmup", "cooldown", "ramp") or (
+            iv.get("power_pct") is None
+            and (iv.get("power_low_pct") is not None or iv.get("power_high_pct") is not None)
+        ):
+            dur = max(0, int(iv.get("duration_sec", 0) or 0))
+            if dur <= 0:
+                continue
+            p_low = _to_pct(iv.get("power_low_pct"), iv.get("low_watts"), 50.0)
+            p_high = _to_pct(iv.get("power_high_pct"), iv.get("high_watts"), 75.0)
+            if dur == 1:
+                pct_stream.append((p_low + p_high) / 2.0)
+            else:
+                step = (p_high - p_low) / float(dur - 1)
+                pct_stream.extend(p_low + i * step for i in range(dur))
+            if seg_type == "ramp":
+                avg_p = (p_low + p_high) / 2.0
+                if avg_p > 40:
+                    work_blocks.append((dur, avg_p))
+        else:
+            dur = max(0, int(iv.get("duration_sec", 0) or 0))
+            if dur <= 0:
+                continue
+            p_pct = _to_pct(
+                iv.get("power_pct"),
+                iv.get("power_watts") or iv.get("target_watts"),
+                65.0,
+            )
+            pct_stream.extend([p_pct] * dur)
+            if seg_type != "rest" and p_pct > 40:
+                work_blocks.append((dur, p_pct))
+
+    n = len(pct_stream)
+    if n == 0:
+        return None
+
+    if n >= 30:
+        window_sum = sum(pct_stream[:30])
+        p4_sum = (window_sum / 30.0) ** 4
+        count = 1
+        for i in range(30, n):
+            window_sum += pct_stream[i] - pct_stream[i - 30]
+            p4_sum += (window_sum / 30.0) ** 4
+            count += 1
+        whole_ride_np_pct = (p4_sum / count) ** 0.25
+    else:
+        whole_ride_np_pct = (sum(p ** 4 for p in pct_stream) / n) ** 0.25
+
+    primary_blocks = [(d, p) for d, p in work_blocks if p > 60]
+    zone_blocks = primary_blocks if primary_blocks else work_blocks
+    if zone_blocks:
+        tot_w_dur = sum(d for d, _ in zone_blocks)
+        work_avg_pct = sum(d * p for d, p in zone_blocks) / max(1, tot_w_dur)
+    else:
+        work_avg_pct = whole_ride_np_pct
+
+    return {
+        "whole_ride_np_pct": whole_ride_np_pct,
+        "work_avg_pct": work_avg_pct,
+    }
+
+
 def resolve_day_prescribed_target(
     date_str: str,
     workout_recovery: int,
@@ -797,27 +896,21 @@ def resolve_day_prescribed_target(
         intervals = target_obj.get("intervals") or []
         is_rest = target_obj.get("is_rest") or (opt_type == "rest") or ("rest" in title.lower() and "interval" not in title.lower())
 
-        # Check intervals for exact work power
-        work_ivs = [
-            iv for iv in intervals
-            if iv.get("type") not in ("Warmup", "Cooldown", "Rest") and (iv.get("power_pct", 0) > 40 or iv.get("power_high_pct", 0) > 40)
-        ]
-        if work_ivs:
-            tot_dur = sum(iv.get("duration_sec", 60) for iv in work_ivs)
-            tot_power = sum(
-                iv.get("duration_sec", 60) * (iv.get("power_pct") or ((iv.get("power_low_pct", 65) + iv.get("power_high_pct", 65)) / 2.0))
-                for iv in work_ivs
-            )
-            pct = round(tot_power / max(1, tot_dur))
-            if pct <= 55:
+        # Compute expected whole-ride Normalized Power (% FTP) across all intervals
+        # (including Warmup, Cooldown, Rest, and Repeats) so target matches actual ride NP.
+        np_stats = _estimate_workout_np_and_work_pct(intervals, ftp=ftp)
+        if np_stats and not is_rest:
+            pct = round(np_stats["whole_ride_np_pct"])
+            zone_pct = round(np_stats["work_avg_pct"])
+            if zone_pct <= 55:
                 zone = "Zone 1 Active Recovery"
-            elif pct <= 75:
+            elif zone_pct <= 75:
                 zone = "Zone 2 Aerobic Base"
-            elif pct <= 85:
+            elif zone_pct <= 85:
                 zone = "Zone 3 Tempo"
-            elif pct <= 94:
+            elif zone_pct <= 94:
                 zone = "Sweet Spot"
-            elif pct <= 105:
+            elif zone_pct <= 105:
                 zone = "Threshold"
             else:
                 zone = "VO2 Max"
