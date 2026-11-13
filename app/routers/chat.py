@@ -2,9 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 
-from app.database import get_setting, set_setting, get_current_user_id, get_athlete_date, GUEST_USER_ID
+from app.database import (
+    get_setting, set_setting, get_current_user_id, get_athlete_date, GUEST_USER_ID,
+    get_coach_chat_messages, clear_coach_chat_messages,
+    get_coach_conversation_memory, clear_coach_conversation_memory
+)
 from app.routers.settings import require_authenticated_user
-from app.services.coach_chat_service import handle_coach_chat, compile_athlete_context, get_gemini_api_key
+from app.services.coach_chat_service import (
+    handle_coach_chat, compile_athlete_context, get_gemini_api_key,
+    maybe_update_conversation_memory
+)
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -30,6 +37,60 @@ def chat_with_coach_endpoint(payload: ChatMessagePayload):
     except Exception as e:
         print(f"Error handling coach chat: {e}")
         raise HTTPException(status_code=500, detail=f"Coach chatbot error: {str(e)}")
+
+@router.get("/history")
+def get_chat_history_endpoint(limit: int = 50):
+    """Returns persisted conversation history and distilled long-term memory for the current user."""
+    uid = get_current_user_id()
+    safe_limit = max(1, min(int(limit or 50), 200))
+    messages = get_coach_chat_messages(limit=safe_limit, user_id=uid)
+    memory = get_coach_conversation_memory(user_id=uid)
+    return {
+        "success": True,
+        "messages": messages,
+        "memory": {
+            "summary": memory.get("summary", ""),
+            "key_facts": memory.get("key_facts", []),
+            "updated_at": memory.get("updated_at")
+        }
+    }
+
+@router.delete("/history")
+def clear_chat_history_endpoint(clear_memory: bool = False):
+    """
+    Clears persisted chat transcript for the current user.
+    By default, distills any unsummarized turns into long-term memory before clearing the transcript,
+    unless clear_memory=true is passed.
+    """
+    uid = get_current_user_id()
+    if clear_memory:
+        deleted = clear_coach_chat_messages(user_id=uid)
+        clear_coach_conversation_memory(user_id=uid)
+    else:
+        try:
+            maybe_update_conversation_memory(uid, api_key=get_gemini_api_key(), force_all=True)
+        except Exception as e:
+            print(f"Error distilling memory before clear: {e}")
+        deleted = clear_coach_chat_messages(user_id=uid)
+
+    memory = get_coach_conversation_memory(user_id=uid)
+    return {
+        "success": True,
+        "cleared_messages": deleted,
+        "cleared_memory": clear_memory,
+        "memory": {
+            "summary": memory.get("summary", ""),
+            "key_facts": memory.get("key_facts", []),
+            "updated_at": memory.get("updated_at")
+        }
+    }
+
+@router.delete("/memory")
+def clear_chat_memory_endpoint():
+    """Clears distilled long-term conversation memory for the current user."""
+    uid = get_current_user_id()
+    clear_coach_conversation_memory(user_id=uid)
+    return {"success": True, "message": "Long-term coach memory cleared."}
 
 @router.get("/status")
 def get_chat_status():

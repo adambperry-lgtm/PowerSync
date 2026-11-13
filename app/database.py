@@ -502,6 +502,34 @@ def init_db():
     );
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS coach_chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
+        proposed_action_json TEXT,
+        executed_tools_json TEXT,
+        provider TEXT,
+        model TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+    cursor.execute("""
+    CREATE INDEX IF NOT EXISTS idx_coach_chat_messages_user_id
+        ON coach_chat_messages(user_id, id);
+    """)
+
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS coach_conversation_memory (
+        user_id TEXT PRIMARY KEY,
+        summary TEXT DEFAULT '',
+        key_facts_json TEXT DEFAULT '[]',
+        last_summarized_msg_id INTEGER DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    """)
+
     # Ensure default user exists so legacy single-user data is preserved
     cursor.execute("""
         INSERT OR IGNORE INTO users (id, email, name, picture)
@@ -1595,6 +1623,169 @@ def claim_or_copy_default_data_to_user(target_user_id: str) -> Dict[str, Any]:
     conn.commit()
     conn.close()
     return {"success": True, "message": "Successfully imported all settings, coaching directives, and history from default athlete."}
+
+def save_coach_chat_message(
+    role: str,
+    content: str,
+    proposed_action: Optional[Dict[str, Any]] = None,
+    executed_tools: Optional[List[Dict[str, Any]]] = None,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    user_id: Optional[str] = None
+) -> int:
+    """Persists a single AI coach chat message for the specified user."""
+    uid = user_id or get_current_user_id()
+    norm_role = "user" if role in ("user", "athlete") else "model"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO coach_chat_messages (
+            user_id, role, content, proposed_action_json, executed_tools_json, provider, model
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    """, (
+        uid,
+        norm_role,
+        content,
+        json.dumps(proposed_action) if proposed_action else None,
+        json.dumps(executed_tools) if executed_tools else None,
+        provider,
+        model
+    ))
+    msg_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+    return int(msg_id or 0)
+
+def _deserialize_chat_row(row: sqlite3.Row) -> Dict[str, Any]:
+    proposed_action = None
+    if row["proposed_action_json"]:
+        try:
+            proposed_action = json.loads(row["proposed_action_json"])
+        except Exception:
+            proposed_action = None
+    executed_tools = None
+    if row["executed_tools_json"]:
+        try:
+            executed_tools = json.loads(row["executed_tools_json"])
+        except Exception:
+            executed_tools = None
+    return {
+        "id": row["id"],
+        "role": row["role"],
+        "text": row["content"],
+        "content": row["content"],
+        "proposed_action": proposed_action,
+        "executed_tools": executed_tools,
+        "provider": row["provider"],
+        "model": row["model"],
+        "created_at": row["created_at"]
+    }
+
+def get_coach_chat_messages(limit: int = 50, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Returns persisted AI coach chat messages in chronological order for the specified user."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, role, content, proposed_action_json, executed_tools_json, provider, model, created_at
+        FROM coach_chat_messages
+        WHERE user_id = ?
+        ORDER BY id DESC
+        LIMIT ?
+    """, (uid, limit))
+    rows = cursor.fetchall()
+    conn.close()
+    return [_deserialize_chat_row(r) for r in reversed(rows)]
+
+def get_unsummarized_coach_chat_messages(after_id: int = 0, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Returns persisted chat messages with id > after_id in chronological order."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id, role, content, proposed_action_json, executed_tools_json, provider, model, created_at
+        FROM coach_chat_messages
+        WHERE user_id = ? AND id > ?
+        ORDER BY id ASC
+    """, (uid, after_id))
+    rows = cursor.fetchall()
+    conn.close()
+    return [_deserialize_chat_row(r) for r in rows]
+
+def clear_coach_chat_messages(user_id: Optional[str] = None) -> int:
+    """Deletes persisted chat messages for the specified user."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM coach_chat_messages WHERE user_id = ?", (uid,))
+    deleted = cursor.rowcount
+    conn.commit()
+    conn.close()
+    return deleted
+
+def get_coach_conversation_memory(user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Retrieves distilled long-term conversation memory for the specified user."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT summary, key_facts_json, last_summarized_msg_id, updated_at
+        FROM coach_conversation_memory
+        WHERE user_id = ?
+    """, (uid,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return {
+            "summary": "",
+            "key_facts": [],
+            "last_summarized_msg_id": 0,
+            "updated_at": None
+        }
+    try:
+        key_facts = json.loads(row["key_facts_json"] or "[]")
+        if not isinstance(key_facts, list):
+            key_facts = []
+    except Exception:
+        key_facts = []
+    return {
+        "summary": row["summary"] or "",
+        "key_facts": key_facts,
+        "last_summarized_msg_id": int(row["last_summarized_msg_id"] or 0),
+        "updated_at": row["updated_at"]
+    }
+
+def save_coach_conversation_memory(
+    summary: str,
+    key_facts: List[str],
+    last_summarized_msg_id: int,
+    user_id: Optional[str] = None
+):
+    """Persists distilled long-term conversation memory for the specified user."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO coach_conversation_memory (
+            user_id, summary, key_facts_json, last_summarized_msg_id, updated_at
+        ) VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id) DO UPDATE SET
+            summary = excluded.summary,
+            key_facts_json = excluded.key_facts_json,
+            last_summarized_msg_id = excluded.last_summarized_msg_id,
+            updated_at = CURRENT_TIMESTAMP
+    """, (uid, summary or "", json.dumps(key_facts or []), int(last_summarized_msg_id or 0)))
+    conn.commit()
+    conn.close()
+
+def clear_coach_conversation_memory(user_id: Optional[str] = None):
+    """Clears distilled long-term conversation memory for the specified user."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM coach_conversation_memory WHERE user_id = ?", (uid,))
+    conn.commit()
+    conn.close()
 
 # Initialize on module load
 init_db()

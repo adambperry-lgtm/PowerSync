@@ -5,7 +5,13 @@ import requests
 import datetime
 from typing import Dict, Any, List, Optional, Tuple
 
-from app.database import get_setting, set_setting, get_db_connection, get_active_target_plan, get_current_user_id, get_athlete_date
+from app.database import (
+    get_setting, set_setting, get_db_connection, get_active_target_plan,
+    get_current_user_id, get_athlete_date,
+    save_coach_chat_message, get_coach_chat_messages,
+    get_unsummarized_coach_chat_messages, get_coach_conversation_memory,
+    save_coach_conversation_memory
+)
 
 def extract_gemini_key_from_text(text: str) -> Optional[str]:
     """Detects if user provided a Google Gemini API key in their message."""
@@ -191,7 +197,7 @@ def compile_athlete_context() -> Dict[str, Any]:
 
     return snapshot
 
-def build_system_prompt(snapshot: Dict[str, Any]) -> str:
+def build_system_prompt(snapshot: Dict[str, Any], memory: Optional[Dict[str, Any]] = None) -> str:
     """Builds the conversational sports-science system instruction for Gemini."""
     snapshot_json = json.dumps(snapshot, indent=2)
     return (
@@ -268,7 +274,178 @@ def build_system_prompt(snapshot: Dict[str, Any]) -> str:
         "- `search_strava_activities(query, sport_type, days_back)`: Searches his historical rides by keywords or sport.\n"
         "- `get_whoop_biometrics_timeline(days)`: Retrieves multi-day Whoop recovery, HRV, and sleep trends.\n"
         "Always use these tools to inspect real numbers and provide high-fidelity coaching advice based on actual data rather than speculating."
+        + _format_memory_prompt_block(memory)
     )
+
+def _format_memory_prompt_block(memory: Optional[Dict[str, Any]]) -> str:
+    """Formats persistent conversation memory into a system prompt block if non-empty."""
+    if not memory or not isinstance(memory, dict):
+        return ""
+    summary = (memory.get("summary") or "").strip()
+    key_facts = [str(f).strip() for f in (memory.get("key_facts") or []) if str(f).strip()]
+    if not summary and not key_facts:
+        return ""
+    lines = [
+        "\n\n11. PERSISTENT CONVERSATION MEMORY (CROSS-SESSION CONTINUITY):",
+        "You remember the following context from earlier coaching conversations with this athlete. "
+        "Use it naturally to maintain continuity (injuries, goals, schedule constraints, preferences, and prior agreements) "
+        "without awkwardly announcing 'according to my memory':"
+    ]
+    if summary:
+        lines.append(f"Conversation Summary: {summary}")
+    if key_facts:
+        lines.append("Remembered Athlete Context & Notes:")
+        for fact in key_facts[:12]:
+            lines.append(f"- {fact}")
+    return "\n".join(lines)
+
+def _extract_memory_facts_fallback(messages: List[Dict[str, Any]], existing_memory: Dict[str, Any]) -> Dict[str, Any]:
+    """Deterministic fallback that distills durable coaching context from conversation turns."""
+    existing_facts = [str(f).strip() for f in (existing_memory.get("key_facts") or []) if str(f).strip()]
+    fact_keywords = (
+        "knee", "back", "pain", "sore", "injury", "injured", "tight", "fatigue", "tired",
+        "travel", "vacation", "trip", "work", "busy", "morning", "evening", "prefer",
+        "goal", "target", "race", "event", "fondo", "century", "ftp", "weight", "carb",
+        "fuel", "zwift", "outdoor", "indoor", "rest", "deload", "recovery week"
+    )
+    new_facts = list(existing_facts)
+    user_snippets = []
+    for m in messages:
+        if m.get("role") == "user":
+            txt = (m.get("content") or m.get("text") or "").strip()
+            if not txt:
+                continue
+            lower = txt.lower()
+            if any(k in lower for k in fact_keywords):
+                snippet = txt if len(txt) <= 140 else txt[:137].rstrip() + "..."
+                if snippet not in new_facts:
+                    new_facts.append(snippet)
+            user_snippets.append(txt[:100])
+
+    # Keep the most recent 12 facts
+    new_facts = new_facts[-12:]
+    prev_summary = (existing_memory.get("summary") or "").strip()
+    if user_snippets:
+        recent_topics = "; ".join(user_snippets[-3:])
+        if prev_summary:
+            combined = f"{prev_summary} Recent topics: {recent_topics}"
+        else:
+            combined = f"Recent coaching topics: {recent_topics}"
+        if len(combined) > 600:
+            combined = "..." + combined[-597:]
+    else:
+        combined = prev_summary
+
+    return {
+        "summary": combined,
+        "key_facts": new_facts
+    }
+
+def distill_conversation_memory(
+    messages: List[Dict[str, Any]],
+    existing_memory: Dict[str, Any],
+    api_key: str = ""
+) -> Dict[str, Any]:
+    """
+    Distills older conversation turns into a concise persistent summary and key coaching facts.
+    Uses Gemini when available, falling back to deterministic extraction otherwise.
+    """
+    if not messages:
+        return {
+            "summary": existing_memory.get("summary", ""),
+            "key_facts": existing_memory.get("key_facts", [])
+        }
+
+    if api_key and "•" not in api_key:
+        try:
+            transcript_lines = []
+            for m in messages[-20:]:
+                speaker = "Athlete" if m.get("role") == "user" else "Coach"
+                txt = (m.get("content") or m.get("text") or "").strip()
+                if len(txt) > 500:
+                    txt = txt[:497] + "..."
+                transcript_lines.append(f"{speaker}: {txt}")
+            transcript = "\n".join(transcript_lines)
+
+            prev_summary = existing_memory.get("summary", "")
+            prev_facts = existing_memory.get("key_facts", [])
+
+            prompt = (
+                "Update the persistent coaching memory for this cyclist based on the existing memory and new conversation turns.\n"
+                "Extract ONLY durable, actionable coaching context: injuries/soreness, goals, target events, schedule/travel constraints, "
+                "equipment/indoor-outdoor preferences, nutrition/fueling notes, and agreed training adjustments.\n"
+                "Return ONLY valid JSON with keys:\n"
+                '{"summary": "<2-3 sentence rolling summary, max 500 chars>", "key_facts": ["<concise fact 1>", ... (max 10 items)]}\n\n'
+                f"EXISTING SUMMARY: {prev_summary or 'None'}\n"
+                f"EXISTING KEY FACTS: {json.dumps(prev_facts)}\n\n"
+                f"NEW CONVERSATION TURNS:\n{transcript}"
+            )
+            model = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3-flash-preview"
+            api_ver = _CACHED_WORKING_MODEL[0] if _CACHED_WORKING_MODEL else "v1beta"
+            url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent?key={api_key}"
+            res = requests.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                    "generationConfig": {"temperature": 0.2, "maxOutputTokens": 600}
+                },
+                timeout=8
+            )
+            if res.status_code == 200:
+                cands = res.json().get("candidates", [])
+                if cands:
+                    parts = cands[0].get("content", {}).get("parts", [])
+                    raw_text = "\n".join(p.get("text", "") for p in parts if "text" in p).strip()
+                    # Strip optional markdown code fences
+                    raw_text = re.sub(r'^```(?:json)?\s*', '', raw_text)
+                    raw_text = re.sub(r'\s*```$', '', raw_text)
+                    parsed = json.loads(raw_text)
+                    if isinstance(parsed, dict):
+                        summary = str(parsed.get("summary") or prev_summary)[:600]
+                        facts = parsed.get("key_facts")
+                        if isinstance(facts, list):
+                            clean_facts = [str(f).strip() for f in facts if str(f).strip()][:12]
+                            return {"summary": summary, "key_facts": clean_facts}
+        except Exception as e:
+            print(f"Memory distillation Gemini fallback triggered: {e}")
+
+    return _extract_memory_facts_fallback(messages, existing_memory)
+
+def maybe_update_conversation_memory(user_id: str, api_key: str = "", force_all: bool = False) -> Optional[Dict[str, Any]]:
+    """
+    Checks for unsummarized messages beyond the active recent window and distills them
+    into persistent long-term conversation memory for the user.
+    """
+    RECENT_WINDOW = 10
+    BATCH_THRESHOLD = 6
+    existing_memory = get_coach_conversation_memory(user_id=user_id)
+    unsummarized = get_unsummarized_coach_chat_messages(
+        after_id=existing_memory.get("last_summarized_msg_id", 0),
+        user_id=user_id
+    )
+    if not unsummarized:
+        return None
+
+    if force_all:
+        to_summarize = unsummarized
+    elif len(unsummarized) >= RECENT_WINDOW + BATCH_THRESHOLD:
+        to_summarize = unsummarized[:-RECENT_WINDOW]
+    else:
+        return None
+
+    if not to_summarize:
+        return None
+
+    updated = distill_conversation_memory(to_summarize, existing_memory, api_key=api_key)
+    last_id = int(to_summarize[-1]["id"])
+    save_coach_conversation_memory(
+        summary=updated.get("summary", ""),
+        key_facts=updated.get("key_facts", []),
+        last_summarized_msg_id=last_id,
+        user_id=user_id
+    )
+    return updated
 
 def extract_action_from_response(text: str) -> Tuple[str, Optional[Dict[str, Any]]]:
     """
@@ -558,7 +735,7 @@ def call_gemini_api(
         if text and text != user_message:
             clean_history.append({"role": role, "text": text})
 
-    for msg in clean_history[-8:]:
+    for msg in clean_history[-14:]:
         role = msg["role"]
         text = msg["text"]
         if contents and contents[-1]["role"] == role:
@@ -1003,12 +1180,26 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         except Exception as e:
             print(f"Error updating forecast plan from chat directives: {e}")
 
-    # 4. Retrieve API Key & active user
+    # 4. Load persistent conversation history & long-term memory for this user
+    persisted_rows = get_coach_chat_messages(limit=20, user_id=uid)
+    effective_history = (
+        [{"role": r["role"], "text": r["content"]} for r in persisted_rows]
+        if persisted_rows else history
+    )
+    conversation_memory = get_coach_conversation_memory(user_id=uid)
+
+    # Persist the incoming user message
+    try:
+        save_coach_chat_message(role="user", content=user_message, user_id=uid)
+    except Exception as e:
+        print(f"Error persisting user chat message: {e}")
+
+    # 5. Retrieve API Key & active user
     api_key = get_gemini_api_key()
 
     if api_key:
-        system_prompt = build_system_prompt(snapshot)
-        gemini_reply, executed_tools = call_gemini_api(api_key, system_prompt, history, user_message, user_id=uid)
+        system_prompt = build_system_prompt(snapshot, memory=conversation_memory)
+        gemini_reply, executed_tools = call_gemini_api(api_key, system_prompt, effective_history, user_message, user_id=uid)
         if gemini_reply:
             model_used = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3-flash-preview"
             clean_reply, proposed_action = extract_action_from_response(gemini_reply)
@@ -1067,9 +1258,24 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 desc_list = [f"**{d['target_date']}**: {d['title']}" for d in chat_directives]
                 reply_text += f"\n\n🎯 **3-Day Forecast Updated:** {', '.join(desc_list)}."
 
+            full_reply = key_saved_notice + reply_text
+            try:
+                save_coach_chat_message(
+                    role="model",
+                    content=full_reply,
+                    proposed_action=proposed_action,
+                    executed_tools=executed_tools,
+                    provider="gemini",
+                    model=model_used,
+                    user_id=uid
+                )
+                maybe_update_conversation_memory(uid, api_key=api_key)
+            except Exception as e:
+                print(f"Error persisting coach chat reply/memory: {e}")
+
             return {
                 "success": True,
-                "reply": key_saved_notice + reply_text,
+                "reply": full_reply,
                 "provider": "gemini",
                 "model": model_used,
                 "gemini_configured": True,
@@ -1091,7 +1297,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         else:
             print("Gemini API call returned null or failed, using sports science fallback.")
 
-    # 5. Sports-science rule-based fallback
+    # 6. Sports-science rule-based fallback
     fallback_reply = generate_sports_science_fallback_response(user_message, snapshot)
     if learned_notice:
         fallback_reply = learned_notice + fallback_reply
@@ -1144,6 +1350,20 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             "name": "get_strava_activity_details",
             "summary": "Retrieved Strava activity lap splits & power telemetry"
         })
+
+    try:
+        save_coach_chat_message(
+            role="model",
+            content=reply_out,
+            proposed_action=proposed_action,
+            executed_tools=fallback_tools,
+            provider="sports_science_engine",
+            model="powersync-coach-v1",
+            user_id=uid
+        )
+        maybe_update_conversation_memory(uid, api_key=api_key)
+    except Exception as e:
+        print(f"Error persisting fallback chat reply/memory: {e}")
 
     return {
         "success": True,

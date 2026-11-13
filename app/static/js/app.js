@@ -5704,6 +5704,7 @@ const coachChatDrawer = document.getElementById("coachChatDrawer");
 const coachChatBackdrop = document.getElementById("coachChatBackdrop");
 const btnCloseCoachChat = document.getElementById("btnCloseCoachChat");
 const btnClearChatHistory = document.getElementById("btnClearChatHistory");
+const btnCoachMemory = document.getElementById("btnCoachMemory");
 const coachChatMessages = document.getElementById("coachChatMessages");
 const formCoachChat = document.getElementById("formCoachChat");
 const inputCoachMessage = document.getElementById("inputCoachMessage");
@@ -5711,6 +5712,8 @@ const btnSendCoachMessage = document.getElementById("btnSendCoachMessage");
 const coachQuickPrompts = document.getElementById("coachQuickPrompts");
 
 let coachChatHistory = [];
+let coachChatHistoryLoaded = false;
+let coachConversationMemory = null;
 let isCoachChatLoading = false;
 
 function updateGeminiConnectedIndicators(isConfigured, modelName) {
@@ -5861,6 +5864,59 @@ function adjustCoachInputHeight() {
   inputCoachMessage.style.overflowY = scrollH > 136 ? "auto" : "hidden";
 }
 
+function updateCoachMemoryIndicator(memory) {
+  coachConversationMemory = memory || null;
+  if (!btnCoachMemory) return;
+  const hasSummary = Boolean(memory && memory.summary && memory.summary.trim());
+  const hasFacts = Boolean(memory && Array.isArray(memory.key_facts) && memory.key_facts.length > 0);
+  if (hasSummary || hasFacts) {
+    btnCoachMemory.style.display = "flex";
+    const factCount = hasFacts ? memory.key_facts.length : 0;
+    btnCoachMemory.title = `Coach Long-Term Memory Active (${factCount} remembered notes) — Click to view or reset`;
+  } else {
+    btnCoachMemory.style.display = "none";
+  }
+}
+
+async function loadCoachChatHistory(force = false) {
+  if (coachChatHistoryLoaded && !force) return;
+  try {
+    const res = await fetch("/api/chat/history?limit=60");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!data.success) return;
+
+    coachChatHistoryLoaded = true;
+    updateCoachMemoryIndicator(data.memory);
+
+    if (Array.isArray(data.messages) && data.messages.length > 0 && coachChatMessages) {
+      // Preserve initial welcome message if present, then append persisted history
+      const firstGreeting = coachChatMessages.querySelector(".chat-msg-coach");
+      const greetingHtml = firstGreeting ? firstGreeting.outerHTML : "";
+      coachChatMessages.innerHTML = greetingHtml;
+      coachChatHistory = [];
+
+      for (const msg of data.messages) {
+        const uiRole = msg.role === "user" ? "user" : "coach";
+        const msgText = msg.text || msg.content || "";
+        appendCoachChatMessage(
+          uiRole,
+          msgText,
+          msg.proposed_action || null,
+          msg.executed_tools || null
+        );
+        coachChatHistory.push({
+          role: msg.role === "user" ? "user" : "model",
+          text: msgText
+        });
+      }
+      scrollCoachChatToBottom();
+    }
+  } catch (e) {
+    console.warn("Could not load persisted coach chat history:", e);
+  }
+}
+
 function openCoachChat() {
   const drawer = document.getElementById("coachChatDrawer");
   const backdrop = document.getElementById("coachChatBackdrop");
@@ -5873,6 +5929,7 @@ function openCoachChat() {
 
   updateCoachChatTelemetryChips();
   checkCoachGeminiStatus();
+  loadCoachChatHistory();
 
   const inp = document.getElementById("inputCoachMessage");
   if (inp) {
@@ -6385,8 +6442,18 @@ document.addEventListener("touchend", (e) => {
 }, { passive: false });
 
 if (btnClearChatHistory) {
-  btnClearChatHistory.addEventListener("click", () => {
+  btnClearChatHistory.addEventListener("click", async () => {
+    try {
+      const res = await fetch("/api/chat/history", { method: "DELETE" });
+      if (res.ok) {
+        const data = await res.json();
+        updateCoachMemoryIndicator(data.memory);
+      }
+    } catch (e) {
+      console.warn("Could not clear persisted chat history:", e);
+    }
     coachChatHistory = [];
+    coachChatHistoryLoaded = true;
     if (coachChatMessages) {
       coachChatMessages.innerHTML = `
         <div class="chat-msg chat-msg-coach">
@@ -6398,7 +6465,32 @@ if (btnClearChatHistory) {
         </div>
       `;
     }
-    showToast("🧹 Chat history cleared.");
+    showToast("🧹 Chat history cleared (long-term coaching memory preserved).");
+  });
+}
+
+if (btnCoachMemory) {
+  btnCoachMemory.addEventListener("click", async () => {
+    const mem = coachConversationMemory;
+    if (!mem) return;
+    const summaryText = mem.summary ? `Summary: ${mem.summary}\n\n` : "";
+    const factsText = (mem.key_facts && mem.key_facts.length > 0)
+      ? `Remembered Notes:\n• ${mem.key_facts.join("\n• ")}\n\n`
+      : "";
+    const shouldClear = window.confirm(
+      `PowerSync Coach Long-Term Memory:\n\n${summaryText}${factsText}Press OK to reset this long-term memory, or Cancel to keep it.`
+    );
+    if (shouldClear) {
+      try {
+        const res = await fetch("/api/chat/memory", { method: "DELETE" });
+        if (res.ok) {
+          updateCoachMemoryIndicator(null);
+          showToast("🧠 Long-term coach memory reset.");
+        }
+      } catch (e) {
+        console.warn("Could not reset coach memory:", e);
+      }
+    }
   });
 }
 

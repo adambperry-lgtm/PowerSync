@@ -145,9 +145,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.8.0",
-        "release_name": "Unauthenticated Privacy Lockdown & Isolated Sign-In Gate",
-        "build_date": "2026-11-12",
+        "version": "2.9.0",
+        "release_name": "Persistent AI Coach Conversation Memory",
+        "build_date": "2026-11-13",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -156,6 +156,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.0",
+                "date": "2026-11-13",
+                "title": "Persistent AI Coach Conversation Memory",
+                "items": [
+                    "Cross-Session Chat Persistence: Stored all AI coach conversations (including proposed workout action cards and tool call pills) in SQLite scoped by user_id.",
+                    "Long-Term Memory Distillation: Automatically summarizes older turns beyond the active 14-message context window into durable coaching notes injected into every prompt.",
+                    "History & Memory APIs: Added GET/DELETE /api/chat/history and DELETE /api/chat/memory endpoints.",
+                    "UI Restoration & Memory Controls: Coach Chat drawer automatically restores prior conversations on open and includes a 🧠 memory inspection/reset button."
+                ]
+            },
             {
                 "version": "v2.8.0",
                 "date": "2026-11-12",

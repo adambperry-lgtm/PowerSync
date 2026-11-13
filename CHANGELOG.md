@@ -3,6 +3,15 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.0] - 2026-11-13
+### Added
+- **Persistent AI Coach Conversation Memory**:
+  - Added `coach_chat_messages` and `coach_conversation_memory` SQLite tables in `app/database.py`, strictly scoped by `user_id` for complete multi-user isolation.
+  - Persists every athlete and AI coach message (including `proposed_action` cards, `executed_tools` pills, provider, and model metadata) across browser reloads, sessions, and devices.
+  - Added automatic long-term memory distillation (`distill_conversation_memory` / `maybe_update_conversation_memory` in `app/services/coach_chat_service.py`) that summarizes older turns beyond the active 14-message context window into durable coaching notes (injuries, goals, schedule constraints, and preferences) and injects them into `build_system_prompt`.
+  - Added `GET /api/chat/history`, `DELETE /api/chat/history`, and `DELETE /api/chat/memory` endpoints in `app/routers/chat.py`.
+  - Updated the Coach Chat drawer (`app/static/js/app.js` and `app/static/index.html`) to automatically restore persisted conversation history on open, preserve long-term memory when clearing the visible chat transcript, and provide a `🧠` memory inspection/reset control.
+
 ## [2.8.0] - 2026-11-12
 ### Security & Privacy
 - **Strict Multi-User Privacy & Unauthenticated Data Lockdown**:
