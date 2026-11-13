@@ -314,7 +314,7 @@ def generate_workout(req: WorkoutGenerateRequest):
                 w["estimated_tss"] = max(5, round(base_tss * (multiplier ** 2)))
             w["ai_rationale"] += f" [Intensity scaled by {req.intensity_adjust:+d}%]"
             w["zwo_content"] = generate_zwo_xml(w, ftp)
-            w["intervals_icu_text"] = generate_intervals_icu_text(w)
+            w["intervals_icu_text"] = generate_intervals_icu_text(w, ftp=ftp)
             enrich_workout_strain(w, ftp)
 
     # Check if a workout was scheduled with the coach for target date
@@ -330,10 +330,8 @@ def generate_workout(req: WorkoutGenerateRequest):
         is_synced = bool(scheduled_target.get("synced_to_zwift") or scheduled_target.get("pushed_to_zwift"))
         scheduled_target["badge"] = "🚀 Sent to Zwift" if is_synced else "⭐ Coach's Choice"
         scheduled_target["badge_color"] = "cyan" if is_synced else "emerald"
-        if not scheduled_target.get("zwo_content"):
-            scheduled_target["zwo_content"] = generate_zwo_xml(scheduled_target, ftp)
-        if not scheduled_target.get("intervals_icu_text"):
-            scheduled_target["intervals_icu_text"] = generate_intervals_icu_text(scheduled_target)
+        scheduled_target["zwo_content"] = generate_zwo_xml(scheduled_target, ftp)
+        scheduled_target["intervals_icu_text"] = generate_intervals_icu_text(scheduled_target, ftp=ftp)
         from app.services.ai_coach import enrich_workout_strain
         scheduled_target = enrich_workout_strain(scheduled_target, ftp)
         if (has_substantial_ride or high_strain_reached) and target_iso == today_iso and not is_explicit_adaptation:
@@ -668,7 +666,7 @@ def replace_with_custom_ride(req: ReplaceCustomRideRequest):
         "intervals": intervals
     }
     custom_workout["zwo_content"] = generate_zwo_xml(custom_workout, ftp)
-    custom_workout["intervals_icu_text"] = generate_intervals_icu_text(custom_workout)
+    custom_workout["intervals_icu_text"] = generate_intervals_icu_text(custom_workout, ftp=ftp)
     from app.services.ai_coach import enrich_workout_strain
     custom_workout = enrich_workout_strain(custom_workout, ftp)
 
@@ -753,6 +751,8 @@ def get_active_fueling_plan(temp_f: int = 74, humidity_pct: int = 50, is_outdoor
 
 @router.get("/download-zwo")
 def download_zwo_file():
+    uid = get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
     workout_cache = get_current_workout_cache()
     options_cache = get_current_options_cache()
     workout = workout_cache or options_cache.get("workout_primary")
@@ -760,7 +760,7 @@ def download_zwo_file():
         gen = generate_workout(WorkoutGenerateRequest(duration_min=60))
         workout = gen["active_workout"]
         
-    zwo_content = workout.get("zwo_content", "")
+    zwo_content = generate_zwo_xml(workout, ftp) if workout.get("intervals") else workout.get("zwo_content", "")
     title = (workout.get("title") or "PowerSync_Workout").replace(" ", "_")
     filename = f"{title}.zwo"
     

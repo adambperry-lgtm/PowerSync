@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.0",
-        "release_name": "Persistent AI Coach Conversation Memory",
+        "version": "2.9.1",
+        "release_name": "Exact Zwift Target Wattage Precision",
         "build_date": "2026-11-13",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.1",
+                "date": "2026-11-13",
+                "title": "Exact Zwift Target Wattage Precision",
+                "items": [
+                    "Half-Up Rounding Parity: Matched backend ZWO power calculation to frontend Math.round() and increased the truncation guard to +0.25W so Zwift ERG targets never drop 1W below prescribed watts.",
+                    "Intervals.icu Precision Sync: Updated Intervals.icu workout text generation to emit precision-compensated percentages instead of integer percentages that truncated in Zwift.",
+                    "Fresh FTP Regeneration: Ensured push_to_intervals_icu and /api/workouts/download-zwo always regenerate ZWO and Intervals.icu payloads with the athlete's current FTP."
+                ]
+            },
             {
                 "version": "v2.9.0",
                 "date": "2026-11-13",

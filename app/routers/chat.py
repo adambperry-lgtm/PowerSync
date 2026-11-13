@@ -242,7 +242,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 "coach_prescribed": True
             }
             workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
-            workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+            workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj, ftp=ftp)
             workout_obj = enrich_workout_strain(workout_obj, ftp)
 
             save_scheduled_workout(workout_obj, today_iso)
@@ -341,7 +341,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 "coach_prescribed": True
             }
             workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
-            workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+            workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj, ftp=ftp)
             workout_obj = enrich_workout_strain(workout_obj, ftp)
 
             athlete_id = get_setting("intervals_athlete_id", "")

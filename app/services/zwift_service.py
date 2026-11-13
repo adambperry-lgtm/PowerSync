@@ -177,6 +177,8 @@ def reconcile_workout_intervals(intervals: List[Dict[str, Any]], target_duration
 
     return reconciled
 
+import math
+
 def _calculate_zwo_power(power_pct: float, athlete_ftp: int = 250, explicit_watts: Optional[float] = None) -> float:
     """
     Calculates the exact Power ratio for Zwift .zwo XML.
@@ -185,19 +187,21 @@ def _calculate_zwo_power(power_pct: float, athlete_ftp: int = 250, explicit_watt
         target_watts = static_cast<int>(athlete_ftp * Power)
     
     In PowerSync, athletes see:
-        display_watts = round(athlete_ftp * (power_pct / 100.0))
+        display_watts = Math.round(athlete_ftp * (power_pct / 100.0))
         
     To guarantee Zwift computes the exact same integer target_watts without
-    being 1-2 watts lower due to float truncation or IEEE 754 under-representation:
-    We target (display_watts + 0.15) / athlete_ftp with 4 decimal places of precision.
+    being 1-2 watts lower due to float truncation, banker's rounding vs JS
+    half-up rounding, or Intervals.icu percentage re-quantization:
+    We match JS Math.round (half-up) and target (display_watts + 0.25) / athlete_ftp
+    with 4 decimal places of precision.
     """
     if not athlete_ftp or athlete_ftp <= 0:
         return round(float(power_pct) / 100.0, 4)
     if explicit_watts is not None and explicit_watts > 0:
-        target_watts = round(float(explicit_watts))
+        target_watts = math.floor(float(explicit_watts) + 0.5)
     else:
-        target_watts = round(float(athlete_ftp) * (float(power_pct) / 100.0))
-    return round((target_watts + 0.15) / float(athlete_ftp), 4)
+        target_watts = math.floor(float(athlete_ftp) * (float(power_pct) / 100.0) + 0.5)
+    return round((target_watts + 0.25) / float(athlete_ftp), 4)
 
 def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> str:
     """
@@ -305,7 +309,14 @@ def generate_zwo_xml(workout_data: Dict[str, Any], athlete_ftp: int = 250) -> st
     reparsed = minidom.parseString(rough_xml)
     return reparsed.toprettyxml(indent="  ")
 
-def generate_intervals_icu_text(workout_data: Dict[str, Any]) -> str:
+def _format_icu_pct(power_pct: float, ftp: Optional[int] = None, explicit_watts: Optional[float] = None) -> str:
+    if ftp and ftp > 0:
+        pct_val = round(_calculate_zwo_power(power_pct, ftp, explicit_watts) * 100.0, 2)
+        formatted = f"{pct_val:.2f}".rstrip("0").rstrip(".")
+        return f"{formatted}%"
+    return f"{power_pct}%"
+
+def generate_intervals_icu_text(workout_data: Dict[str, Any], ftp: Optional[int] = None) -> str:
     """
     Generates plain-text workout definition compatible with Intervals.icu.
     Intervals.icu automatically converts this into Zwift workouts when synced.
@@ -313,7 +324,8 @@ def generate_intervals_icu_text(workout_data: Dict[str, Any]) -> str:
     if "duration_minutes" in workout_data and workout_data["duration_minutes"]:
         workout_data["intervals"] = reconcile_workout_intervals(
             workout_data.get("intervals", []),
-            int(workout_data["duration_minutes"])
+            int(workout_data["duration_minutes"]),
+            ftp or 250
         )
     lines = [f"{workout_data.get('title', 'AI Workout')}"]
     lines.append(f"{workout_data.get('ai_rationale', '')}\n")
@@ -322,34 +334,41 @@ def generate_intervals_icu_text(workout_data: Dict[str, Any]) -> str:
         seg_type = item.get("type", "SteadyState").lower()
         if seg_type == "warmup":
             dur_str = _format_intervals_dur(item.get("duration_sec", 600))
-            p_low = item.get("power_low_pct", 50)
-            p_high = item.get("power_high_pct", 75)
+            p_low = _format_icu_pct(item.get("power_low_pct", 50), ftp, item.get("low_watts"))
+            p_high = _format_icu_pct(item.get("power_high_pct", 75), ftp, item.get("high_watts"))
             cad = f" {item['cadence']}rpm" if item.get("cadence") else ""
-            lines.append(f"Warmup\n- {dur_str} {p_low}-{p_high}%{cad}\n")
+            lines.append(f"Warmup\n- {dur_str} {p_low.rstrip('%')}-{p_high}{cad}\n")
         elif seg_type == "cooldown":
             dur_str = _format_intervals_dur(item.get("duration_sec", 300))
-            p_low = item.get("power_low_pct", 75)
-            p_high = item.get("power_high_pct", 45)
+            p_low = _format_icu_pct(item.get("power_low_pct", 75), ftp, item.get("low_watts"))
+            p_high = _format_icu_pct(item.get("power_high_pct", 45), ftp, item.get("high_watts"))
             cad = f" {item['cadence']}rpm" if item.get("cadence") else ""
-            lines.append(f"Cooldown\n- {dur_str} {p_low}-{p_high}%{cad}\n")
+            lines.append(f"Cooldown\n- {dur_str} {p_low.rstrip('%')}-{p_high}{cad}\n")
         elif seg_type in ["repeats", "intervalblock", "intervals"]:
             repeat = int(item.get("repeat", 3))
             on_dur_str = _format_intervals_dur(item.get("on_duration_sec", 180))
             off_dur_str = _format_intervals_dur(item.get("off_duration_sec", 120))
-            on_p = item.get("on_power_pct", 95)
-            off_p = item.get("off_power_pct", 55)
+            on_p = _format_icu_pct(item.get("on_power_pct", 95), ftp, item.get("on_watts"))
+            off_p = _format_icu_pct(item.get("off_power_pct", 55), ftp, item.get("off_watts"))
             cad = f" {item['cadence']}rpm" if item.get("cadence") else ""
             cad_rest = f" {item['cadence_rest']}rpm" if item.get("cadence_rest") else ""
             
             lines.append(f"Main Set {repeat}x")
-            lines.append(f"- {on_dur_str} {on_p}%{cad}")
-            lines.append(f"- {off_dur_str} {off_p}%{cad_rest}\n")
+            lines.append(f"- {on_dur_str} {on_p}{cad}")
+            lines.append(f"- {off_dur_str} {off_p}{cad_rest}\n")
+        elif seg_type == "ramp":
+            dur_str = _format_intervals_dur(item.get("duration_sec", 300))
+            p_low = _format_icu_pct(item.get("power_low_pct", 60), ftp, item.get("low_watts"))
+            p_high = _format_icu_pct(item.get("power_high_pct", 90), ftp, item.get("high_watts"))
+            cad = f" {item['cadence']}rpm" if item.get("cadence") else ""
+            name = item.get("name", "Ramp")
+            lines.append(f"- {dur_str} ramp {p_low.rstrip('%')}-{p_high}{cad} {name}")
         else:
             dur_str = _format_intervals_dur(item.get("duration_sec", 300))
-            p = item.get("power_pct", 65)
+            p = _format_icu_pct(item.get("power_pct", 65), ftp, item.get("power_watts") or item.get("target_watts"))
             cad = f" {item['cadence']}rpm" if item.get("cadence") else ""
             name = item.get("name", "Steady")
-            lines.append(f"- {dur_str} {p}%{cad} {name}")
+            lines.append(f"- {dur_str} {p}{cad} {name}")
             
     return "\n".join(lines)
 
@@ -381,12 +400,12 @@ def push_to_intervals_icu(athlete_id: str, api_key: str, workout_data: Dict[str,
             int(workout_data["duration_minutes"]),
             ftp
         )
-        workout_data["zwo_content"] = generate_zwo_xml(workout_data, ftp)
-        workout_data["intervals_icu_text"] = generate_intervals_icu_text(workout_data)
 
-    # Generate native ZWO and Intervals syntax
-    zwo_content = workout_data.get("zwo_content") or generate_zwo_xml(workout_data, ftp)
-    workout_text = workout_data.get("intervals_icu_text") or generate_intervals_icu_text(workout_data)
+    # Always regenerate native ZWO and Intervals syntax with current FTP to prevent stale/rounded targets
+    zwo_content = generate_zwo_xml(workout_data, ftp)
+    workout_text = generate_intervals_icu_text(workout_data, ftp=ftp)
+    workout_data["zwo_content"] = zwo_content
+    workout_data["intervals_icu_text"] = workout_text
     workout_title = workout_data.get('title', 'Adaptive Workout')
     clean_filename = f"PowerSync_{workout_title.replace(' ', '_')}.zwo"
     

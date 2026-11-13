@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.1] - 2026-11-13
+### Fixed
+- **Exact Zwift & Intervals.icu Target Wattage Precision**:
+  - Fixed 1-watt under-target drops (e.g., 200W prescribed in PowerSync appearing as 199W in Zwift) caused by Python banker's rounding (`round()`) vs. frontend `Math.round()`, Intervals.icu text-step integer `%` truncation, and stale cached `.zwo` / Intervals.icu payloads.
+  - Updated `_calculate_zwo_power` in `app/services/zwift_service.py` to use half-up rounding (`math.floor(x + 0.5)`) matching `app.js` and a `+0.25W` compensation offset.
+  - Updated `generate_intervals_icu_text` to emit precision-compensated 2-decimal percentages when athlete FTP is provided, and updated `push_to_intervals_icu` and `/api/workouts/download-zwo` to always regenerate `.zwo` and Intervals.icu text using the athlete's current FTP.
+
 ## [2.9.0] - 2026-11-13
 ### Added
 - **Persistent AI Coach Conversation Memory**:
