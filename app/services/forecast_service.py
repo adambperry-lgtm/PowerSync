@@ -115,17 +115,11 @@ def save_athlete_planned_session(date_iso: str, plan_data: Dict[str, Any], user_
         "updated_at": datetime.datetime.now().isoformat()
     }
     set_setting("coach_upcoming_plans", plans, user_id=uid)
-    if uid == "usr_guest":
-        set_setting("coach_upcoming_plans", plans, user_id="usr_default")
-    elif uid == "usr_default":
-        set_setting("coach_upcoming_plans", plans, user_id="usr_guest")
 
 def get_athlete_planned_sessions(user_id: Optional[str] = None) -> Dict[str, Any]:
     """Retrieves all upcoming sessions planned via Coach Chat or target planning."""
     uid = user_id or get_current_user_id()
     plans = get_setting("coach_upcoming_plans", {}, user_id=uid)
-    if (not plans or not isinstance(plans, dict)) and uid == "usr_guest":
-        plans = get_setting("coach_upcoming_plans", {}, user_id="usr_default")
     return plans if isinstance(plans, dict) else {}
 
 def clear_athlete_planned_session(date_iso: Optional[str] = None, user_id: Optional[str] = None) -> None:
@@ -133,19 +127,11 @@ def clear_athlete_planned_session(date_iso: Optional[str] = None, user_id: Optio
     uid = user_id or get_current_user_id()
     if not date_iso:
         set_setting("coach_upcoming_plans", {}, user_id=uid)
-        if uid == "usr_guest":
-            set_setting("coach_upcoming_plans", {}, user_id="usr_default")
-        elif uid == "usr_default":
-            set_setting("coach_upcoming_plans", {}, user_id="usr_guest")
         return
     plans = get_athlete_planned_sessions(user_id=uid)
     if isinstance(plans, dict) and date_iso in plans:
         del plans[date_iso]
         set_setting("coach_upcoming_plans", plans, user_id=uid)
-        if uid == "usr_guest":
-            set_setting("coach_upcoming_plans", plans, user_id="usr_default")
-        elif uid == "usr_default":
-            set_setting("coach_upcoming_plans", plans, user_id="usr_guest")
 
 def parse_chat_schedule_directives(message: str, today: Optional[datetime.date] = None, ftp: int = 250) -> List[Dict[str, Any]]:
     """

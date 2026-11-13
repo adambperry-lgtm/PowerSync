@@ -984,10 +984,6 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     if chat_directives:
         for cd in chat_directives:
             save_athlete_planned_session(cd["date_iso"], cd, user_id=uid)
-            if uid == "usr_guest":
-                save_athlete_planned_session(cd["date_iso"], cd, user_id="usr_default")
-            elif uid == "usr_default":
-                save_athlete_planned_session(cd["date_iso"], cd, user_id="usr_guest")
 
         from app.services.review_coach import build_preference_aligned_outlook_days
         try:
@@ -1004,10 +1000,6 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 program=snapshot.get("program", {})
             )
             save_coach_forecast_plan(uid, refreshed_outlook)
-            if uid == "usr_guest":
-                save_coach_forecast_plan("usr_default", refreshed_outlook)
-            elif uid == "usr_default":
-                save_coach_forecast_plan("usr_guest", refreshed_outlook)
         except Exception as e:
             print(f"Error updating forecast plan from chat directives: {e}")
 

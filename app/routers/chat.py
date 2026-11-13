@@ -206,9 +206,6 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             c = conn.cursor()
             c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
             whoop_row = c.fetchone()
-            if not whoop_row and uid == "usr_guest":
-                c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
-                whoop_row = c.fetchone()
             conn.close()
             rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
             from app.services.whoop_service import get_trailing_whoop_stats
@@ -305,10 +302,6 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             save_scheduled_workout(workout_obj, target_date)
             from app.services.forecast_service import save_athlete_planned_session
             save_athlete_planned_session(target_date, workout_obj, user_id=uid)
-            if uid == "usr_guest":
-                save_athlete_planned_session(target_date, workout_obj, user_id="usr_default")
-            elif uid == "usr_default":
-                save_athlete_planned_session(target_date, workout_obj, user_id="usr_guest")
 
             from app.services.review_coach import build_preference_aligned_outlook_days
             from app.services.forecast_service import save_coach_forecast_plan
@@ -327,10 +320,6 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                     program={}
                 )
                 save_coach_forecast_plan(uid, refreshed_outlook)
-                if uid == "usr_guest":
-                    save_coach_forecast_plan("usr_default", refreshed_outlook)
-                elif uid == "usr_default":
-                    save_coach_forecast_plan("usr_guest", refreshed_outlook)
             except Exception:
                 pass
 
@@ -384,16 +373,8 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             }
             plan_id = save_target_plan(plan_dict)
             set_setting("travel_recovery_week_active", False, user_id=uid)
-            if uid == "usr_guest":
-                set_setting("travel_recovery_week_active", False, user_id="usr_default")
-            elif uid == "usr_default":
-                set_setting("travel_recovery_week_active", False, user_id="usr_guest")
             from app.services.forecast_service import save_athlete_planned_session, save_coach_forecast_plan
             save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id=uid)
-            if uid == "usr_guest":
-                save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id="usr_default")
-            elif uid == "usr_default":
-                save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id="usr_guest")
 
             from app.services.review_coach import build_preference_aligned_outlook_days
             try:
@@ -411,10 +392,6 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                     program={}
                 )
                 save_coach_forecast_plan(uid, refreshed_outlook)
-                if uid == "usr_guest":
-                    save_coach_forecast_plan("usr_default", refreshed_outlook)
-                elif uid == "usr_default":
-                    save_coach_forecast_plan("usr_guest", refreshed_outlook)
             except Exception:
                 pass
 

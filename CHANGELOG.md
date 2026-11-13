@@ -3,6 +3,27 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.8.0] - 2026-11-12
+### Security & Privacy
+- **Strict Multi-User Privacy & Unauthenticated Data Lockdown**:
+  - Addressed critical data leakage where unauthenticated visitors or incognito sessions received private athlete data (Whoop biometrics, Strava rides, training plans, AI debriefs).
+  - Enforced strict session boundaries: unauthenticated visitors (`usr_guest`) receive zero personal telemetry across all endpoints (`/api/dashboard`, `/api/workouts/*`, `/api/review/*`, `/api/power/*`, `/api/chat/*`).
+  - Purged all `usr_guest` fallback queries that fell back to `usr_default` across all backend services (`review_coach`, `strava_service`, `plan_service`, `power_profile_service`, `coach_chat_service`, `forecast_service`).
+  - Disabled anonymous auto-login: terminated frontend automated invocation of `/api/auth/primary-login` when visiting unauthenticated, and restricted primary login to explicitly authorized environments.
+
+### Added
+- **Unauthenticated Welcome & Sign-In Gate**:
+  - Implemented modern `#unauthenticatedGate` portal displayed immediately to visitors not signed in.
+  - Features clear security messaging, seamless Email sign-in, Google OAuth, and developer environment demo profile switching.
+  - Automatically conceals private telemetry tiles, daily debriefs, workout prescription cards, spiderweb power envelopes, and toolbar actions until the athlete authenticates.
+
+### Fixed
+- **Cross-User Syncing & Cache Mirroring**:
+  - Prevented guest sessions from duplicating Strava activities, Whoop biometrics, coach chat plans, or target training profiles into other user accounts.
+  - Standardized ASGI test server host resolution (`testserver`) within production route guards.
+
+---
+
 ## [2.7.2] - 2026-11-12
 ### Fixed
 - **Spiderweb Active Goal & Target Planner Progress Synchronization**:

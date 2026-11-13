@@ -178,9 +178,19 @@ function showToast(message, duration = 4000) {
 
 // 1. Fetch Dashboard Data
 async function loadDashboard() {
+  const isAuthUser = Boolean(currentAthleteUser && !currentAthleteUser.is_guest);
+  if (!isAuthUser) {
+    applyAuthVisibility(false);
+    return;
+  }
   try {
     const res = await fetch("/api/dashboard");
     const data = await res.json();
+    if (data.authenticated === false || (data.user && data.user.is_guest)) {
+      applyAuthVisibility(false);
+      return;
+    }
+    applyAuthVisibility(true);
     state.dashboard = data;
     state.whoop = data.whoop;
     state.strava = data.strava;
@@ -8328,27 +8338,61 @@ async function checkAuthStatus() {
     }
     if (meRes.ok) {
       let user = await meRes.json();
-      // If user is guest and instance has not locked owner email, automatically establish primary athlete session
-      if (user.is_guest && (!primaryOwnerInfo || !primaryOwnerInfo.is_locked)) {
-        try {
-          const autoRes = await fetch("/api/auth/primary-login", { method: "POST" });
-          if (autoRes.ok) {
-            const autoData = await autoRes.json();
-            if (autoData.session_token) {
-              localStorage.setItem("powersync_token", autoData.session_token);
-            }
-            user = autoData.user;
-          }
-        } catch (autoErr) {
-          console.warn("Auto primary athlete session establishment note:", autoErr);
-        }
-      }
       currentAthleteUser = user;
       renderUserNavPill(user);
     }
+    const isAuth = Boolean(currentAthleteUser && !currentAthleteUser.is_guest);
+    applyAuthVisibility(isAuth);
     renderAuthModalContent(currentAthleteUser);
   } catch (e) {
     console.warn("Failed to check auth status:", e);
+  }
+}
+
+function applyAuthVisibility(isAuthUser) {
+  const gateEl = document.getElementById("unauthenticatedGate");
+  const dailyViewEl = document.getElementById("viewDailyContainer");
+  const analysisViewEl = document.getElementById("viewAnalysisContainer");
+  const toolbarEl = document.querySelector(".dashboard-toolbar");
+  const demoBannerEl = document.getElementById("demoModeBanner");
+  const switcherEl = document.querySelector(".main-view-switcher");
+  const gateGoogleSec = document.getElementById("gateGoogleSection");
+
+  if (gateGoogleSec) {
+    gateGoogleSec.style.display = isGoogleOauthConfigured ? "block" : "none";
+  }
+
+  const gateClaimLabel = document.getElementById("gateClaimLabel");
+  const chkGateClaim = document.getElementById("chkGateClaimPrimary");
+  if (gateClaimLabel) {
+    if (primaryOwnerInfo && primaryOwnerInfo.is_locked) {
+      gateClaimLabel.style.display = "none";
+      if (chkGateClaim) chkGateClaim.checked = false;
+    } else {
+      gateClaimLabel.style.display = "flex";
+    }
+  }
+
+  if (isAuthUser) {
+    if (gateEl) gateEl.style.display = "none";
+    if (switcherEl) switcherEl.style.display = "flex";
+    if (toolbarEl) toolbarEl.style.display = "flex";
+    const activeTab = document.querySelector(".main-view-tab-btn.active");
+    const activeView = activeTab ? activeTab.getAttribute("data-view") : "daily";
+    if (activeView === "analysis") {
+      if (dailyViewEl) dailyViewEl.style.display = "none";
+      if (analysisViewEl) analysisViewEl.style.display = "block";
+    } else {
+      if (dailyViewEl) dailyViewEl.style.display = "block";
+      if (analysisViewEl) analysisViewEl.style.display = "none";
+    }
+  } else {
+    if (gateEl) gateEl.style.display = "block";
+    if (switcherEl) switcherEl.style.display = "none";
+    if (toolbarEl) toolbarEl.style.display = "none";
+    if (dailyViewEl) dailyViewEl.style.display = "none";
+    if (analysisViewEl) analysisViewEl.style.display = "none";
+    if (demoBannerEl) demoBannerEl.style.display = "none";
   }
 }
 
@@ -8565,6 +8609,39 @@ if (formEmailLogin) {
   });
 }
 
+// Landing Gate Email Login Handler
+const formGateEmailLogin = document.getElementById("formGateEmailLogin");
+const inputGateEmail = document.getElementById("inputGateEmail");
+const inputGateName = document.getElementById("inputGateName");
+const chkGateClaimPrimary = document.getElementById("chkGateClaimPrimary");
+
+if (formGateEmailLogin) {
+  formGateEmailLogin.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = inputGateEmail ? inputGateEmail.value.trim() : "";
+    const name = inputGateName ? inputGateName.value.trim() : "";
+    const claimPrimary = chkGateClaimPrimary ? chkGateClaimPrimary.checked : false;
+
+    if (!email || !email.includes("@")) {
+      showToast("Please enter a valid email address.");
+      return;
+    }
+    await performEmailLogin(email, name, claimPrimary);
+  });
+}
+
+// Delegate all dev-switch clicks (handles dynamically rendered and gate buttons)
+document.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".btn-dev-switch");
+  if (btn) {
+    const email = btn.getAttribute("data-email");
+    const name = btn.getAttribute("data-name");
+    if (email) {
+      await performEmailLogin(email, name, false);
+    }
+  }
+});
+
 const btnDevLoginSubmit = document.getElementById("btnDevLoginSubmit");
 const inputDevLoginEmail = document.getElementById("inputDevLoginEmail");
 if (btnDevLoginSubmit && inputDevLoginEmail) {
@@ -8704,22 +8781,17 @@ async function bootApp() {
   }
 
   const isAuthUser = Boolean(currentAthleteUser && !currentAthleteUser.is_guest);
-
-  try {
-    const tzToSync = (typeof clientTz !== "undefined" && clientTz) ? clientTz : ((typeof Intl !== "undefined" && Intl.DateTimeFormat) ? Intl.DateTimeFormat().resolvedOptions().timeZone : null);
-    if (tzToSync && isAuthUser) {
-      fetch("/api/settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ athlete_timezone: tzToSync })
-      }).catch(() => {});
-    }
-  } catch (_) {}
+  applyAuthVisibility(isAuthUser);
 
   try {
     await loadVersionInfo();
   } catch (e) {
     console.warn("Version load error in bootApp:", e);
+  }
+
+  if (!isAuthUser) {
+    // Unauthenticated visitor: hide all athlete data and do not load private resources
+    return;
   }
 
   try {

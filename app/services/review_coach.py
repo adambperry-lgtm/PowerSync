@@ -91,14 +91,6 @@ def get_whoop_for_date(target_date_str: str) -> Optional[Dict[str, Any]]:
         WHERE user_id = ? AND date = ?
     """, (uid, target_date_str))
     row = c.fetchone()
-    if not row and uid == "usr_guest":
-        c.execute("""
-            SELECT date, recovery_score, hrv_rmssd, resting_heart_rate,
-                   sleep_performance, sleep_duration_hours, day_strain
-            FROM whoop_metrics
-            WHERE user_id = 'usr_default' AND date = ?
-        """, (target_date_str,))
-        row = c.fetchone()
     conn.close()
     if row:
         return dict(row)
@@ -771,25 +763,19 @@ def resolve_day_prescribed_target(
     # 1. Scheduled workout for this date
     from app.database import get_scheduled_workout_for_date
     scheduled_w = get_scheduled_workout_for_date(date_str, user_id=uid)
-    if not scheduled_w and uid == "usr_guest":
-        scheduled_w = get_scheduled_workout_for_date(date_str, user_id="usr_default")
 
     # 2. Planned session for this date
     from app.services.forecast_service import get_athlete_planned_sessions
     planned_sessions = get_athlete_planned_sessions(user_id=uid)
-    if not planned_sessions and uid == "usr_guest":
-        planned_sessions = get_athlete_planned_sessions(user_id="usr_default")
     planned_session = planned_sessions.get(date_str) if planned_sessions else None
 
     # 3. Active prescribed workout if evaluating today
     active_prescribed = None
     if is_today:
         try:
-            from app.routers.workouts import get_current_workout_cache, _workout_cache_by_user
+            from app.routers.workouts import get_current_workout_cache
             w_cache = get_current_workout_cache()
-            if not w_cache and uid == "usr_guest":
-                w_cache = _workout_cache_by_user.get("usr_default", {})
-            active_prescribed = w_cache.get("workout_primary") or w_cache.get("workout_custom_replaced")
+            active_prescribed = (w_cache.get("workout_primary") or w_cache.get("workout_custom_replaced")) if w_cache else None
         except Exception:
             active_prescribed = None
 

@@ -116,9 +116,6 @@ def generate_workout(req: WorkoutGenerateRequest):
     c = conn.cursor()
     c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
     row = c.fetchone()
-    if not row and uid == "usr_guest":
-        c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
-        row = c.fetchone()
     conn.close()
 
     # Auto-sync live Whoop if connected and today's record missing or >15m elapsed
@@ -474,6 +471,12 @@ def select_workout_option(req: WorkoutSelectRequest):
 
 @router.get("/current")
 def get_current_workout():
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        return {
+            "active_workout": None,
+            "options": []
+        }
     today_iso = get_athlete_date().isoformat()
     from app.database import get_scheduled_workout_for_date
     scheduled = get_scheduled_workout_for_date(today_iso)
@@ -498,6 +501,12 @@ def get_current_workout():
 @router.get("/scheduled")
 def get_scheduled_workouts_endpoint():
     """Returns all workouts scheduled for today and upcoming dates."""
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        return {
+            "success": True,
+            "scheduled_workouts": []
+        }
     from app.database import get_upcoming_scheduled_workouts
     today_iso = get_athlete_date().isoformat()
     workouts = get_upcoming_scheduled_workouts(today_iso)

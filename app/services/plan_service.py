@@ -538,42 +538,17 @@ def execute_clear_plan(user_id: Optional[str] = None, is_recovery_week: bool = T
     clear_athlete_planned_session(user_id=uid)
     clear_active_spiderweb_goal(user_id=uid)
 
-    if uid == "usr_guest":
-        clear_active_target_plans(user_id="usr_default")
-        clear_scheduled_workouts(from_date=today_iso, user_id="usr_default")
-        clear_athlete_planned_session(user_id="usr_default")
-        clear_active_spiderweb_goal(user_id="usr_default")
-    elif uid == "usr_default":
-        clear_active_target_plans(user_id="usr_guest")
-        clear_scheduled_workouts(from_date=today_iso, user_id="usr_guest")
-        clear_athlete_planned_session(user_id="usr_guest")
-        clear_active_spiderweb_goal(user_id="usr_guest")
-
     # 2. Persist travel / recovery week state
     set_setting("travel_recovery_week_active", True, user_id=uid)
     set_setting("travel_recovery_week_start", today_iso, user_id=uid)
     if notes:
         set_setting("travel_recovery_week_notes", notes, user_id=uid)
 
-    if uid == "usr_guest":
-        set_setting("travel_recovery_week_active", True, user_id="usr_default")
-        set_setting("travel_recovery_week_start", today_iso, user_id="usr_default")
-        if notes:
-            set_setting("travel_recovery_week_notes", notes, user_id="usr_default")
-    elif uid == "usr_default":
-        set_setting("travel_recovery_week_active", True, user_id="usr_guest")
-        set_setting("travel_recovery_week_start", today_iso, user_id="usr_guest")
-        if notes:
-            set_setting("travel_recovery_week_notes", notes, user_id="usr_guest")
-
     # 3. Retrieve Whoop recovery baseline & build rest/recovery workout bundle
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
     whoop_row = c.fetchone()
-    if not whoop_row and uid == "usr_guest":
-        c.execute("SELECT * FROM whoop_metrics WHERE user_id = 'usr_default' ORDER BY date DESC LIMIT 1")
-        whoop_row = c.fetchone()
     conn.close()
 
     rec_score = int(whoop_row["recovery_score"]) if whoop_row and whoop_row["recovery_score"] else 65
@@ -606,16 +581,6 @@ def execute_clear_plan(user_id: Optional[str] = None, is_recovery_week: bool = T
     for opt in all_opts:
         o_cache[opt["id"]] = opt
 
-    other_uid = "usr_default" if uid == "usr_guest" else ("usr_guest" if uid == "usr_default" else None)
-    if other_uid:
-        ow_cache = USER_WORKOUT_CACHE.setdefault(other_uid, {})
-        oo_cache = USER_OPTIONS_CACHE.setdefault(other_uid, {})
-        ow_cache.clear()
-        ow_cache.update(primary_w)
-        oo_cache.clear()
-        for opt in all_opts:
-            oo_cache[opt["id"]] = opt
-
     # 4. Generate refreshed restorative 3-day forecast
     refreshed_outlook = []
     try:
@@ -633,10 +598,6 @@ def execute_clear_plan(user_id: Optional[str] = None, is_recovery_week: bool = T
             program={}
         )
         save_coach_forecast_plan(uid, refreshed_outlook)
-        if uid == "usr_guest":
-            save_coach_forecast_plan("usr_default", refreshed_outlook)
-        elif uid == "usr_default":
-            save_coach_forecast_plan("usr_guest", refreshed_outlook)
     except Exception as e:
         print("Error refreshing outlook in execute_clear_plan:", e)
 

@@ -175,14 +175,26 @@ class TestWhoopAutoSyncAndPersistence(unittest.TestCase):
         self.assertEqual(whoop["recovery_zone"], "green")
         self.assertTrue(dash["integrations"]["whoop"]["connected"])
 
-        # Simulate unauthenticated guest visitor (e.g. mobile Safari tab reopen)
+        # Simulate unauthenticated guest visitor (e.g. incognito or unauthenticated tab reopen)
+        # Without sign in, personal athlete metrics MUST be hidden
         client = ASGIClient(app)
         dash_guest = client.get("/api/dashboard").json()
         self.assertIn("whoop", dash_guest)
-        # Must return the athlete's real persisted metrics, NOT mock data
-        self.assertEqual(dash_guest["whoop"]["recovery_score"], 82)
-        self.assertEqual(dash_guest["whoop"]["day_strain"], 17.7)
-        self.assertTrue(dash_guest["integrations"]["whoop"]["connected"])
+        self.assertIsNone(dash_guest["whoop"])
+        self.assertFalse(dash_guest["authenticated"])
+        self.assertFalse(dash_guest["integrations"]["whoop"]["connected"])
+
+        # Authenticated athlete session: displays real persisted metrics
+        from app.database import create_session
+        auth_token = create_session(DEFAULT_USER_ID)
+        client_auth = ASGIClient(app)
+        client_auth.cookies["powersync_session"] = auth_token
+        dash_auth = client_auth.get("/api/dashboard").json()
+        self.assertIn("whoop", dash_auth)
+        self.assertIsNotNone(dash_auth["whoop"])
+        self.assertEqual(dash_auth["whoop"]["recovery_score"], 82)
+        self.assertEqual(dash_auth["whoop"]["day_strain"], 17.7)
+        self.assertTrue(dash_auth["integrations"]["whoop"]["connected"])
 
     def test_03_oauth_callback_sets_persistent_session_cookie(self):
         """Verify Whoop OAuth callback issues powersync_session cookie and session_token query param."""

@@ -38,7 +38,7 @@ def get_app_base_url(request: Request) -> str:
         host = str(request.base_url.netloc)
 
     # In production/cloud environments (non-localhost), enforce https and strip internal container ports
-    if "localhost" not in host and "127.0.0.1" not in host:
+    if "localhost" not in host and "127.0.0.1" not in host and "testserver" not in host:
         if ":" in host:
             host = host.split(":")[0]
         return f"https://{host}"
@@ -48,7 +48,7 @@ def get_app_base_url(request: Request) -> str:
 
 def is_production_req(request: Request) -> bool:
     base = get_app_base_url(request)
-    return "powersync.up.railway.app" in base or (base.startswith("https://") and "localhost" not in base)
+    return "powersync.up.railway.app" in base or (base.startswith("https://") and "localhost" not in base and "testserver" not in base)
 
 @router.get("/me")
 def get_current_user_profile(request: Request):
@@ -254,7 +254,7 @@ def lock_owner_email(payload: LockOwnerPayload, request: Request):
 def primary_login(request: Request):
     """
     Direct login as the primary athlete account owner holding all historical directives and intervals credentials.
-    If an owner email is locked, anonymous access is rejected.
+    If an owner email is locked or in production, anonymous access is rejected.
     """
     locked_owner = get_primary_owner_email()
     current_uid = get_current_user_id()
@@ -262,6 +262,11 @@ def primary_login(request: Request):
         raise HTTPException(
             status_code=403,
             detail="Primary athlete account is locked to the owner email. Please enter your email to sign in."
+        )
+    if is_production_req(request) and current_uid == GUEST_USER_ID:
+        raise HTTPException(
+            status_code=403,
+            detail="Please sign in with your email or Google account to access your athlete profile."
         )
 
     user = get_default_athlete_user()
@@ -491,9 +496,9 @@ def whoop_callback(
 @router.post("/sync/strava")
 def sync_strava():
     uid = get_current_user_id()
+    if uid == GUEST_USER_ID:
+        return {"success": False, "error": "Authentication required. Please sign in to sync Strava.", "count": 0}
     tokens = get_setting("strava_tokens", {}, user_id=uid)
-    if (not tokens or not tokens.get("access_token")) and uid == "usr_guest":
-        tokens = get_setting("strava_tokens", {}, user_id="usr_default")
     if not tokens or not tokens.get("access_token"):
         return {"success": False, "error": "Strava is not connected for this account. Please connect in Settings.", "count": 0}
         
@@ -513,14 +518,14 @@ def sync_strava():
 @router.post("/sync/whoop")
 def sync_whoop():
     uid = get_current_user_id()
+    if uid == GUEST_USER_ID:
+        return {"success": False, "error": "Authentication required. Please sign in to sync Whoop.", "auth_expired": False}
     metrics = fetch_latest_whoop_metrics(user_id=uid)
     if metrics.get("error"):
         return {"success": False, "error": metrics.get("error"), "auth_expired": metrics.get("auth_expired", False)}
     import time
     now_ts = time.time()
     set_setting("last_whoop_sync_timestamp", now_ts, user_id=uid)
-    if uid == "usr_guest":
-        set_setting("last_whoop_sync_timestamp", now_ts, user_id="usr_default")
     return {"success": True, "metrics": metrics}
 
 @router.post("/disconnect/{service}")

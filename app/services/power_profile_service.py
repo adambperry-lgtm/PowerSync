@@ -413,8 +413,6 @@ def get_power_spiderweb_profile(
 
     # Auto-sync live Strava activities if athlete has connected tokens and >60s elapsed since last sync
     strava_tokens = get_setting("strava_tokens", {}, user_id=uid)
-    if not strava_tokens and uid == "usr_guest":
-        strava_tokens = get_setting("strava_tokens", {}, user_id="usr_default")
     if strava_tokens:
         last_sync_key = "last_strava_sync_timestamp"
         last_sync_time = float(get_setting(last_sync_key, 0.0, user_id=uid))
@@ -437,23 +435,17 @@ def get_power_spiderweb_profile(
         ORDER BY start_date DESC
     """, (uid,))
     rows = c.fetchall()
-    if not rows and uid == "usr_guest":
-        c.execute("""
-            SELECT id, name, sport_type, start_date, moving_time_sec, distance_meters,
-                   average_watts, weighted_average_watts, average_heartrate, suffer_score, raw_json
-            FROM strava_activities
-            WHERE user_id = 'usr_default'
-            ORDER BY start_date DESC
-        """)
-        rows = c.fetchall()
     conn.close()
 
     activities = [dict(r) for r in rows] if rows else []
 
-    # If no activities in DB, use mock activities
+    # If no activities in DB, use mock activities (only for demo/authenticated accounts, not guests)
     if not activities:
-        from app.services.mock_data import get_mock_strava_activities
-        activities = get_mock_strava_activities()
+        if uid == "usr_guest":
+            activities = []
+        else:
+            from app.services.mock_data import get_mock_strava_activities
+            activities = get_mock_strava_activities()
 
     # Determine reference date (most recent activity date or today)
     today = get_athlete_date(uid)
