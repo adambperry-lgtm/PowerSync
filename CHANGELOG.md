@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.6] - 2026-11-13
+### Fixed
+- **All-Time PRs Collapsed Summary Chip Accuracy**:
+  - Fixed `renderPowerSpiderweb()` in `app/static/js/app.js` displaying the 30-day `current_watts` instead of `all_time_pr_watts` in the collapsed summary chips (`5s`, `5m`, `20m`) when the **All-Time PRs** tab is selected, which had made PRs appear lower than 90-day bests.
+- **Long-Term Analysis Mobile Card Header Alignment**:
+  - Hidden `#spiderwebTimeframeGroup` and `#cardProgram` action buttons when their parent cards are collapsed, aligned `.card-header-left` icons to the top, and pinned `Collapse`/`Expand` buttons to the top-right on mobile viewports.
+
 ## [2.9.5] - 2026-11-13
 ### Fixed
 - **Mobile UI Tightening & Dead Space Elimination**:

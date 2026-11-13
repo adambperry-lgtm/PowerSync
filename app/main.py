@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.5",
-        "release_name": "Tight Mobile UI & Dropdown Fix",
+        "version": "2.9.6",
+        "release_name": "All-Time PR Chip & Long-Term Mobile Polish",
         "build_date": "2026-11-13",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.6",
+                "date": "2026-11-13",
+                "title": "All-Time PR Chip & Long-Term Mobile Polish",
+                "items": [
+                    "All-Time PRs Summary Chip Fix: Displayed true all_time_pr_watts (e.g., 280W PR) instead of 30-day current_watts in Power Spiderweb collapsed summary chips when All-Time PRs is selected.",
+                    "Long-Term Analysis Header Polish: Hid timeframe tabs and action buttons when collapsed and pinned Collapse/Expand controls to the top-right on mobile."
+                ]
+            },
             {
                 "version": "v2.9.5",
                 "date": "2026-11-13",

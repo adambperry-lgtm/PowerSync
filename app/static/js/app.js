@@ -7089,19 +7089,23 @@ function renderPowerSpiderweb(data) {
   const s5 = data.axes.find(a => a.key === "5s");
   const s5m = data.axes.find(a => a.key === "5m");
   const s20m = data.axes.find(a => a.key === "20m");
+  const isAllTime = data.timeframe === "all_time";
 
-  if (c5s && s5) {
-    const sign = s5.delta_watts > 0 ? "+" : "";
-    c5s.textContent = `5s: ${s5.current_watts}W (${sign}${s5.delta_watts}W)`;
-  }
-  if (c5m && s5m) {
-    const sign = s5m.delta_watts > 0 ? "+" : "";
-    c5m.textContent = `5m: ${s5m.current_watts}W (${sign}${s5m.delta_watts}W)`;
-  }
-  if (c20m && s20m) {
-    const sign = s20m.delta_watts > 0 ? "+" : "";
-    c20m.textContent = `20m: ${s20m.current_watts}W (${sign}${s20m.delta_watts}W)`;
-  }
+  const formatCollapsedChip = (label, axis) => {
+    if (isAllTime) {
+      const prW = axis.all_time_pr_watts || axis.previous_watts || axis.current_watts;
+      const delta = axis.delta_watts || 0;
+      return delta < 0
+        ? `${label}: ${prW}W PR (${delta}W cur)`
+        : `${label}: ${prW}W PR`;
+    }
+    const sign = axis.delta_watts > 0 ? "+" : "";
+    return `${label}: ${axis.current_watts}W (${sign}${axis.delta_watts}W)`;
+  };
+
+  if (c5s && s5) c5s.textContent = formatCollapsedChip("5s", s5);
+  if (c5m && s5m) c5m.textContent = formatCollapsedChip("5m", s5m);
+  if (c20m && s20m) c20m.textContent = formatCollapsedChip("20m", s20m);
 
   // Draw SVG Radar with active goal polygon
   renderSpiderwebSvg(data.axes, data.active_goal);

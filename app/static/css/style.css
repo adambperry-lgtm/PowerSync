@@ -1245,7 +1245,12 @@ h1, h2, h3, h4,
 }
 
 .card.collapsible-tile.collapsed #debriefTabGroup,
-.card.collapsible-tile.collapsed #btnRefreshDebrief {
+.card.collapsible-tile.collapsed #btnRefreshDebrief,
+.card.collapsible-tile.collapsed #spiderwebTimeframeGroup,
+.card.collapsible-tile.collapsed #btnJumpToSpiderwebPlanner,
+.card.collapsible-tile.collapsed #btnResetProgramBlock,
+.card.collapsible-tile.collapsed #btnOpenPlanBuilder,
+.card.collapsible-tile.collapsed #btnAdjustGoal {
   display: none !important;
 }
 
@@ -3249,6 +3254,46 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .workout-stage-header-right {
     flex-shrink: 0 !important;
+  }
+
+  #powerSpiderwebHeader,
+  #programCardHeader {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
+
+  #powerSpiderwebHeader .card-header-left,
+  #programCardHeader .card-header-left {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    align-items: flex-start !important;
+  }
+
+  #powerSpiderwebHeader > div:last-child,
+  #programCardHeader > div:last-child {
+    display: contents !important;
+  }
+
+  #btnTogglePowerSpiderweb,
+  #btnToggleProgramCard {
+    order: 2 !important;
+    flex-shrink: 0 !important;
+    margin-left: auto !important;
+  }
+
+  #spiderwebTimeframeGroup {
+    order: 3 !important;
+    width: 100% !important;
+    margin-top: 0.15rem !important;
+  }
+
+  #btnJumpToSpiderwebPlanner,
+  #btnResetProgramBlock,
+  #btnOpenPlanBuilder,
+  #btnAdjustGoal {
+    order: 3 !important;
   }
 
   .workout-stage.collapsed {
