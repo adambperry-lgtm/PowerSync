@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.4] - 2026-11-13
+### Fixed
+- **Initial-Load Ride Debrief Persistence**:
+  - Fixed `loadWorkout()` in `app/static/js/app.js` unconditionally setting `state.activeCoachView = "prescribed"` on initial page load, which had been overriding the automatic **Ride Debrief** view whenever a completed ride existed for today.
+  - `loadWorkout()` now only switches `state.activeCoachView` to `"prescribed"` when the user explicitly requests a duration, intensity, or note adjustment.
+
 ## [2.9.3] - 2026-11-13
 ### Changed
 - **Automatic Top-Right Ride Debrief Mode**:

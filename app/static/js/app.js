@@ -1936,7 +1936,9 @@ async function loadWorkout(duration = null, intensity = 0, userNote = "") {
     if (matchingOption) {
       state.currentWorkout = matchingOption;
       state.activeOptionId = matchingOption.id;
-      state.activeCoachView = "prescribed";
+      if (duration !== null || intensity !== 0 || hasUserNote) {
+        state.activeCoachView = "prescribed";
+      }
       if (typeof setWorkoutStageCollapsed === "function" && state.workoutStageCollapsed) {
         setWorkoutStageCollapsed(false);
       }

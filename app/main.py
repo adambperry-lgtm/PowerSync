@@ -145,7 +145,7 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.3",
+        "version": "2.9.4",
         "release_name": "Auto Ride Debrief Panel",
         "build_date": "2026-11-13",
         "services": {
@@ -156,6 +156,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.4",
+                "date": "2026-11-13",
+                "title": "Auto Ride Debrief Panel (Startup Fix)",
+                "items": [
+                    "Initial-Load Ride Debrief Persistence: Prevented loadWorkout() from overwriting state.activeCoachView = 'prescribed' on initial page load so the top-right panel stays in Ride Debrief mode whenever a ride has already occurred today."
+                ]
+            },
             {
                 "version": "v2.9.3",
                 "date": "2026-11-13",
