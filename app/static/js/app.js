@@ -638,6 +638,7 @@ function computeWorkoutTargetWatts(w, ftp) {
 
 // Render Top-Right AI Coach Directive Panel (Completed vs Scheduled)
 function renderAiCoachTodayCard(debriefData, workoutData) {
+  const cardTitle = document.getElementById("coachCardTitle");
   const badge = document.getElementById("coachCardStatusBadge");
   const preHeading = document.getElementById("coachCardPreHeading");
   const title = document.getElementById("coachCardSessionTitle");
@@ -673,24 +674,23 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     )
   );
 
-  // If user explicitly chose a view, honor it. Otherwise, if an active prescription or zwift sync exists, show it!
-  const showPrescribed = (state.activeCoachView === "prescribed") ||
-    (!state.activeCoachView && hasActivePrescription) ||
-    (!isCompletedToday);
+  // Default to Ride Debrief once a ride has occurred today, unless the user explicitly switches to the prescribed briefing
+  const showPrescribed = (state.activeCoachView === "prescribed") || (!isCompletedToday);
 
   if (!showPrescribed && isCompletedToday) {
-    // State 1: Workout Completed Today
+    // State 1: Ride Debrief (Workout Completed Today)
+    if (cardTitle) cardTitle.textContent = "Ride Debrief";
     if (preHeading) {
       preHeading.innerHTML = hasActivePrescription
-        ? '<span style="color:var(--text-muted);font-weight:700;">TODAY\'S COMPLETED WORKOUT</span> · <a href="#" id="linkSwitchToPrescribed" style="color:var(--accent-cyan);text-decoration:none;font-weight:600;font-size:0.75rem;">Switch to Zwift Directive 🚀</a>'
-        : 'TODAY\'S COMPLETED WORKOUT';
+        ? '<span style="color:var(--text-muted);font-weight:700;">DIRECTEUR SPORTIVE • POST-RIDE DEBRIEF</span> · <a href="#" id="linkSwitchToPrescribed" style="color:var(--accent-cyan);text-decoration:none;font-weight:600;font-size:0.75rem;">Switch to Ride Briefing 🚀</a>'
+        : 'DIRECTEUR SPORTIVE • POST-RIDE DEBRIEF';
     }
     title.textContent = assessment.title;
 
     if (lbl1) lbl1.textContent = "Duration";
     if (val1) {
       val1.textContent = assessment.moving_time_formatted || `${assessment.moving_time_min || 0}m`;
-      val1.style.color = "#fff";
+      val1.style.color = "var(--text-primary)";
     }
 
     if (lbl2) lbl2.textContent = "Avg Power";
@@ -728,23 +728,13 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     }
 
     if (jumpLink) {
-      if (hasActivePrescription) {
-        jumpLink.href = "#";
-        jumpLink.innerHTML = "View Zwift Directive ↗";
-        jumpLink.onclick = (e) => {
-          e.preventDefault();
-          state.activeCoachView = "prescribed";
-          renderAiCoachTodayCard(debriefData, workoutData);
-        };
-      } else {
-        jumpLink.href = "#cardCoachDebrief";
-        jumpLink.innerHTML = "Full Debrief ↓";
-        jumpLink.onclick = (e) => {
-          e.preventDefault();
-          const debriefEl = document.getElementById("cardCoachDebrief");
-          if (debriefEl) debriefEl.scrollIntoView({ behavior: "smooth", block: "start" });
-        };
-      }
+      jumpLink.href = "#cardCoachDebrief";
+      jumpLink.innerHTML = "Full Debrief ↓";
+      jumpLink.onclick = (e) => {
+        e.preventDefault();
+        const debriefEl = document.getElementById("cardCoachDebrief");
+        if (debriefEl) debriefEl.scrollIntoView({ behavior: "smooth", block: "start" });
+      };
     }
 
     const linkSwitch = document.getElementById("linkSwitchToPrescribed");
@@ -756,7 +746,8 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
       };
     }
   } else {
-    // State 2: Active Coach Directive / Prescribed Session
+    // State 2: Ride Briefing (Active Coach Directive / Prescribed Session)
+    if (cardTitle) cardTitle.textContent = "Ride Briefing";
     const whoopRec = (state.whoop && state.whoop.recovery_score) || (state.dashboard && state.dashboard.whoop && state.dashboard.whoop.recovery_score) || 50;
     const isRest = (w.duration_minutes === 0 || w.option_type === "rest");
     const isZwiftSynced = Boolean(w.pushed_to_zwift || w.synced_to_zwift);
@@ -764,17 +755,18 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     if (preHeading) {
       if (isZwiftSynced) {
         preHeading.innerHTML = '<span style="color:#10b981;font-weight:700;">ACTIVE DIRECTIVE</span> · <span style="color:var(--accent-cyan);font-weight:700;">SENT TO ZWIFT 🚀</span>' +
-          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Morning Ride ↗</a>' : '');
+          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Ride Debrief ↗</a>' : '');
       } else if (hasActivePrescription && (w.coach_prescribed || w.option_type === "coach_chat")) {
         preHeading.innerHTML = '<span style="color:var(--accent-cyan);font-weight:700;">ACTIVE COACH DIRECTIVE</span> · <span style="color:#c084fc;font-weight:700;">CHAT REVISED 💬</span>' +
-          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Morning Ride ↗</a>' : '');
+          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Ride Debrief ↗</a>' : '');
       } else if (hasActivePrescription && w.is_user_adapted) {
         preHeading.innerHTML = '<span style="color:var(--accent-cyan);font-weight:700;">ACTIVE COACH DIRECTIVE</span> · <span style="color:#f59e0b;font-weight:700;">CUSTOM ADAPTED ⚡</span>' +
-          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Morning Ride ↗</a>' : '');
+          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Ride Debrief ↗</a>' : '');
       } else if (isRest) {
         preHeading.textContent = "TODAY'S REST DAY DIRECTIVE";
       } else {
-        preHeading.textContent = "TODAY'S PRESCRIBED SESSION";
+        preHeading.innerHTML = 'DIRECTEUR SPORTIVE • PRE-RIDE RACE BRIEFING' +
+          (isCompletedToday ? ' · <a href="#" id="linkSwitchToCompleted" style="color:var(--text-muted);text-decoration:underline;font-size:0.75rem;margin-left:0.25rem;">Ride Debrief ↗</a>' : '');
       }
     }
 
@@ -783,7 +775,7 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     if (lbl1) lbl1.textContent = "Duration";
     if (val1) {
       val1.textContent = `${w.duration_minutes !== undefined ? w.duration_minutes : 60}m`;
-      val1.style.color = "#fff";
+      val1.style.color = "var(--text-primary)";
     }
 
     if (lbl2) lbl2.textContent = "Target Watts";
@@ -834,7 +826,7 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     if (jumpLink) {
       if (isCompletedToday) {
         jumpLink.href = "#";
-        jumpLink.innerHTML = "View Morning Ride ↗";
+        jumpLink.innerHTML = "View Ride Debrief ↗";
         jumpLink.onclick = (e) => {
           e.preventDefault();
           state.activeCoachView = "completed";

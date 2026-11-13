@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.2",
-        "release_name": "Whole-Ride NP Target Alignment",
+        "version": "2.9.3",
+        "release_name": "Auto Ride Debrief Panel",
         "build_date": "2026-11-13",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.3",
+                "date": "2026-11-13",
+                "title": "Auto Ride Debrief Panel",
+                "items": [
+                    "Automatic Ride Debrief Mode: Top-right panel automatically switches from Ride Briefing to Ride Debrief once a completed ride is detected today, while keeping a quick toggle back to Ride Briefing.",
+                    "Theme & Navigation Polish: Fixed Duration metric text color to var(--text-primary) and preserved the Full Debrief ↓ jump link."
+                ]
+            },
             {
                 "version": "v2.9.2",
                 "date": "2026-11-13",

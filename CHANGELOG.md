@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.3] - 2026-11-13
+### Changed
+- **Automatic Top-Right Ride Debrief Mode**:
+  - Updated `renderAiCoachTodayCard()` in `app/static/js/app.js` so the top-right panel automatically switches from **Ride Briefing** to **Ride Debrief** once a ride has been detected for today (`isCompletedToday === true`), unless the athlete explicitly switches back to the Ride Briefing view.
+  - Updated the card header (`#coachCardTitle`) dynamically between `"Ride Debrief"` and `"Ride Briefing"`, preserved the `"Full Debrief ↓"` jump link in debrief mode, and fixed Duration metric text color (`var(--text-primary)`) for crisp contrast in the light theme.
+
 ## [2.9.2] - 2026-11-13
 ### Fixed
 - **Whole-Ride Normalized Power Target Alignment**:
