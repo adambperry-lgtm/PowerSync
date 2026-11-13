@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.4",
-        "release_name": "Auto Ride Debrief Panel",
+        "version": "2.9.5",
+        "release_name": "Tight Mobile UI & Dropdown Fix",
         "build_date": "2026-11-13",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.5",
+                "date": "2026-11-13",
+                "title": "Tight Mobile UI & Dropdown Fix",
+                "items": [
+                    "Compact Telemetry Card Headers: Removed the redundant Sync Whoop button and eliminated header wrapping and dead space across Whoop Biometrics, Strava Training Load, Ride Debrief, and Today's Training panels.",
+                    "Connected Services Dropdown Positioning: Anchored #connectionsDropdownMenu within viewport bounds on mobile so it no longer clips off the left edge of the screen."
+                ]
+            },
             {
                 "version": "v2.9.4",
                 "date": "2026-11-13",

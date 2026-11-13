@@ -495,13 +495,13 @@ h1, h2, h3, h4,
 }
 
 .telemetry-grid > .card {
-  padding: 1rem 1.15rem;
-  gap: 0.65rem;
+  padding: 0.85rem 1rem;
+  gap: 0.5rem;
   border-radius: var(--radius-md, 12px);
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .telemetry-grid > .card.collapsible-tile.collapsed {
@@ -509,19 +509,26 @@ h1, h2, h3, h4,
   padding: 0.65rem 1rem !important;
 }
 
+.telemetry-grid .collapsible-tile-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1 1 auto;
+}
+
 .telemetry-grid .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem 0.55rem;
-  margin-bottom: 0.25rem;
+  flex-wrap: nowrap;
+  gap: 0.45rem;
+  margin-bottom: 0.1rem;
 }
 
 .telemetry-grid .card-header-left {
-  min-width: 160px;
+  min-width: 0;
   flex: 1 1 auto;
-  gap: 0.5rem;
+  gap: 0.45rem;
   flex-wrap: nowrap;
 }
 
@@ -533,8 +540,9 @@ h1, h2, h3, h4,
 .telemetry-grid .card-header-actions {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  flex-wrap: wrap;
+  gap: 0.3rem;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
   justify-content: flex-end;
   margin-left: auto;
 }
@@ -876,7 +884,8 @@ h1, h2, h3, h4,
   margin-bottom: 0.2rem;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.35rem;
 }
 
 .session-heading {
@@ -3148,9 +3157,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     justify-content: center;
   }
 
+  .connections-dropdown-wrapper {
+    position: static;
+  }
+
   .connections-dropdown-menu {
-    width: min(285px, calc(100vw - 1.5rem));
-    right: 0;
+    top: calc(100% + 0.35rem);
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    max-width: 360px;
+    margin: 0 auto;
   }
 
   .badge-status {
@@ -3163,8 +3180,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   /* Main Container on Mobile */
   .container,
   .main-content {
-    padding: 0.85rem 0.65rem max(5.5rem, calc(4.5rem + env(safe-area-inset-bottom, 24px))) 0.65rem !important;
-    gap: 1.15rem !important;
+    padding: 0.7rem 0.6rem max(5.2rem, calc(4.2rem + env(safe-area-inset-bottom, 24px))) 0.6rem !important;
+    gap: 0.85rem !important;
     width: 100% !important;
     max-width: 100vw !important;
     box-sizing: border-box !important;
@@ -3172,8 +3189,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .card {
-    padding: 1rem 0.85rem;
-    margin-bottom: 1rem;
+    padding: 0.85rem 0.75rem;
+    margin-bottom: 0.85rem;
     border-radius: 12px;
     width: 100%;
     max-width: 100%;
@@ -3185,15 +3202,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     justify-content: space-between;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.65rem;
+    gap: 0.5rem;
   }
 
   .card-header .card-title,
   .workout-stage-header .card-title,
   .card-title,
   .program-heading {
-    font-size: 1.08rem !important;
+    font-size: 1.02rem !important;
     font-weight: 800 !important;
+  }
+
+  .telemetry-grid .card-header .card-title,
+  .telemetry-grid .card-title {
+    font-size: 0.92rem !important;
+    line-height: 1.2 !important;
   }
 
   .card-subtitle,
@@ -3204,8 +3227,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   /* Workout Stage Tile & Selector on Mobile */
   .workout-stage {
-    padding: 1rem 0.75rem !important;
-    gap: 1.15rem !important;
+    padding: 0.85rem 0.75rem !important;
+    gap: 0.85rem !important;
     border-radius: 12px !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -3213,31 +3236,46 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     overflow-x: hidden !important;
   }
 
+  .workout-stage-header {
+    flex-wrap: nowrap !important;
+    align-items: flex-start !important;
+    gap: 0.5rem !important;
+  }
+
+  .workout-stage-header .card-header-left {
+    align-items: flex-start !important;
+    min-width: 0 !important;
+  }
+
+  .workout-stage-header-right {
+    flex-shrink: 0 !important;
+  }
+
   .workout-stage.collapsed {
-    padding: 0.75rem 0.85rem !important;
+    padding: 0.75rem 0.8rem !important;
     gap: 0 !important;
   }
 
   .card.collapsible-tile.collapsed {
-    padding: 0.75rem 0.85rem !important;
+    padding: 0.75rem 0.8rem !important;
     gap: 0 !important;
   }
 
   .card-header-icon,
   .workout-stage-header-icon,
   .program-icon {
-    width: 34px !important;
-    height: 34px !important;
-    font-size: 1.15rem !important;
+    width: 32px !important;
+    height: 32px !important;
+    font-size: 1.1rem !important;
   }
 
   .collapsed-summary-title {
-    font-size: 0.88rem !important;
+    font-size: 0.86rem !important;
   }
 
   .dashboard-toolbar {
-    padding: 0.55rem 0.85rem !important;
-    margin-bottom: -0.35rem !important;
+    padding: 0.5rem 0.8rem !important;
+    margin-bottom: -0.25rem !important;
   }
 
   .dashboard-toolbar-hint {
@@ -3245,8 +3283,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .btn-stage-collapse {
-    padding: 0.22rem 0.55rem !important;
-    font-size: 0.72rem !important;
+    padding: 0.2rem 0.5rem !important;
+    font-size: 0.7rem !important;
   }
 
   .btn-toggle-all-tiles {
@@ -6612,7 +6650,32 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   /* 2. Full-Width Stacked Telemetry Cards on iPhone (Whoop, Strava, Ride Briefing) */
   .telemetry-grid {
     grid-template-columns: 1fr !important;
-    gap: 0.85rem !important;
+    gap: 0.75rem !important;
+  }
+
+  .telemetry-grid > .card {
+    padding: 0.8rem 0.75rem !important;
+    gap: 0.45rem !important;
+  }
+
+  .telemetry-grid .card-header-icon {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  .telemetry-grid .badge-status {
+    font-size: 0.66rem !important;
+    padding: 0.14rem 0.42rem !important;
+  }
+
+  .telemetry-grid .btn-stage-collapse {
+    padding: 0.18rem 0.44rem !important;
+    font-size: 0.68rem !important;
+    gap: 0.22rem !important;
+  }
+
+  .ai-briefing-narrative-box {
+    padding: 0.65rem 0.8rem !important;
   }
 
   /* 3. 3-Tab Mode Switchers (#debriefTabGroup & #planSourceTabs) on Single 3-Column Row */

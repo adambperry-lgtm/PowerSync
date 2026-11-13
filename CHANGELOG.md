@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.5] - 2026-11-13
+### Fixed
+- **Mobile UI Tightening & Dead Space Elimination**:
+  - Removed the redundant `Sync Whoop` button (`#btnSyncWhoop`) from the **Whoop Biometrics** card header and fixed `.telemetry-grid` header wrapping (`min-width: 0`, `flex-wrap: nowrap`) so **Whoop Biometrics**, **Strava Training Load (7 Days)**, and **Ride Debrief / Briefing** headers stay on a single compact row with zero dead space.
+  - Fixed the **Connected Services** dropdown (`#connectionsDropdownMenu`) clipping off the left edge of narrow mobile viewports by anchoring it within the navbar bounds (`left: 0.75rem; right: 0.75rem;`).
+  - Allowed `#coachCardPreHeading` (`.section-eyebrow`) to wrap cleanly without stranding separator dots, tightened card/container padding and gaps, and aligned `.workout-stage-header` so the Collapse/Expand button never wraps below collapsed summaries.
+
 ## [2.9.4] - 2026-11-13
 ### Fixed
 - **Initial-Load Ride Debrief Persistence**:
