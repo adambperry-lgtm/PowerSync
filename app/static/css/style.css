@@ -1247,10 +1247,7 @@ h1, h2, h3, h4,
 .card.collapsible-tile.collapsed #debriefTabGroup,
 .card.collapsible-tile.collapsed #btnRefreshDebrief,
 .card.collapsible-tile.collapsed #spiderwebTimeframeGroup,
-.card.collapsible-tile.collapsed #btnJumpToSpiderwebPlanner,
-.card.collapsible-tile.collapsed #btnResetProgramBlock,
-.card.collapsible-tile.collapsed #btnOpenPlanBuilder,
-.card.collapsible-tile.collapsed #btnAdjustGoal {
+.card.collapsible-tile.collapsed .program-action-btns {
   display: none !important;
 }
 
@@ -3258,15 +3255,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   #powerSpiderwebHeader,
   #programCardHeader {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    align-items: flex-start !important;
-    gap: 0.5rem !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    align-items: start !important;
+    gap: 0.55rem !important;
   }
 
   #powerSpiderwebHeader .card-header-left,
   #programCardHeader .card-header-left {
-    flex: 1 1 0 !important;
+    grid-column: 1 !important;
+    grid-row: 1 !important;
     min-width: 0 !important;
     align-items: flex-start !important;
   }
@@ -3278,22 +3276,32 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   #btnTogglePowerSpiderweb,
   #btnToggleProgramCard {
-    order: 2 !important;
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    justify-self: end !important;
     flex-shrink: 0 !important;
-    margin-left: auto !important;
   }
 
   #spiderwebTimeframeGroup {
-    order: 3 !important;
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
     width: 100% !important;
-    margin-top: 0.15rem !important;
+    margin-top: 0.1rem !important;
   }
 
-  #btnJumpToSpiderwebPlanner,
-  #btnResetProgramBlock,
-  #btnOpenPlanBuilder,
-  #btnAdjustGoal {
-    order: 3 !important;
+  .program-action-btns {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 0.4rem !important;
+    width: 100% !important;
+  }
+
+  .program-action-btns .btn {
+    width: 100% !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
   }
 
   .workout-stage.collapsed {

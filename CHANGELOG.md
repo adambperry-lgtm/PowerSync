@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.7] - 2026-11-13
+### Fixed
+- **Long-Term Program & Spiderweb Mobile Header Grid**:
+  - Replaced flex `display: contents` ordering on `#powerSpiderwebHeader` and `#programCardHeader` with a 2-column CSS Grid (`minmax(0, 1fr) auto`) on mobile, and grouped the 4 program action buttons in `.program-action-btns` as a clean 2x2 full-width row below the title/description so text is never squeezed into a narrow column.
+
 ## [2.9.6] - 2026-11-13
 ### Fixed
 - **All-Time PRs Collapsed Summary Chip Accuracy**:

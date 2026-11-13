@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.6",
-        "release_name": "All-Time PR Chip & Long-Term Mobile Polish",
+        "version": "2.9.7",
+        "release_name": "Program & Spiderweb Mobile Grid Fix",
         "build_date": "2026-11-13",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.7",
+                "date": "2026-11-13",
+                "title": "Program & Spiderweb Mobile Grid Fix",
+                "items": [
+                    "Mobile Header Grid Layout: Switched #programCardHeader and #powerSpiderwebHeader to a 2-column CSS Grid on mobile with a dedicated 2x2 .program-action-btns row below so titles, badges, and descriptions always render at full width."
+                ]
+            },
             {
                 "version": "v2.9.6",
                 "date": "2026-11-13",
