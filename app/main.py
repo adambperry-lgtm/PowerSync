@@ -145,9 +145,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.7",
-        "release_name": "Program & Spiderweb Mobile Grid Fix",
-        "build_date": "2026-11-13",
+        "version": "2.9.8",
+        "release_name": "Desktop & Mobile Telemetry Header Fix",
+        "build_date": "2026-11-15",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -156,6 +156,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.8",
+                "date": "2026-11-15",
+                "title": "Desktop & Mobile Telemetry Header Fix",
+                "items": [
+                    "Telemetry Card Header Layout: Moved status badges (Today, Optimal Load Balance, DS Live/Connected) inline/wrapped with each card title inside .card-header-left so 3-column desktop cards never squeeze titles into single-character vertical columns."
+                ]
+            },
             {
                 "version": "v2.9.7",
                 "date": "2026-11-13",

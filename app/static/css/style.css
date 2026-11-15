@@ -519,7 +519,7 @@ h1, h2, h3, h4,
 .telemetry-grid .card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: nowrap;
   gap: 0.45rem;
   margin-bottom: 0.1rem;
@@ -528,6 +528,7 @@ h1, h2, h3, h4,
 .telemetry-grid .card-header-left {
   min-width: 0;
   flex: 1 1 auto;
+  align-items: flex-start;
   gap: 0.45rem;
   flex-wrap: nowrap;
 }

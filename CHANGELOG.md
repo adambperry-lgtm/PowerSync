@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.8] - 2026-11-15
+### Fixed
+- **Desktop 3-Column Telemetry Card Title Squeezing**:
+  - Moved the status badges (`#whoopDateBadge`, `#formStatusBadge`, `#badgeCardGeminiStatus`) into `.card-header-left` alongside each card's title (matching `#powerSpiderwebHeader` and `#programCardHeader`), leaving only the `Collapse`/`Expand` button in `.card-header-actions`.
+  - Prevents 3-column desktop cards (~310px wide) from squeezing `Strava Training Load (7 Days)` and `Ride Briefing` into 1-character-wide vertical text while keeping `Collapse` pinned top-right and eliminating dead space on both desktop and mobile.
+
 ## [2.9.7] - 2026-11-13
 ### Fixed
 - **Long-Term Program & Spiderweb Mobile Header Grid**:
