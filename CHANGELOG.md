@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.10.1] - 2026-11-15
+### Fixed
+- **Workout Archive Tab Visibility & Navbar Overflow**:
+  - Removed the `max-width: 440px` cap on `.main-view-tabs-container` in `app/static/css/style.css` (which clipped the new **Workout Archive** tab behind the **Connections** button) and added a responsive wrap breakpoint (`@media (max-width: 1320px)`) so all three tabs stay cleanly visible on all desktop, laptop, and mobile viewports.
+  - Bumped cache-busting query strings (`style.css?v=65`, `app.js?v=121`) in `app/static/index.html`.
+
 ## [2.10.0] - 2026-11-15
 ### Added
 - **Workout Archive & Library Tab (`#tabMainViewArchive` / `#viewArchiveContainer`)**:

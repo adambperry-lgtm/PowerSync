@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.10.0",
-        "release_name": "Workout Archive, Customizer & Zwift Sync Agent",
+        "version": "2.10.1",
+        "release_name": "Workout Archive Tab Visibility Fix",
         "build_date": "2026-11-15",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.10.1",
+                "date": "2026-11-15",
+                "title": "Workout Archive Tab Visibility Fix",
+                "items": [
+                    "Navbar Tab Switcher Width Fix: Removed the 440px max-width cap on .main-view-tabs-container and added a 1320px responsive wrap breakpoint so the Workout Archive tab is fully visible without overlapping Connections.",
+                    "Asset Cache Busting: Bumped style.css?v=65 and app.js?v=121."
+                ]
+            },
             {
                 "version": "v2.10.0",
                 "date": "2026-11-15",
