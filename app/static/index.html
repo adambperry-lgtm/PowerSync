@@ -85,6 +85,16 @@
           <span class="main-view-tab-title">Long-Term Analysis</span>
           <span class="main-view-tab-badge">Strategy</span>
         </button>
+        <button class="main-view-tab-btn" id="tabMainViewArchive" type="button" role="tab" aria-selected="false" data-view="archive">
+          <span class="main-view-tab-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
+          </span>
+          <span class="main-view-tab-title">Workout Archive</span>
+          <span class="main-view-tab-badge">Library</span>
+        </button>
       </div>
     </nav>
     
@@ -1844,6 +1854,171 @@
       </div>
     </section>
   </div> <!-- end viewAnalysisContainer (Long-Term Analysis & Strategy) -->
+
+  <!-- VIEW 3: WORKOUT ARCHIVE & CUSTOMIZER -->
+  <div id="viewArchiveContainer" class="main-view-pane hidden-pane" role="tabpanel" aria-labelledby="tabMainViewArchive" style="display:none;">
+    <section class="card" id="cardWorkoutArchiveHeader" style="margin-top:0;">
+      <div class="card-header" style="flex-wrap:wrap;gap:0.75rem;">
+        <div class="card-header-left">
+          <span class="card-header-icon">📚</span>
+          <div>
+            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+              <span class="card-title">Workout Archive &amp; Library</span>
+              <span class="tag tag-focus" id="archiveCountBadge" style="background:rgba(0,82,255,0.1);color:var(--accent-cyan);border:1px solid rgba(0,82,255,0.28);font-weight:700;">19 Library + Prior</span>
+            </div>
+            <div class="card-subtitle" style="font-size:0.76rem;color:var(--text-muted);margin-top:0.15rem;">
+              Browse prior &amp; saved workouts or structured Coach archetypes, customize intervals &amp; intensity, and push directly to Zwift.
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+          <button type="button" class="btn btn-primary" id="btnArchiveNewWorkout" style="padding:0.45rem 0.9rem;font-size:0.82rem;font-weight:700;">
+            + New Custom Workout
+          </button>
+        </div>
+      </div>
+
+      <!-- Search, Zone Filter Pills & Library Duration Selector -->
+      <div class="archive-toolbar">
+        <div class="archive-search-box">
+          <input type="text" id="archiveSearchInput" placeholder="Search workouts (e.g. Criss-Cross, Over-Under, 40/20, Tempo)..." autocomplete="off" />
+        </div>
+        <div class="archive-duration-control" title="Preview Coach Library templates at this target duration">
+          <label for="archiveLibraryDuration" style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">Library Duration:</label>
+          <select id="archiveLibraryDuration">
+            <option value="35">35 min</option>
+            <option value="45">45 min</option>
+            <option value="60" selected>60 min</option>
+            <option value="75">75 min</option>
+            <option value="90">90 min</option>
+            <option value="120">120 min</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="archive-filter-pills" id="archiveFilterPills" role="tablist" aria-label="Filter workouts by category">
+        <button type="button" class="archive-pill active" data-filter="all">All Workouts</button>
+        <button type="button" class="archive-pill" data-filter="archive">My Archive (Prior &amp; Saved)</button>
+        <button type="button" class="archive-pill" data-filter="sweet_spot">Sweet Spot</button>
+        <button type="button" class="archive-pill" data-filter="tempo">Tempo</button>
+        <button type="button" class="archive-pill" data-filter="vo2_max">VO2 Max</button>
+        <button type="button" class="archive-pill" data-filter="endurance_base">Endurance</button>
+        <button type="button" class="archive-pill" data-filter="express">Express</button>
+      </div>
+    </section>
+
+    <!-- Split Workspace: Library/Archive Grid + Interactive Workout Customizer -->
+    <div class="archive-workspace-grid">
+      <!-- Left: Workout Cards Grid -->
+      <div class="archive-list-column">
+        <div id="archiveWorkoutsGrid" class="archive-cards-grid">
+          <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">
+            Loading Workout Archive &amp; Library...
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Interactive Workout Editor & Zwift Sender -->
+      <aside class="card archive-editor-panel" id="archiveEditorPanel">
+        <div class="card-header" style="padding-bottom:0.65rem;border-bottom:1px solid var(--border-color);">
+          <div class="card-header-left">
+            <span class="card-header-icon">🛠️</span>
+            <div>
+              <span class="card-title" id="archiveEditorHeading">Workout Customizer</span>
+              <div style="font-size:0.72rem;color:var(--text-muted);" id="archiveEditorSourceLabel">Select any workout to edit or create a custom session</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="archive-editor-body" style="padding-top:0.85rem;display:flex;flex-direction:column;gap:0.85rem;">
+          <!-- Title & Date Row -->
+          <div style="display:grid;grid-template-columns:1fr 145px;gap:0.6rem;">
+            <div>
+              <label for="archiveEditTitle" style="display:block;font-size:0.72rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.25rem;">Workout Title</label>
+              <input type="text" id="archiveEditTitle" class="archive-input" placeholder="e.g. Custom Sweet Spot Criss-Cross" />
+            </div>
+            <div>
+              <label for="archiveEditDate" style="display:block;font-size:0.72rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.25rem;">Target Date (Zwift)</label>
+              <input type="date" id="archiveEditDate" class="archive-input" />
+            </div>
+          </div>
+
+          <!-- Live Power Profile Canvas -->
+          <div class="archive-canvas-wrap">
+            <canvas id="archiveEditorCanvas" height="145" style="width:100%;height:145px;display:block;"></canvas>
+          </div>
+
+          <!-- Live Metrics Strip -->
+          <div class="archive-metrics-strip" id="archiveEditorMetrics">
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">Duration</span>
+              <span class="archive-metric-val" id="archiveMetricDur">60m</span>
+            </div>
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">NP</span>
+              <span class="archive-metric-val" id="archiveMetricNP">-- W</span>
+            </div>
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">IF</span>
+              <span class="archive-metric-val" id="archiveMetricIF">--</span>
+            </div>
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">Est. TSS</span>
+              <span class="archive-metric-val" id="archiveMetricTSS">--</span>
+            </div>
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">Total XSS</span>
+              <span class="archive-metric-val" id="archiveMetricXSS">--</span>
+            </div>
+          </div>
+
+          <!-- Quick Intensity & Duration Adjust Controls -->
+          <div class="archive-quick-adjust">
+            <div style="display:flex;align-items:center;gap:0.4rem;flex-wrap:wrap;">
+              <span style="font-size:0.73rem;font-weight:700;color:var(--text-secondary);">Intensity Scale:</span>
+              <button type="button" class="btn btn-secondary btn-xs archive-scale-btn" data-delta="-10">-10%</button>
+              <button type="button" class="btn btn-secondary btn-xs archive-scale-btn" data-delta="-5">-5%</button>
+              <button type="button" class="btn btn-secondary btn-xs archive-scale-btn" data-delta="5">+5%</button>
+              <button type="button" class="btn btn-secondary btn-xs archive-scale-btn" data-delta="10">+10%</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:0.4rem;">
+              <label for="archiveReconcileDur" style="font-size:0.73rem;font-weight:700;color:var(--text-secondary);">Scale Dur:</label>
+              <input type="number" id="archiveReconcileDur" min="15" max="240" step="5" value="60" class="archive-input" style="width:68px;padding:0.25rem 0.4rem;font-size:0.78rem;" />
+              <button type="button" class="btn btn-secondary btn-xs" id="btnArchiveApplyDur">Apply</button>
+            </div>
+          </div>
+
+          <!-- Intervals List Editor -->
+          <div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+              <span style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);">Interval Blocks</span>
+              <button type="button" class="btn btn-secondary btn-xs" id="btnArchiveAddInterval">+ Add Step</button>
+            </div>
+            <div id="archiveIntervalRows" class="archive-interval-rows"></div>
+          </div>
+
+          <!-- Notes / Rationale -->
+          <div>
+            <label for="archiveEditNotes" style="display:block;font-size:0.72rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.25rem;">Coaching Notes / Description</label>
+            <textarea id="archiveEditNotes" rows="2" class="archive-input" placeholder="Optional notes or physiological focus..."></textarea>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="archive-editor-actions">
+            <button type="button" class="btn btn-secondary" id="btnArchiveSave" style="flex:1;">
+              💾 Save to Archive
+            </button>
+            <button type="button" class="btn btn-secondary" id="btnArchiveDownloadZwo" title="Download .zwo file">
+              ⬇️ .ZWO
+            </button>
+            <button type="button" class="btn btn-primary" id="btnArchivePushZwift" style="flex:1.3;background:linear-gradient(135deg,#0052FF,#FF5E00);border:none;">
+              🚀 Send to Zwift
+            </button>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div> <!-- end viewArchiveContainer (Workout Archive & Library) -->
 
   </main>
 

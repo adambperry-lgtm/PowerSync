@@ -1038,3 +1038,246 @@ def select_outdoor_option(req: OutdoorSelectRequest):
 
     raise HTTPException(status_code=404, detail=f"Outdoor ride option {target_id} not found")
 
+
+# ==============================================================================
+# WORKOUT ARCHIVE & LIBRARY ENDPOINTS
+# ==============================================================================
+
+class ArchiveWorkoutSaveRequest(BaseModel):
+    id: Optional[str] = None
+    title: str
+    description: Optional[str] = ""
+    focus_area: Optional[str] = "Custom"
+    ai_rationale: Optional[str] = ""
+    date: Optional[str] = None
+    status: Optional[str] = "archived"
+    intervals: List[Dict[str, Any]]
+    duration_minutes: Optional[int] = None
+    intensity_adjust_pct: Optional[int] = 0
+
+class ArchiveWorkoutPreviewRequest(BaseModel):
+    title: Optional[str] = "Custom Workout"
+    ai_rationale: Optional[str] = ""
+    intervals: List[Dict[str, Any]]
+    duration_minutes: Optional[int] = None
+    intensity_adjust_pct: Optional[int] = 0
+
+class ArchivePushZwiftRequest(BaseModel):
+    workout_id: Optional[str] = None
+    archetype_id: Optional[str] = None
+    workout: Optional[Dict[str, Any]] = None
+    target_date: Optional[str] = None
+    duration_min: Optional[int] = None
+    intensity_adjust_pct: Optional[int] = 0
+    save_to_archive: Optional[bool] = True
+
+
+@router.get("/archive")
+def get_workout_archive_and_library(
+    duration_min: int = 60,
+    zone: Optional[str] = None,
+    q: Optional[str] = None,
+):
+    """Returns the user's prior/saved workouts alongside the structured Coach Library."""
+    uid = get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+
+    from app.services.workout_archive_service import (
+        get_archived_workouts,
+        get_workout_library,
+    )
+
+    prior_workouts = [] if uid == "usr_guest" else get_archived_workouts(user_id=uid, ftp=ftp, query=q)
+    library_workouts = get_workout_library(ftp=ftp, duration_min=duration_min, zone_filter=zone, query=q)
+
+    return {
+        "success": True,
+        "ftp": ftp,
+        "prior_workouts": prior_workouts,
+        "library_workouts": library_workouts,
+    }
+
+
+@router.post("/archive/preview")
+def preview_archive_workout(req: ArchiveWorkoutPreviewRequest):
+    """Recalculates NP, IF, TSS, 3-tier XSS, .zwo XML, and Intervals.icu text for edited intervals."""
+    uid = get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    from app.services.workout_archive_service import adjust_workout_structure
+
+    base = {
+        "title": req.title or "Custom Workout",
+        "ai_rationale": req.ai_rationale or "",
+        "intervals": req.intervals,
+    }
+    hydrated = adjust_workout_structure(
+        base,
+        target_duration_min=req.duration_minutes,
+        intensity_adjust_pct=int(req.intensity_adjust_pct or 0),
+        ftp=ftp,
+    )
+    return {
+        "success": True,
+        "ftp": ftp,
+        "workout": hydrated,
+    }
+
+
+@router.post("/archive/save")
+def save_archive_workout_endpoint(req: ArchiveWorkoutSaveRequest):
+    """Saves a new or customized workout to the current user's Workout Archive."""
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        raise HTTPException(status_code=401, detail="Sign in required to save custom workouts.")
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+
+    from app.services.workout_archive_service import adjust_workout_structure, save_custom_workout
+
+    base = {
+        "id": req.id,
+        "title": req.title.strip() or "Custom Workout",
+        "description": req.description or req.ai_rationale or "",
+        "focus_area": req.focus_area or "Custom",
+        "ai_rationale": req.ai_rationale or "",
+        "date": req.date or get_athlete_date(uid).isoformat(),
+        "status": req.status or "archived",
+        "intervals": req.intervals,
+    }
+    if req.duration_minutes or (req.intensity_adjust_pct and req.intensity_adjust_pct != 0):
+        base = adjust_workout_structure(
+            base,
+            target_duration_min=req.duration_minutes,
+            intensity_adjust_pct=int(req.intensity_adjust_pct or 0),
+            ftp=ftp,
+        )
+        base["id"] = req.id
+        base["date"] = req.date or get_athlete_date(uid).isoformat()
+        base["status"] = req.status or "archived"
+
+    saved = save_custom_workout(base, user_id=uid, ftp=ftp)
+    return {
+        "success": True,
+        "message": f"Saved '{saved['title']}' to your Workout Archive.",
+        "workout": saved,
+    }
+
+
+@router.delete("/archive/{workout_id}")
+def delete_archive_workout_endpoint(workout_id: str):
+    """Deletes a workout from the current user's Workout Archive."""
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    from app.services.workout_archive_service import delete_archived_workout
+
+    deleted = delete_archived_workout(workout_id, user_id=uid)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Archived workout not found.")
+    return {"success": True, "deleted_id": workout_id}
+
+
+@router.post("/archive/push-zwift")
+def push_archive_workout_to_zwift(req: ArchivePushZwiftRequest):
+    """
+    Loads an archived, library, or customized workout, applies optional duration/intensity adjustments,
+    and pushes it directly to Zwift via Intervals.icu.
+    """
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        raise HTTPException(status_code=401, detail="Sign in required to send workouts to Zwift.")
+
+    athlete_id = get_setting("intervals_athlete_id", "", user_id=uid)
+    api_key = get_setting("intervals_icu_api_key", "", user_id=uid)
+    if not athlete_id or not api_key or "•" in api_key or "\u2022" in api_key:
+        return {
+            "success": False,
+            "error": "Intervals.icu API Key is unconfigured or needs to be re-entered. Please open Settings (⚙️) and enter your Intervals.icu API Key to enable direct Zwift sync.",
+        }
+
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    from app.services.workout_archive_service import (
+        adjust_workout_structure,
+        hydrate_workout_payload,
+        resolve_workout_by_identifier,
+        save_custom_workout,
+    )
+
+    workout = None
+    if req.workout:
+        workout = hydrate_workout_payload(req.workout, ftp=ftp, reconcile_duration=False)
+    else:
+        workout = resolve_workout_by_identifier(
+            workout_id=req.workout_id,
+            archetype_id=req.archetype_id,
+            duration_min=int(req.duration_min or 60),
+            ftp=ftp,
+            user_id=uid,
+        )
+
+    if not workout:
+        raise HTTPException(status_code=404, detail="Workout not found in archive or library.")
+
+    if req.duration_min or (req.intensity_adjust_pct and req.intensity_adjust_pct != 0):
+        workout = adjust_workout_structure(
+            workout,
+            target_duration_min=req.duration_min,
+            intensity_adjust_pct=int(req.intensity_adjust_pct or 0),
+            ftp=ftp,
+        )
+
+    target_date = req.target_date or get_athlete_date(uid).isoformat()
+    result = push_to_intervals_icu(athlete_id, api_key, workout, target_date, ftp=ftp)
+
+    if result.get("success"):
+        workout["pushed_to_zwift"] = True
+        workout["synced_to_zwift"] = True
+        workout["badge"] = "🚀 Sent to Zwift"
+        workout["badge_color"] = "cyan"
+        workout["date"] = target_date
+        workout["status"] = "scheduled"
+
+        if req.save_to_archive:
+            saved = save_custom_workout(workout, user_id=uid, ftp=ftp)
+            workout = saved
+
+        today_iso = get_athlete_date(uid).isoformat()
+        if target_date == today_iso:
+            workout_cache = get_current_workout_cache()
+            options_cache = get_current_options_cache()
+            workout_cache.clear()
+            workout_cache.update(workout)
+            options_cache[workout["id"]] = workout
+
+        result["workout"] = workout
+        result["active_workout"] = workout
+
+    return result
+
+
+@router.post("/archive/download-zwo")
+def download_archive_zwo(req: ArchiveWorkoutPreviewRequest):
+    """Generates and downloads a .zwo file for any archived or customized workout."""
+    uid = get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    from app.services.workout_archive_service import adjust_workout_structure
+
+    hydrated = adjust_workout_structure(
+        {
+            "title": req.title or "Custom_Workout",
+            "ai_rationale": req.ai_rationale or "",
+            "intervals": req.intervals,
+        },
+        target_duration_min=req.duration_minutes,
+        intensity_adjust_pct=int(req.intensity_adjust_pct or 0),
+        ftp=ftp,
+    )
+    zwo_content = hydrated.get("zwo_content", "")
+    safe_title = re.sub(r"[^A-Za-z0-9_-]+", "_", hydrated.get("title") or "PowerSync_Workout").strip("_")
+    filename = f"{safe_title or 'PowerSync_Workout'}.zwo"
+    return Response(
+        content=zwo_content,
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+

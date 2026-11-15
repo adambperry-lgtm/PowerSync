@@ -3,6 +3,17 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.10.0] - 2026-11-15
+### Added
+- **Workout Archive & Library Tab (`#tabMainViewArchive` / `#viewArchiveContainer`)**:
+  - Added a dedicated third top-level navigation tab to browse all prior/saved workouts alongside the 19-workout structured Coach Library (Sweet Spot, Tempo, VO2 Max, Endurance Base, Express).
+  - Supports live keyword search, category/zone filtering, library duration preview scaling (35–120 min), mini SVG power profile sparklines, and one-click Zwift push or deletion.
+- **Interactive Workout Customizer & Coggan Metrics Engine (`app/services/workout_archive_service.py`)**:
+  - Added an interactive interval editor with live high-DPI power profile canvas, Coggan NP / IF / TSS calculation, 3-tier XSS strain tracking, quick intensity scaling (`-10%` to `+10%`), duration reconciliation, step reordering/addition/deletion, `.zwo` export, and direct Zwift push via Intervals.icu.
+  - Added backend endpoints `/api/workouts/archive`, `/api/workouts/archive/preview`, `/api/workouts/archive/save`, `/api/workouts/archive/{workout_id}`, `/api/workouts/archive/push-zwift`, and `/api/workouts/archive/download-zwo`.
+- **AI Coach Agent Tools (`app/services/coach_tools.py`)**:
+  - Added `search_workout_archive_and_library`, `customize_and_save_workout`, and `send_workout_to_zwift` Gemini function-calling tools so the AI Coach can search your archive/library, customize workouts, save them, and push them directly to Zwift from chat.
+
 ## [2.9.9] - 2026-11-15
 ### Fixed
 - **Workout Option Card Active Badge Overlap**:

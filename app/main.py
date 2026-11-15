@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.9",
-        "release_name": "Workout Option Badge Overlap Fix",
+        "version": "2.10.0",
+        "release_name": "Workout Archive, Customizer & Zwift Sync Agent",
         "build_date": "2026-11-15",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.10.0",
+                "date": "2026-11-15",
+                "title": "Workout Archive, Customizer & Zwift Sync Agent",
+                "items": [
+                    "Workout Archive & Library Tab: Browse prior/saved workouts and all 19 structured Coach archetypes with search, zone filters, duration scaling, and SVG power sparklines.",
+                    "Interactive Workout Customizer: Edit interval blocks, scale intensity (-10% to +10%) or duration, preview live Coggan NP/IF/TSS & 3-tier XSS, save to Archive, download .zwo, or push directly to Zwift.",
+                    "AI Coach Agent Tools: Added search_workout_archive_and_library, customize_and_save_workout, and send_workout_to_zwift so the AI Coach can find, tailor, and send library/archive workouts to Zwift on command."
+                ]
+            },
             {
                 "version": "v2.9.9",
                 "date": "2026-11-15",

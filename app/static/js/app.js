@@ -6354,6 +6354,12 @@ async function sendCoachMessage(text) {
         }
       }
 
+      if (Array.isArray(data.executed_tools) && data.executed_tools.some(t => t.name === "customize_and_save_workout" || t.name === "send_workout_to_zwift")) {
+        if (typeof loadWorkoutArchive === "function") loadWorkoutArchive();
+        if (typeof loadWorkout === "function") loadWorkout();
+        if (typeof loadDebrief === "function") loadDebrief();
+      }
+
       const subtitle = document.getElementById("coachChatSubtitle");
       if (subtitle) {
         if (data.provider === "gemini") {
@@ -8137,49 +8143,55 @@ let recentWorkoutsCollapsible = null;
 let powerSpiderwebCollapsible = null;
 let athleteCardCollapsible = null;
 
-// --- Main Dashboard View Switcher (Daily Training vs Long-Term Analysis) ---
+// --- Main Dashboard View Switcher (Daily Training vs Long-Term Analysis vs Workout Archive) ---
 let currentActiveMainView = "daily";
 
 function switchMainDashboardView(targetView, updateHistory = true) {
-  currentActiveMainView = (targetView === "analysis") ? "analysis" : "daily";
+  currentActiveMainView = (targetView === "analysis" || targetView === "archive") ? targetView : "daily";
   const tabDaily = document.getElementById("tabMainViewDaily");
   const tabAnalysis = document.getElementById("tabMainViewAnalysis");
+  const tabArchive = document.getElementById("tabMainViewArchive");
   const paneDaily = document.getElementById("viewDailyContainer");
   const paneAnalysis = document.getElementById("viewAnalysisContainer");
+  const paneArchive = document.getElementById("viewArchiveContainer");
   const toolbarTitle = document.getElementById("dashboardToolbarTitle");
 
+  const tabs = [
+    { key: "daily", tab: tabDaily, pane: paneDaily },
+    { key: "analysis", tab: tabAnalysis, pane: paneAnalysis },
+    { key: "archive", tab: tabArchive, pane: paneArchive }
+  ];
+
+  tabs.forEach(({ key, tab, pane }) => {
+    const isActive = key === currentActiveMainView;
+    if (tab) {
+      tab.classList.toggle("active", isActive);
+      tab.setAttribute("aria-selected", isActive ? "true" : "false");
+    }
+    if (pane) {
+      pane.classList.toggle("hidden-pane", !isActive);
+      pane.style.display = isActive ? "block" : "none";
+    }
+  });
+
   if (currentActiveMainView === "analysis") {
-    tabAnalysis?.classList.add("active");
-    tabAnalysis?.setAttribute("aria-selected", "true");
-    tabDaily?.classList.remove("active");
-    tabDaily?.setAttribute("aria-selected", "false");
-    if (paneDaily) {
-      paneDaily.classList.add("hidden-pane");
-      paneDaily.style.display = "none";
-    }
-    if (paneAnalysis) {
-      paneAnalysis.classList.remove("hidden-pane");
-      paneAnalysis.style.display = "block";
-    }
     if (toolbarTitle) toolbarTitle.textContent = "📈 Long-Term Performance & Strategy";
     requestAnimationFrame(() => {
       if (typeof renderSpiderwebSvg === "function" && typeof currentSpiderwebData !== "undefined" && currentSpiderwebData && currentSpiderwebData.axes) {
         renderSpiderwebSvg(currentSpiderwebData.axes, currentSpiderwebData.active_goal);
       }
     });
+  } else if (currentActiveMainView === "archive") {
+    if (toolbarTitle) toolbarTitle.textContent = "📚 Workout Archive & Customizer";
+    if (typeof loadWorkoutArchive === "function") {
+      loadWorkoutArchive();
+    }
+    requestAnimationFrame(() => {
+      if (typeof drawArchiveEditorCanvas === "function") {
+        drawArchiveEditorCanvas();
+      }
+    });
   } else {
-    tabDaily?.classList.add("active");
-    tabDaily?.setAttribute("aria-selected", "true");
-    tabAnalysis?.classList.remove("active");
-    tabAnalysis?.setAttribute("aria-selected", "false");
-    if (paneAnalysis) {
-      paneAnalysis.classList.add("hidden-pane");
-      paneAnalysis.style.display = "none";
-    }
-    if (paneDaily) {
-      paneDaily.classList.remove("hidden-pane");
-      paneDaily.style.display = "block";
-    }
     if (toolbarTitle) toolbarTitle.textContent = "⚡ Daily Training & Recovery";
     requestAnimationFrame(() => {
       if (state.currentWorkout && typeof drawWorkoutGraph === "function") {
@@ -8207,15 +8219,17 @@ function switchMainDashboardView(targetView, updateHistory = true) {
 function initMainViewSwitcher() {
   const tabDaily = document.getElementById("tabMainViewDaily");
   const tabAnalysis = document.getElementById("tabMainViewAnalysis");
+  const tabArchive = document.getElementById("tabMainViewArchive");
 
   tabDaily?.addEventListener("click", () => switchMainDashboardView("daily"));
   tabAnalysis?.addEventListener("click", () => switchMainDashboardView("analysis"));
+  tabArchive?.addEventListener("click", () => switchMainDashboardView("archive"));
 
   // Always default to opening on the Daily Training view ("daily") on startup
   const initialView = "daily";
   try {
     localStorage.setItem("powersync_main_view", "daily");
-    if (window.location.hash && window.location.hash.toLowerCase() === "#analysis") {
+    if (window.location.hash && (window.location.hash.toLowerCase() === "#analysis" || window.location.hash.toLowerCase() === "#archive")) {
       history.replaceState(null, "", "#daily");
     }
   } catch (_) {}
@@ -8231,6 +8245,10 @@ function initMainViewSwitcher() {
       if (currentActiveMainView !== "analysis") {
         switchMainDashboardView("analysis", true);
       }
+    } else if (["#cardWorkoutArchiveHeader", "#archiveEditorPanel"].includes(href)) {
+      if (currentActiveMainView !== "archive") {
+        switchMainDashboardView("archive", true);
+      }
     } else if (["#cardWhoop", "#cardStrava", "#cardAiCoachToday", "#workoutStageSection", "#cardUpcomingPlan", "#cardCoachDebrief", "#cardRecentWorkouts"].includes(href)) {
       if (currentActiveMainView !== "daily") {
         switchMainDashboardView("daily", true);
@@ -8242,6 +8260,8 @@ function initMainViewSwitcher() {
     const newHash = window.location.hash.toLowerCase();
     if (newHash.includes("analysis") || newHash.includes("spiderweb") || newHash.includes("program") || newHash.includes("athlete")) {
       if (currentActiveMainView !== "analysis") switchMainDashboardView("analysis", false);
+    } else if (newHash.includes("archive")) {
+      if (currentActiveMainView !== "archive") switchMainDashboardView("archive", false);
     } else if (newHash.includes("daily") || newHash.includes("today")) {
       if (currentActiveMainView !== "daily") switchMainDashboardView("daily", false);
     }
@@ -8957,4 +8977,714 @@ window.addEventListener("focus", () => {
     loadDashboard();
   }
 });
+
+// ==========================================================================
+// WORKOUT ARCHIVE & CUSTOMIZER MODULE
+// ==========================================================================
+
+const archiveState = {
+  ftp: 250,
+  priorWorkouts: [],
+  libraryWorkouts: [],
+  filter: "all",
+  search: "",
+  libraryDuration: 60,
+  editingWorkout: null,
+  initialized: false
+};
+
+function _archiveZoneColor(pct) {
+  if (pct < 56) return "#94A3B8";      // Z1 Recovery
+  if (pct < 76) return "#3B82F6";      // Z2 Endurance
+  if (pct < 88) return "#10B981";      // Z3 Tempo
+  if (pct < 95) return "#F59E0B";      // Sweet Spot
+  if (pct < 106) return "#F97316";     // Z4 Threshold
+  if (pct < 121) return "#EF4444";     // Z5 VO2 Max
+  return "#EC4899";                    // Z6/Z7 Anaerobic/Sprint
+}
+
+function _buildIntervalSparklineSvg(intervals) {
+  if (!Array.isArray(intervals) || intervals.length === 0) {
+    return `<svg viewBox="0 0 200 36" width="100%" height="36" preserveAspectRatio="none"><line x1="0" y1="32" x2="200" y2="32" stroke="rgba(148,163,184,0.35)" stroke-width="2"/></svg>`;
+  }
+  const segs = [];
+  let totalSec = 0;
+  intervals.forEach(item => {
+    const t = String(item.type || "SteadyState").toLowerCase();
+    if (t === "repeats" || t === "intervalblock" || t === "intervals") {
+      const rep = Math.max(1, parseInt(item.repeat || 1, 10));
+      const onD = Math.max(1, parseInt(item.on_duration_sec || 60, 10));
+      const offD = Math.max(1, parseInt(item.off_duration_sec || 60, 10));
+      const onP = Number(item.on_power_pct || 95);
+      const offP = Number(item.off_power_pct || 55);
+      for (let i = 0; i < rep; i++) {
+        segs.push({ dur: onD, p1: onP, p2: onP });
+        segs.push({ dur: offD, p1: offP, p2: offP });
+        totalSec += onD + offD;
+      }
+    } else if (t === "warmup" || t === "cooldown" || t === "ramp") {
+      const d = Math.max(1, parseInt(item.duration_sec || 300, 10));
+      segs.push({ dur: d, p1: Number(item.power_low_pct || 50), p2: Number(item.power_high_pct || 75) });
+      totalSec += d;
+    } else {
+      const d = Math.max(1, parseInt(item.duration_sec || 300, 10));
+      const p = Number(item.power_pct || 65);
+      segs.push({ dur: d, p1: p, p2: p });
+      totalSec += d;
+    }
+  });
+  if (totalSec <= 0) totalSec = 1;
+  const maxP = 140;
+  let x = 0;
+  const shapes = segs.map(s => {
+    const w = (s.dur / totalSec) * 200;
+    const h1 = Math.min(34, Math.max(3, (s.p1 / maxP) * 34));
+    const h2 = Math.min(34, Math.max(3, (s.p2 / maxP) * 34));
+    const y1 = 36 - h1;
+    const y2 = 36 - h2;
+    const avgP = (s.p1 + s.p2) / 2;
+    const col = _archiveZoneColor(avgP);
+    const pts = `${x.toFixed(2)},36 ${x.toFixed(2)},${y1.toFixed(2)} ${(x + w).toFixed(2)},${y2.toFixed(2)} ${(x + w).toFixed(2)},36`;
+    x += w;
+    return `<polygon points="${pts}" fill="${col}" fill-opacity="0.82"/>`;
+  }).join("");
+  return `<svg viewBox="0 0 200 36" width="100%" height="36" preserveAspectRatio="none">${shapes}</svg>`;
+}
+
+function drawArchiveEditorCanvas() {
+  const canvas = document.getElementById("archiveEditorCanvas");
+  if (!canvas || !archiveState.editingWorkout) return;
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(280, Math.round(rect.width || 380));
+  const height = 145;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, width, height);
+
+  const intervals = archiveState.editingWorkout.intervals || [];
+  const ftp = archiveState.ftp || 250;
+  const segs = [];
+  let totalSec = 0;
+  intervals.forEach(item => {
+    const t = String(item.type || "SteadyState").toLowerCase();
+    if (t === "repeats" || t === "intervalblock" || t === "intervals") {
+      const rep = Math.max(1, parseInt(item.repeat || 1, 10));
+      const onD = Math.max(1, parseInt(item.on_duration_sec || 60, 10));
+      const offD = Math.max(1, parseInt(item.off_duration_sec || 60, 10));
+      const onP = Number(item.on_power_pct || 95);
+      const offP = Number(item.off_power_pct || 55);
+      for (let i = 0; i < rep; i++) {
+        segs.push({ dur: onD, p1: onP, p2: onP });
+        segs.push({ dur: offD, p1: offP, p2: offP });
+        totalSec += onD + offD;
+      }
+    } else if (t === "warmup" || t === "cooldown" || t === "ramp") {
+      const d = Math.max(1, parseInt(item.duration_sec || 300, 10));
+      segs.push({ dur: d, p1: Number(item.power_low_pct || 50), p2: Number(item.power_high_pct || 75) });
+      totalSec += d;
+    } else {
+      const d = Math.max(1, parseInt(item.duration_sec || 300, 10));
+      const p = Number(item.power_pct || 65);
+      segs.push({ dur: d, p1: p, p2: p });
+      totalSec += d;
+    }
+  });
+
+  if (totalSec <= 0) return;
+
+  const padL = 6, padR = 6, padT = 14, padB = 18;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+  const maxPct = Math.max(125, ...segs.map(s => Math.max(s.p1, s.p2) + 10));
+
+  // FTP reference line
+  const ftpY = padT + plotH - (100 / maxPct) * plotH;
+  ctx.strokeStyle = "rgba(255, 94, 0, 0.45)";
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(padL, ftpY);
+  ctx.lineTo(padL + plotW, ftpY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = "rgba(255, 94, 0, 0.85)";
+  ctx.font = "600 10px Inter, sans-serif";
+  ctx.fillText(`FTP ${ftp}W`, padL + 4, Math.max(10, ftpY - 3));
+
+  let curX = padL;
+  segs.forEach(s => {
+    const segW = (s.dur / totalSec) * plotW;
+    const y1 = padT + plotH - (s.p1 / maxPct) * plotH;
+    const y2 = padT + plotH - (s.p2 / maxPct) * plotH;
+    const baseY = padT + plotH;
+    ctx.fillStyle = _archiveZoneColor((s.p1 + s.p2) / 2);
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.moveTo(curX, baseY);
+    ctx.lineTo(curX, y1);
+    ctx.lineTo(curX + segW, y2);
+    ctx.lineTo(curX + segW, baseY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+    curX += segW;
+  });
+
+  // Bottom time label
+  ctx.fillStyle = "rgba(100, 116, 139, 0.9)";
+  ctx.font = "600 10px Inter, sans-serif";
+  ctx.fillText("0m", padL, height - 4);
+  const totalMin = Math.round(totalSec / 60);
+  ctx.fillText(`${totalMin}m`, padL + plotW - 26, height - 4);
+}
+
+function _updateArchiveMetricsStrip(w) {
+  const durEl = document.getElementById("archiveMetricDur");
+  const npEl = document.getElementById("archiveMetricNP");
+  const ifEl = document.getElementById("archiveMetricIF");
+  const tssEl = document.getElementById("archiveMetricTSS");
+  const xssEl = document.getElementById("archiveMetricXSS");
+  if (durEl) durEl.textContent = `${w.duration_minutes || 0}m`;
+  if (npEl) npEl.textContent = w.normalized_power_watts ? `${w.normalized_power_watts} W` : "-- W";
+  if (ifEl) ifEl.textContent = w.intensity_factor ? Number(w.intensity_factor).toFixed(2) : "--";
+  if (tssEl) tssEl.textContent = w.estimated_tss != null ? `${w.estimated_tss}` : "--";
+  if (xssEl) xssEl.textContent = w.total_xss != null ? `${Math.round(w.total_xss)}` : "--";
+}
+
+async function previewArchiveEditor(options = {}) {
+  if (!archiveState.editingWorkout) return;
+  const w = archiveState.editingWorkout;
+  const titleInput = document.getElementById("archiveEditTitle");
+  const notesInput = document.getElementById("archiveEditNotes");
+  if (titleInput) w.title = titleInput.value.trim() || "Custom Workout";
+  if (notesInput) w.ai_rationale = notesInput.value.trim();
+
+  try {
+    const res = await fetch("/api/workouts/archive/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: w.title,
+        ai_rationale: w.ai_rationale || "",
+        intervals: w.intervals || [],
+        duration_minutes: options.duration_minutes || null,
+        intensity_adjust_pct: options.intensity_adjust_pct || 0
+      })
+    });
+    const data = await res.json();
+    if (data.success && data.workout) {
+      archiveState.ftp = data.ftp || archiveState.ftp;
+      w.intervals = data.workout.intervals;
+      w.duration_minutes = data.workout.duration_minutes;
+      w.normalized_power_watts = data.workout.normalized_power_watts;
+      w.intensity_factor = data.workout.intensity_factor;
+      w.estimated_tss = data.workout.estimated_tss;
+      w.total_xss = data.workout.total_xss;
+      w.low_xss = data.workout.low_xss;
+      w.high_xss = data.workout.high_xss;
+      w.peak_xss = data.workout.peak_xss;
+      w.zwo_content = data.workout.zwo_content;
+      w.intervals_icu_text = data.workout.intervals_icu_text;
+
+      const durInput = document.getElementById("archiveReconcileDur");
+      if (durInput && w.duration_minutes) durInput.value = w.duration_minutes;
+      _updateArchiveMetricsStrip(w);
+      drawArchiveEditorCanvas();
+      if (options.reRenderRows) renderArchiveEditorIntervals();
+    }
+  } catch (e) {
+    console.warn("Preview archive workout failed:", e);
+  }
+}
+
+function renderArchiveEditorIntervals() {
+  const container = document.getElementById("archiveIntervalRows");
+  if (!container || !archiveState.editingWorkout) return;
+  const intervals = archiveState.editingWorkout.intervals || [];
+  if (intervals.length === 0) {
+    container.innerHTML = `<div style="font-size:0.78rem;color:var(--text-muted);padding:0.5rem;">No intervals yet. Click "+ Add Step" to build your workout.</div>`;
+    return;
+  }
+
+  container.innerHTML = intervals.map((item, idx) => {
+    const segType = String(item.type || "SteadyState");
+    const lower = segType.toLowerCase();
+    let fieldsHtml = "";
+
+    if (lower === "repeats" || lower === "intervalblock" || lower === "intervals") {
+      fieldsHtml = `
+        <input type="number" title="Repeats" min="1" max="50" value="${item.repeat || 3}" data-idx="${idx}" data-field="repeat" style="width:46px;" />
+        <span style="font-size:0.7rem;color:var(--text-muted);">x</span>
+        <input type="number" title="On (sec)" min="5" max="3600" value="${item.on_duration_sec || 120}" data-idx="${idx}" data-field="on_duration_sec" style="width:54px;" />
+        <span style="font-size:0.7rem;color:var(--text-muted);">s @</span>
+        <input type="number" title="On % FTP" min="35" max="250" value="${item.on_power_pct || 95}" data-idx="${idx}" data-field="on_power_pct" style="width:48px;" />
+        <span style="font-size:0.7rem;color:var(--text-muted);">% /</span>
+        <input type="number" title="Off (sec)" min="5" max="3600" value="${item.off_duration_sec || 60}" data-idx="${idx}" data-field="off_duration_sec" style="width:54px;" />
+        <span style="font-size:0.7rem;color:var(--text-muted);">s @</span>
+        <input type="number" title="Off % FTP" min="35" max="150" value="${item.off_power_pct || 55}" data-idx="${idx}" data-field="off_power_pct" style="width:48px;" />%
+      `;
+    } else if (lower === "warmup" || lower === "cooldown" || lower === "ramp") {
+      const mins = Math.round((item.duration_sec || 300) / 60);
+      fieldsHtml = `
+        <input type="number" title="Minutes" min="1" max="180" value="${mins}" data-idx="${idx}" data-field="duration_min" style="width:48px;" />
+        <span style="font-size:0.7rem;color:var(--text-muted);">m</span>
+        <input type="number" title="Start % FTP" min="35" max="200" value="${item.power_low_pct || 50}" data-idx="${idx}" data-field="power_low_pct" style="width:48px;" />
+        <span style="font-size:0.7rem;color:var(--text-muted);">→</span>
+        <input type="number" title="End % FTP" min="35" max="200" value="${item.power_high_pct || 75}" data-idx="${idx}" data-field="power_high_pct" style="width:48px;" />%
+      `;
+    } else {
+      const mins = Math.round((item.duration_sec || 300) / 60);
+      fieldsHtml = `
+        <input type="number" title="Minutes" min="1" max="240" value="${mins}" data-idx="${idx}" data-field="duration_min" style="width:48px;" />
+        <span style="font-size:0.7rem;color:var(--text-muted);">m @</span>
+        <input type="number" title="% FTP" min="35" max="220" value="${item.power_pct || 75}" data-idx="${idx}" data-field="power_pct" style="width:50px;" />%
+      `;
+    }
+
+    return `
+      <div class="archive-interval-row">
+        <select data-idx="${idx}" data-field="type">
+          <option value="Warmup" ${lower === "warmup" ? "selected" : ""}>Warmup</option>
+          <option value="SteadyState" ${lower === "steadystate" ? "selected" : ""}>Steady</option>
+          <option value="Repeats" ${lower === "repeats" || lower === "intervalblock" || lower === "intervals" ? "selected" : ""}>Repeats</option>
+          <option value="Ramp" ${lower === "ramp" ? "selected" : ""}>Ramp</option>
+          <option value="Cooldown" ${lower === "cooldown" ? "selected" : ""}>Cooldown</option>
+        </select>
+        <div class="archive-interval-fields">
+          ${fieldsHtml}
+          <button type="button" class="btn btn-secondary btn-xs" data-action="up" data-idx="${idx}" title="Move Up">↑</button>
+          <button type="button" class="btn btn-secondary btn-xs" data-action="down" data-idx="${idx}" title="Move Down">↓</button>
+          <button type="button" class="btn btn-secondary btn-xs" data-action="remove" data-idx="${idx}" title="Delete Step">✕</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  container.querySelectorAll("select, input").forEach(el => {
+    el.addEventListener("change", () => {
+      const idx = parseInt(el.dataset.idx, 10);
+      const field = el.dataset.field;
+      const item = archiveState.editingWorkout.intervals[idx];
+      if (!item) return;
+
+      if (field === "type") {
+        const newT = el.value;
+        if (newT === "Repeats") {
+          archiveState.editingWorkout.intervals[idx] = {
+            type: "Repeats", repeat: 4, on_duration_sec: 120, off_duration_sec: 60, on_power_pct: 105, off_power_pct: 55, cadence: 95, name: "4x Intervals"
+          };
+        } else if (newT === "Warmup" || newT === "Cooldown" || newT === "Ramp") {
+          archiveState.editingWorkout.intervals[idx] = {
+            type: newT,
+            duration_sec: item.duration_sec || 300,
+            power_low_pct: newT === "Cooldown" ? 65 : 45,
+            power_high_pct: newT === "Cooldown" ? 40 : 75,
+            cadence: 88,
+            name: newT
+          };
+        } else {
+          archiveState.editingWorkout.intervals[idx] = {
+            type: "SteadyState",
+            duration_sec: item.duration_sec || 300,
+            power_pct: item.power_pct || 75,
+            cadence: 90,
+            name: "Steady Block"
+          };
+        }
+        renderArchiveEditorIntervals();
+        previewArchiveEditor();
+        return;
+      }
+
+      const val = Number(el.value);
+      if (field === "duration_min") {
+        item.duration_sec = Math.max(60, Math.round(val * 60));
+      } else {
+        item[field] = val;
+      }
+      previewArchiveEditor();
+    });
+  });
+
+  container.querySelectorAll("button[data-action]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = parseInt(btn.dataset.idx, 10);
+      const act = btn.dataset.action;
+      const arr = archiveState.editingWorkout.intervals;
+      if (act === "remove") {
+        arr.splice(idx, 1);
+      } else if (act === "up" && idx > 0) {
+        [arr[idx - 1], arr[idx]] = [arr[idx], arr[idx - 1]];
+      } else if (act === "down" && idx < arr.length - 1) {
+        [arr[idx + 1], arr[idx]] = [arr[idx], arr[idx + 1]];
+      }
+      renderArchiveEditorIntervals();
+      previewArchiveEditor();
+    });
+  });
+}
+
+function openArchiveEditor(workout) {
+  const clone = JSON.parse(JSON.stringify(workout));
+  archiveState.editingWorkout = clone;
+
+  const titleInput = document.getElementById("archiveEditTitle");
+  const dateInput = document.getElementById("archiveEditDate");
+  const notesInput = document.getElementById("archiveEditNotes");
+  const sourceLbl = document.getElementById("archiveEditorSourceLabel");
+  const durInput = document.getElementById("archiveReconcileDur");
+
+  if (titleInput) titleInput.value = clone.title || "Custom Workout";
+  if (dateInput) {
+    const todayIso = new Date().toISOString().slice(0, 10);
+    dateInput.value = (clone.date && clone.date.length >= 10) ? clone.date.slice(0, 10) : todayIso;
+  }
+  if (notesInput) notesInput.value = clone.ai_rationale || clone.description || "";
+  if (durInput) durInput.value = clone.duration_minutes || 60;
+  if (sourceLbl) {
+    sourceLbl.textContent = clone.source === "archive"
+      ? `Editing Archived Workout (${clone.date || "Saved"})`
+      : `Customizing Library Archetype (${clone.zone_label || "Template"})`;
+  }
+
+  _updateArchiveMetricsStrip(clone);
+  renderArchiveEditorIntervals();
+  drawArchiveEditorCanvas();
+  renderArchiveGrid();
+}
+
+function renderArchiveGrid() {
+  const grid = document.getElementById("archiveWorkoutsGrid");
+  if (!grid) return;
+
+  const q = (archiveState.search || "").trim().toLowerCase();
+  const filter = archiveState.filter || "all";
+
+  let items = [];
+  if (filter === "all") {
+    items = [...archiveState.priorWorkouts, ...archiveState.libraryWorkouts];
+  } else if (filter === "archive") {
+    items = [...archiveState.priorWorkouts];
+  } else {
+    items = archiveState.libraryWorkouts.filter(w => w.zone === filter);
+  }
+
+  if (q) {
+    items = items.filter(w => {
+      const hay = `${w.title || ""} ${w.focus_area || ""} ${w.zone_label || ""} ${w.ai_rationale || ""} ${w.date || ""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
+
+  const badgeEl = document.getElementById("archiveCountBadge");
+  if (badgeEl) {
+    badgeEl.textContent = `${archiveState.priorWorkouts.length} Archived • ${archiveState.libraryWorkouts.length} Library`;
+  }
+
+  if (items.length === 0) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">No matching workouts found. Try clearing your filter or click "+ New Custom Workout".</div>`;
+    return;
+  }
+
+  const selectedId = archiveState.editingWorkout ? archiveState.editingWorkout.id : null;
+
+  grid.innerHTML = items.map(w => {
+    const isArch = w.source === "archive";
+    const isSelected = selectedId && w.id === selectedId;
+    const badgeClass = (w.status === "scheduled" || w.pushed_to_zwift) ? "badge-zwift" : (isArch ? "badge-archive" : "");
+    const badgeText = (w.status === "scheduled" || w.pushed_to_zwift)
+      ? "🚀 Scheduled"
+      : (isArch ? `📦 Archived${w.date ? " • " + w.date : ""}` : `📚 ${w.zone_label || "Library"}`);
+    const spark = _buildIntervalSparklineSvg(w.intervals || []);
+    const safeTitle = (w.title || "Workout").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const safeFocus = (w.focus_area || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    return `
+      <div class="archive-workout-card ${isSelected ? "selected" : ""}" data-id="${w.id}" data-source="${w.source}">
+        <div class="archive-card-top">
+          <span class="archive-card-badge ${badgeClass}">${badgeText}</span>
+          ${isArch ? `<button type="button" class="btn btn-secondary btn-xs archive-card-del" data-del-id="${w.id}" title="Delete from Archive">🗑️</button>` : ""}
+        </div>
+        <div class="archive-card-title">${safeTitle}</div>
+        <div class="archive-card-sub">${safeFocus}</div>
+        <div class="archive-card-spark">${spark}</div>
+        <div class="archive-card-stats">
+          <span>⏱️ ${w.duration_minutes || 0}m</span>
+          <span>⚡ ${w.normalized_power_watts || "--"}W NP</span>
+          <span>🔥 ${w.estimated_tss || 0} TSS</span>
+          <span>🧬 ${Math.round(w.total_xss || 0)} XSS</span>
+        </div>
+        <div class="archive-card-actions">
+          <button type="button" class="btn btn-secondary btn-xs archive-btn-edit" style="flex:1;">✏️ Customize</button>
+          <button type="button" class="btn btn-primary btn-xs archive-btn-zwift" style="flex:1;background:linear-gradient(135deg,#0052FF,#FF5E00);border:none;">🚀 Send to Zwift</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  grid.querySelectorAll(".archive-workout-card").forEach(cardEl => {
+    const id = cardEl.dataset.id;
+    const src = cardEl.dataset.source;
+    const pool = src === "archive" ? archiveState.priorWorkouts : archiveState.libraryWorkouts;
+    const workoutObj = pool.find(x => x.id === id);
+    if (!workoutObj) return;
+
+    cardEl.addEventListener("click", (e) => {
+      if (e.target.closest(".archive-card-del") || e.target.closest(".archive-btn-zwift")) return;
+      openArchiveEditor(workoutObj);
+    });
+
+    cardEl.querySelector(".archive-btn-zwift")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = "⏳ Sending...";
+      await pushArchiveWorkoutToZwift({
+        workout_id: src === "archive" ? workoutObj.id : null,
+        archetype_id: src === "library" ? workoutObj.archetype_id : null,
+        workout: workoutObj
+      });
+      btn.disabled = false;
+      btn.textContent = "🚀 Send to Zwift";
+    });
+
+    cardEl.querySelector(".archive-card-del")?.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await deleteArchiveWorkout(id);
+    });
+  });
+}
+
+async function loadWorkoutArchive() {
+  try {
+    const url = `/api/workouts/archive?duration_min=${encodeURIComponent(archiveState.libraryDuration || 60)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.success) {
+      archiveState.ftp = data.ftp || 250;
+      archiveState.priorWorkouts = data.prior_workouts || [];
+      archiveState.libraryWorkouts = data.library_workouts || [];
+      renderArchiveGrid();
+      if (!archiveState.editingWorkout && (archiveState.priorWorkouts.length > 0 || archiveState.libraryWorkouts.length > 0)) {
+        openArchiveEditor(archiveState.priorWorkouts[0] || archiveState.libraryWorkouts[0]);
+      }
+    }
+  } catch (e) {
+    console.warn("Could not load workout archive:", e);
+  }
+}
+
+async function saveArchiveEditorWorkout() {
+  if (!archiveState.editingWorkout) return;
+  const w = archiveState.editingWorkout;
+  const titleInput = document.getElementById("archiveEditTitle");
+  const dateInput = document.getElementById("archiveEditDate");
+  const notesInput = document.getElementById("archiveEditNotes");
+
+  const payload = {
+    id: w.id || null,
+    title: (titleInput?.value || w.title || "Custom Workout").trim(),
+    description: (notesInput?.value || w.description || "").trim(),
+    focus_area: w.focus_area || "Custom",
+    ai_rationale: (notesInput?.value || w.ai_rationale || "").trim(),
+    date: dateInput?.value || new Date().toISOString().slice(0, 10),
+    status: "archived",
+    intervals: w.intervals || []
+  };
+
+  const btn = document.getElementById("btnArchiveSave");
+  if (btn) { btn.disabled = true; btn.textContent = "⏳ Saving..."; }
+  try {
+    const res = await fetch("/api/workouts/archive/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (data.success && data.workout) {
+      showToast(`💾 Saved '${data.workout.title}' to Workout Archive!`);
+      archiveState.editingWorkout = data.workout;
+      await loadWorkoutArchive();
+      openArchiveEditor(data.workout);
+    } else {
+      showToast(`⚠️ ${data.detail || data.error || "Could not save workout."}`);
+    }
+  } catch (e) {
+    showToast("⚠️ Error saving workout to archive.");
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "💾 Save to Archive"; }
+  }
+}
+
+async function pushArchiveWorkoutToZwift(payload) {
+  const dateInput = document.getElementById("archiveEditDate");
+  const targetDate = payload.target_date || dateInput?.value || new Date().toISOString().slice(0, 10);
+  try {
+    const res = await fetch("/api/workouts/archive/push-zwift", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workout_id: payload.workout_id || null,
+        archetype_id: payload.archetype_id || null,
+        workout: payload.workout || null,
+        target_date: targetDate,
+        save_to_archive: true
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`🚀 Sent '${data.workout?.title || "Workout"}' to Zwift for ${targetDate}!`);
+      await loadWorkoutArchive();
+      if (typeof loadWorkout === "function") loadWorkout();
+    } else {
+      showToast(`⚠️ ${data.error || data.detail || "Could not sync to Zwift."}`);
+      if ((data.error || "").toLowerCase().includes("api key")) {
+        openSettingsModal();
+      }
+    }
+  } catch (e) {
+    showToast("⚠️ Network error sending workout to Zwift.");
+  }
+}
+
+async function deleteArchiveWorkout(workoutId) {
+  try {
+    const res = await fetch(`/api/workouts/archive/${encodeURIComponent(workoutId)}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data.success) {
+      showToast("🗑️ Deleted workout from Archive.");
+      if (archiveState.editingWorkout && archiveState.editingWorkout.id === workoutId) {
+        archiveState.editingWorkout = null;
+      }
+      await loadWorkoutArchive();
+    }
+  } catch (e) {
+    showToast("⚠️ Could not delete workout.");
+  }
+}
+
+async function downloadArchiveZwo() {
+  if (!archiveState.editingWorkout) return;
+  const w = archiveState.editingWorkout;
+  const titleInput = document.getElementById("archiveEditTitle");
+  try {
+    const res = await fetch("/api/workouts/archive/download-zwo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        title: titleInput?.value || w.title || "PowerSync_Workout",
+        ai_rationale: w.ai_rationale || "",
+        intervals: w.intervals || []
+      })
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(titleInput?.value || w.title || "PowerSync_Workout").replace(/\s+/g, "_")}.zwo`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    showToast("⚠️ Failed to download .zwo file.");
+  }
+}
+
+function initWorkoutArchive() {
+  if (archiveState.initialized) return;
+  archiveState.initialized = true;
+
+  const searchEl = document.getElementById("archiveSearchInput");
+  searchEl?.addEventListener("input", () => {
+    archiveState.search = searchEl.value;
+    renderArchiveGrid();
+  });
+
+  const durSel = document.getElementById("archiveLibraryDuration");
+  durSel?.addEventListener("change", () => {
+    archiveState.libraryDuration = parseInt(durSel.value || "60", 10);
+    loadWorkoutArchive();
+  });
+
+  document.querySelectorAll("#archiveFilterPills .archive-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll("#archiveFilterPills .archive-pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      archiveState.filter = pill.dataset.filter || "all";
+      renderArchiveGrid();
+    });
+  });
+
+  document.getElementById("btnArchiveNewWorkout")?.addEventListener("click", () => {
+    openArchiveEditor({
+      id: null,
+      title: "Custom Interval Session",
+      focus_area: "Custom",
+      duration_minutes: 45,
+      ai_rationale: "Custom workout built in PowerSync Workout Archive.",
+      source: "archive",
+      intervals: [
+        { type: "Warmup", duration_sec: 420, power_low_pct: 45, power_high_pct: 75, cadence: 88, name: "Progressive Warmup Ramp" },
+        { type: "SteadyState", duration_sec: 900, power_pct: 88, cadence: 90, name: "Sweet Spot Block" },
+        { type: "SteadyState", duration_sec: 180, power_pct: 55, cadence: 85, name: "Recovery Spin" },
+        { type: "SteadyState", duration_sec: 900, power_pct: 90, cadence: 92, name: "Sweet Spot Block 2" },
+        { type: "Cooldown", duration_sec: 300, power_low_pct: 65, power_high_pct: 40, cadence: 82, name: "Progressive Cooldown Ramp" }
+      ]
+    });
+    previewArchiveEditor();
+  });
+
+  document.getElementById("btnArchiveAddInterval")?.addEventListener("click", () => {
+    if (!archiveState.editingWorkout) return;
+    archiveState.editingWorkout.intervals.push({
+      type: "SteadyState",
+      duration_sec: 300,
+      power_pct: 85,
+      cadence: 90,
+      name: "Custom Block"
+    });
+    renderArchiveEditorIntervals();
+    previewArchiveEditor();
+  });
+
+  document.querySelectorAll(".archive-scale-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const delta = parseInt(btn.dataset.delta || "0", 10);
+      previewArchiveEditor({ intensity_adjust_pct: delta, reRenderRows: true });
+    });
+  });
+
+  document.getElementById("btnArchiveApplyDur")?.addEventListener("click", () => {
+    const durVal = parseInt(document.getElementById("archiveReconcileDur")?.value || "60", 10);
+    if (durVal >= 15) {
+      previewArchiveEditor({ duration_minutes: durVal, reRenderRows: true });
+    }
+  });
+
+  document.getElementById("btnArchiveSave")?.addEventListener("click", saveArchiveEditorWorkout);
+  document.getElementById("btnArchiveDownloadZwo")?.addEventListener("click", downloadArchiveZwo);
+  document.getElementById("btnArchivePushZwift")?.addEventListener("click", async () => {
+    if (!archiveState.editingWorkout) return;
+    const btn = document.getElementById("btnArchivePushZwift");
+    const titleInput = document.getElementById("archiveEditTitle");
+    const notesInput = document.getElementById("archiveEditNotes");
+    archiveState.editingWorkout.title = titleInput?.value?.trim() || archiveState.editingWorkout.title;
+    archiveState.editingWorkout.ai_rationale = notesInput?.value?.trim() || archiveState.editingWorkout.ai_rationale;
+    if (btn) { btn.disabled = true; btn.textContent = "⏳ Sending..."; }
+    await pushArchiveWorkoutToZwift({ workout: archiveState.editingWorkout });
+    if (btn) { btn.disabled = false; btn.textContent = "🚀 Send to Zwift"; }
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initWorkoutArchive);
+} else {
+  initWorkoutArchive();
+}
+
 

@@ -273,6 +273,9 @@ def build_system_prompt(snapshot: Dict[str, Any], memory: Optional[Dict[str, Any
         "- `get_strava_activity_streams_and_power_curve(activity_id)`: Calculates his peak power profile (5s, 1m, 5m, 20m watts), interval power decay, and aerobic decoupling (cardiac drift) from second-by-second telemetry.\n"
         "- `search_strava_activities(query, sport_type, days_back)`: Searches his historical rides by keywords or sport.\n"
         "- `get_whoop_biometrics_timeline(days)`: Retrieves multi-day Whoop recovery, HRV, and sleep trends.\n"
+        "- `search_workout_archive_and_library(query, zone, source, duration_min)`: Searches Adam's saved/prior Workout Archive and the 19-workout structured Coach Library.\n"
+        "- `customize_and_save_workout(workout_id, archetype_id, query, new_title, duration_min, intensity_adjust_pct, notes)`: Clones or edits a workout from the Archive or Library, adjusts duration or intensity %, recalculates NP/IF/TSS/XSS, and saves it to the Workout Archive.\n"
+        "- `send_workout_to_zwift(workout_id, archetype_id, query, target_date, duration_min, intensity_adjust_pct)`: Sends a specific workout from the Archive or Library directly to Zwift via Intervals.icu (with optional duration/intensity adjustment).\n"
         "Always use these tools to inspect real numbers and provide high-fidelity coaching advice based on actual data rather than speculating."
         + _format_memory_prompt_block(memory)
     )

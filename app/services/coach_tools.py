@@ -140,6 +140,112 @@ COACH_TOOL_DECLARATIONS = [
             },
             "required": ["goal_type", "target_key"]
         }
+    },
+    {
+        "name": "search_workout_archive_and_library",
+        "description": (
+            "Searches both the athlete's saved/prior Workout Archive and the 19-workout structured Coach Library "
+            "(Sweet Spot, Tempo, VO2 Max, Endurance Base, Express). Use this when the athlete asks what workouts are "
+            "available in their library or archive, wants to revisit a past workout, or wants to pick a specific workout to send to Zwift."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "query": {
+                    "type": "STRING",
+                    "description": "Optional keyword to filter by title or focus (e.g. 'criss-cross', 'over-under', '40/20', 'ladder')."
+                },
+                "zone": {
+                    "type": "STRING",
+                    "description": "Optional zone filter: 'all', 'sweet_spot', 'tempo', 'vo2_max', 'endurance_base', 'express'."
+                },
+                "source": {
+                    "type": "STRING",
+                    "description": "'all' (default), 'archive' (prior/saved workouts only), or 'library' (coach archetypes only)."
+                },
+                "duration_min": {
+                    "type": "INTEGER",
+                    "description": "Optional target duration in minutes for library previews (default 60)."
+                }
+            }
+        }
+    },
+    {
+        "name": "customize_and_save_workout",
+        "description": (
+            "Loads a workout from the Coach Library or the athlete's Archive (or uses custom intervals), "
+            "customizes its duration, intensity (% scale), title, or notes, recalculates Coggan NP/IF/TSS and 3-tier XSS, "
+            "and saves it to the athlete's Workout Archive."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "workout_id": {
+                    "type": "STRING",
+                    "description": "Existing archive workout ID (optional)."
+                },
+                "archetype_id": {
+                    "type": "STRING",
+                    "description": "Coach library archetype ID (e.g. 'sst_criss_cross', 'vo2_microbursts_40_20', 'tempo_cadence_ladders')."
+                },
+                "query": {
+                    "type": "STRING",
+                    "description": "Fuzzy title search if exact ID is not known."
+                },
+                "new_title": {
+                    "type": "STRING",
+                    "description": "Optional new title for the customized workout."
+                },
+                "duration_min": {
+                    "type": "INTEGER",
+                    "description": "Optional target duration in minutes (e.g. 45, 60, 75, 90)."
+                },
+                "intensity_adjust_pct": {
+                    "type": "INTEGER",
+                    "description": "Optional percentage to scale all interval power targets (e.g. -5 for 5% easier, +5 for 5% harder)."
+                },
+                "notes": {
+                    "type": "STRING",
+                    "description": "Optional custom rationale or coaching notes."
+                }
+            }
+        }
+    },
+    {
+        "name": "send_workout_to_zwift",
+        "description": (
+            "Sends a specific workout from the athlete's Archive or the Coach Library directly to Zwift via Intervals.icu "
+            "for a target date (default today). Can also adjust duration or intensity (%) before sending."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "workout_id": {
+                    "type": "STRING",
+                    "description": "Archive workout ID to send (optional)."
+                },
+                "archetype_id": {
+                    "type": "STRING",
+                    "description": "Library archetype ID to send (e.g. 'sst_over_under', 'vo2_30_30')."
+                },
+                "query": {
+                    "type": "STRING",
+                    "description": "Workout title or keyword if exact ID is not known."
+                },
+                "target_date": {
+                    "type": "STRING",
+                    "description": "ISO date YYYY-MM-DD (defaults to today in athlete timezone)."
+                },
+                "duration_min": {
+                    "type": "INTEGER",
+                    "description": "Optional target duration in minutes to scale/reconcile before sending."
+                },
+                "intensity_adjust_pct": {
+                    "type": "INTEGER",
+                    "description": "Optional intensity scaling percentage (e.g. -5 or +5) before sending."
+                }
+            }
+        }
     }
 ]
 
@@ -520,6 +626,227 @@ def tool_get_whoop_biometrics_timeline(days: int = 7, user_id: Optional[str] = N
         "tool_summary": f"Retrieved {len(timeline)} days of Whoop biometric recovery history"
     }
 
+
+def tool_search_workout_archive_and_library(
+    query: str = "",
+    zone: str = "all",
+    source: str = "all",
+    duration_min: int = 60,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Searches the athlete's saved Workout Archive and the structured Coach Library."""
+    uid = user_id or get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    from app.services.workout_archive_service import (
+        get_archived_workouts,
+        get_workout_library,
+    )
+
+    src = (source or "all").strip().lower()
+    archived_items = []
+    library_items = []
+
+    if src in ("all", "archive"):
+        for w in get_archived_workouts(user_id=uid, ftp=ftp, query=query)[:15]:
+            archived_items.append({
+                "id": w.get("id"),
+                "title": w.get("title"),
+                "date": w.get("date"),
+                "status": w.get("status"),
+                "focus_area": w.get("focus_area"),
+                "duration_minutes": w.get("duration_minutes"),
+                "estimated_tss": w.get("estimated_tss"),
+                "normalized_power_watts": w.get("normalized_power_watts"),
+                "total_xss": w.get("total_xss"),
+                "source": "archive",
+            })
+
+    if src in ("all", "library"):
+        for w in get_workout_library(ftp=ftp, duration_min=duration_min, zone_filter=zone, query=query):
+            library_items.append({
+                "id": w.get("id"),
+                "archetype_id": w.get("archetype_id"),
+                "title": w.get("title"),
+                "zone": w.get("zone"),
+                "zone_label": w.get("zone_label"),
+                "focus_area": w.get("focus_area"),
+                "duration_minutes": w.get("duration_minutes"),
+                "estimated_tss": w.get("estimated_tss"),
+                "normalized_power_watts": w.get("normalized_power_watts"),
+                "total_xss": w.get("total_xss"),
+                "source": "library",
+            })
+
+    return {
+        "ftp": ftp,
+        "archive_count": len(archived_items),
+        "library_count": len(library_items),
+        "archive_workouts": archived_items,
+        "library_workouts": library_items,
+        "tool_summary": f"Found {len(archived_items)} archived workouts and {len(library_items)} library archetypes",
+    }
+
+
+def tool_customize_and_save_workout(
+    workout_id: Optional[str] = None,
+    archetype_id: Optional[str] = None,
+    query: Optional[str] = None,
+    new_title: Optional[str] = None,
+    duration_min: Optional[int] = None,
+    intensity_adjust_pct: int = 0,
+    notes: Optional[str] = None,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Loads a workout from archive or library, customizes it, and saves to the user's archive."""
+    uid = user_id or get_current_user_id()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    from app.services.workout_archive_service import (
+        adjust_workout_structure,
+        resolve_workout_by_identifier,
+        save_custom_workout,
+    )
+
+    target_dur = int(duration_min) if duration_min else 60
+    base = resolve_workout_by_identifier(
+        workout_id=workout_id,
+        archetype_id=archetype_id,
+        query=query,
+        duration_min=target_dur,
+        ftp=ftp,
+        user_id=uid,
+    )
+    if not base:
+        return {
+            "success": False,
+            "error": "Could not find a matching workout in your Archive or Library.",
+            "tool_summary": "Workout not found for customization",
+        }
+
+    customized = adjust_workout_structure(
+        base,
+        target_duration_min=duration_min,
+        intensity_adjust_pct=int(intensity_adjust_pct or 0),
+        ftp=ftp,
+    )
+    if new_title and new_title.strip():
+        customized["title"] = new_title.strip()
+    if notes and notes.strip():
+        customized["ai_rationale"] = notes.strip()
+        customized["description"] = notes.strip()
+    # Force minting a new custom archive ID when cloning from library
+    if str(customized.get("id", "")).startswith("lib_"):
+        customized["id"] = ""
+    customized["status"] = "archived"
+
+    saved = save_custom_workout(customized, user_id=uid, ftp=ftp)
+    return {
+        "success": True,
+        "workout": {
+            "id": saved["id"],
+            "title": saved["title"],
+            "duration_minutes": saved["duration_minutes"],
+            "estimated_tss": saved["estimated_tss"],
+            "normalized_power_watts": saved.get("normalized_power_watts"),
+            "intensity_factor": saved.get("intensity_factor"),
+            "total_xss": saved.get("total_xss"),
+            "date": saved.get("date"),
+        },
+        "tool_summary": f"Customized and saved '{saved['title']}' ({saved['duration_minutes']}m, {saved['estimated_tss']} TSS) to Workout Archive",
+    }
+
+
+def tool_send_workout_to_zwift(
+    workout_id: Optional[str] = None,
+    archetype_id: Optional[str] = None,
+    query: Optional[str] = None,
+    target_date: Optional[str] = None,
+    duration_min: Optional[int] = None,
+    intensity_adjust_pct: int = 0,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Resolves a workout from archive/library, optionally adjusts it, and pushes it to Zwift via Intervals.icu."""
+    uid = user_id or get_current_user_id()
+    athlete_id = get_setting("intervals_athlete_id", "", user_id=uid)
+    api_key = get_setting("intervals_icu_api_key", "", user_id=uid)
+    if not athlete_id or not api_key or "•" in api_key or "\u2022" in api_key:
+        return {
+            "success": False,
+            "error": "Intervals.icu API Key is not configured. Open Settings (⚙️) to add your Intervals.icu Athlete ID and API Key.",
+            "tool_summary": "Zwift push blocked: Intervals.icu credentials not configured",
+        }
+
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    from app.services.workout_archive_service import (
+        adjust_workout_structure,
+        resolve_workout_by_identifier,
+        save_custom_workout,
+    )
+    from app.services.zwift_service import push_to_intervals_icu
+
+    target_dur = int(duration_min) if duration_min else 60
+    base = resolve_workout_by_identifier(
+        workout_id=workout_id,
+        archetype_id=archetype_id,
+        query=query,
+        duration_min=target_dur,
+        ftp=ftp,
+        user_id=uid,
+    )
+    if not base:
+        return {
+            "success": False,
+            "error": "Could not find a matching workout in your Archive or Library.",
+            "tool_summary": "Workout not found for Zwift push",
+        }
+
+    if duration_min or (intensity_adjust_pct and intensity_adjust_pct != 0):
+        workout = adjust_workout_structure(
+            base,
+            target_duration_min=duration_min,
+            intensity_adjust_pct=int(intensity_adjust_pct or 0),
+            ftp=ftp,
+        )
+    else:
+        workout = base
+
+    push_date = target_date or get_athlete_date(uid).isoformat()
+    res = push_to_intervals_icu(athlete_id, api_key, workout, push_date, ftp=ftp)
+    if res.get("success"):
+        workout["pushed_to_zwift"] = True
+        workout["synced_to_zwift"] = True
+        workout["badge"] = "🚀 Sent to Zwift"
+        workout["badge_color"] = "cyan"
+        workout["date"] = push_date
+        workout["status"] = "scheduled"
+        saved = save_custom_workout(workout, user_id=uid, ftp=ftp)
+
+        today_iso = get_athlete_date(uid).isoformat()
+        if push_date == today_iso:
+            from app.routers.workouts import USER_OPTIONS_CACHE, USER_WORKOUT_CACHE
+            wc = USER_WORKOUT_CACHE.setdefault(uid, {})
+            oc = USER_OPTIONS_CACHE.setdefault(uid, {})
+            wc.clear()
+            wc.update(saved)
+            oc[saved["id"]] = saved
+
+        return {
+            "success": True,
+            "date": push_date,
+            "workout_id": saved["id"],
+            "title": saved["title"],
+            "duration_minutes": saved["duration_minutes"],
+            "estimated_tss": saved["estimated_tss"],
+            "message": res.get("message"),
+            "tool_summary": f"Sent '{saved['title']}' ({saved['duration_minutes']}m, {saved['estimated_tss']} TSS) to Zwift for {push_date}",
+        }
+
+    return {
+        "success": False,
+        "error": res.get("error", "Failed to push workout to Zwift."),
+        "tool_summary": f"Zwift push failed: {res.get('error', 'Unknown error')}",
+    }
+
+
 def execute_coach_tool(name: str, args: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
     """Dispatcher executing Gemini tool calls."""
     uid = user_id or get_current_user_id()
@@ -557,5 +884,34 @@ def execute_coach_tool(name: str, args: Dict[str, Any], user_id: Optional[str] =
             "progress_pct": prof.get("active_goal", {}).get("progress_pct", 0.0),
             "tool_summary": f"Configured active spiderweb training goal: {g.get('target_title')}"
         }
+    elif name == "search_workout_archive_and_library":
+        return tool_search_workout_archive_and_library(
+            query=args.get("query", ""),
+            zone=args.get("zone", "all"),
+            source=args.get("source", "all"),
+            duration_min=int(args.get("duration_min") or 60),
+            user_id=uid,
+        )
+    elif name == "customize_and_save_workout":
+        return tool_customize_and_save_workout(
+            workout_id=args.get("workout_id"),
+            archetype_id=args.get("archetype_id"),
+            query=args.get("query"),
+            new_title=args.get("new_title"),
+            duration_min=args.get("duration_min"),
+            intensity_adjust_pct=int(args.get("intensity_adjust_pct") or 0),
+            notes=args.get("notes"),
+            user_id=uid,
+        )
+    elif name == "send_workout_to_zwift":
+        return tool_send_workout_to_zwift(
+            workout_id=args.get("workout_id"),
+            archetype_id=args.get("archetype_id"),
+            query=args.get("query"),
+            target_date=args.get("target_date"),
+            duration_min=args.get("duration_min"),
+            intensity_adjust_pct=int(args.get("intensity_adjust_pct") or 0),
+            user_id=uid,
+        )
     else:
         return {"error": f"Unknown tool '{name}'", "tool_summary": f"Unknown tool '{name}'"}
