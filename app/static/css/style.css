@@ -2368,8 +2368,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   letter-spacing: 0.04em;
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.3rem;
   width: fit-content;
+  max-width: 100%;
+}
+
+.workout-option-card.active .workout-option-badge {
+  padding-right: 4.6rem;
 }
 
 .workout-option-title {

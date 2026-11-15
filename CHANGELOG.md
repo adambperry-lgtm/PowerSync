@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.9.9] - 2026-11-15
+### Fixed
+- **Workout Option Card Active Badge Overlap**:
+  - Added `padding-right: 4.6rem` and `flex-wrap: wrap` to `.workout-option-card.active .workout-option-badge` in `app/static/css/style.css` so long phenotype/target labels (e.g., `ROULEUR / TT SPECIALIST TARGET`) wrap cleanly without overlapping the `✓ Active` pill.
+
 ## [2.9.8] - 2026-11-15
 ### Fixed
 - **Desktop 3-Column Telemetry Card Title Squeezing**:

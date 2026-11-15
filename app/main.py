@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.9.8",
-        "release_name": "Desktop & Mobile Telemetry Header Fix",
+        "version": "2.9.9",
+        "release_name": "Workout Option Badge Overlap Fix",
         "build_date": "2026-11-15",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.9.9",
+                "date": "2026-11-15",
+                "title": "Workout Option Badge Overlap Fix",
+                "items": [
+                    "Workout Option Card Active Pill: Added right-side clearance on .workout-option-card.active .workout-option-badge so long target labels wrap cleanly instead of overlapping the ✓ Active pill."
+                ]
+            },
             {
                 "version": "v2.9.8",
                 "date": "2026-11-15",
