@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.3] - 2026-11-16
+### Fixed
+- **iPhone 3-Tab View Switcher Clipping**:
+  - Updated `.main-view-tabs-container` and `.main-view-tab-btn` inside `@media (max-width: 640px)` in `app/static/css/style.css` (`width: 100%`, `min-width: 0`, `font-size: 0.67rem`, compact padding/icon sizing) so all three tabs (**Daily Training**, **Long-Term Analysis**, **Workout Archive**) fit cleanly within 375px–430px iPhone viewports without clipping off either side.
+  - Bumped `style.css?v=68` in `app/static/index.html`.
+
 ## [2.11.2] - 2026-11-16
 ### Removed
 - **Monthly Mini-Spiderweb Cards**:

@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.2",
-        "release_name": "Streamlined Power Curve Progression",
+        "version": "2.11.3",
+        "release_name": "iPhone Tab Switcher Fit Fix",
         "build_date": "2026-11-16",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.3",
+                "date": "2026-11-16",
+                "title": "iPhone Tab Switcher Fit Fix",
+                "items": [
+                    "iPhone 3-Tab Navbar Fit: Scaled .main-view-tabs-container and .main-view-tab-btn on mobile (<=640px) so Daily Training, Long-Term Analysis, and Workout Archive all fit cleanly inside iPhone viewports without left/right clipping.",
+                    "Asset Cache Busting: Bumped style.css?v=68."
+                ]
+            },
             {
                 "version": "v2.11.2",
                 "date": "2026-11-16",
