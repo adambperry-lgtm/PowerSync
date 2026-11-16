@@ -3,6 +3,15 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.0] - 2026-11-16
+### Added
+- **All-Time Paginated Strava History Backfill & Background Sync**:
+  - Added `sync_all_strava_activities()`, `get_strava_sync_status()`, and `trigger_strava_full_backfill_async()` in `app/services/strava_service.py` to paginate through `/athlete/activities?per_page=200&page=N` across an athlete's full Strava history, with per-user incremental sync watermarks (`strava_backfill_complete`, `strava_last_synced_epoch`), 401 token refresh, and 429 rate-limit handling.
+  - Scheduled automatic background all-time backfill on Strava OAuth connection (`app/routers/auth.py`) and on first Power Spiderweb load for existing connected accounts (`app/services/power_profile_service.py`).
+  - Added `POST /api/auth/sync/strava/full` and `GET /api/auth/sync/strava/status` endpoints in `app/routers/auth.py`.
+  - Added a **🔄 Sync All-Time** button (`#btnSyncStravaFull`) in the Power Spiderweb header (`app/static/index.html`) with live progress polling and automatic Spiderweb refresh (`app/static/js/app.js`).
+  - Bumped `app.js?v=123` in `app/static/index.html`.
+
 ## [2.10.2] - 2026-11-16
 ### Changed
 - **Power Spiderweb Graphic & Label Readability**:

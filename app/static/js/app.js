@@ -2806,6 +2806,62 @@ document.getElementById("btnSyncStrava").addEventListener("click", async () => {
   }
 });
 
+// Sync All-Time Strava History (paginated background backfill)
+const btnSyncStravaFull = document.getElementById("btnSyncStravaFull");
+if (btnSyncStravaFull) {
+  let stravaFullPollTimer = null;
+  const pollStravaFullStatus = async () => {
+    try {
+      const sRes = await fetch("/api/auth/sync/strava/status");
+      const sData = await sRes.json();
+      if (sData.in_progress) {
+        btnSyncStravaFull.textContent = `🔄 Syncing (${sData.activities_synced || 0})...`;
+        btnSyncStravaFull.disabled = true;
+        stravaFullPollTimer = setTimeout(pollStravaFullStatus, 1500);
+        return;
+      }
+      btnSyncStravaFull.textContent = "🔄 Sync All-Time";
+      btnSyncStravaFull.disabled = false;
+      if (sData.error) {
+        showToast(`⚠️ Strava all-time sync: ${sData.error}`);
+      } else {
+        showToast(`✅ All-time Strava sync complete (${sData.total_stored_activities || 0} total activities)!`);
+      }
+      if (typeof loadPowerSpiderweb === "function") {
+        await loadPowerSpiderweb(typeof currentSpiderwebTimeframe !== "undefined" ? currentSpiderwebTimeframe : "30d");
+      }
+      if (typeof loadDashboard === "function") {
+        await loadDashboard();
+      }
+    } catch (_) {
+      btnSyncStravaFull.textContent = "🔄 Sync All-Time";
+      btnSyncStravaFull.disabled = false;
+    }
+  };
+
+  btnSyncStravaFull.addEventListener("click", async () => {
+    if (stravaFullPollTimer) clearTimeout(stravaFullPollTimer);
+    btnSyncStravaFull.textContent = "🔄 Starting...";
+    btnSyncStravaFull.disabled = true;
+    try {
+      const res = await fetch("/api/auth/sync/strava/full", { method: "POST" });
+      const data = await res.json();
+      if (!data.success) {
+        showToast(`⚠️ ${data.error || "Unable to start all-time Strava sync"}`);
+        btnSyncStravaFull.textContent = "🔄 Sync All-Time";
+        btnSyncStravaFull.disabled = false;
+        return;
+      }
+      showToast("🔄 Syncing all-time Strava history in background...");
+      stravaFullPollTimer = setTimeout(pollStravaFullStatus, 1200);
+    } catch (err) {
+      showToast("⚠️ Failed to start all-time sync: " + (err.message || "Network error"));
+      btnSyncStravaFull.textContent = "🔄 Sync All-Time";
+      btnSyncStravaFull.disabled = false;
+    }
+  });
+}
+
 // Sync Whoop manually
 const btnSyncWhoop = document.getElementById("btnSyncWhoop");
 if (btnSyncWhoop) {

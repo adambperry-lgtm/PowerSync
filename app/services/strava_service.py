@@ -1,4 +1,6 @@
 import json
+import time
+import threading
 import requests
 import datetime
 from typing import Dict, Any, List, Optional
@@ -59,6 +61,89 @@ def refresh_strava_token(user_id: Optional[str] = None) -> Optional[str]:
         return new_tokens.get("access_token")
     return None
 
+def _upsert_strava_activities(activities: List[Dict[str, Any]], uid: str) -> List[Dict[str, Any]]:
+    """Upserts a batch of Strava API activity payloads into strava_activities scoped by user_id."""
+    if not activities:
+        return []
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    saved = []
+
+    # Auto-calibrate athlete timezone from Strava activity if not yet explicitly customized
+    current_saved_tz = get_setting("athlete_timezone", default=None, user_id=uid)
+    if not current_saved_tz:
+        for act in activities:
+            raw_tz = act.get("timezone")
+            if raw_tz and isinstance(raw_tz, str) and ")" in raw_tz:
+                tz_candidate = raw_tz.split(")")[-1].strip()
+                try:
+                    import zoneinfo
+                    zoneinfo.ZoneInfo(tz_candidate)
+                    set_setting("athlete_timezone", tz_candidate, user_id=uid)
+                    if uid == "usr_guest":
+                        set_setting("athlete_timezone", tz_candidate, user_id="usr_default")
+                    break
+                except Exception:
+                    pass
+
+    for a in activities:
+        act_id = str(a.get("id"))
+        name = a.get("name", "Activity")
+        sport = a.get("sport_type") or a.get("type", "Ride")
+        start_date = resolve_strava_local_start(a, user_id=uid) or a.get("start_date", "")
+        moving_time = a.get("moving_time", 0)
+        dist = a.get("distance", 0.0)
+        elev = a.get("total_elevation_gain", 0.0)
+        watts = a.get("average_watts", 0.0)
+        w_watts = a.get("weighted_average_watts", 0.0)
+        hr = a.get("average_heartrate", 0.0)
+        max_hr = a.get("max_heartrate", 0.0)
+        suffer = a.get("suffer_score", 0.0)
+        kj = a.get("kilojoules", 0.0)
+
+        c.execute("""
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec, distance_meters,
+                total_elevation_gain, average_watts, weighted_average_watts,
+                average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, id) DO UPDATE SET
+                start_date = excluded.start_date,
+                name = excluded.name,
+                sport_type = excluded.sport_type,
+                moving_time_sec = excluded.moving_time_sec,
+                distance_meters = excluded.distance_meters,
+                total_elevation_gain = excluded.total_elevation_gain,
+                average_watts = excluded.average_watts,
+                weighted_average_watts = excluded.weighted_average_watts,
+                average_heartrate = excluded.average_heartrate,
+                max_heartrate = excluded.max_heartrate,
+                suffer_score = excluded.suffer_score,
+                kilojoules = excluded.kilojoules,
+                raw_json = excluded.raw_json
+        """, (uid, act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, json.dumps(a)))
+
+        saved.append({
+            "id": act_id,
+            "name": name,
+            "sport_type": sport,
+            "start_date": start_date,
+            "moving_time_sec": moving_time,
+            "distance_meters": dist,
+            "total_elevation_gain": elev,
+            "average_watts": watts,
+            "weighted_average_watts": w_watts,
+            "average_heartrate": hr,
+            "max_heartrate": max_hr,
+            "suffer_score": suffer,
+            "kilojoules": kj
+        })
+
+    conn.commit()
+    conn.close()
+    return saved
+
 def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
     uid = user_id or get_current_user_id()
     tokens = get_setting("strava_tokens", {}, user_id=uid)
@@ -89,84 +174,175 @@ def fetch_recent_strava_activities(limit: int = 20, user_id: Optional[str] = Non
     except Exception as e:
         print(f"Network error communicating with Strava: {e}")
         return []
+
+    return _upsert_strava_activities(activities, uid)
+
+def get_strava_sync_status(user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Returns per-user Strava backfill/sync status and total stored activity count."""
+    uid = user_id or get_current_user_id()
+    status = get_setting("strava_sync_status", {}, user_id=uid) or {}
+    backfill_complete = bool(get_setting("strava_backfill_complete", False, user_id=uid))
+
+    # Clear stale in_progress lock if > 10 minutes old
+    if status.get("in_progress") and status.get("started_at_ts"):
+        if time.time() - float(status.get("started_at_ts", 0)) > 600:
+            status["in_progress"] = False
+            set_setting("strava_sync_status", status, user_id=uid)
+
     conn = get_db_connection()
     c = conn.cursor()
-    
-    saved = []
-    # Auto-calibrate athlete timezone from Strava activity if not yet explicitly customized
-    if activities:
-        current_saved_tz = get_setting("athlete_timezone", default=None, user_id=uid)
-        if not current_saved_tz:
-            for act in activities:
-                raw_tz = act.get("timezone")
-                if raw_tz and isinstance(raw_tz, str) and ")" in raw_tz:
-                    tz_candidate = raw_tz.split(")")[-1].strip()
+    c.execute("SELECT COUNT(*) FROM strava_activities WHERE user_id = ?", (uid,))
+    row = c.fetchone()
+    total_count = int(row[0]) if row else 0
+    conn.close()
+
+    return {
+        "in_progress": bool(status.get("in_progress", False)),
+        "pages_fetched": int(status.get("pages_fetched", 0)),
+        "activities_synced": int(status.get("activities_synced", 0)),
+        "backfill_complete": backfill_complete,
+        "total_stored_activities": total_count,
+        "error": status.get("error"),
+        "last_run_at": status.get("last_run_at")
+    }
+
+def sync_all_strava_activities(
+    user_id: Optional[str] = None,
+    force_full: bool = False,
+    max_pages: int = 100
+) -> Dict[str, Any]:
+    """
+    Paginates through Strava /athlete/activities (per_page=200) to backfill all-time
+    history (when force_full=True or backfill is not yet complete), or incrementally
+    syncs activities since the last synced timestamp.
+    """
+    uid = user_id or get_current_user_id()
+    tokens = get_setting("strava_tokens", {}, user_id=uid)
+    access_token = tokens.get("access_token") if tokens else None
+    if not access_token:
+        return {"success": False, "error": "No Strava access token found.", "activities_synced": 0}
+
+    cur_status = get_strava_sync_status(user_id=uid)
+    if cur_status.get("in_progress"):
+        return {"success": True, "already_running": True, **cur_status}
+
+    backfill_complete = bool(get_setting("strava_backfill_complete", False, user_id=uid))
+    last_epoch = get_setting("strava_last_synced_epoch", None, user_id=uid)
+    is_incremental = (not force_full) and backfill_complete and bool(last_epoch)
+
+    status_obj = {
+        "in_progress": True,
+        "started_at_ts": time.time(),
+        "pages_fetched": 0,
+        "activities_synced": 0,
+        "error": None,
+        "last_run_at": datetime.datetime.utcnow().isoformat() + "Z"
+    }
+    set_setting("strava_sync_status", status_obj, user_id=uid)
+
+    total_synced = 0
+    pages_fetched = 0
+    newest_epoch = int(last_epoch or 0)
+    completed_cleanly = True
+    err_msg = None
+
+    try:
+        headers = {"Authorization": f"Bearer {access_token}"}
+        for page in range(1, max_pages + 1):
+            url = f"{STRAVA_API_BASE}/athlete/activities?per_page=200&page={page}"
+            if is_incremental and last_epoch:
+                after_ts = max(0, int(last_epoch) - 86400)
+                url += f"&after={after_ts}"
+
+            res = requests.get(url, headers=headers, timeout=15)
+            if res.status_code == 401:
+                new_tok = refresh_strava_token(user_id=uid)
+                if new_tok:
+                    access_token = new_tok
+                    headers = {"Authorization": f"Bearer {access_token}"}
+                    res = requests.get(url, headers=headers, timeout=15)
+                else:
+                    completed_cleanly = False
+                    err_msg = "Strava token refresh failed."
+                    break
+
+            if res.status_code == 429:
+                completed_cleanly = False
+                err_msg = "Strava API rate limit reached; partial history saved. Try again in 15 minutes."
+                break
+
+            if res.status_code != 200:
+                completed_cleanly = False
+                err_msg = f"Strava API error HTTP {res.status_code}"
+                break
+
+            batch = res.json()
+            if not isinstance(batch, list) or len(batch) == 0:
+                break
+
+            _upsert_strava_activities(batch, uid)
+            pages_fetched += 1
+            total_synced += len(batch)
+
+            for a in batch:
+                sd = a.get("start_date")
+                if sd:
                     try:
-                        import zoneinfo
-                        zoneinfo.ZoneInfo(tz_candidate)
-                        set_setting("athlete_timezone", tz_candidate, user_id=uid)
-                        if uid == "usr_guest":
-                            set_setting("athlete_timezone", tz_candidate, user_id="usr_default")
-                        break
+                        dt = datetime.datetime.fromisoformat(str(sd).replace("Z", "+00:00"))
+                        ep = int(dt.timestamp())
+                        if ep > newest_epoch:
+                            newest_epoch = ep
                     except Exception:
                         pass
 
-    for a in activities:
-        act_id = str(a.get("id"))
-        name = a.get("name", "Activity")
-        sport = a.get("sport_type") or a.get("type", "Ride")
-        start_date = resolve_strava_local_start(a, user_id=uid) or a.get("start_date", "")
-        moving_time = a.get("moving_time", 0)
-        dist = a.get("distance", 0.0)
-        elev = a.get("total_elevation_gain", 0.0)
-        watts = a.get("average_watts", 0.0)
-        w_watts = a.get("weighted_average_watts", 0.0)
-        hr = a.get("average_heartrate", 0.0)
-        max_hr = a.get("max_heartrate", 0.0)
-        suffer = a.get("suffer_score", 0.0)
-        kj = a.get("kilojoules", 0.0)
-        
-        c.execute("""
-            INSERT INTO strava_activities (
-                user_id, id, name, sport_type, start_date, moving_time_sec, distance_meters,
-                total_elevation_gain, average_watts, weighted_average_watts,
-                average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(user_id, id) DO UPDATE SET
-                start_date = excluded.start_date,
-                name = excluded.name,
-                sport_type = excluded.sport_type,
-                moving_time_sec = excluded.moving_time_sec,
-                distance_meters = excluded.distance_meters,
-                total_elevation_gain = excluded.total_elevation_gain,
-                average_watts = excluded.average_watts,
-                weighted_average_watts = excluded.weighted_average_watts,
-                average_heartrate = excluded.average_heartrate,
-                max_heartrate = excluded.max_heartrate,
-                suffer_score = excluded.suffer_score,
-                kilojoules = excluded.kilojoules,
-                raw_json = excluded.raw_json
-        """, (uid, act_id, name, sport, start_date, moving_time, dist, elev, watts, w_watts, hr, max_hr, suffer, kj, json.dumps(a)))
-        
-        saved.append({
-            "id": act_id,
-            "name": name,
-            "sport_type": sport,
-            "start_date": start_date,
-            "moving_time_sec": moving_time,
-            "distance_meters": dist,
-            "total_elevation_gain": elev,
-            "average_watts": watts,
-            "weighted_average_watts": w_watts,
-            "average_heartrate": hr,
-            "max_heartrate": max_hr,
-            "suffer_score": suffer,
-            "kilojoules": kj
-        })
-        
-    conn.commit()
-    conn.close()
-    return saved
+            status_obj["pages_fetched"] = pages_fetched
+            status_obj["activities_synced"] = total_synced
+            set_setting("strava_sync_status", status_obj, user_id=uid)
+
+            # If fewer than 200 returned, we've reached the end of the athlete's history
+            if len(batch) < 200:
+                break
+
+            # Gentle pacing between pages
+            time.sleep(0.15)
+    except Exception as e:
+        completed_cleanly = False
+        err_msg = str(e)
+    finally:
+        status_obj["in_progress"] = False
+        status_obj["pages_fetched"] = pages_fetched
+        status_obj["activities_synced"] = total_synced
+        status_obj["error"] = err_msg
+        status_obj["last_run_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+        set_setting("strava_sync_status", status_obj, user_id=uid)
+
+        if completed_cleanly:
+            set_setting("strava_backfill_complete", True, user_id=uid)
+            if newest_epoch > 0:
+                set_setting("strava_last_synced_epoch", newest_epoch, user_id=uid)
+
+    return {
+        "success": completed_cleanly,
+        "pages_fetched": pages_fetched,
+        "activities_synced": total_synced,
+        "backfill_complete": bool(get_setting("strava_backfill_complete", False, user_id=uid)),
+        "error": err_msg
+    }
+
+def trigger_strava_full_backfill_async(user_id: Optional[str] = None, force_full: bool = False) -> Dict[str, Any]:
+    """Starts paginated all-time Strava backfill in a background daemon thread if not already running."""
+    uid = user_id or get_current_user_id()
+    cur_status = get_strava_sync_status(user_id=uid)
+    if cur_status.get("in_progress"):
+        return {"started": False, "already_running": True, **cur_status}
+
+    t = threading.Thread(
+        target=sync_all_strava_activities,
+        kwargs={"user_id": uid, "force_full": force_full},
+        daemon=True
+    )
+    t.start()
+    return {"started": True, "already_running": False, **cur_status}
 
 def get_strava_trailing_stats(activities: Optional[List[Dict[str, Any]]] = None, days: int = 7, user_id: Optional[str] = None) -> Dict[str, Any]:
     """

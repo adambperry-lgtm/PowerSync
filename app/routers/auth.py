@@ -1,12 +1,15 @@
 import os
 import requests
 import secrets
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
 from fastapi.responses import RedirectResponse, JSONResponse
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 
-from app.services.strava_service import get_strava_auth_url, exchange_strava_code, fetch_recent_strava_activities
+from app.services.strava_service import (
+    get_strava_auth_url, exchange_strava_code, fetch_recent_strava_activities,
+    sync_all_strava_activities, get_strava_sync_status, trigger_strava_full_backfill_async
+)
 from app.services.whoop_service import get_whoop_auth_url, exchange_whoop_code, fetch_latest_whoop_metrics
 from app.database import (
     set_setting, get_setting, get_db_connection, get_current_user_id,
@@ -408,7 +411,7 @@ def strava_login(request: Request, client_id: Optional[str] = None, client_secre
     return RedirectResponse(url)
 
 @router.get("/strava/callback")
-def strava_callback(request: Request, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
+def strava_callback(request: Request, background_tasks: BackgroundTasks, code: Optional[str] = None, state: Optional[str] = None, error: Optional[str] = None):
     if error:
         return {"error": f"Strava authorization was cancelled or denied: {error}"}
     if not code:
@@ -421,6 +424,7 @@ def strava_callback(request: Request, code: Optional[str] = None, state: Optiona
     if res.get("success"):
         try:
             fetch_recent_strava_activities(20, user_id=uid)
+            background_tasks.add_task(sync_all_strava_activities, user_id=uid, force_full=True)
         except Exception as e:
             print(f"[PowerSync] Note: Background Strava pre-fetch error: {e}")
         session_token = create_session(uid, days_valid=30)
@@ -514,6 +518,25 @@ def sync_strava():
         return {"success": True, "count": 0, "message": "No new activities found."}
         
     return {"success": True, "count": len(acts)}
+
+@router.post("/sync/strava/full")
+def sync_strava_full():
+    uid = get_current_user_id()
+    if uid == GUEST_USER_ID:
+        return {"success": False, "error": "Authentication required. Please sign in to sync Strava."}
+    tokens = get_setting("strava_tokens", {}, user_id=uid)
+    if not tokens or not tokens.get("access_token"):
+        return {"success": False, "error": "Strava is not connected for this account. Please connect in Settings."}
+    res = trigger_strava_full_backfill_async(user_id=uid, force_full=True)
+    return {"success": True, **res}
+
+@router.get("/sync/strava/status")
+def sync_strava_status():
+    uid = get_current_user_id()
+    if uid == GUEST_USER_ID:
+        return {"success": False, "in_progress": False, "total_stored_activities": 0}
+    status = get_strava_sync_status(user_id=uid)
+    return {"success": True, **status}
 
 @router.post("/sync/whoop")
 def sync_whoop():

@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.10.2",
-        "release_name": "Power Spiderweb Readability & Graphic Scale",
+        "version": "2.11.0",
+        "release_name": "All-Time Strava History Backfill & Background Sync",
         "build_date": "2026-11-16",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.0",
+                "date": "2026-11-16",
+                "title": "All-Time Strava History Backfill & Background Sync",
+                "items": [
+                    "Paginated All-Time Strava Backfill: sync_all_strava_activities() paginates /athlete/activities at 200/page across full history with incremental watermarks and 429 rate-limit protection.",
+                    "Background Sync & Endpoints: Auto-triggers background backfill on Strava OAuth connect and first Spiderweb load, plus POST /api/auth/sync/strava/full and GET /api/auth/sync/strava/status.",
+                    "Spiderweb UI Trigger: Added 🔄 Sync All-Time button with live activity count polling and automatic Power Spiderweb refresh."
+                ]
+            },
             {
                 "version": "v2.10.2",
                 "date": "2026-11-16",

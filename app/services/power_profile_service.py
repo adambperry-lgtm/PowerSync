@@ -419,9 +419,11 @@ def get_power_spiderweb_profile(
         now_ts = datetime.datetime.now().timestamp()
         if (now_ts - last_sync_time > 60):
             try:
-                from app.services.strava_service import fetch_recent_strava_activities
+                from app.services.strava_service import fetch_recent_strava_activities, trigger_strava_full_backfill_async
                 fetch_recent_strava_activities(limit=25, user_id=uid)
                 set_setting(last_sync_key, now_ts, user_id=uid)
+                if not bool(get_setting("strava_backfill_complete", False, user_id=uid)):
+                    trigger_strava_full_backfill_async(user_id=uid, force_full=False)
             except Exception:
                 pass
 
