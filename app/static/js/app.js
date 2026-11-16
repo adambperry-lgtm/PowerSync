@@ -7136,9 +7136,9 @@ function renderSpiderwebSvg(axes, activeGoal) {
   const svg = document.getElementById("spiderwebSvg");
   if (!svg || !axes || axes.length === 0) return;
 
-  const cx = 250;
-  const cy = 195;
-  const r = 110;
+  const cx = 300;
+  const cy = 232;
+  const r = 142;
   const n = axes.length;
 
   const defsHtml = `
@@ -7183,7 +7183,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
     // Percentage tick label along top axis
     if (idx > 0 && idx < levels.length - 1) {
       const labelY = cy - (r * lvl);
-      content += `<text x="${cx + 4}" y="${(labelY + 11).toFixed(1)}" fill="#64748B" font-size="9" font-family="Inter, monospace">${Math.round(lvl * 100)}%</text>`;
+      content += `<text x="${cx + 5}" y="${(labelY + 13).toFixed(1)}" fill="#64748B" font-size="11" font-weight="600" font-family="Inter, monospace">${Math.round(lvl * 100)}%</text>`;
     }
   });
 
@@ -7206,9 +7206,9 @@ function renderSpiderwebSvg(axes, activeGoal) {
     prevPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
     prevCircles.push({ x: px, y: py, axis: axes[i] });
   }
-  content += `<polygon points="${prevPts.join(" ")}" fill="url(#radarPreviousGradient)" stroke="#FF5E00" stroke-width="2" stroke-dasharray="4 3" opacity="0.92" />`;
+  content += `<polygon points="${prevPts.join(" ")}" fill="url(#radarPreviousGradient)" stroke="#FF5E00" stroke-width="2.2" stroke-dasharray="4 3" opacity="0.92" />`;
   prevCircles.forEach(pt => {
-    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="3.5" fill="#FF5E00" stroke="#FFFFFF" stroke-width="1.5"><title>Baseline: ${pt.axis.previous_watts || '--'}W</title></circle>`;
+    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="4.5" fill="#FF5E00" stroke="#FFFFFF" stroke-width="1.5"><title>Baseline: ${pt.axis.previous_watts || '--'}W</title></circle>`;
   });
 
   // Active Goal Polygon (if active goal set)
@@ -7227,7 +7227,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
     content += `<polygon points="${goalPts.join(" ")}" fill="url(#radarGoalGradient)" stroke="#00C896" stroke-width="2.5" stroke-dasharray="6 3" opacity="0.95" />`;
     goalDiamonds.forEach(pt => {
       content += `
-        <polygon points="${(pt.x).toFixed(1)},${(pt.y - 4.5).toFixed(1)} ${(pt.x + 4.5).toFixed(1)},${(pt.y).toFixed(1)} ${(pt.x).toFixed(1)},${(pt.y + 4.5).toFixed(1)} ${(pt.x - 4.5).toFixed(1)},${(pt.y).toFixed(1)}" fill="#00C896" stroke="#FFFFFF" stroke-width="1.5">
+        <polygon points="${(pt.x).toFixed(1)},${(pt.y - 5.5).toFixed(1)} ${(pt.x + 5.5).toFixed(1)},${(pt.y).toFixed(1)} ${(pt.x).toFixed(1)},${(pt.y + 5.5).toFixed(1)} ${(pt.x - 5.5).toFixed(1)},${(pt.y).toFixed(1)}" fill="#00C896" stroke="#FFFFFF" stroke-width="1.5">
           <title>Goal Target: ${escapeSpiderwebHtml(pt.axis.name)} @ ${pt.axis.target_watts || '--'}W (${pt.axis.target_w_kg || '--'} W/kg)</title>
         </polygon>
       `;
@@ -7245,16 +7245,16 @@ function renderSpiderwebSvg(axes, activeGoal) {
     curPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
     curCircles.push({ x: px, y: py, axis: axes[i] });
   }
-  content += `<polygon points="${curPts.join(" ")}" fill="url(#radarCurrentGradient)" stroke="#0052FF" stroke-width="2.5" filter="url(#radarGlow)" />`;
+  content += `<polygon points="${curPts.join(" ")}" fill="url(#radarCurrentGradient)" stroke="#0052FF" stroke-width="2.75" filter="url(#radarGlow)" />`;
   curCircles.forEach(pt => {
-    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="5" fill="#0052FF" stroke="#FFFFFF" stroke-width="1.5"><title>${escapeSpiderwebHtml(pt.axis.name)}: ${pt.axis.current_watts}W (${pt.axis.current_w_kg} W/kg)</title></circle>`;
+    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="6" fill="#0052FF" stroke="#FFFFFF" stroke-width="2"><title>${escapeSpiderwebHtml(pt.axis.name)}: ${pt.axis.current_watts}W (${pt.axis.current_w_kg} W/kg)</title></circle>`;
   });
 
   // Outer axis labels
   for (let i = 0; i < n; i++) {
     const ax = axes[i];
     const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
-    const labelDist = r + 26;
+    const labelDist = r + 18;
     let lx = cx + labelDist * Math.cos(angle);
     let ly = cy + labelDist * Math.sin(angle);
 
@@ -7267,9 +7267,12 @@ function renderSpiderwebSvg(axes, activeGoal) {
         textAnchor = "end";
         lx -= 6;
       }
+      if (Math.sin(angle) < 0) {
+        ly -= 12;
+      }
     } else {
       if (Math.sin(angle) < 0) {
-        ly -= 16;
+        ly -= 36;
       } else {
         ly += 14;
       }
@@ -7281,21 +7284,21 @@ function renderSpiderwebSvg(axes, activeGoal) {
     let goalLine = "";
     if (hasGoal && ax.target_watts) {
       if (ax.goal_met) {
-        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 33).toFixed(1)}" text-anchor="${textAnchor}" fill="#00C896" font-size="8.5" font-weight="700">🎯 ${ax.target_watts}W (✓ Met)</text>`;
+        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 48).toFixed(1)}" text-anchor="${textAnchor}" fill="#00C896" font-size="11" font-weight="700">🎯 ${ax.target_watts}W (✓ Met)</text>`;
       } else {
-        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 33).toFixed(1)}" text-anchor="${textAnchor}" fill="#FF5E00" font-size="8.5" font-weight="700">🎯 ${ax.target_watts}W (-${ax.goal_remaining_watts}W)</text>`;
+        goalLine = `<text x="${lx.toFixed(1)}" y="${(ly + 48).toFixed(1)}" text-anchor="${textAnchor}" fill="#FF5E00" font-size="11" font-weight="700">🎯 ${ax.target_watts}W (-${ax.goal_remaining_watts}W)</text>`;
       }
     }
 
     content += `
       <g class="spiderweb-svg-axis-label">
-        <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="#111625" font-size="11" font-weight="800" font-family="Outfit, Inter, sans-serif">
+        <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="#111625" font-size="14" font-weight="800" font-family="Outfit, Inter, sans-serif">
           ${ax.icon} ${escapeSpiderwebHtml(ax.label)}
         </text>
-        <text x="${lx.toFixed(1)}" y="${(ly + 12).toFixed(1)}" text-anchor="${textAnchor}" fill="#0052FF" font-size="10" font-weight="700" font-family="Outfit, Inter, sans-serif">
-          ${ax.current_watts}W <tspan fill="#64748B" font-weight="500" font-family="Inter, sans-serif">· ${ax.current_w_kg ? ax.current_w_kg.toFixed(1) : '--'} W/kg</tspan>
+        <text x="${lx.toFixed(1)}" y="${(ly + 17).toFixed(1)}" text-anchor="${textAnchor}" fill="#0052FF" font-size="14" font-weight="800" font-family="Outfit, Inter, sans-serif">
+          ${ax.current_watts}W <tspan fill="#64748B" font-size="12" font-weight="600" font-family="Inter, sans-serif">· ${ax.current_w_kg ? ax.current_w_kg.toFixed(1) : '--'} W/kg</tspan>
         </text>
-        <text x="${lx.toFixed(1)}" y="${(ly + 23).toFixed(1)}" text-anchor="${textAnchor}" fill="${deltaColor}" font-size="9" font-weight="700">
+        <text x="${lx.toFixed(1)}" y="${(ly + 32).toFixed(1)}" text-anchor="${textAnchor}" fill="${deltaColor}" font-size="11.5" font-weight="700">
           ${deltaSign}${ax.delta_watts}W (${deltaSign}${ax.delta_pct ? ax.delta_pct.toFixed(1) : '0.0'}%)
         </text>
         ${goalLine}

@@ -145,9 +145,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.10.1",
-        "release_name": "Workout Archive Tab Visibility Fix",
-        "build_date": "2026-11-15",
+        "version": "2.10.2",
+        "release_name": "Power Spiderweb Readability & Graphic Scale",
+        "build_date": "2026-11-16",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.10.2",
+                "date": "2026-11-16",
+                "title": "Power Spiderweb Readability & Graphic Scale",
+                "items": [
+                    "Larger Spiderweb Radar Panel: Widened the left radar column in .spiderweb-main-layout and expanded #spiderwebSvg viewBox to 600x455 with a 29% larger radar radius (142 vs 110).",
+                    "Readable Axis & Ring Numbers: Scaled up wattage, W/kg, delta, goal target, and percentage ring tick font sizes (11–14px) and vertex markers in renderSpiderwebSvg().",
+                    "Asset Cache Busting: Bumped style.css?v=66 and app.js?v=122."
+                ]
+            },
             {
                 "version": "v2.10.1",
                 "date": "2026-11-15",

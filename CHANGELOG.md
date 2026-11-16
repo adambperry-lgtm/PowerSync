@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.10.2] - 2026-11-16
+### Changed
+- **Power Spiderweb Graphic & Label Readability**:
+  - Widened the left radar panel in `.spiderweb-main-layout` (`minmax(420px, 1.15fr) 1fr`) and increased `.spiderweb-svg-wrapper` `max-width` to `600px` in `app/static/css/style.css`.
+  - Expanded `#spiderwebSvg` `viewBox` to `0 0 600 455` in `app/static/index.html` and scaled up the radar radius (`110` → `142`), vertex markers, polygon stroke widths, percentage ring ticks (`9px` → `11px`), and axis wattage/W/kg/delta/goal labels (`8.5–11px` → `11–14px`) in `renderSpiderwebSvg()` (`app/static/js/app.js`).
+  - Bumped cache-busting query strings (`style.css?v=66`, `app.js?v=122`) in `app/static/index.html`.
+
 ## [2.10.1] - 2026-11-15
 ### Fixed
 - **Workout Archive Tab Visibility & Navbar Overflow**:
