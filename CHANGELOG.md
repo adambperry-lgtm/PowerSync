@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.2] - 2026-11-16
+### Removed
+- **Monthly Mini-Spiderweb Cards**:
+  - Removed `#spiderwebTimelineGrid` (all monthly mini-spiderweb cards) and the `.timeline-view-switcher` toggle buttons from `app/static/index.html`, keeping the clean 3-Line Power Duration Curve progression chart in `#timelineCurveChartWrap`.
+
 ## [2.11.1] - 2026-11-16
 ### Changed
 - **Full-Width Power Spiderweb & Click-to-Inspect Popup**:

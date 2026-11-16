@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.1",
-        "release_name": "Full-Width Spiderweb & Clickable Detail Popup",
+        "version": "2.11.2",
+        "release_name": "Streamlined Power Curve Progression",
         "build_date": "2026-11-16",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.2",
+                "date": "2026-11-16",
+                "title": "Streamlined Power Curve Progression",
+                "items": [
+                    "Removed Monthly Mini-Spiderwebs: Removed the monthly mini-spiderweb grid and view switcher in favor of the clean 3-Line Power Duration Curve chart."
+                ]
+            },
             {
                 "version": "v2.11.1",
                 "date": "2026-11-16",
