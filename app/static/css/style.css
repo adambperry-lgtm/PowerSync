@@ -5298,28 +5298,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .spiderweb-main-layout {
   display: grid;
-  grid-template-columns: minmax(420px, 1.15fr) 1fr;
+  grid-template-columns: 1fr;
   gap: 1.5rem;
   align-items: stretch;
   margin-top: 0.5rem;
-}
-
-@media (max-width: 900px) {
-  .spiderweb-main-layout {
-    grid-template-columns: 1fr;
-  }
 }
 
 .spiderweb-radar-container {
   background: rgba(15, 23, 42, 0.45);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  padding: 1rem 1.25rem;
+  padding: 1.25rem 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   position: relative;
+  width: 100%;
 }
 
 .spiderweb-legend {
@@ -5328,7 +5323,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   justify-content: center;
   flex-wrap: wrap;
   gap: 1.25rem;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
   font-weight: 600;
   margin-bottom: 0.5rem;
   width: 100%;
@@ -5360,7 +5355,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .spiderweb-svg-wrapper {
   width: 100%;
-  max-width: 600px;
+  max-width: 860px;
+  margin: 0 auto;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -5371,6 +5367,58 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   height: auto;
   overflow: visible;
   filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.3));
+}
+
+.spiderweb-svg-axis-label,
+.spiderweb-svg-vertex-hit {
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.spiderweb-svg-axis-label:hover {
+  opacity: 0.78;
+}
+
+.spiderweb-click-hint {
+  margin-top: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.spiderweb-axis-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.spiderweb-axis-stat-box {
+  background: rgba(15, 23, 42, 0.04);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 0.9rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.spiderweb-axis-stat-lbl {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.spiderweb-axis-stat-val {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.spiderweb-axis-stat-sub {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
 }
 
 .spiderweb-metrics-container {

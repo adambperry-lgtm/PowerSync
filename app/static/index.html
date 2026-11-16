@@ -15,7 +15,7 @@
     document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.setAttribute("data-theme-mode", "light");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=66">
+  <link rel="stylesheet" href="/static/css/style.css?v=67">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -1452,9 +1452,8 @@
           </div>
         </div>
 
-        <!-- Main Spiderweb Grid: Radar Chart + Phenotype & Metrics -->
+        <!-- Main Spiderweb Full-Width Radar Chart -->
         <div class="spiderweb-main-layout">
-          <!-- Left: SVG Radar Spiderweb -->
           <div class="spiderweb-radar-container">
             <div class="spiderweb-legend">
               <span class="spiderweb-legend-item">
@@ -1489,37 +1488,8 @@
                 </defs>
               </svg>
             </div>
-          </div>
-
-          <!-- Right: Phenotype & Duration Breakdown Cards -->
-          <div class="spiderweb-metrics-container">
-            <!-- Phenotype & Rider Archetype Summary -->
-            <div class="spiderweb-phenotype-card">
-              <div class="phenotype-header">
-                <div>
-                  <span class="phenotype-eyebrow">RIDER PHENOTYPE</span>
-                  <div class="phenotype-title" id="spiderwebPhenotypeTitle">All-Rounder</div>
-                </div>
-                <div class="phenotype-icon-badge" id="spiderwebPhenotypeIcon">🎯</div>
-              </div>
-              <div class="phenotype-description" id="spiderwebPhenotypeDesc">
-                Well-balanced spiderweb with harmonious capabilities across sprint, anaerobic capacity, and sustained threshold.
-              </div>
-              <div class="phenotype-focus-tags">
-                <div class="phenotype-focus-item">
-                  <span class="phenotype-focus-lbl">PRIMARY STRENGTH:</span>
-                  <span class="phenotype-focus-val" id="spiderwebStrengthVal">5m Maximal Aerobic Power</span>
-                </div>
-                <div class="phenotype-focus-item">
-                  <span class="phenotype-focus-lbl">GROWTH FOCUS:</span>
-                  <span class="phenotype-focus-val" id="spiderwebGrowthVal">Neuromuscular Peak Sprint P_max</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Duration Metrics Grid (5s, 1m, 5m, 20m, 60m) -->
-            <div class="spiderweb-durations-grid" id="spiderwebDurationsGrid">
-              <!-- Dynamically populated via JavaScript -->
+            <div class="spiderweb-click-hint">
+              💡 Click any power number or vertex on the spiderweb to inspect full energy-system &amp; PR details
             </div>
           </div>
         </div>
@@ -2457,6 +2427,25 @@
     </div>
   </div>
 
+  <!-- Spiderweb Axis Detail Popup Modal -->
+  <div class="modal-overlay" id="spiderwebAxisModal">
+    <div class="modal-dialog" style="max-width:460px;">
+      <div class="modal-header">
+        <div style="display:flex;align-items:center;gap:0.6rem;">
+          <span id="spiderwebAxisModalIcon" style="font-size:1.4rem;">⚡</span>
+          <div>
+            <h3 id="spiderwebAxisModalTitle" style="margin:0;">5s Sprint Power</h3>
+            <div id="spiderwebAxisModalSystem" style="font-size:0.75rem;color:var(--text-muted);font-weight:600;">Neuromuscular (ATP-PCr)</div>
+          </div>
+        </div>
+        <button class="modal-close" id="btnCloseSpiderwebAxisModal" type="button" aria-label="Close" title="Close">&times;</button>
+      </div>
+      <div class="modal-body" id="spiderwebAxisModalBody" style="gap:1rem;">
+        <!-- Populated dynamically when clicking a spiderweb number -->
+      </div>
+    </div>
+  </div>
+
   <!-- Athlete Sign-In & Multi-User Accounts Modal -->
   <div class="modal-overlay" id="authModal">
     <div class="modal-dialog" style="max-width:480px;">
@@ -2957,6 +2946,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=123"></script>
+  <script src="/static/js/app.js?v=124"></script>
 </body>
 </html>

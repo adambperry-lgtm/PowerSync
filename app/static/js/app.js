@@ -7303,7 +7303,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
   }
   content += `<polygon points="${curPts.join(" ")}" fill="url(#radarCurrentGradient)" stroke="#0052FF" stroke-width="2.75" filter="url(#radarGlow)" />`;
   curCircles.forEach(pt => {
-    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="6" fill="#0052FF" stroke="#FFFFFF" stroke-width="2"><title>${escapeSpiderwebHtml(pt.axis.name)}: ${pt.axis.current_watts}W (${pt.axis.current_w_kg} W/kg)</title></circle>`;
+    content += `<circle class="spiderweb-svg-vertex-hit" data-axis-key="${escapeSpiderwebHtml(pt.axis.key)}" cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="6" fill="#0052FF" stroke="#FFFFFF" stroke-width="2"><title>${escapeSpiderwebHtml(pt.axis.name)}: ${pt.axis.current_watts}W (${pt.axis.current_w_kg} W/kg) — Click for details</title></circle>`;
   });
 
   // Outer axis labels
@@ -7315,13 +7315,16 @@ function renderSpiderwebSvg(axes, activeGoal) {
     let ly = cy + labelDist * Math.sin(angle);
 
     let textAnchor = "middle";
+    let hitX = lx - 68;
     if (Math.abs(Math.cos(angle)) > 0.3) {
       if (Math.cos(angle) > 0) {
         textAnchor = "start";
         lx += 6;
+        hitX = lx - 6;
       } else {
         textAnchor = "end";
         lx -= 6;
+        hitX = lx - 134;
       }
       if (Math.sin(angle) < 0) {
         ly -= 12;
@@ -7332,6 +7335,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
       } else {
         ly += 14;
       }
+      hitX = lx - 70;
     }
 
     const deltaSign = ax.delta_watts > 0 ? "+" : "";
@@ -7346,8 +7350,10 @@ function renderSpiderwebSvg(axes, activeGoal) {
       }
     }
 
+    const hitHeight = (hasGoal && ax.target_watts) ? 68 : 52;
     content += `
-      <g class="spiderweb-svg-axis-label">
+      <g class="spiderweb-svg-axis-label" data-axis-key="${escapeSpiderwebHtml(ax.key)}" role="button" tabindex="0" aria-label="Inspect ${escapeSpiderwebHtml(ax.name || ax.label)} details">
+        <rect x="${hitX.toFixed(1)}" y="${(ly - 15).toFixed(1)}" width="140" height="${hitHeight}" rx="6" fill="transparent" />
         <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="#111625" font-size="14" font-weight="800" font-family="Outfit, Inter, sans-serif">
           ${ax.icon} ${escapeSpiderwebHtml(ax.label)}
         </text>
@@ -7363,7 +7369,109 @@ function renderSpiderwebSvg(axes, activeGoal) {
   }
 
   svg.innerHTML = content;
+
+  svg.querySelectorAll("[data-axis-key]").forEach(el => {
+    const key = el.getAttribute("data-axis-key");
+    el.addEventListener("click", () => openSpiderwebAxisModal(key));
+    el.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        openSpiderwebAxisModal(key);
+      }
+    });
+  });
 }
+
+function openSpiderwebAxisModal(axisKey) {
+  if (typeof currentSpiderwebData === "undefined" || !currentSpiderwebData || !Array.isArray(currentSpiderwebData.axes)) return;
+  const ax = currentSpiderwebData.axes.find(a => a.key === axisKey);
+  const modal = document.getElementById("spiderwebAxisModal");
+  if (!ax || !modal) return;
+
+  const iconEl = document.getElementById("spiderwebAxisModalIcon");
+  const titleEl = document.getElementById("spiderwebAxisModalTitle");
+  const sysEl = document.getElementById("spiderwebAxisModalSystem");
+  const bodyEl = document.getElementById("spiderwebAxisModalBody");
+
+  if (iconEl) iconEl.textContent = ax.icon || "⚡";
+  if (titleEl) titleEl.textContent = ax.name || ax.label || axisKey;
+  if (sysEl) sysEl.textContent = ax.energy_system || "Power Duration Axis";
+
+  const deltaSign = ax.delta_watts > 0 ? "▲ +" : ax.delta_watts < 0 ? "▼ " : "";
+  const deltaColor = ax.delta_watts > 0 ? "#00C896" : ax.delta_watts < 0 ? "#EF4444" : "#64748B";
+  const barPct = Math.min(100, Math.max(8, ax.current_radar_pct || 20));
+  const pheno = currentSpiderwebData.phenotype || {};
+
+  const goalHtml = ax.target_watts
+    ? `<div class="spiderweb-axis-stat-box" style="grid-column:1 / -1;border-color:${ax.goal_met ? 'rgba(0,200,150,0.45)' : 'rgba(255,94,0,0.45)'};">
+         <span class="spiderweb-axis-stat-lbl">Active Goal Target</span>
+         <span class="spiderweb-axis-stat-val" style="color:${ax.goal_met ? '#00C896' : '#FF5E00'};">
+           🎯 ${ax.target_watts}W ${ax.target_w_kg ? `(${ax.target_w_kg.toFixed(2)} W/kg)` : ''}
+         </span>
+         <span class="spiderweb-axis-stat-sub">
+           ${ax.goal_met ? '✓ Target Achieved!' : `${ax.goal_remaining_watts}W remaining to reach target`}
+         </span>
+       </div>`
+    : "";
+
+  if (bodyEl) {
+    bodyEl.innerHTML = `
+      <div class="spiderweb-axis-stat-grid">
+        <div class="spiderweb-axis-stat-box">
+          <span class="spiderweb-axis-stat-lbl">Current Period</span>
+          <span class="spiderweb-axis-stat-val" style="color:#0052FF;">${ax.current_watts}W</span>
+          <span class="spiderweb-axis-stat-sub">${ax.current_w_kg ? ax.current_w_kg.toFixed(2) : '--'} W/kg</span>
+        </div>
+        <div class="spiderweb-axis-stat-box">
+          <span class="spiderweb-axis-stat-lbl">Period Change</span>
+          <span class="spiderweb-axis-stat-val" style="color:${deltaColor};">${deltaSign}${ax.delta_watts}W</span>
+          <span class="spiderweb-axis-stat-sub">${ax.delta_pct > 0 ? '+' : ''}${ax.delta_pct ? ax.delta_pct.toFixed(1) : '0.0'}% vs prior</span>
+        </div>
+        <div class="spiderweb-axis-stat-box">
+          <span class="spiderweb-axis-stat-lbl">Comparison / Prior</span>
+          <span class="spiderweb-axis-stat-val">${ax.previous_watts || '--'}W</span>
+          <span class="spiderweb-axis-stat-sub">${ax.previous_w_kg ? ax.previous_w_kg.toFixed(2) + ' W/kg' : '--'}</span>
+        </div>
+        <div class="spiderweb-axis-stat-box">
+          <span class="spiderweb-axis-stat-lbl">Synced All-Time PR</span>
+          <span class="spiderweb-axis-stat-val" style="color:#FF5E00;">${ax.all_time_pr_watts || ax.current_watts}W</span>
+          <span class="spiderweb-axis-stat-sub">Benchmark ceiling: ${ax.benchmark_watts || '--'}W</span>
+        </div>
+        ${goalHtml}
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;font-size:0.78rem;color:var(--text-muted);margin-bottom:0.35rem;">
+          <span>Benchmark Ceiling Progress</span>
+          <span style="font-weight:700;color:var(--text-primary);">${(ax.current_radar_pct || 0).toFixed(0)}%</span>
+        </div>
+        <div class="duration-progress-bar-bg">
+          <div class="duration-progress-bar-fill" style="width:${barPct}%;"></div>
+        </div>
+      </div>
+      ${pheno.title ? `
+        <div style="background:rgba(0,82,255,0.05);border:1px solid rgba(0,82,255,0.2);border-radius:10px;padding:0.75rem 0.9rem;font-size:0.8rem;color:var(--text-secondary);">
+          <div style="font-weight:700;color:var(--text-primary);margin-bottom:0.2rem;">${pheno.icon || '🎯'} Rider Phenotype: ${escapeSpiderwebHtml(pheno.title)}</div>
+          <div>${escapeSpiderwebHtml(pheno.description || '')}</div>
+        </div>
+      ` : ''}
+    `;
+  }
+
+  modal.classList.add("open");
+}
+
+(function initSpiderwebAxisModal() {
+  const modal = document.getElementById("spiderwebAxisModal");
+  const closeBtn = document.getElementById("btnCloseSpiderwebAxisModal");
+  if (closeBtn && modal) {
+    closeBtn.addEventListener("click", () => modal.classList.remove("open"));
+  }
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) modal.classList.remove("open");
+    });
+  }
+})();
 
 function renderSpiderwebDurationsGrid(axes) {
   const container = document.getElementById("spiderwebDurationsGrid");

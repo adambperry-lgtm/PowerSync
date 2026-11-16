@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.1] - 2026-11-16
+### Changed
+- **Full-Width Power Spiderweb & Click-to-Inspect Popup**:
+  - Removed the right-side phenotype and duration cards from `.spiderweb-main-layout` (`app/static/index.html`) and switched `.spiderweb-main-layout` to a single full-width column (`1fr`) with `.spiderweb-svg-wrapper` expanded up to `860px` (`app/static/css/style.css`) so the spiderweb graphic and numbers scale significantly larger.
+  - Added click and keyboard handlers on all spiderweb axis numbers/labels and vertex dots (`renderSpiderwebSvg()` in `app/static/js/app.js`) that open `#spiderwebAxisModal` with full energy-system, period comparison, All-Time PR, benchmark ceiling, and active goal details.
+  - Bumped `style.css?v=67` and `app.js?v=124` in `app/static/index.html`.
+
 ## [2.11.0] - 2026-11-16
 ### Added
 - **All-Time Paginated Strava History Backfill & Background Sync**:

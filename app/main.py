@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.0",
-        "release_name": "All-Time Strava History Backfill & Background Sync",
+        "version": "2.11.1",
+        "release_name": "Full-Width Spiderweb & Clickable Detail Popup",
         "build_date": "2026-11-16",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.1",
+                "date": "2026-11-16",
+                "title": "Full-Width Spiderweb & Clickable Detail Popup",
+                "items": [
+                    "Full-Width Spiderweb Layout: Removed the right-hand metrics column and expanded the spiderweb radar across the full card width (max-width: 860px) for much larger graphics and numbers.",
+                    "Click-to-Inspect Axis Popup: Clicking any wattage number or vertex on the spiderweb opens a detail modal showing current vs prior power, All-Time PR, benchmark ceiling progress, and active goal targets.",
+                    "Asset Cache Busting: Bumped style.css?v=67 and app.js?v=124."
+                ]
+            },
             {
                 "version": "v2.11.0",
                 "date": "2026-11-16",
