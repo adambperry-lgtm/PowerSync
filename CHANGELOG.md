@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.5] - 2026-11-17
+### Changed
+- **Workout Archive & Customizer Collapsible Panels**:
+  - Removed the separate top-spanning header card (`#cardWorkoutArchiveHeader`) and unified the search bar, duration selector, filter pills, and workout grid inside a single collapsible **Workout Archive & Library** panel (`#cardWorkoutArchive`).
+  - Added **Collapse / Expand** buttons (`#btnToggleArchiveLibrary` and `#btnToggleArchiveEditor`) to both the **Workout Archive & Library** panel and the **Workout Customizer** panel (`#archiveEditorPanel`), and wired them into the master `Collapse All` / `Expand All` toolbar toggle.
+  - Bumped `app.js?v=126` in `app/static/index.html`.
+
 ## [2.11.4] - 2026-11-17
 ### Fixed
 - **Workout Duration Pill Adjustment (`#durPillGroup`) Reverting to 45m**:

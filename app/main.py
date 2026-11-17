@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.4",
-        "release_name": "Adaptive Duration Pill Override Fix",
+        "version": "2.11.5",
+        "release_name": "Collapsible Archive & Customizer Panels",
         "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.5",
+                "date": "2026-11-17",
+                "title": "Collapsible Archive & Customizer Panels",
+                "items": [
+                    "Unified Archive & Library Panel: Removed the separate top header panel and unified search, duration selector, filter pills, and workout cards inside a single collapsible Workout Archive & Library card.",
+                    "Expand & Collapse Controls: Added Collapse/Expand buttons to both the Workout Archive & Library and Workout Customizer panels, wired into the master Collapse All / Expand All toolbar toggle.",
+                    "Asset Cache Busting: Bumped app.js?v=126."
+                ]
+            },
             {
                 "version": "v2.11.4",
                 "date": "2026-11-17",

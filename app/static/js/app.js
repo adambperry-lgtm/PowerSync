@@ -8314,6 +8314,8 @@ let coachDebriefCollapsible = null;
 let recentWorkoutsCollapsible = null;
 let powerSpiderwebCollapsible = null;
 let athleteCardCollapsible = null;
+let archiveLibraryCollapsible = null;
+let archiveEditorCollapsible = null;
 
 // --- Main Dashboard View Switcher (Daily Training vs Long-Term Analysis vs Workout Archive) ---
 let currentActiveMainView = "daily";
@@ -8580,6 +8582,29 @@ function initAllCollapsibleTiles() {
     toggleIconId: "athleteToggleIcon",
     toggleTextId: "athleteToggleText",
     storageKey: "athleteCardCollapsed"
+  });
+
+  archiveLibraryCollapsible = setupCollapsibleTile({
+    cardId: "cardWorkoutArchive",
+    headerId: "archiveLibraryHeader",
+    toggleBtnId: "btnToggleArchiveLibrary",
+    toggleIconId: "archiveLibraryToggleIcon",
+    toggleTextId: "archiveLibraryToggleText",
+    storageKey: "archiveLibraryCollapsed"
+  });
+
+  archiveEditorCollapsible = setupCollapsibleTile({
+    cardId: "archiveEditorPanel",
+    headerId: "archiveEditorHeader",
+    toggleBtnId: "btnToggleArchiveEditor",
+    toggleIconId: "archiveEditorToggleIcon",
+    toggleTextId: "archiveEditorToggleText",
+    storageKey: "archiveEditorCollapsed",
+    onToggle: (collapsed) => {
+      if (!collapsed && typeof drawArchiveEditorCanvas === "function") {
+        requestAnimationFrame(() => drawArchiveEditorCanvas());
+      }
+    }
   });
 
   // Jump link to full debrief auto-expands debrief tile if collapsed
@@ -9792,7 +9817,8 @@ function initWorkoutArchive() {
     });
   });
 
-  document.getElementById("btnArchiveNewWorkout")?.addEventListener("click", () => {
+  document.getElementById("btnArchiveNewWorkout")?.addEventListener("click", (e) => {
+    e.stopPropagation();
     openArchiveEditor({
       id: null,
       title: "Custom Interval Session",

@@ -1821,80 +1821,90 @@
 
   <!-- VIEW 3: WORKOUT ARCHIVE & CUSTOMIZER -->
   <div id="viewArchiveContainer" class="main-view-pane hidden-pane" role="tabpanel" aria-labelledby="tabMainViewArchive" style="display:none;">
-    <section class="card" id="cardWorkoutArchiveHeader" style="margin-top:0;">
-      <div class="card-header" style="flex-wrap:wrap;gap:0.75rem;">
-        <div class="card-header-left">
-          <span class="card-header-icon">📚</span>
-          <div>
-            <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-              <span class="card-title">Workout Archive &amp; Library</span>
-              <span class="tag tag-focus" id="archiveCountBadge" style="background:rgba(0,82,255,0.1);color:var(--accent-cyan);border:1px solid rgba(0,82,255,0.28);font-weight:700;">19 Library + Prior</span>
+    <!-- Split Workspace: Library/Archive Panel + Interactive Workout Customizer Panel -->
+    <div class="archive-workspace-grid" style="margin-top:0;">
+      <!-- Left: Workout Archive & Library Panel -->
+      <section class="card collapsible-tile" id="cardWorkoutArchive" style="margin-top:0;">
+        <div class="card-header collapsible-tile-header" id="archiveLibraryHeader" role="button" tabindex="0" title="Click to collapse or expand Workout Archive &amp; Library" aria-expanded="true">
+          <div class="card-header-left">
+            <span class="card-header-icon">📚</span>
+            <div>
+              <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                <span class="card-title">Workout Archive &amp; Library</span>
+                <span class="tag tag-focus" id="archiveCountBadge" style="background:rgba(0,82,255,0.1);color:var(--accent-cyan);border:1px solid rgba(0,82,255,0.28);font-weight:700;">19 Library + Prior</span>
+              </div>
+              <div class="card-subtitle collapsible-tile-subtitle" style="font-size:0.76rem;color:var(--text-muted);margin-top:0.15rem;">
+                Browse prior &amp; saved workouts or Coach archetypes, customize intervals, and push to Zwift.
+              </div>
             </div>
-            <div class="card-subtitle" style="font-size:0.76rem;color:var(--text-muted);margin-top:0.15rem;">
-              Browse prior &amp; saved workouts or structured Coach archetypes, customize intervals &amp; intensity, and push directly to Zwift.
+          </div>
+          <div class="card-header-actions" style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            <button type="button" class="btn btn-primary" id="btnArchiveNewWorkout" style="padding:0.38rem 0.78rem;font-size:0.78rem;font-weight:700;">
+              + New Custom
+            </button>
+            <button class="btn btn-secondary btn-stage-collapse" id="btnToggleArchiveLibrary" type="button" aria-label="Collapse or expand workout archive &amp; library">
+              <span id="archiveLibraryToggleIcon">▲</span>
+              <span id="archiveLibraryToggleText">Collapse</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="collapsible-tile-body" id="archiveLibraryBody">
+          <!-- Search, Zone Filter Pills & Library Duration Selector -->
+          <div class="archive-toolbar">
+            <div class="archive-search-box">
+              <input type="text" id="archiveSearchInput" placeholder="Search workouts (e.g. Criss-Cross, Over-Under, 40/20, Tempo)..." autocomplete="off" />
+            </div>
+            <div class="archive-duration-control" title="Preview Coach Library templates at this target duration">
+              <label for="archiveLibraryDuration" style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">Library Duration:</label>
+              <select id="archiveLibraryDuration">
+                <option value="35">35 min</option>
+                <option value="45">45 min</option>
+                <option value="60" selected>60 min</option>
+                <option value="75">75 min</option>
+                <option value="90">90 min</option>
+                <option value="120">120 min</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="archive-filter-pills" id="archiveFilterPills" role="tablist" aria-label="Filter workouts by category">
+            <button type="button" class="archive-pill active" data-filter="all">All Workouts</button>
+            <button type="button" class="archive-pill" data-filter="archive">My Archive (Prior &amp; Saved)</button>
+            <button type="button" class="archive-pill" data-filter="sweet_spot">Sweet Spot</button>
+            <button type="button" class="archive-pill" data-filter="tempo">Tempo</button>
+            <button type="button" class="archive-pill" data-filter="vo2_max">VO2 Max</button>
+            <button type="button" class="archive-pill" data-filter="endurance_base">Endurance</button>
+            <button type="button" class="archive-pill" data-filter="express">Express</button>
+          </div>
+
+          <div id="archiveWorkoutsGrid" class="archive-cards-grid" style="margin-top:0.85rem;">
+            <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">
+              Loading Workout Archive &amp; Library...
             </div>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
-          <button type="button" class="btn btn-primary" id="btnArchiveNewWorkout" style="padding:0.45rem 0.9rem;font-size:0.82rem;font-weight:700;">
-            + New Custom Workout
-          </button>
-        </div>
-      </div>
-
-      <!-- Search, Zone Filter Pills & Library Duration Selector -->
-      <div class="archive-toolbar">
-        <div class="archive-search-box">
-          <input type="text" id="archiveSearchInput" placeholder="Search workouts (e.g. Criss-Cross, Over-Under, 40/20, Tempo)..." autocomplete="off" />
-        </div>
-        <div class="archive-duration-control" title="Preview Coach Library templates at this target duration">
-          <label for="archiveLibraryDuration" style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">Library Duration:</label>
-          <select id="archiveLibraryDuration">
-            <option value="35">35 min</option>
-            <option value="45">45 min</option>
-            <option value="60" selected>60 min</option>
-            <option value="75">75 min</option>
-            <option value="90">90 min</option>
-            <option value="120">120 min</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="archive-filter-pills" id="archiveFilterPills" role="tablist" aria-label="Filter workouts by category">
-        <button type="button" class="archive-pill active" data-filter="all">All Workouts</button>
-        <button type="button" class="archive-pill" data-filter="archive">My Archive (Prior &amp; Saved)</button>
-        <button type="button" class="archive-pill" data-filter="sweet_spot">Sweet Spot</button>
-        <button type="button" class="archive-pill" data-filter="tempo">Tempo</button>
-        <button type="button" class="archive-pill" data-filter="vo2_max">VO2 Max</button>
-        <button type="button" class="archive-pill" data-filter="endurance_base">Endurance</button>
-        <button type="button" class="archive-pill" data-filter="express">Express</button>
-      </div>
-    </section>
-
-    <!-- Split Workspace: Library/Archive Grid + Interactive Workout Customizer -->
-    <div class="archive-workspace-grid">
-      <!-- Left: Workout Cards Grid -->
-      <div class="archive-list-column">
-        <div id="archiveWorkoutsGrid" class="archive-cards-grid">
-          <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">
-            Loading Workout Archive &amp; Library...
-          </div>
-        </div>
-      </div>
+      </section>
 
       <!-- Right: Interactive Workout Editor & Zwift Sender -->
-      <aside class="card archive-editor-panel" id="archiveEditorPanel">
-        <div class="card-header" style="padding-bottom:0.65rem;border-bottom:1px solid var(--border-color);">
+      <aside class="card collapsible-tile archive-editor-panel" id="archiveEditorPanel">
+        <div class="card-header collapsible-tile-header" id="archiveEditorHeader" role="button" tabindex="0" title="Click to collapse or expand Workout Customizer" aria-expanded="true" style="padding-bottom:0.65rem;border-bottom:1px solid var(--border-color);">
           <div class="card-header-left">
             <span class="card-header-icon">🛠️</span>
             <div>
               <span class="card-title" id="archiveEditorHeading">Workout Customizer</span>
-              <div style="font-size:0.72rem;color:var(--text-muted);" id="archiveEditorSourceLabel">Select any workout to edit or create a custom session</div>
+              <div class="collapsible-tile-subtitle" style="font-size:0.72rem;color:var(--text-muted);" id="archiveEditorSourceLabel">Select any workout to edit or create a custom session</div>
             </div>
+          </div>
+          <div class="card-header-actions">
+            <button class="btn btn-secondary btn-stage-collapse" id="btnToggleArchiveEditor" type="button" aria-label="Collapse or expand workout customizer">
+              <span id="archiveEditorToggleIcon">▲</span>
+              <span id="archiveEditorToggleText">Collapse</span>
+            </button>
           </div>
         </div>
 
-        <div class="archive-editor-body" style="padding-top:0.85rem;display:flex;flex-direction:column;gap:0.85rem;">
+        <div class="collapsible-tile-body archive-editor-body" id="archiveEditorBody" style="padding-top:0.85rem;display:flex;flex-direction:column;gap:0.85rem;">
           <!-- Title & Date Row -->
           <div style="display:grid;grid-template-columns:1fr 145px;gap:0.6rem;">
             <div>
@@ -2937,6 +2947,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=125"></script>
+  <script src="/static/js/app.js?v=126"></script>
 </body>
 </html>
