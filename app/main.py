@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.11",
-        "release_name": "Auto-Archive Every Zwift Push",
+        "version": "2.11.12",
+        "release_name": "Streamlined Workout Archive Header",
         "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.12",
+                "date": "2026-11-17",
+                "title": "Streamlined Workout Archive Header",
+                "items": [
+                    "Removed Top Archive Bar: Hid the redundant .dashboard-toolbar ('Workout Archive & Customizer') on the Workout Archive tab so the Archive/Library and Customizer panels sit cleanly at the top.",
+                    "Asset Cache Busting: Bumped app.js?v=130."
+                ]
+            },
             {
                 "version": "v2.11.11",
                 "date": "2026-11-17",

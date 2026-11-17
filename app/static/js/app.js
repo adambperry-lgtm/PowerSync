@@ -8330,6 +8330,10 @@ function switchMainDashboardView(targetView, updateHistory = true) {
   const paneAnalysis = document.getElementById("viewAnalysisContainer");
   const paneArchive = document.getElementById("viewArchiveContainer");
   const toolbarTitle = document.getElementById("dashboardToolbarTitle");
+  const dashboardToolbar = document.querySelector(".dashboard-toolbar");
+  if (dashboardToolbar) {
+    dashboardToolbar.style.display = currentActiveMainView === "archive" ? "none" : "";
+  }
 
   const tabs = [
     { key: "daily", tab: tabDaily, pane: paneDaily },

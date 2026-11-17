@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.12] - 2026-11-17
+### Changed
+- **Removed Redundant Top Bar on Workout Archive Tab**:
+  - Updated `switchMainView()` in `app/static/js/app.js` to hide `.dashboard-toolbar` (`Workout Archive & Customizer`) when on the `archive` view, since both Archive & Customizer panels now have their own dedicated Collapse/Expand controls.
+  - Bumped `app.js?v=130` in `app/static/index.html`.
+
 ## [2.11.11] - 2026-11-17
 ### Changed
 - **Guaranteed Archiving for All Zwift Pushes**:
