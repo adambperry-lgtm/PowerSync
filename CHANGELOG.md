@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.7] - 2026-11-17
+### Fixed
+- **Workout Archive Preservation & Completed Ride History**:
+  - Date-scoped transient daily workout IDs (`workout_primary`, `workout_alt_*`, `workout_custom_replaced`) inside `save_scheduled_workout()` (`app/database.py`) so pushing or modifying a workout on a new day never overwrites prior days' workouts in SQLite.
+  - Updated `get_archived_workouts()` in `app/services/workout_archive_service.py` to also surface completed cycling rides from `strava_activities` with synthesized editable Warmup / Main / Cooldown intervals, Coggan NP/IF/TSS, and 3-tier XSS so past Zwift/Strava rides can be revisited, customized, saved, and re-pushed to Zwift.
+  - Updated `renderArchiveGrid()` in `app/static/js/app.js` with `🚴 Completed` badges for synced rides and bumped `app.js?v=127` in `app/static/index.html`.
+
 ## [2.11.6] - 2026-11-17
 ### Changed
 - **Strava 64-Bit Identifier & `id_str` Compatibility**:

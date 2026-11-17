@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.6",
-        "release_name": "Strava 64-Bit ID & id_str Compatibility",
+        "version": "2.11.7",
+        "release_name": "Archive History Preservation & Strava Rides",
         "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.7",
+                "date": "2026-11-17",
+                "title": "Archive History Preservation & Strava Rides",
+                "items": [
+                    "Date-Scoped Archive IDs: Fixed save_scheduled_workout() overwriting prior days' workouts when pushing workout_primary or workout_alt_* on a new day.",
+                    "Completed Strava & Zwift Rides in Archive: Surfaced completed cycling rides from strava_activities in the Workout Archive with editable intervals so past rides can be customized and re-pushed to Zwift.",
+                    "Asset Cache Busting: Bumped app.js?v=127."
+                ]
+            },
             {
                 "version": "v2.11.6",
                 "date": "2026-11-17",

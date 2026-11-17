@@ -172,6 +172,61 @@ class TestWorkoutArchiveAndAgent(unittest.TestCase):
         self.assertEqual(prev_data["workout"]["duration_minutes"], 35)
         self.assertGreater(prev_data["workout"]["estimated_tss"], 20)
 
+    def test_date_scoped_scheduled_workouts_and_strava_history(self):
+        from app.database import get_db_connection, save_scheduled_workout
+
+        intervals = [
+            {"type": "Warmup", "duration_sec": 300, "power_low_pct": 50, "power_high_pct": 75},
+            {"type": "SteadyState", "duration_sec": 1500, "power_pct": 88},
+            {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 65, "power_high_pct": 45},
+        ]
+        id_sun = save_scheduled_workout(
+            {"id": "workout_primary", "title": "Sunday Sweet Spot", "intervals": intervals},
+            "2026-11-15",
+            user_id=self.user_a,
+        )
+        id_tue = save_scheduled_workout(
+            {"id": "workout_primary", "title": "Tuesday VO2", "intervals": intervals},
+            "2026-11-17",
+            user_id=self.user_a,
+        )
+        self.assertNotEqual(id_sun, id_tue)
+        self.assertEqual(id_sun, "workout_primary_20261115")
+        self.assertEqual(id_tue, "workout_primary_20261117")
+
+        # Insert a completed Strava/Zwift ride for user_a and ensure it appears in archive
+        conn = get_db_connection()
+        conn.execute(
+            """
+            INSERT OR REPLACE INTO strava_activities
+            (user_id, id, name, sport_type, start_date, elapsed_time_sec, moving_time_sec, average_watts, weighted_average_watts)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (self.user_a, "99887766", "Sunday Zwift Watopia Tempo", "VirtualRide", "2026-11-15T10:00:00Z", 3600, 3540, 210.0, 224.0),
+        )
+        conn.commit()
+        conn.close()
+
+        try:
+            arch_a = get_archived_workouts(user_id=self.user_a, ftp=260)
+            titles = [w["title"] for w in arch_a]
+            self.assertIn("Sunday Sweet Spot", titles)
+            self.assertIn("Tuesday VO2", titles)
+            self.assertIn("Sunday Zwift Watopia Tempo", titles)
+
+            strava_item = next(w for w in arch_a if w["id"] == "strava_99887766")
+            self.assertEqual(strava_item["origin"], "strava")
+            self.assertEqual(strava_item["status"], "completed_ride")
+            self.assertGreater(len(strava_item["intervals"]), 0)
+
+            cloned = save_custom_workout(strava_item, user_id=self.user_a, ftp=260)
+            self.assertTrue(cloned["id"].startswith("custom_"))
+        finally:
+            conn = get_db_connection()
+            conn.execute("DELETE FROM strava_activities WHERE user_id = ? AND id = ?", (self.user_a, "99887766"))
+            conn.commit()
+            conn.close()
+
 
 if __name__ == "__main__":
     unittest.main()

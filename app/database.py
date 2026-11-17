@@ -1461,7 +1461,21 @@ def save_scheduled_workout(workout: Dict[str, Any], date_str: str, user_id: Opti
     uid = user_id or get_current_user_id()
     conn = get_db_connection()
     cursor = conn.cursor()
-    w_id = str(workout.get("id") or f"workout_scheduled_{date_str.replace('-', '')}")
+    raw_id = str(workout.get("id") or "").strip()
+    date_tag = str(date_str or "")[:10].replace("-", "")
+    if not raw_id:
+        w_id = f"workout_scheduled_{date_tag}"
+    elif (
+        raw_id.startswith("workout_primary")
+        or raw_id.startswith("workout_alt")
+        or raw_id.startswith("workout_custom_replaced")
+    ):
+        # Preserve each day's pushed/modified workout in the archive instead of
+        # overwriting prior days that shared the same transient option ID.
+        base_id = raw_id.split("_20")[0] if "_20" in raw_id else raw_id
+        w_id = f"{base_id}_{date_tag}" if date_tag else raw_id
+    else:
+        w_id = raw_id
     intervals_json = json.dumps(workout.get("intervals") or [])
     
     cursor.execute("""

@@ -235,6 +235,59 @@ def get_workout_library(
     return library
 
 
+CYCLING_SPORT_TYPES = {
+    "ride",
+    "virtualride",
+    "gravelride",
+    "mountainbikeride",
+    "ebikeride",
+    "handcycle",
+    "velomobile",
+}
+
+
+def _build_strava_ride_intervals(
+    duration_sec: int,
+    avg_watts: float,
+    weighted_watts: float,
+    ftp: int,
+) -> List[Dict[str, Any]]:
+    """
+    Synthesizes an editable Warmup / Main Block / Cooldown interval structure
+    from a completed Strava/Zwift ride so it can be previewed, customized,
+    and pushed back to Zwift.
+    """
+    total_sec = max(600, int(duration_sec or 1800))
+    ftp_val = max(50, int(ftp or 250))
+    ref_watts = float(weighted_watts or avg_watts or round(ftp_val * 0.72))
+    main_pct = max(45, min(130, round((ref_watts / float(ftp_val)) * 100)))
+    warmup_end = max(55, min(main_pct, round(main_pct * 0.85)))
+
+    warm_sec = max(180, min(600, round(total_sec * 0.10)))
+    cool_sec = max(180, min(600, round(total_sec * 0.10)))
+    main_sec = max(300, total_sec - warm_sec - cool_sec)
+
+    return [
+        {
+            "type": "Warmup",
+            "duration_sec": warm_sec,
+            "power_low_pct": 50,
+            "power_high_pct": warmup_end,
+        },
+        {
+            "type": "SteadyState",
+            "duration_sec": main_sec,
+            "power_pct": main_pct,
+        },
+        {
+            "type": "Cooldown",
+            "duration_sec": cool_sec,
+            "power_low_pct": warmup_end,
+            "power_high_pct": 45,
+        },
+    ]
+
+
 def get_archived_workouts(
     user_id: Optional[str] = None,
     ftp: int = 250,
@@ -242,7 +295,7 @@ def get_archived_workouts(
 ) -> List[Dict[str, Any]]:
     """
     Retrieves all prior, scheduled, prescribed, and custom archived workouts
-    for the current user from SQLite.
+    for the current user from SQLite, plus completed cycling rides from Strava/Zwift.
     """
     uid = user_id or get_current_user_id()
     q = (query or "").strip().lower()
@@ -257,9 +310,23 @@ def get_archived_workouts(
         (uid,),
     )
     rows = cursor.fetchall()
+
+    cursor.execute(
+        """
+        SELECT id, name, sport_type, start_date, elapsed_time_sec, moving_time_sec,
+               average_watts, weighted_average_watts, average_heartrate, kilojoules
+        FROM strava_activities
+        WHERE user_id = ?
+        ORDER BY start_date DESC
+        LIMIT 60
+        """,
+        (uid,),
+    )
+    strava_rows = cursor.fetchall()
     conn.close()
 
     results: List[Dict[str, Any]] = []
+    seen_saved_dates_titles = set()
     for r in rows:
         w = dict(r)
         try:
@@ -281,10 +348,62 @@ def get_archived_workouts(
 
         hydrated = hydrate_workout_payload(w, ftp=ftp, reconcile_duration=False)
         hydrated["source"] = "archive"
+        hydrated["origin"] = "workouts"
         hydrated["status"] = w.get("status") or "archived"
         hydrated["date"] = w.get("date") or ""
         results.append(hydrated)
+        seen_saved_dates_titles.add((hydrated["date"], str(hydrated.get("title", "")).strip().lower()))
 
+    for sr in strava_rows:
+        act = dict(sr)
+        sport = str(act.get("sport_type") or "").strip().lower()
+        avg_w = float(act.get("average_watts") or 0)
+        np_w = float(act.get("weighted_average_watts") or 0)
+        if sport not in CYCLING_SPORT_TYPES and avg_w <= 0 and np_w <= 0:
+            continue
+
+        date_str = str(act.get("start_date") or "")[:10]
+        title = str(act.get("name") or "Completed Ride").strip()
+        if (date_str, title.lower()) in seen_saved_dates_titles:
+            continue
+
+        dur_sec = int(act.get("moving_time_sec") or act.get("elapsed_time_sec") or 0)
+        if dur_sec < 300:
+            continue
+
+        intervals = _build_strava_ride_intervals(dur_sec, avg_w, np_w, ftp)
+        sport_label = "Zwift / Virtual Ride" if sport == "virtualride" else "Completed Ride"
+        notes_parts = [f"Synced from Strava ({act.get('sport_type') or 'Ride'}) on {date_str}."]
+        if avg_w > 0:
+            notes_parts.append(f"Avg Power: {round(avg_w)}W")
+        if np_w > 0:
+            notes_parts.append(f"NP: {round(np_w)}W")
+        if act.get("average_heartrate"):
+            notes_parts.append(f"Avg HR: {round(float(act['average_heartrate']))} bpm")
+        notes = " ".join(notes_parts)
+
+        if q:
+            haystack = f"{title} {sport_label} {notes} {date_str}".lower()
+            if q not in haystack:
+                continue
+
+        base = {
+            "id": f"strava_{act['id']}",
+            "title": title,
+            "focus_area": sport_label,
+            "description": notes,
+            "ai_rationale": notes,
+            "date": date_str,
+            "intervals": intervals,
+        }
+        hydrated = hydrate_workout_payload(base, ftp=ftp, reconcile_duration=False)
+        hydrated["source"] = "archive"
+        hydrated["origin"] = "strava"
+        hydrated["status"] = "completed_ride"
+        hydrated["date"] = date_str
+        results.append(hydrated)
+
+    results.sort(key=lambda item: str(item.get("date") or ""), reverse=True)
     return results
 
 
@@ -298,8 +417,14 @@ def save_custom_workout(
     """
     uid = user_id or get_current_user_id()
     raw_id = str(workout_data.get("id") or "").strip()
-    # If cloning from a library template or empty, mint a persistent custom ID
-    if not raw_id or raw_id.startswith("lib_") or raw_id.startswith("workout_primary") or raw_id.startswith("workout_alt"):
+    # If cloning from a library template, transient daily ID, Strava ride, or empty, mint a persistent custom ID
+    if (
+        not raw_id
+        or raw_id.startswith("lib_")
+        or raw_id.startswith("strava_")
+        or raw_id.startswith("workout_primary")
+        or raw_id.startswith("workout_alt")
+    ):
         w_id = f"custom_{uuid.uuid4().hex[:10]}"
     else:
         w_id = raw_id

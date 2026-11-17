@@ -9590,11 +9590,14 @@ function renderArchiveGrid() {
 
   grid.innerHTML = items.map(w => {
     const isArch = w.source === "archive";
+    const isStravaRide = w.origin === "strava" || w.status === "completed_ride";
     const isSelected = selectedId && w.id === selectedId;
     const badgeClass = (w.status === "scheduled" || w.pushed_to_zwift) ? "badge-zwift" : (isArch ? "badge-archive" : "");
     const badgeText = (w.status === "scheduled" || w.pushed_to_zwift)
-      ? "🚀 Scheduled"
-      : (isArch ? `📦 Archived${w.date ? " • " + w.date : ""}` : `📚 ${w.zone_label || "Library"}`);
+      ? `🚀 Scheduled${w.date ? " • " + w.date : ""}`
+      : (isStravaRide
+        ? `🚴 Completed${w.date ? " • " + w.date : ""}`
+        : (isArch ? `📦 Archived${w.date ? " • " + w.date : ""}` : `📚 ${w.zone_label || "Library"}`));
     const spark = _buildIntervalSparklineSvg(w.intervals || []);
     const safeTitle = (w.title || "Workout").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const safeFocus = (w.focus_area || "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -9603,7 +9606,7 @@ function renderArchiveGrid() {
       <div class="archive-workout-card ${isSelected ? "selected" : ""}" data-id="${w.id}" data-source="${w.source}">
         <div class="archive-card-top">
           <span class="archive-card-badge ${badgeClass}">${badgeText}</span>
-          ${isArch ? `<button type="button" class="btn btn-secondary btn-xs archive-card-del" data-del-id="${w.id}" title="Delete from Archive">🗑️</button>` : ""}
+          ${(isArch && !isStravaRide) ? `<button type="button" class="btn btn-secondary btn-xs archive-card-del" data-del-id="${w.id}" title="Delete from Archive">🗑️</button>` : ""}
         </div>
         <div class="archive-card-title">${safeTitle}</div>
         <div class="archive-card-sub">${safeFocus}</div>
