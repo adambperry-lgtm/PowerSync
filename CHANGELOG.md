@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.9] - 2026-11-17
+### Changed
+- **Archive Cleanup (Removed Strava Auto-Import)**:
+  - Removed the experimental `strava_activities` import from `get_archived_workouts()` in `app/services/workout_archive_service.py` and reverted the completed-ride badge in `app/static/js/app.js`, keeping the Archive focused cleanly on PowerSync structured/custom/scheduled workouts.
+  - Preserved the `v2.11.7` date-scoping fix in `save_scheduled_workout()` so daily pushed workouts never overwrite each other going forward.
+
 ## [2.11.8] - 2026-11-17
 ### Fixed
 - **Spiderweb Axis Click Popup on Initial Load**:

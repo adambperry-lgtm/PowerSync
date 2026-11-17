@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.8",
-        "release_name": "Spiderweb Click Popup Fix",
+        "version": "2.11.9",
+        "release_name": "Clean PowerSync Workout Archive",
         "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.9",
+                "date": "2026-11-17",
+                "title": "Clean PowerSync Workout Archive",
+                "items": [
+                    "Removed Strava Auto-Import from Archive: Reverted pulling raw Strava rides into get_archived_workouts() so the Archive only shows structured PowerSync workouts.",
+                    "Preserved Date-Scoped IDs: Kept date-scoping in save_scheduled_workout() so pushed daily workouts never overwrite prior days going forward."
+                ]
+            },
             {
                 "version": "v2.11.8",
                 "date": "2026-11-17",
