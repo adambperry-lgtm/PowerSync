@@ -2632,21 +2632,25 @@ window.addEventListener("resize", () => {
 
 // Duration Pills
 durPillGroup.addEventListener("click", (e) => {
-  if (e.target.classList.contains("btn-pill")) {
-    const dur = parseInt(e.target.dataset.dur, 10);
-    state.currentDuration = dur;
-    state.selectedIntervalIndex = null;
-    syncDurationPills(dur);
-    loadWorkout(state.currentDuration, state.currentIntensity);
+  const pill = e.target.closest(".btn-pill");
+  if (pill && durPillGroup.contains(pill)) {
+    const dur = parseInt(pill.dataset.dur, 10);
+    if (!Number.isNaN(dur)) {
+      state.currentDuration = dur;
+      state.selectedIntervalIndex = null;
+      syncDurationPills(dur);
+      loadWorkout(state.currentDuration, state.currentIntensity);
+    }
   }
 });
 
 // Intensity Pills
 intensityPillGroup.addEventListener("click", (e) => {
-  if (e.target.classList.contains("btn-pill")) {
+  const pill = e.target.closest(".btn-pill");
+  if (pill && intensityPillGroup.contains(pill)) {
     intensityPillGroup.querySelectorAll(".btn-pill").forEach(b => b.classList.remove("active"));
-    e.target.classList.add("active");
-    state.currentIntensity = parseInt(e.target.dataset.intensity, 10);
+    pill.classList.add("active");
+    state.currentIntensity = parseInt(pill.dataset.intensity, 10);
     loadWorkout(state.currentDuration, state.currentIntensity);
   }
 });
@@ -2662,10 +2666,11 @@ if (tabModeOutdoor) {
 // Outdoor Duration Pills
 if (outdoorDurPillGroup) {
   outdoorDurPillGroup.addEventListener("click", (e) => {
-    if (e.target.classList.contains("btn-pill")) {
+    const pill = e.target.closest(".btn-pill");
+    if (pill && outdoorDurPillGroup.contains(pill)) {
       outdoorDurPillGroup.querySelectorAll(".btn-pill").forEach(b => b.classList.remove("active"));
-      e.target.classList.add("active");
-      state.outdoorDuration = parseInt(e.target.dataset.dur, 10);
+      pill.classList.add("active");
+      state.outdoorDuration = parseInt(pill.dataset.dur, 10);
       loadOutdoorRecommendation(state.outdoorDuration, inputOutdoorUserNote ? inputOutdoorUserNote.value.trim() : "");
     }
   });

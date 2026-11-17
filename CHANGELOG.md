@@ -3,6 +3,15 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.4] - 2026-11-17
+### Fixed
+- **Workout Duration Pill Adjustment (`#durPillGroup`) Reverting to 45m**:
+  - Updated `build_adaptive_workout_local()` and `build_workout_bundle()` in `app/services/ai_coach.py` (`has_explicit_duration` flag) so explicit duration pill selections (`0m Rest`, `30m`, `35m`, `45m`, `60m`, `75m`, `90m`) override the default 45-minute weekday entry in `coach_forecast_plan`, travel/rest day defaults, and completed-ride locks instead of snapping back to `45m`.
+  - Added `rebuild_workout_for_duration()` in `app/services/workout_catalog.py` and updated `build_express_*` builders so primary, scheduled, and alternative workouts (`workout_alt_express`, `workout_alt_base`, `workout_alt_flush`) dynamically scale their interval blocks, titles, ZWO XML, and TSS to the exact selected duration.
+  - Updated `POST /api/workouts/generate` in `app/routers/workouts.py` to scale and persist scheduled workouts (`save_scheduled_workout`) and update `coach_forecast_plan` when the user explicitly selects a new duration pill.
+  - Fixed a missing `get_setting` import in `build_workout_bundle()` when generating `0m Rest` options and preserved `0` duration in `save_scheduled_workout()`.
+  - Bumped `app.js?v=125` in `app/static/index.html`.
+
 ## [2.11.3] - 2026-11-16
 ### Fixed
 - **iPhone 3-Tab View Switcher Clipping**:

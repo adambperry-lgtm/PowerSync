@@ -566,115 +566,121 @@ def build_endurance_progressive_build(duration_min: int, ftp: int, plan_ctx: Opt
 # ==============================================================================
 
 def build_express_microbursts(duration_min: int = 35, ftp: int = 250, plan_ctx: Optional[str] = None) -> Dict[str, Any]:
-    """35-Min Microburst & Cadence Flush (8x 30s @ 110% / 90s @ 55% + aerobic bridge)."""
-    dur = 35
-    w_dur = 360 # 6m
-    c_dur = 300 # 5m
-    # 8 reps * 120s = 960s (16m)
-    # Bridge = 2100 - (360 + 960 + 300) = 480s (8m)
+    """Microburst & Cadence Flush (30s @ 110% / 90s @ 55% + aerobic bridge)."""
+    dur = max(20, int(duration_min or 35))
+    dur_sec = dur * 60
+    w_dur = 300 if dur <= 30 else 360
+    c_dur = 240 if dur <= 30 else 300
+    avail = max(600, dur_sec - (w_dur + c_dur))
+    reps = max(4, min(16, (avail - 300) // 120))
+    bridge_sec = max(180, avail - (reps * 120))
     intervals = [
         make_progressive_warmup(w_dur),
         {
             "type": "Repeats",
-            "repeat": 8,
+            "repeat": reps,
             "on_duration_sec": 30,
             "off_duration_sec": 90,
             "on_power_pct": 110,
             "off_power_pct": 55,
             "cadence": 102,
             "cadence_rest": 85,
-            "name": "8x 30s High Cadence Bursts (110%)"
+            "name": f"{reps}x 30s High Cadence Bursts (110%)"
         },
-        {"type": "SteadyState", "duration_sec": 480, "power_pct": 68, "cadence": 90, "name": "Aerobic Bridge (68%)"},
+        {"type": "SteadyState", "duration_sec": bridge_sec, "power_pct": 68, "cadence": 90, "name": "Aerobic Bridge (68%)"},
         make_progressive_cooldown(c_dur)
     ]
     return {
         "archetype_id": "express_microbursts",
-        "title": "35-Min Microburst & Cadence Flush",
+        "title": f"{dur}-Min Microburst & Cadence Flush",
         "focus_area": "Time-Crunched High Efficiency",
         "duration_minutes": dur,
-        "estimated_tss": 36,
+        "estimated_tss": max(15, round(dur * 1.03)),
         "ai_rationale": "Short on time? 30-second cadence surges stimulate motor unit recruitment and cardiovascular turnover in half the time.",
         "intervals": intervals
     }
 
 def build_express_40_20(duration_min: int = 35, ftp: int = 250, plan_ctx: Optional[str] = None) -> Dict[str, Any]:
-    """35-Min 40/20 Aerobic Shock (2 sets of 40/20)."""
-    dur = 35
-    w_dur = 360 # 6m
-    c_dur = 300 # 5m
-    # Total = 2100s. Remainder = 2100 - 660 = 1440s (24m).
-    # Set 1: 8 reps * 60s = 480s (8m)
-    # Mid-valley: 480s (8m)
-    # Set 2: 8 reps * 60s = 480s (8m)
+    """40/20 Aerobic Shock (2 sets of 40/20)."""
+    dur = max(20, int(duration_min or 35))
+    dur_sec = dur * 60
+    w_dur = 300 if dur <= 30 else 360
+    c_dur = 240 if dur <= 30 else 300
+    avail = max(600, dur_sec - (w_dur + c_dur))
+    valley_sec = 240 if dur <= 30 else 480
+    reps_per_set = max(4, (avail - valley_sec) // 120)
+    valley_sec = max(180, avail - (reps_per_set * 120))
     intervals = [
         make_progressive_warmup(w_dur),
         {
             "type": "Repeats",
-            "repeat": 8,
+            "repeat": reps_per_set,
             "on_duration_sec": 40,
             "off_duration_sec": 20,
             "on_power_pct": 115,
             "off_power_pct": 50,
             "cadence": 98,
             "cadence_rest": 85,
-            "name": "Set 1: 8x 40/20 Surges (115%)"
+            "name": f"Set 1: {reps_per_set}x 40/20 Surges (115%)"
         },
-        {"type": "SteadyState", "duration_sec": 480, "power_pct": 55, "cadence": 88, "name": "Mid-Session Valley Flush"},
+        {"type": "SteadyState", "duration_sec": valley_sec, "power_pct": 55, "cadence": 88, "name": "Mid-Session Valley Flush"},
         {
             "type": "Repeats",
-            "repeat": 8,
+            "repeat": reps_per_set,
             "on_duration_sec": 40,
             "off_duration_sec": 20,
             "on_power_pct": 115,
             "off_power_pct": 50,
             "cadence": 98,
             "cadence_rest": 85,
-            "name": "Set 2: 8x 40/20 Surges (115%)"
+            "name": f"Set 2: {reps_per_set}x 40/20 Surges (115%)"
         },
         make_progressive_cooldown(c_dur)
     ]
     return {
         "archetype_id": "express_40_20",
-        "title": "35-Min 40/20 Aerobic Shock",
+        "title": f"{dur}-Min 40/20 Aerobic Shock",
         "focus_area": "High-Efficiency Aerobic Capacity",
         "duration_minutes": dur,
-        "estimated_tss": 38,
-        "ai_rationale": "Two sets of 40/20 surges maximize aerobic cardiac output and oxygen consumption within an efficient 35-minute block.",
+        "estimated_tss": max(16, round(dur * 1.08)),
+        "ai_rationale": f"Two sets of 40/20 surges maximize aerobic cardiac output and oxygen consumption within an efficient {dur}-minute block.",
         "intervals": intervals
     }
 
 def build_express_tempo_primer(duration_min: int = 35, ftp: int = 250, plan_ctx: Optional[str] = None) -> Dict[str, Any]:
-    """35-Min Tempo & Cadence Primer (two tempo blocks with alternating cadence)."""
-    dur = 35
-    w_dur = 360 # 6m
-    c_dur = 300 # 5m
-    # Remainder = 2100 - 660 = 1440s (24m).
-    # Block 1: 600s (10m), Valley: 240s (4m), Block 2: 600s (10m)
+    """Tempo & Cadence Primer (two tempo blocks with alternating cadence)."""
+    dur = max(20, int(duration_min or 35))
+    dur_sec = dur * 60
+    w_dur = 300 if dur <= 30 else 360
+    c_dur = 240 if dur <= 30 else 300
+    valley_sec = 180 if dur <= 30 else 240
+    avail = max(480, dur_sec - (w_dur + c_dur + valley_sec))
+    block_sec = max(240, avail // 2)
     intervals = [
         make_progressive_warmup(w_dur),
-        {"type": "SteadyState", "duration_sec": 600, "power_pct": 80, "cadence": 90, "name": "Tempo Block 1 (90 RPM)"},
-        {"type": "SteadyState", "duration_sec": 240, "power_pct": 55, "cadence": 85, "name": "Spin Valley"},
-        {"type": "SteadyState", "duration_sec": 600, "power_pct": 82, "cadence": 96, "name": "Tempo Block 2 (96 RPM)"},
+        {"type": "SteadyState", "duration_sec": block_sec, "power_pct": 80, "cadence": 90, "name": "Tempo Block 1 (90 RPM)"},
+        {"type": "SteadyState", "duration_sec": valley_sec, "power_pct": 55, "cadence": 85, "name": "Spin Valley"},
+        {"type": "SteadyState", "duration_sec": block_sec, "power_pct": 82, "cadence": 96, "name": "Tempo Block 2 (96 RPM)"},
         make_progressive_cooldown(c_dur)
     ]
     return {
         "archetype_id": "express_tempo_primer",
-        "title": "35-Min Tempo & Cadence Primer",
+        "title": f"{dur}-Min Tempo & Cadence Primer",
         "focus_area": "Time-Crunched Muscular Endurance",
         "duration_minutes": dur,
-        "estimated_tss": 35,
-        "ai_rationale": "Focused 35-minute tempo workout targeting aerobic muscular endurance without fatigue spillover.",
+        "estimated_tss": max(15, round(dur * 1.0)),
+        "ai_rationale": f"Focused {dur}-minute tempo workout targeting aerobic muscular endurance without fatigue spillover.",
         "intervals": intervals
     }
 
 def build_express_stepped_punch(duration_min: int = 35, ftp: int = 250, plan_ctx: Optional[str] = None) -> Dict[str, Any]:
-    """35-Min Stepped Threshold Punch (ascending 88% -> 92% -> 96% -> 100%)."""
-    dur = 35
-    w_dur = 360 # 6m
-    c_dur = 300 # 5m
-    # Remainder = 2100 - 660 = 1440s (24m) -> 4 steps of 360s (6m each)
-    step = 360
+    """Stepped Threshold Punch (ascending 88% -> 92% -> 96% -> 100%)."""
+    dur = max(20, int(duration_min or 35))
+    dur_sec = dur * 60
+    w_dur = 300 if dur <= 30 else 360
+    c_dur = 240 if dur <= 30 else 300
+    avail = max(480, dur_sec - (w_dur + c_dur))
+    step = max(120, avail // 4)
     intervals = [
         make_progressive_warmup(w_dur),
         {"type": "SteadyState", "duration_sec": step, "power_pct": 88, "cadence": 90, "name": "Step 1: Low Sweet Spot (88%)"},
@@ -685,11 +691,11 @@ def build_express_stepped_punch(duration_min: int = 35, ftp: int = 250, plan_ctx
     ]
     return {
         "archetype_id": "express_stepped_punch",
-        "title": "35-Min Stepped Threshold Punch",
+        "title": f"{dur}-Min Stepped Threshold Punch",
         "focus_area": "Threshold Stepped Pacing",
         "duration_minutes": dur,
-        "estimated_tss": 37,
-        "ai_rationale": "A 35-minute ascending stepped ladder from 88% to 100% FTP. Sharpens threshold pacing in minimal time.",
+        "estimated_tss": max(16, round(dur * 1.05)),
+        "ai_rationale": f"A {dur}-minute ascending stepped ladder from 88% to 100% FTP. Sharpens threshold pacing in minimal time.",
         "intervals": intervals
     }
 
@@ -729,6 +735,105 @@ ZONE_ARCHETYPES = {
         build_express_stepped_punch
     ]
 }
+
+def _strip_duration_prefix(title: str) -> str:
+    """Strips leading duration prefixes like '45-Min ', 'Optional 45m ', etc. for archetype matching."""
+    import re
+    s = (title or "").strip()
+    s = re.sub(r'^(?:optional\s+|manual\s+override:\s*)?\d+\s*(?:-?\s*min(?:ute)?s?|m)\s+', '', s, flags=re.IGNORECASE)
+    return s.strip().lower()
+
+def _replace_duration_tokens(text: str, old_dur: Optional[int], new_dur: int) -> str:
+    """Updates duration tokens in titles, badges, or rationales (e.g. '45-Min' -> '35-Min', '(45m)' -> '(35m)')."""
+    import re
+    if not text:
+        return text
+    out = re.sub(r'\b\d+\s*-\s*Min\b', f"{new_dur}-Min", text, flags=re.IGNORECASE)
+    out = re.sub(r'\b(Optional|Override:)\s+\d+m\b', rf"\1 {new_dur}m", out, flags=re.IGNORECASE)
+    out = re.sub(r'\(\d+m(\s*Z2)?\)', rf"({new_dur}m\1)", out, flags=re.IGNORECASE)
+    if old_dur and old_dur > 0 and old_dur != new_dur:
+        out = re.sub(rf'\b{old_dur}-minute\b', f"{new_dur}-minute", out, flags=re.IGNORECASE)
+        out = re.sub(rf'\b{old_dur}\s+minutes\b', f"{new_dur} minutes", out, flags=re.IGNORECASE)
+    return out
+
+def rebuild_workout_for_duration(
+    workout: Dict[str, Any],
+    target_duration_min: int,
+    ftp: int = 250,
+    plan_ctx: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Rebuilds or reconciles an existing workout dictionary to match target_duration_min exactly.
+    If the workout matches a catalog archetype, invokes that archetype's builder at target_duration_min
+    so interval block counts, step durations, and names scale natively. Otherwise reconciles intervals.
+    """
+    import copy
+    from app.services.zwift_service import reconcile_workout_intervals, generate_zwo_xml, generate_intervals_icu_text
+
+    w = copy.deepcopy(workout)
+    old_dur = int(w.get("duration_minutes") or w.get("duration_min") or 45)
+    target_dur = int(target_duration_min)
+
+    if target_dur <= 0:
+        w["title"] = "Rest & Recovery"
+        w["focus_area"] = "Rest & Recovery"
+        w["option_type"] = "rest"
+        w["duration_minutes"] = 0
+        w["estimated_tss"] = 0
+        w["intervals"] = []
+        w["zwo_content"] = generate_zwo_xml(w, ftp)
+        w["intervals_icu_text"] = generate_intervals_icu_text(w, ftp=ftp)
+        return w
+
+    arch_id = w.get("archetype_id")
+    stripped_title = _strip_duration_prefix(w.get("title", ""))
+
+    matched_rebuilt = None
+    for builders in ZONE_ARCHETYPES.values():
+        for b in builders:
+            candidate = b(target_dur, ftp, plan_ctx)
+            if arch_id and candidate.get("archetype_id") == arch_id:
+                matched_rebuilt = candidate
+                break
+            if stripped_title and _strip_duration_prefix(candidate.get("title", "")) == stripped_title:
+                matched_rebuilt = candidate
+                break
+        if matched_rebuilt:
+            break
+
+    if matched_rebuilt:
+        orig_title = w.get("title", "")
+        if orig_title.lower().startswith("optional "):
+            w["title"] = _replace_duration_tokens(orig_title, old_dur, target_dur)
+        else:
+            w["title"] = matched_rebuilt["title"]
+        w["archetype_id"] = matched_rebuilt.get("archetype_id")
+        w["focus_area"] = matched_rebuilt.get("focus_area", w.get("focus_area"))
+        w["duration_minutes"] = target_dur
+        w["estimated_tss"] = matched_rebuilt["estimated_tss"]
+        w["intervals"] = reconcile_workout_intervals(matched_rebuilt["intervals"], target_dur, ftp=ftp)
+        if w.get("badge"):
+            w["badge"] = _replace_duration_tokens(w["badge"], old_dur, target_dur)
+        if w.get("ai_rationale"):
+            w["ai_rationale"] = _replace_duration_tokens(w["ai_rationale"], old_dur, target_dur)
+    else:
+        w["title"] = _replace_duration_tokens(w.get("title", ""), old_dur, target_dur)
+        if w.get("badge"):
+            w["badge"] = _replace_duration_tokens(w["badge"], old_dur, target_dur)
+        if w.get("ai_rationale"):
+            w["ai_rationale"] = _replace_duration_tokens(w["ai_rationale"], old_dur, target_dur)
+        w["duration_minutes"] = target_dur
+        intervals = w.get("intervals") or []
+        if intervals:
+            w["intervals"] = reconcile_workout_intervals(intervals, target_dur, ftp=ftp)
+        if old_dur > 0 and w.get("estimated_tss"):
+            w["estimated_tss"] = max(5, round(int(w["estimated_tss"]) * (target_dur / float(old_dur))))
+        else:
+            w["estimated_tss"] = max(10, round(target_dur * 0.65))
+
+    w["zwo_content"] = generate_zwo_xml(w, ftp)
+    w["intervals_icu_text"] = generate_intervals_icu_text(w, ftp=ftp)
+    return w
 
 def get_recent_workout_history(user_id: Optional[str] = None, limit: int = 5) -> List[str]:
     """

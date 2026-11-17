@@ -252,18 +252,19 @@ def generate_workout(req: WorkoutGenerateRequest):
     cur_date_iso = (tgt_dt or get_athlete_date()).isoformat()
     forecast_entry = get_forecast_for_date(cur_date_iso, user_id=get_current_user_id())
 
-    has_duration_override = bool(
-        req.duration_min is not None and req.duration_min > 0 and
-        forecast_entry and req.duration_min != forecast_entry.get("duration_min")
+    has_explicit_duration = (req.duration_min is not None)
+    wants_rest = bool(wants_rest_note or (has_explicit_duration and req.duration_min == 0))
+    has_explicit_override = bool(
+        (note_clean and not wants_rest_note) or
+        (has_explicit_duration and req.duration_min is not None and req.duration_min > 0)
     )
-    has_explicit_override = bool((note_clean and not wants_rest_note) or has_duration_override)
 
-    if wants_rest_note or (is_rest_day and not has_explicit_override and (req.duration_min is None or req.duration_min == 0)):
+    if wants_rest or (is_rest_day and not has_explicit_override):
         target_dur = 0
-    elif req.duration_min is not None and req.duration_min > 0:
+    elif has_explicit_duration and req.duration_min is not None and req.duration_min > 0:
         target_dur = req.duration_min
     elif forecast_entry and forecast_entry.get("duration_min") is not None and not has_explicit_override:
-        target_dur = forecast_entry["duration_min"]
+        target_dur = int(forecast_entry["duration_min"])
     else:
         pref_dur = day_cfg.get("preferred_duration_min", 45)
         target_dur = pref_dur if pref_dur > 0 else 45
@@ -290,51 +291,72 @@ def generate_workout(req: WorkoutGenerateRequest):
         yesterday_tss=yesterday_tss,
         load_profile=load_profile,
         strain_profile=strain_profile,
-        target_date=tgt_dt
+        target_date=tgt_dt,
+        has_explicit_duration=has_explicit_duration
     )
+
+    def _apply_intensity_scale(w_obj: Dict[str, Any], pct_delta: int) -> None:
+        from app.services.ai_coach import enrich_workout_strain
+        multiplier = 1.0 + (pct_delta / 100.0)
+        for interval in w_obj.get("intervals", []):
+            if "power_pct" in interval:
+                interval["power_pct"] = max(40, round(interval["power_pct"] * multiplier))
+            if "on_power_pct" in interval:
+                interval["on_power_pct"] = max(45, round(interval["on_power_pct"] * multiplier))
+            if "power_low_pct" in interval:
+                interval["power_low_pct"] = max(35, round(interval["power_low_pct"] * multiplier))
+            if "power_high_pct" in interval:
+                interval["power_high_pct"] = max(45, round(interval["power_high_pct"] * multiplier))
+        if w_obj.get("estimated_tss", 0) > 0:
+            base_tss = w_obj.get("base_estimated_tss") or w_obj["estimated_tss"]
+            w_obj["base_estimated_tss"] = base_tss
+            # TSS scales with normalized power squared: TSS' = TSS * (multiplier ** 2)
+            w_obj["estimated_tss"] = max(5, round(base_tss * (multiplier ** 2)))
+        tag = f"[Intensity scaled by {pct_delta:+d}%]"
+        if tag not in (w_obj.get("ai_rationale") or ""):
+            w_obj["ai_rationale"] = f"{w_obj.get('ai_rationale', '')} {tag}".strip()
+        w_obj["zwo_content"] = generate_zwo_xml(w_obj, ftp)
+        w_obj["intervals_icu_text"] = generate_intervals_icu_text(w_obj, ftp=ftp)
+        enrich_workout_strain(w_obj, ftp)
 
     # Apply intensity adjustment if requested
     if req.intensity_adjust and req.intensity_adjust != 0:
-        from app.services.ai_coach import enrich_workout_strain
-        multiplier = 1.0 + (req.intensity_adjust / 100.0)
         for w in bundle["all_options"]:
-            for interval in w.get("intervals", []):
-                if "power_pct" in interval:
-                    interval["power_pct"] = max(40, round(interval["power_pct"] * multiplier))
-                if "on_power_pct" in interval:
-                    interval["on_power_pct"] = max(45, round(interval["on_power_pct"] * multiplier))
-                if "power_low_pct" in interval:
-                    interval["power_low_pct"] = max(35, round(interval["power_low_pct"] * multiplier))
-                if "power_high_pct" in interval:
-                    interval["power_high_pct"] = max(45, round(interval["power_high_pct"] * multiplier))
-            if w.get("estimated_tss", 0) > 0:
-                base_tss = w.get("base_estimated_tss") or w["estimated_tss"]
-                w["base_estimated_tss"] = base_tss
-                # TSS scales with normalized power squared: TSS' = TSS * (multiplier ** 2)
-                w["estimated_tss"] = max(5, round(base_tss * (multiplier ** 2)))
-            w["ai_rationale"] += f" [Intensity scaled by {req.intensity_adjust:+d}%]"
-            w["zwo_content"] = generate_zwo_xml(w, ftp)
-            w["intervals_icu_text"] = generate_intervals_icu_text(w, ftp=ftp)
-            enrich_workout_strain(w, ftp)
+            _apply_intensity_scale(w, req.intensity_adjust)
 
     # Check if a workout was scheduled with the coach for target date
     target_iso = req.target_date[:10] if req.target_date else today_iso
-    from app.database import get_scheduled_workout_for_date
+    from app.database import get_scheduled_workout_for_date, save_scheduled_workout
+    from app.services.workout_catalog import rebuild_workout_for_duration
+    from app.services.ai_coach import enrich_workout_strain
     scheduled_target = get_scheduled_workout_for_date(target_iso)
+
+    # If user explicitly adjusted duration while a scheduled workout exists (without a conflicting text note),
+    # scale the scheduled workout to match the requested duration and persist it.
+    if scheduled_target and has_explicit_duration and not note_clean:
+        if target_dur > 0 and scheduled_target.get("duration_minutes") != target_dur:
+            scheduled_target = rebuild_workout_for_duration(scheduled_target, target_dur, ftp=ftp)
+            try:
+                save_scheduled_workout(scheduled_target, target_iso, user_id=uid)
+            except Exception:
+                pass
+        if req.intensity_adjust and req.intensity_adjust != 0 and target_dur > 0:
+            _apply_intensity_scale(scheduled_target, req.intensity_adjust)
+
     is_explicit_adaptation = bool(
         note_clean or
+        wants_rest or
         (req.intensity_adjust and req.intensity_adjust != 0) or
-        (req.duration_min is not None and scheduled_target and req.duration_min > 0 and req.duration_min != scheduled_target.get("duration_minutes"))
+        (has_explicit_duration and scheduled_target and target_dur != scheduled_target.get("duration_minutes"))
     )
-    if scheduled_target and not day_cfg.get("is_directive_rest"):
+    if scheduled_target and not day_cfg.get("is_directive_rest") and not wants_rest:
         is_synced = bool(scheduled_target.get("synced_to_zwift") or scheduled_target.get("pushed_to_zwift"))
         scheduled_target["badge"] = "🚀 Sent to Zwift" if is_synced else "⭐ Coach's Choice"
         scheduled_target["badge_color"] = "cyan" if is_synced else "emerald"
         scheduled_target["zwo_content"] = generate_zwo_xml(scheduled_target, ftp)
         scheduled_target["intervals_icu_text"] = generate_intervals_icu_text(scheduled_target, ftp=ftp)
-        from app.services.ai_coach import enrich_workout_strain
         scheduled_target = enrich_workout_strain(scheduled_target, ftp)
-        if (has_substantial_ride or high_strain_reached) and target_iso == today_iso and not is_explicit_adaptation:
+        if (has_substantial_ride or high_strain_reached) and target_iso == today_iso and not is_explicit_adaptation and not has_explicit_override:
             scheduled_target["badge"] = "✅ Completed on Zwift"
             scheduled_target["badge_color"] = "emerald"
             scheduled_target["is_completed"] = True
@@ -359,15 +381,52 @@ def generate_workout(req: WorkoutGenerateRequest):
 
     # Determine active workout: check if athlete had selected an alternative option
     chosen_id = req.selected_option_id or workout_cache.get("id")
-    if chosen_id and chosen_id in options_cache:
-        active_workout = options_cache[chosen_id]
+    if note_clean or wants_rest:
+        active_workout = bundle["primary"]
+        is_adapted = True
+    elif chosen_id and chosen_id in options_cache:
+        candidate_w = options_cache[chosen_id]
+        if has_explicit_duration and candidate_w.get("duration_minutes") != target_dur:
+            if target_dur > 0 and candidate_w.get("intervals"):
+                candidate_w = rebuild_workout_for_duration(candidate_w, target_dur, ftp=ftp)
+                candidate_w = enrich_workout_strain(candidate_w, ftp)
+                options_cache[chosen_id] = candidate_w
+                for idx, opt in enumerate(bundle["all_options"]):
+                    if opt.get("id") == chosen_id:
+                        bundle["all_options"][idx] = candidate_w
+                active_workout = candidate_w
+            else:
+                active_workout = bundle["primary"]
+        else:
+            active_workout = candidate_w
         is_adapted = True
     else:
         active_workout = bundle["primary"]
-        is_adapted = bool(note_clean)
+        is_adapted = bool(note_clean or has_explicit_duration or (req.intensity_adjust and req.intensity_adjust != 0))
 
     workout_cache.clear()
     workout_cache.update(active_workout)
+
+    # Persist explicit duration adjustment into coach_forecast_plan for target date so subsequent loads stay synced
+    if has_explicit_duration and forecast_entry:
+        try:
+            plan_map = get_setting("coach_forecast_plan", {}, user_id=uid)
+            if isinstance(plan_map, dict) and cur_date_iso in plan_map:
+                updated_entry = dict(plan_map[cur_date_iso])
+                updated_entry["duration_min"] = int(active_workout.get("duration_minutes") if active_workout.get("duration_minutes") is not None else target_dur)
+                if active_workout.get("title"):
+                    updated_entry["title"] = active_workout["title"]
+                if active_workout.get("estimated_tss") is not None:
+                    updated_entry["estimated_tss"] = int(active_workout["estimated_tss"])
+                if active_workout.get("intervals") is not None:
+                    updated_entry["intervals"] = active_workout["intervals"]
+                if target_dur > 0:
+                    updated_entry["is_default_rest"] = False
+                    updated_entry["is_directive_rest"] = False
+                plan_map[cur_date_iso] = updated_entry
+                set_setting("coach_forecast_plan", plan_map, user_id=uid)
+        except Exception:
+            pass
 
     # Check if user describes planning a custom ride or uploaded a route
     if req.gpx_content or (req.user_note and is_planned_custom_ride_description(req.user_note)):
@@ -404,7 +463,7 @@ def generate_workout(req: WorkoutGenerateRequest):
     if is_adapted:
         response_payload["is_user_adapted"] = True
         response_payload["fueling_plan"] = generate_fueling_plan(
-            duration_min=int(active_workout.get("duration_minutes") or target_dur),
+            duration_min=int(active_workout.get("duration_minutes") if active_workout.get("duration_minutes") is not None else target_dur),
             distance_miles=float(active_workout.get("distance_miles") or 0.0),
             avg_power_watts=round(ftp * 0.72),
             ftp=ftp,

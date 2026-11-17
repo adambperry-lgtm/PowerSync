@@ -145,9 +145,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.3",
-        "release_name": "iPhone Tab Switcher Fit Fix",
-        "build_date": "2026-11-16",
+        "version": "2.11.4",
+        "release_name": "Adaptive Duration Pill Override Fix",
+        "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.4",
+                "date": "2026-11-17",
+                "title": "Adaptive Duration Pill Override Fix",
+                "items": [
+                    "Duration Pill Override Fix: Fixed a bug where clicking 35m (or any duration pill) in Today's Training reverted back to 45m due to forecast continuity and scheduled workout duration locks.",
+                    "Dynamic Archetype & Express Scaling: Added rebuild_workout_for_duration() and dynamic duration scaling for Express, Base, Flush, and Coach-Scheduled workouts so interval blocks and TSS match the selected pill duration.",
+                    "Forecast Continuity Sync: Persists explicit duration pill changes into today's forecast entry and scheduled workout record."
+                ]
+            },
             {
                 "version": "v2.11.3",
                 "date": "2026-11-16",

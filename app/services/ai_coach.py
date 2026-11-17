@@ -67,7 +67,8 @@ def build_adaptive_workout_local(
     load_profile: str = "Evenly Distributed",
     strain_profile: str = "Evenly Distributed",
     target_plan: Optional[Dict[str, Any]] = None,
-    target_date: Optional[datetime.date] = None
+    target_date: Optional[datetime.date] = None,
+    has_explicit_duration: bool = False
 ) -> Dict[str, Any]:
     duration = target_duration_min
     active_plan = target_plan if target_plan is not None else get_active_target_plan()
@@ -91,8 +92,13 @@ def build_adaptive_workout_local(
     wants_rest_note = bool(note_clean and any(k in note_clean for k in [
         "rest day", "take today off", "full rest", "skip today", "no ride", "day off"
     ]) and not any(k in note_clean for k in ["active", "spin", "flush"]))
+    wants_rest_pill = bool(has_explicit_duration and target_duration_min is not None and target_duration_min == 0)
+    has_explicit_override = bool(
+        (note_clean and not wants_rest_note) or
+        (has_explicit_duration and target_duration_min is not None and target_duration_min > 0)
+    )
 
-    if is_travel_recovery and not (note_clean and not wants_rest_note):
+    if is_travel_recovery and not has_explicit_override:
         title = "Rest Day & Light Mobility (Travel Week)"
         focus_area = "Rest & Recovery"
         badge_text = "🧘 Travel & Recovery Week"
@@ -134,24 +140,26 @@ def build_adaptive_workout_local(
     day_cfg = get_day_target_config(target_date)
     is_dir_rest = day_cfg.get("is_directive_rest", False)
     is_default_rest = day_cfg.get("is_default_rest", False)
-    has_explicit_override = bool(note_clean and not wants_rest_note)
 
     if has_explicit_override and duration <= 0:
         pref_d = day_cfg.get("preferred_duration_min", 45)
         duration = pref_d if pref_d > 0 else 45
 
-    is_scheduled_rest_day = wants_rest_note or ((is_default_rest or is_dir_rest or duration == 0) and not has_explicit_override)
+    is_scheduled_rest_day = wants_rest_note or wants_rest_pill or ((is_default_rest or is_dir_rest or duration == 0) and not has_explicit_override)
     
     if is_scheduled_rest_day:
-        title = "Rest Day or Easy Spin" if is_dir_rest and not wants_rest_note else "Rest & Recovery"
+        title = "Rest Day or Easy Spin" if is_dir_rest and not (wants_rest_note or wants_rest_pill) else "Rest & Recovery"
         focus_area = "Rest & Recovery"
-        badge_text = "✨ Adapted Rest Day" if wants_rest_note else ("📋 Schedule Directive" if is_dir_rest else "🛋️ Scheduled Rest Day")
+        badge_text = "✨ Adapted Rest Day" if (wants_rest_note or wants_rest_pill) else ("📋 Schedule Directive" if is_dir_rest else "🛋️ Scheduled Rest Day")
         ai_rationale = (
             f"Adapted to your instruction ('{user_note}'): Today is set as a full passive rest day to prioritize autonomic recovery ({recovery_score}% Whoop recovery) and glycogen restoration."
             if wants_rest_note else (
-                f"Expected Recovery: ~{recovery_score}% (Supercompensation). Per your forward directive, {day_cfg.get('day_name', 'today')} is recommended as a full rest day or gentle active recovery spin (<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) to allow cellular supercompensation before Friday's ride."
-                if is_dir_rest else
-                (day_cfg.get("notes") or f"Per your coaching schedule preferences, {day_cfg.get('day_name', 'today')} is designated as your dedicated rest day. Your Whoop recovery is {recovery_score}%. Focus on hydration, mobility, and restorative sleep before your upcoming sessions.")
+                f"Rest Day Selected: Today is set as a full passive rest day to prioritize autonomic recovery ({recovery_score}% Whoop recovery) and glycogen restoration."
+                if wants_rest_pill else (
+                    f"Expected Recovery: ~{recovery_score}% (Supercompensation). Per your forward directive, {day_cfg.get('day_name', 'today')} is recommended as a full rest day or gentle active recovery spin (<55% FTP, <{int(ftp * 0.55)}W, ~15 Low XSS) to allow cellular supercompensation before Friday's ride."
+                    if is_dir_rest else
+                    (day_cfg.get("notes") or f"Per your coaching schedule preferences, {day_cfg.get('day_name', 'today')} is designated as your dedicated rest day. Your Whoop recovery is {recovery_score}%. Focus on hydration, mobility, and restorative sleep before your upcoming sessions.")
+                )
             )
         )
         workout_obj = {
@@ -356,7 +364,7 @@ def build_adaptive_workout_local(
         )
     )
 
-    if active_plan and days_until is not None and days_until >= 0 and not has_explicit_override:
+    if active_plan and days_until is not None and days_until >= 0 and not (note_clean and not wants_rest_note):
         plan_title = active_plan.get("title", "Target Event")
         plan_dist = float(active_plan.get("distance_miles") or 50.0)
         plan_tss = int(active_plan.get("estimated_tss") or 160)
@@ -364,18 +372,19 @@ def build_adaptive_workout_local(
 
         if days_until == 0:
             # EVENT DAY TODAY!
-            duration = min(180, int(active_plan.get("estimated_duration_min") or 180))
+            default_ev_dur = min(180, int(active_plan.get("estimated_duration_min") or 180))
+            duration = int(duration) if (has_explicit_duration and duration and duration > 0) else default_ev_dur
             title = f"Target Event: {plan_title}"
             focus_area = f"{plan_dist:.1f} Miles • Event Day Execution"
-            estimated_tss = plan_tss
+            estimated_tss = max(15, round(plan_tss * (duration / max(1, default_ev_dur)))) if duration != default_ev_dur else plan_tss
             ai_rationale = (
-                f"Today is your scheduled target event: '{plan_title}' ({plan_dist:.1f} mi, est. {plan_tss} TSS). "
+                f"Today is your scheduled target event: '{plan_title}' ({plan_dist:.1f} mi, est. {estimated_tss} TSS). "
                 f"Execution strategy: Maintain smooth aerobic economy in Zone 2 on flats (60–68% FTP) and cap climbs strictly below threshold (<85% FTP) to preserve muscle glycogen. "
                 f"Fuel with 60–80g carbs/hr and maintain consistent electrolyte hydration."
             )
-            w_sec = 600
-            c_sec = 300
-            main_sec = (duration * 60) - w_sec - c_sec
+            w_sec = 360 if duration <= 40 else 600
+            c_sec = 240 if duration <= 40 else 300
+            main_sec = max(300, (duration * 60) - w_sec - c_sec)
             intervals = [
                 {"type": "Warmup", "duration_sec": w_sec, "power_low_pct": 50, "power_high_pct": 65, "cadence": 88, "name": "Gradual Warmup"},
                 {"type": "SteadyState", "duration_sec": main_sec, "power_pct": 68, "cadence": 90, "name": f"Event Pacing Simulation ({plan_dist:.1f} mi)"},
@@ -400,13 +409,13 @@ def build_adaptive_workout_local(
 
         elif days_until == 1 and is_periodized_target:
             # T-1 PRIMER (Day Before Major Event with Active Taper)
-            duration = 30
+            duration = int(duration) if (has_explicit_duration and duration and duration > 0) else 30
             title = "Pre-Event Neuromuscular Primer"
             focus_area = "Neural Activation & Glycogen Sparing"
-            estimated_tss = 22
+            estimated_tss = max(12, round(22 * (duration / 30.0)))
             ai_rationale = (
                 f"Target Event Horizon: Tomorrow is your scheduled '{plan_title}' ({plan_dist:.1f} mi, ~{plan_tss} TSS). "
-                f"To guarantee green Whoop recovery and full glycogen stores tomorrow morning, today is strictly capped at a 30-minute primer. "
+                f"To guarantee green Whoop recovery and full glycogen stores tomorrow morning, today is dialed into a {duration}-minute primer. "
                 f"Includes three 30-second cadence spin-ups (105% FTP, 102+ rpm) to open neuromuscular pathways and prime enzyme turnover without glycogen depletion."
             )
             intervals = [
@@ -444,10 +453,10 @@ def build_adaptive_workout_local(
 
         elif days_until == 2 and is_periodized_target:
             # T-2 FLUSH (2 Days Before Event)
-            duration = 35
+            duration = int(duration) if (has_explicit_duration and duration and duration > 0) else 35
             title = "Pre-Event Active Recovery Flush"
             focus_area = "Active Flush & Supercompensation"
-            estimated_tss = 20
+            estimated_tss = max(10, round(20 * (duration / 35.0)))
             ai_rationale = (
                 f"Target Event Horizon: 2 days until '{plan_title}' ({plan_dist:.1f} mi on {plan_target_date}). "
                 f"Entering peak taper window. Prescribed gentle Zone 1 active recovery (52–58% FTP) to clear metabolic waste, "
@@ -477,13 +486,13 @@ def build_adaptive_workout_local(
 
         elif days_until == 3 and is_periodized_target:
             # T-3 TAPER ONSET (3 Days Before Event)
-            duration = 45
+            duration = int(duration) if (has_explicit_duration and duration and duration > 0) else 45
             title = "Taper Onset: Controlled Tempo Touch"
             focus_area = "Taper Onset & Muscular Tension"
-            estimated_tss = 38
+            estimated_tss = max(18, round(38 * (duration / 45.0)))
             ai_rationale = (
                 f"Target Event Horizon: 3 days until '{plan_title}' ({plan_dist:.1f} mi). "
-                f"Beginning pre-event taper. Training duration is scaled down to 45 minutes with 2x 6-minute controlled Zone 3 tempo blocks (80% FTP) "
+                f"Beginning pre-event taper. Training duration is scaled to {duration} minutes with 2x 6-minute controlled Zone 3 tempo blocks (80% FTP) "
                 f"to maintain neuromuscular tension and blood plasma volume without digging into recovery reserves."
             )
             intervals = [
@@ -519,19 +528,20 @@ def build_adaptive_workout_local(
     forecast = get_forecast_for_date(cur_date_iso, user_id=uid)
     forecast_divergence_note = ""
 
-    if forecast and not has_explicit_override:
+    if forecast and not (note_clean and not wants_rest_note):
         is_valid, validation_msg = is_forecast_valid_for_recovery(forecast, recovery_score)
         if is_valid:
             # The forecast assumptions hold true! Select the promised workout archetype and structure.
             f_title = forecast.get("title") or "Endurance Session"
-            f_dur = int(forecast.get("duration_min") if forecast.get("duration_min") is not None else duration)
+            orig_f_dur = int(forecast.get("duration_min") if forecast.get("duration_min") is not None else duration)
             f_focus = forecast.get("focus_area") or forecast.get("focus") or "Structured Training"
-            f_tss = int(forecast.get("estimated_tss") or int(f_dur * 0.75))
+            f_tss = int(forecast.get("estimated_tss") or int(orig_f_dur * 0.75))
             f_intervals = list(forecast.get("intervals") or [])
             f_rationale = forecast.get("ai_rationale") or forecast.get("description") or ""
+            is_forecast_rest = bool(orig_f_dur == 0 or forecast.get("is_directive_rest") or forecast.get("is_default_rest"))
 
             # Check if forecast prescribed rest or active recovery
-            if f_dur == 0 or forecast.get("is_directive_rest") or forecast.get("is_default_rest"):
+            if is_forecast_rest and not has_explicit_override:
                 workout_obj = {
                     "id": "workout_primary",
                     "option_type": "rest",
@@ -553,31 +563,37 @@ def build_adaptive_workout_local(
                 workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
                 return enrich_workout_strain(workout_obj, ftp)
 
-            proj_rec = forecast.get("projected_recovery", recovery_score)
-            p_zone = forecast.get("projected_zone", "green")
-            badge_color = "emerald" if p_zone == "green" else ("amber" if p_zone == "yellow" else "rose")
+            if not is_forecast_rest and f_intervals:
+                f_dur = int(duration) if (has_explicit_duration and duration and duration > 0) else orig_f_dur
+                proj_rec = forecast.get("projected_recovery", recovery_score)
+                p_zone = forecast.get("projected_zone", "green")
+                badge_color = "emerald" if p_zone == "green" else ("amber" if p_zone == "yellow" else "rose")
 
-            continuity_desc = (
-                f"Forecast Confirmed: Projected recovery was ~{proj_rec}%, and actual Whoop recovery is {recovery_score}% ({validation_msg}). "
-                f"Executing the planned session from your forward forecast: {f_rationale}"
-            )
+                continuity_desc = (
+                    f"Forecast Confirmed: Projected recovery was ~{proj_rec}%, and actual Whoop recovery is {recovery_score}% ({validation_msg}). "
+                    f"Executing the planned session from your forward forecast: {f_rationale}"
+                )
 
-            workout_obj = {
-                "id": "workout_primary",
-                "option_type": "primary",
-                "badge": "⭐ Coach's Choice • Forecast Confirmed",
-                "badge_color": badge_color,
-                "title": f_title,
-                "description": f"Forecast Confirmed for Whoop Recovery {recovery_score}%",
-                "focus_area": f_focus,
-                "duration_minutes": f_dur,
-                "estimated_tss": f_tss,
-                "ai_rationale": continuity_desc,
-                "intervals": f_intervals
-            }
-            workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
-            workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
-            return enrich_workout_strain(workout_obj, ftp)
+                workout_obj = {
+                    "id": "workout_primary",
+                    "option_type": "primary",
+                    "badge": "⭐ Coach's Choice • Forecast Confirmed",
+                    "badge_color": badge_color,
+                    "title": f_title,
+                    "description": f"Forecast Confirmed for Whoop Recovery {recovery_score}%",
+                    "focus_area": f_focus,
+                    "duration_minutes": orig_f_dur,
+                    "estimated_tss": f_tss,
+                    "ai_rationale": continuity_desc,
+                    "intervals": f_intervals
+                }
+                if f_dur != orig_f_dur:
+                    from app.services.workout_catalog import rebuild_workout_for_duration
+                    workout_obj = rebuild_workout_for_duration(workout_obj, f_dur, ftp=ftp)
+                else:
+                    workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
+                    workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj)
+                return enrich_workout_strain(workout_obj, ftp)
         else:
             # Assumptions diverged (e.g. forecast anticipated Green 75% but athlete woke up Red 28%)
             forecast_divergence_note = (
@@ -877,9 +893,11 @@ def build_workout_bundle(
     yesterday_tss: int = 0,
     load_profile: str = "Evenly Distributed",
     strain_profile: str = "Evenly Distributed",
-    target_date: Optional[datetime.date] = None
+    target_date: Optional[datetime.date] = None,
+    has_explicit_duration: bool = False
 ) -> Dict[str, Any]:
     """Generates the primary prescribed workout and 2 tailored alternatives."""
+    from app.database import get_setting, get_current_user_id
     cur_eval_date = target_date or get_athlete_date()
     is_eval_today = (cur_eval_date == get_athlete_date())
     today_acts = today_activities or []
@@ -887,6 +905,10 @@ def build_workout_bundle(
     has_active_day_strain = (today_strain >= 4.0) or (today_acts and today_strain >= 2.0)
     has_substantial_ride = (today_moving_min >= 20 and has_active_day_strain) or (today_moving_min >= 45 and today_strain >= 1.5)
     high_strain_reached = today_strain >= 13.5 or (today_strain >= 11.5 and recovery_score <= 55)
+    has_explicit_ride_override = bool(
+        (user_note and user_note.strip()) or
+        (has_explicit_duration and target_duration_min is not None and target_duration_min > 0)
+    )
 
     primary = build_adaptive_workout_local(
         recovery_score=recovery_score,
@@ -909,7 +931,8 @@ def build_workout_bundle(
         yesterday_tss=yesterday_tss,
         load_profile=load_profile,
         strain_profile=strain_profile,
-        target_date=target_date
+        target_date=target_date,
+        has_explicit_duration=has_explicit_duration
     )
 
     if primary.get("is_travel_recovery") or (primary.get("option_type") == "rest" and bool(get_setting("travel_recovery_week_active", False, user_id=get_current_user_id()))):
@@ -1002,7 +1025,7 @@ def build_workout_bundle(
             "all_options": [primary, alt_flush, alt_base]
         }
     
-    if is_eval_today and (has_substantial_ride or high_strain_reached) and not (user_note and user_note.strip()):
+    if is_eval_today and (has_substantial_ride or high_strain_reached) and not has_explicit_ride_override:
         alt_rest = {
             "id": "workout_alt_rest",
             "option_type": "rest",
@@ -1042,7 +1065,7 @@ def build_workout_bundle(
 
     active_plan = get_active_target_plan()
     days_until = active_plan.get("days_until") if active_plan else None
-    if active_plan and days_until is not None and days_until <= 1 and not (user_note and user_note.strip()):
+    if active_plan and days_until is not None and days_until <= 1 and not has_explicit_ride_override:
         alt_rest = {
             "id": "workout_alt_rest",
             "option_type": "rest",
@@ -1096,7 +1119,11 @@ def build_workout_bundle(
     alt_base["badge"] = f"🚴 Low-Strain Base ({opt_base_dur}m)"
     alt_base["title"] = f"Optional {opt_base_dur}m Aerobic Endurance"
     
-    opt_express_dur = min(45, max(20, target_duration_min or 35))
+    opt_express_dur = (
+        int(target_duration_min)
+        if (has_explicit_duration and target_duration_min and target_duration_min > 0)
+        else (30 if (target_duration_min and target_duration_min <= 35) else 35)
+    )
     alt_express = build_alternative_express_workout(
         recovery_score=recovery_score,
         duration_min=opt_express_dur,
