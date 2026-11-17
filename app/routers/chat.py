@@ -360,7 +360,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 workout_obj["badge"] = "🚀 Sent to Zwift"
                 workout_obj["badge_color"] = "cyan"
 
-            save_scheduled_workout(workout_obj, target_date)
+            save_scheduled_workout(workout_obj, target_date, user_id=uid)
             from app.services.forecast_service import save_athlete_planned_session
             save_athlete_planned_session(target_date, workout_obj, user_id=uid)
 

@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.11] - 2026-11-17
+### Changed
+- **Guaranteed Archiving for All Zwift Pushes**:
+  - Audited and hardened all four Zwift push paths (`POST /api/workouts/push-intervals-icu`, `POST /api/workouts/archive/push-zwift`, `app/routers/chat.py`, and `send_workout_to_zwift` in `app/services/coach_tools.py`) so every workout pushed to Zwift is permanently archived under a date-scoped or custom `user_id`-isolated record in `workouts`.
+
 ## [2.11.10] - 2026-11-17
 ### Fixed
 - **Workout Archive Duration Filter**:

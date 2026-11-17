@@ -858,7 +858,7 @@ def push_to_zwift_via_intervals(req: IntervalsPushRequest):
             workout["synced_to_zwift"] = True
             workout["badge"] = "🚀 Sent to Zwift"
             workout["badge_color"] = "cyan"
-            save_scheduled_workout(workout, target_date)
+            save_scheduled_workout(workout, target_date, user_id=uid)
         if workout_cache:
             workout_cache["pushed_to_zwift"] = True
             workout_cache["synced_to_zwift"] = True
@@ -1295,9 +1295,8 @@ def push_archive_workout_to_zwift(req: ArchivePushZwiftRequest):
         workout["date"] = target_date
         workout["status"] = "scheduled"
 
-        if req.save_to_archive:
-            saved = save_custom_workout(workout, user_id=uid, ftp=ftp)
-            workout = saved
+        saved = save_custom_workout(workout, user_id=uid, ftp=ftp)
+        workout = saved
 
         today_iso = get_athlete_date(uid).isoformat()
         if target_date == today_iso:

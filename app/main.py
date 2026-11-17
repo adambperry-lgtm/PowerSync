@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.10",
-        "release_name": "Archive Duration Filter Fix",
+        "version": "2.11.11",
+        "release_name": "Auto-Archive Every Zwift Push",
         "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.11",
+                "date": "2026-11-17",
+                "title": "Auto-Archive Every Zwift Push",
+                "items": [
+                    "Guaranteed Zwift Push Archiving: Hardened all four Zwift push paths (Daily Training, Archive/Customizer, AI Coach chat, and Coach tool calling) to always persist pushed workouts to the user's SQLite Archive with date-scoped or custom IDs."
+                ]
+            },
             {
                 "version": "v2.11.10",
                 "date": "2026-11-17",
