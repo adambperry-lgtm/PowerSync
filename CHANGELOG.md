@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.6] - 2026-11-17
+### Changed
+- **Strava 64-Bit Identifier & `id_str` Compatibility**:
+  - Added `extract_strava_id()` in `app/services/strava_service.py` to prefer Strava's string `id_str` field over numeric `id` (with string fallback) for both Activities and Athletes, preparing for Strava's June 1, 2027 64-bit ID rollout without JavaScript IEEE-754 precision loss.
+  - Updated `exchange_strava_code()` and `refresh_strava_token()` to normalize and preserve `athlete.id_str` inside `strava_tokens`.
+  - Updated `_upsert_strava_activities()`, `app/services/coach_tools.py`, `app/services/outdoor_coach.py`, `app/services/review_coach.py`, `app/services/plan_service.py`, and `app/routers/dashboard.py` to consistently resolve and emit string IDs (`id_str` / `str(id)`).
+  - Added unit tests in `tests/test_strava_64bit_ids.py` covering 64-bit activity and athlete IDs.
+
 ## [2.11.5] - 2026-11-17
 ### Changed
 - **Workout Archive & Customizer Collapsible Panels**:

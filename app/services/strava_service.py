@@ -10,6 +10,18 @@ STRAVA_AUTH_URL = "https://www.strava.com/oauth/authorize"
 STRAVA_TOKEN_URL = "https://www.strava.com/oauth/token"
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
 
+def extract_strava_id(obj: Any) -> str:
+    """
+    Extracts the canonical Strava object identifier as a string, preferring `id_str`
+    over `id` to safely handle 64-bit identifiers (Strava API June 2027 update).
+    """
+    if not isinstance(obj, dict):
+        return str(obj).strip() if obj is not None else ""
+    val = obj.get("id_str")
+    if val is None or str(val).strip() == "":
+        val = obj.get("id")
+    return str(val).strip() if val is not None else ""
+
 def get_strava_auth_url(redirect_uri: str, state: Optional[str] = None) -> str:
     client_id = get_setting("strava_client_id", "")
     scope = "read,activity:read_all"
@@ -32,6 +44,11 @@ def exchange_strava_code(code: str, user_id: Optional[str] = None) -> Dict[str, 
         res = requests.post(STRAVA_TOKEN_URL, data=data, timeout=10)
         if res.status_code == 200:
             token_info = res.json()
+            if isinstance(token_info.get("athlete"), dict):
+                athlete = token_info["athlete"]
+                athlete_id_str = extract_strava_id(athlete)
+                if athlete_id_str:
+                    athlete["id_str"] = athlete_id_str
             set_setting("strava_tokens", token_info, user_id=uid)
             return {"success": True, "token_info": token_info}
         return {"success": False, "error": f"Strava returned HTTP {res.status_code}: {res.text}"}
@@ -57,6 +74,8 @@ def refresh_strava_token(user_id: Optional[str] = None) -> Optional[str]:
     res = requests.post(STRAVA_TOKEN_URL, data=data, timeout=10)
     if res.status_code == 200:
         new_tokens = res.json()
+        if "athlete" not in new_tokens and isinstance(tokens.get("athlete"), dict):
+            new_tokens["athlete"] = tokens["athlete"]
         set_setting("strava_tokens", new_tokens, user_id=uid)
         return new_tokens.get("access_token")
     return None
@@ -88,7 +107,9 @@ def _upsert_strava_activities(activities: List[Dict[str, Any]], uid: str) -> Lis
                     pass
 
     for a in activities:
-        act_id = str(a.get("id"))
+        act_id = extract_strava_id(a)
+        if not act_id:
+            continue
         name = a.get("name", "Activity")
         sport = a.get("sport_type") or a.get("type", "Ride")
         start_date = resolve_strava_local_start(a, user_id=uid) or a.get("start_date", "")

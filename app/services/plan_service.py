@@ -369,7 +369,7 @@ def get_strava_route_candidates() -> List[Dict[str, Any]]:
             svg_path, _, _ = generate_svg_path(sampled, width=320, height=140, padding=12)
             
         candidates.append({
-            "id": str(r.get("id")),
+            "id": str(r.get("id_str") or r.get("id") or ""),
             "title": r.get("name", "Strava Ride"),
             "distance_miles": dist_mi,
             "elevation_gain_ft": elev_ft,

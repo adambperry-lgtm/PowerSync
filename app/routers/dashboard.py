@@ -191,6 +191,8 @@ def get_dashboard_data(request: Request = None):
     from app.services.strava_service import resolve_strava_local_start
     for act in activities:
         act_copy = dict(act)
+        if act_copy.get("id_str") is not None or act_copy.get("id") is not None:
+            act_copy["id"] = str(act_copy.get("id_str") or act_copy.get("id") or "")
         local_start = resolve_strava_local_start(act_copy, user_id=uid)
         if local_start:
             act_copy["start_date"] = local_start

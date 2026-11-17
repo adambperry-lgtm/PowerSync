@@ -371,8 +371,9 @@ def build_outdoor_ride_recommendation(
             else:
                 orientation_label = "Point-to-Point Route"
 
+        ride_id_str = str(ride.get("id_str") or ride.get("id") or "")
         ride_annotated = {
-            "id": str(ride.get("id")),
+            "id": ride_id_str,
             "name": ride.get("name", "Outdoor Ride"),
             "sport_type": ride.get("sport_type", "Ride"),
             "start_date": ride.get("start_date", ""),
@@ -388,7 +389,7 @@ def build_outdoor_ride_recommendation(
             "pct_ftp": r_pct_ftp if r_watts else None,
             "suffer_score": int(r_suffer) if r_suffer else None,
             "match_score": total_score,
-            "strava_url": f"https://www.strava.com/activities/{ride.get('id')}",
+            "strava_url": f"https://www.strava.com/activities/{ride_id_str}",
             "summary_polyline": poly,
             "map_points": sampled_pts,
             "svg_path": svg_d,

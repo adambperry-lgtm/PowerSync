@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.5",
-        "release_name": "Collapsible Archive & Customizer Panels",
+        "version": "2.11.6",
+        "release_name": "Strava 64-Bit ID & id_str Compatibility",
         "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.6",
+                "date": "2026-11-17",
+                "title": "Strava 64-Bit ID & id_str Compatibility",
+                "items": [
+                    "Canonical String ID Extraction: Added extract_strava_id() in strava_service.py preferring Strava's id_str field over numeric id (with string fallback) to safely handle 64-bit Activity and Athlete IDs.",
+                    "OAuth Athlete Metadata Preservation: Normalized athlete.id_str during Strava OAuth code exchange and preserved athlete metadata across token refreshes.",
+                    "End-to-End String ID Propagation: Updated Strava activity upserts, Coach Tools, Outdoor Coach, Review Coach, Plan Service, and Dashboard responses to consistently emit string IDs."
+                ]
+            },
             {
                 "version": "v2.11.5",
                 "date": "2026-11-17",

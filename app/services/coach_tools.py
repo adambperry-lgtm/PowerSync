@@ -12,7 +12,7 @@ from app.database import (
     get_athlete_date,
     resolve_strava_local_start
 )
-from app.services.strava_service import refresh_strava_token
+from app.services.strava_service import refresh_strava_token, extract_strava_id
 from app.services.strain_model_service import calculate_activity_strain
 
 STRAVA_API_BASE = "https://www.strava.com/api/v3"
@@ -344,7 +344,7 @@ def tool_get_strava_activity_details(activity_id: str = "latest", user_id: Optio
             "tool_summary": f"Could not locate activity '{activity_id}'"
         }
 
-    numeric_id = str(db_rec.get("id"))
+    numeric_id = extract_strava_id(db_rec)
     api_detail = _fetch_strava_api_activity(numeric_id, uid)
 
     # Blend API detail with DB record
@@ -449,7 +449,7 @@ def tool_get_strava_activity_streams_and_power_curve(activity_id: str = "latest"
             "tool_summary": f"Could not find activity '{activity_id}'"
         }
 
-    numeric_id = str(db_rec.get("id"))
+    numeric_id = extract_strava_id(db_rec)
     streams = _fetch_strava_api_streams(numeric_id, uid)
     act_name = db_rec.get("name", "Workout")
 
@@ -569,7 +569,7 @@ def tool_search_strava_activities(
         dist_mi = round((act.get("distance_meters") or 0.0) / 1609.34, 1)
         strain = calculate_activity_strain(act, ftp=ftp)
         results.append({
-            "id": act.get("id"),
+            "id": extract_strava_id(act),
             "name": act.get("name"),
             "date": str(act.get("start_date", ""))[:10],
             "sport": act.get("sport_type", "Ride"),

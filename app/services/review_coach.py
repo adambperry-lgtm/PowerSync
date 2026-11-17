@@ -1163,7 +1163,7 @@ def build_daily_review_and_outlook_local(
                 min_w_bal_pct = float(s_strain.get("min_w_bal_pct", 100.0))
 
             sessions_list.append({
-                "id": a.get("id"),
+                "id": str(a.get("id_str") or a.get("id") or ""),
                 "name": a.get("name", "Ride" if s_is_cycling else "Cross-Training"),
                 "is_primary": (a is primary_act),
                 "is_cross_training": not s_is_cycling,
