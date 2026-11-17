@@ -7068,6 +7068,7 @@ function setupPowerSpiderwebTabs() {
 
 function renderPowerSpiderweb(data) {
   if (!data || !data.axes) return;
+  currentSpiderwebData = data;
 
   // Legend labels
   const curLbl = document.getElementById("spiderwebLegendCurrentLabel");
@@ -7357,8 +7358,8 @@ function renderSpiderwebSvg(axes, activeGoal) {
 
     const hitHeight = (hasGoal && ax.target_watts) ? 68 : 52;
     content += `
-      <g class="spiderweb-svg-axis-label" data-axis-key="${escapeSpiderwebHtml(ax.key)}" role="button" tabindex="0" aria-label="Inspect ${escapeSpiderwebHtml(ax.name || ax.label)} details">
-        <rect x="${hitX.toFixed(1)}" y="${(ly - 15).toFixed(1)}" width="140" height="${hitHeight}" rx="6" fill="transparent" />
+      <g class="spiderweb-svg-axis-label" data-axis-key="${escapeSpiderwebHtml(ax.key)}" role="button" tabindex="0" aria-label="Inspect ${escapeSpiderwebHtml(ax.name || ax.label)} details" style="pointer-events:all;">
+        <rect x="${hitX.toFixed(1)}" y="${(ly - 15).toFixed(1)}" width="140" height="${hitHeight}" rx="6" fill="transparent" pointer-events="all" />
         <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="#111625" font-size="14" font-weight="800" font-family="Outfit, Inter, sans-serif">
           ${ax.icon} ${escapeSpiderwebHtml(ax.label)}
         </text>

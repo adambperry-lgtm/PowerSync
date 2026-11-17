@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.8] - 2026-11-17
+### Fixed
+- **Spiderweb Axis Click Popup on Initial Load**:
+  - Assigned `currentSpiderwebData = data` inside `renderPowerSpiderweb()` in `app/static/js/app.js` so clicking any wattage number or vertex on initial dashboard load (before switching timeframe tabs) opens `#spiderwebAxisModal`.
+  - Added `pointer-events="all"` to the SVG label hit target `<rect>` for reliable click/tap handling across all browsers, and bumped `app.js?v=128`.
+
 ## [2.11.7] - 2026-11-17
 ### Fixed
 - **Workout Archive Preservation & Completed Ride History**:

@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.7",
-        "release_name": "Archive History Preservation & Strava Rides",
+        "version": "2.11.8",
+        "release_name": "Spiderweb Click Popup Fix",
         "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.8",
+                "date": "2026-11-17",
+                "title": "Spiderweb Click Popup Fix",
+                "items": [
+                    "Spiderweb Axis Click Popup Fix: Populated currentSpiderwebData inside renderPowerSpiderweb() so clicking any power number or vertex opens the detail modal immediately on initial load, with pointer-events=\"all\" hit targets, and bumped app.js?v=128."
+                ]
+            },
             {
                 "version": "v2.11.7",
                 "date": "2026-11-17",
