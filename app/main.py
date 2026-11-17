@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.9",
-        "release_name": "Clean PowerSync Workout Archive",
+        "version": "2.11.10",
+        "release_name": "Archive Duration Filter Fix",
         "build_date": "2026-11-17",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.10",
+                "date": "2026-11-17",
+                "title": "Archive Duration Filter Fix",
+                "items": [
+                    "Unified Archive Duration Filter: Added All Durations option and updated renderArchiveGrid() so selecting a specific duration (e.g. 45 min) filters archived workouts to ±5 min in addition to scaling library templates.",
+                    "Asset Cache Busting: Bumped app.js?v=129."
+                ]
+            },
             {
                 "version": "v2.11.9",
                 "date": "2026-11-17",

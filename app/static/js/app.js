@@ -9186,6 +9186,7 @@ const archiveState = {
   libraryWorkouts: [],
   filter: "all",
   search: "",
+  durationFilter: "all",
   libraryDuration: 60,
   editingWorkout: null,
   initialized: false
@@ -9577,6 +9578,11 @@ function renderArchiveGrid() {
     });
   }
 
+  if (archiveState.durationFilter !== "all" && Number.isFinite(Number(archiveState.durationFilter))) {
+    const targetDur = Number(archiveState.durationFilter);
+    items = items.filter(w => Math.abs((Number(w.duration_minutes) || 0) - targetDur) <= 5);
+  }
+
   const badgeEl = document.getElementById("archiveCountBadge");
   if (badgeEl) {
     badgeEl.textContent = `${archiveState.priorWorkouts.length} Archived • ${archiveState.libraryWorkouts.length} Library`;
@@ -9805,7 +9811,15 @@ function initWorkoutArchive() {
 
   const durSel = document.getElementById("archiveLibraryDuration");
   durSel?.addEventListener("change", () => {
-    archiveState.libraryDuration = parseInt(durSel.value || "60", 10);
+    const val = durSel.value || "all";
+    if (val === "all") {
+      archiveState.durationFilter = "all";
+      archiveState.libraryDuration = 60;
+    } else {
+      const parsed = parseInt(val, 10) || 60;
+      archiveState.durationFilter = parsed;
+      archiveState.libraryDuration = parsed;
+    }
     loadWorkoutArchive();
   });
 

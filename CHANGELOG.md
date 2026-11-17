@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.10] - 2026-11-17
+### Fixed
+- **Workout Archive Duration Filter**:
+  - Added an **All Durations** default option to `#archiveLibraryDuration` (labeled `Duration:`) and updated `renderArchiveGrid()` in `app/static/js/app.js` so selecting a specific duration (e.g. `45 min`) both scales Coach Library templates to that duration and filters archived workouts to match within ±5 minutes.
+  - Bumped `app.js?v=129` in `app/static/index.html`.
+
 ## [2.11.9] - 2026-11-17
 ### Changed
 - **Archive Cleanup (Removed Strava Auto-Import)**:

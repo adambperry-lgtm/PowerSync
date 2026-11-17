@@ -1855,12 +1855,13 @@
             <div class="archive-search-box">
               <input type="text" id="archiveSearchInput" placeholder="Search workouts (e.g. Criss-Cross, Over-Under, 40/20, Tempo)..." autocomplete="off" />
             </div>
-            <div class="archive-duration-control" title="Preview Coach Library templates at this target duration">
-              <label for="archiveLibraryDuration" style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">Library Duration:</label>
+            <div class="archive-duration-control" title="Filter archive by duration and scale Coach Library templates">
+              <label for="archiveLibraryDuration" style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">Duration:</label>
               <select id="archiveLibraryDuration">
+                <option value="all" selected>All Durations</option>
                 <option value="35">35 min</option>
                 <option value="45">45 min</option>
-                <option value="60" selected>60 min</option>
+                <option value="60">60 min</option>
                 <option value="75">75 min</option>
                 <option value="90">90 min</option>
                 <option value="120">120 min</option>
@@ -2947,6 +2948,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=128"></script>
+  <script src="/static/js/app.js?v=129"></script>
 </body>
 </html>
