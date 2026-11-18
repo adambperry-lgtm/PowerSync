@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.12.2] - 2026-11-18
+### Fixed
+- **Volume & Strain Distribution 3-Tier Strain Fix**:
+  - Updated `app/services/ride_history_service.py` to read `low_xss`, `high_xss`, and `peak_xss` (instead of `low_strain`/`high_strain`/`peak_strain`) from `calculate_activity_strain()` and pass `max_watts` from `raw_json` so the **3-Tier Strain** toggle in **Volume & Strain Distribution** and the **Single-Ride Inspector** render actual Low/High/Peak mechanical strain.
+
 ## [2.12.1] - 2026-11-18
 ### Fixed
 - **Google Maps Base Tiles for Ride History Heatmap & Inspector**:

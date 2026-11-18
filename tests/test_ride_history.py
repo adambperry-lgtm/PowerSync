@@ -220,6 +220,9 @@ class TestRideHistoryTab(unittest.TestCase):
         # Ensure other user's ride is never included
         ride_ids = [r["id"] for r in res_30d["rides"]]
         self.assertNotIn("ride_other_secret", ride_ids)
+        # Ensure 3-tier strain is populated in both rides and volume_buckets
+        self.assertTrue(any(r["strain_low"] > 0 for r in res_30d["rides"]))
+        self.assertTrue(any(b["strain_low"] > 0 for b in res_30d["volume_buckets"]))
 
     def test_env_filter_and_single_ride_detail(self):
         res_out = get_ride_history_analytics(user_id=self.test_uid, range_key="30d", env_filter="outdoor")

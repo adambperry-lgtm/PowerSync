@@ -219,10 +219,13 @@ def _load_normalized_rides_and_whoop(
 
         # 3-Tier Strain breakdown
         try:
-            strain = calculate_activity_strain(rd, ftp=int(round(ftp)))
-            s_low = round(_safe_float(strain.get("low_strain")), 1)
-            s_high = round(_safe_float(strain.get("high_strain")), 1)
-            s_peak = round(_safe_float(strain.get("peak_strain")), 1)
+            strain_input = dict(rd)
+            if raw.get("max_watts") and not strain_input.get("max_watts"):
+                strain_input["max_watts"] = raw.get("max_watts")
+            strain = calculate_activity_strain(strain_input, ftp=int(round(ftp)))
+            s_low = round(_safe_float(strain.get("low_xss")), 1)
+            s_high = round(_safe_float(strain.get("high_xss")), 1)
+            s_peak = round(_safe_float(strain.get("peak_xss")), 1)
         except Exception:
             s_low, s_high, s_peak = round(tss * 0.75, 1), round(tss * 0.2, 1), round(tss * 0.05, 1)
 

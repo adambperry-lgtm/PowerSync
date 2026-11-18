@@ -146,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.12.1",
-        "release_name": "Ride History Google Maps Tiles",
+        "version": "2.12.2",
+        "release_name": "3-Tier Strain Distribution Fix",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -157,6 +157,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.12.2",
+                "date": "2026-11-18",
+                "title": "3-Tier Strain Distribution Fix",
+                "items": [
+                    "Volume & Strain Distribution: Fixed ride_history_service.py reading low_xss, high_xss, and peak_xss from calculate_activity_strain() (and forwarding max_watts from raw_json) so the 3-Tier Strain chart and Single-Ride Inspector display non-zero Low/High/Peak strain."
+                ]
+            },
             {
                 "version": "v2.12.1",
                 "date": "2026-11-18",
