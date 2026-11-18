@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.15.2] - 2026-11-18
+### Changed
+- **Ride Log Distances in Miles**:
+  - Updated `renderHistoryRideTable()` and `openRideInspectorModal()` in `app/static/js/app.js` to display ride distances in miles (`mi`) instead of kilometers (`km`), with a `0.621371` fallback for any previously cached IndexedDB entries.
+  - Bumped `app.js?v=139` in `app/static/index.html`.
+
 ## [2.15.1] - 2026-11-18
 ### Changed
 - **Sticky Daily Ride Debrief Caching**:

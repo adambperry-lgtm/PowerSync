@@ -11221,12 +11221,15 @@ function renderHistoryRideTable(rides) {
       const hr = r.avg_hr ? `${Math.round(r.avg_hr)} bpm` : "--";
       const ef = r.ef ? r.ef : "--";
       const rec = r.whoop_recovery !== null && r.whoop_recovery !== undefined ? `${r.whoop_recovery}%` : "--";
+      const distMi = r.distance_mi !== null && r.distance_mi !== undefined
+        ? Number(r.distance_mi).toFixed(1)
+        : ((Number(r.distance_km) || 0) * 0.621371).toFixed(1);
       return `
         <tr onclick="openRideInspectorModal('${escapeHistoryHtml(r.id)}')">
           <td>${escapeHistoryHtml(r.date)}</td>
           <td class="history-ride-name-cell" title="${escapeHistoryHtml(r.name)}">${escapeHistoryHtml(r.name)}</td>
           <td>${envTag}</td>
-          <td>${r.distance_km} km</td>
+          <td>${distMi} mi</td>
           <td>${formatHistoryDuration(r.moving_time_sec)}</td>
           <td>${Math.round(r.elevation_m)} m</td>
           <td>${pwr}</td>
@@ -11275,7 +11278,7 @@ async function openRideInspectorModal(rideId) {
     bodyEl.innerHTML = `
       ${r.has_polyline ? `<div id="rideInspectorMiniMap" class="history-inspector-minimap"></div>` : ""}
       <div class="history-inspector-stats">
-        <div class="history-inspector-stat"><div class="history-kpi-label">Distance / Time</div><div style="font-weight:800;">${r.distance_km} km</div><div style="font-size:0.72rem;color:var(--text-muted);">${formatHistoryDuration(r.moving_time_sec)} · ${Math.round(r.elevation_m)}m elev</div></div>
+        <div class="history-inspector-stat"><div class="history-kpi-label">Distance / Time</div><div style="font-weight:800;">${(r.distance_mi != null ? Number(r.distance_mi) : (Number(r.distance_km) || 0) * 0.621371).toFixed(1)} mi</div><div style="font-size:0.72rem;color:var(--text-muted);">${formatHistoryDuration(r.moving_time_sec)} · ${Math.round(r.elevation_m)}m elev</div></div>
         <div class="history-inspector-stat"><div class="history-kpi-label">Power</div><div style="font-weight:800;">${r.np_watts ? Math.round(r.np_watts) + " W NP" : "--"}</div><div style="font-size:0.72rem;color:var(--text-muted);">Avg ${r.avg_watts ? Math.round(r.avg_watts) + "W" : "--"} · IF ${r.intensity_factor ?? "--"}</div></div>
         <div class="history-inspector-stat"><div class="history-kpi-label">Load &amp; Efficiency</div><div style="font-weight:800;">${Math.round(r.tss)} TSS</div><div style="font-size:0.72rem;color:var(--text-muted);">EF ${r.ef ?? "--"} · ${r.avg_hr ? Math.round(r.avg_hr) + " bpm" : "--"}</div></div>
         ${whoopHtml}
