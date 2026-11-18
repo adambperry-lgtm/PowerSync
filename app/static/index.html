@@ -2279,16 +2279,16 @@
   </div> <!-- end viewHistoryContainer -->
 
   <!-- Single-Ride Inspector Modal -->
-  <div id="modalRideInspector" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="rideInspectorTitle">
-    <div class="modal-card history-inspector-modal">
+  <div id="modalRideInspector" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="rideInspectorTitle">
+    <div class="modal-dialog history-inspector-modal" style="max-width:720px;">
       <div class="modal-header">
         <div>
           <h3 id="rideInspectorTitle" style="margin:0;font-size:1.15rem;">Ride Telemetry</h3>
           <div id="rideInspectorSubtitle" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">--</div>
         </div>
-        <button type="button" class="btn-close-modal" id="btnCloseRideInspector" aria-label="Close">✕</button>
+        <button type="button" class="modal-close" id="btnCloseRideInspector" aria-label="Close" title="Close">&times;</button>
       </div>
-      <div id="rideInspectorBody" class="history-inspector-body">
+      <div id="rideInspectorBody" class="modal-body history-inspector-body">
         Loading...
       </div>
     </div>
@@ -3339,6 +3339,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=139"></script>
+  <script src="/static/js/app.js?v=140"></script>
 </body>
 </html>

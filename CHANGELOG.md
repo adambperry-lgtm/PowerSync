@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.15.3] - 2026-11-18
+### Fixed
+- **Ride Log & Heatmap Pop-Up Inspector Modal**:
+  - Updated `#modalRideInspector` in `app/static/index.html` to use PowerSync's `.modal-overlay`, `.modal-dialog`, and `.modal-close` classes (instead of undefined `.modal-backdrop`/`.modal-card` classes) and toggled `.open` in `openRideInspectorModal()` / `closeRideInspectorModal()` (`app/static/js/app.js`) so clicking any ride in the Ride Log, Heatmap, Scatter Plot, or Breakthrough pills opens a centered overlay pop-up.
+  - Bumped `app.js?v=140` in `app/static/index.html`.
+
 ## [2.15.2] - 2026-11-18
 ### Changed
 - **Ride Log Distances in Miles**:

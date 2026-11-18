@@ -146,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.15.2",
-        "release_name": "Ride Log Miles Display",
+        "version": "2.15.3",
+        "release_name": "Ride Inspector Pop-Up Modal Fix",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -158,6 +158,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.15.3",
+                "date": "2026-11-18",
+                "title": "Ride Inspector Pop-Up Modal Fix",
+                "items": [
+                    "Centered Pop-Up Modal: Updated #modalRideInspector to use PowerSync's .modal-overlay / .modal-dialog / .modal-close styling and .open class toggling so clicking any ride in the Ride Log, Heatmap, or Scatter Plot opens the Ride Telemetry pop-up.",
+                    "Asset Cache Busting: Bumped app.js?v=140."
+                ]
+            },
             {
                 "version": "v2.15.2",
                 "date": "2026-11-18",

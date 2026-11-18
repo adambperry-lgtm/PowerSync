@@ -11250,6 +11250,7 @@ async function openRideInspectorModal(rideId) {
   const bodyEl = document.getElementById("rideInspectorBody");
   if (!modal || !bodyEl) return;
 
+  modal.classList.add("open");
   modal.style.display = "flex";
   if (titleEl) titleEl.textContent = "Loading ride telemetry...";
   if (subEl) subEl.textContent = "";
@@ -11339,7 +11340,10 @@ async function openRideInspectorModal(rideId) {
 
 function closeRideInspectorModal() {
   const modal = document.getElementById("modalRideInspector");
-  if (modal) modal.style.display = "none";
+  if (modal) {
+    modal.classList.remove("open");
+    modal.style.display = "none";
+  }
   if (historyState.inspectorMap) {
     historyState.inspectorMap.remove();
     historyState.inspectorMap = null;
