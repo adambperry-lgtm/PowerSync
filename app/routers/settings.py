@@ -113,7 +113,7 @@ def get_settings_endpoint(uid: str = Depends(require_authenticated_user)):
         "strava_connected": bool(all_s.get("strava_tokens")),
         "whoop_client_secret_set": is_valid_secret(whoop_secret),
         "whoop_connected": bool(all_s.get("whoop_tokens")),
-        "wyze_connected": bool(all_s.get("wyze_tokens")),
+        "wyze_connected": bool(all_s.get("wyze_tokens") or wyze_summary.get("connected")),
         "wyze_email": str(all_s.get("wyze_email", "")),
         "wyze_key_id": str(all_s.get("wyze_key_id", "")),
         "wyze_api_key_set": is_valid_secret(wyze_api_key),
@@ -177,16 +177,37 @@ def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require
         set_setting("whoop_client_id", payload.whoop_client_id.strip())
     if is_valid_secret(payload.whoop_client_secret):
         set_setting("whoop_client_secret", payload.whoop_client_secret.strip())
+    wyze_cred_updated = False
     if payload.wyze_email is not None and payload.wyze_email.strip():
         set_setting("wyze_email", payload.wyze_email.strip(), user_id=uid)
+        wyze_cred_updated = True
     if is_valid_secret(payload.wyze_password):
         set_setting("wyze_password", payload.wyze_password.strip(), user_id=uid)
+        wyze_cred_updated = True
     if payload.wyze_key_id is not None and payload.wyze_key_id.strip():
         set_setting("wyze_key_id", payload.wyze_key_id.strip(), user_id=uid)
+        wyze_cred_updated = True
     if is_valid_secret(payload.wyze_api_key):
         set_setting("wyze_api_key", payload.wyze_api_key.strip(), user_id=uid)
+        wyze_cred_updated = True
     if is_valid_secret(payload.wyze_totp_secret):
         set_setting("wyze_totp_secret", payload.wyze_totp_secret.strip(), user_id=uid)
+        wyze_cred_updated = True
+
+    if wyze_cred_updated or not get_setting("wyze_tokens", None, user_id=uid):
+        if (
+            get_setting("wyze_email", "", user_id=uid)
+            and get_setting("wyze_password", "", user_id=uid)
+            and get_setting("wyze_key_id", "", user_id=uid)
+            and get_setting("wyze_api_key", "", user_id=uid)
+        ):
+            try:
+                from app.services.wyze_service import login_wyze, fetch_latest_wyze_scale_data
+                login_res = login_wyze(user_id=uid)
+                if login_res.get("success"):
+                    fetch_latest_wyze_scale_data(user_id=uid)
+            except Exception as e:
+                print(f"[PowerSync] Wyze auto-connect on settings save error: {e}")
     if payload.program_goal is not None:
         set_setting("program_goal", payload.program_goal, user_id=uid)
     if payload.program_target_ftp is not None:

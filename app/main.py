@@ -146,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.15.4",
-        "release_name": "Daily Training Streamline",
+        "version": "2.15.5",
+        "release_name": "Wyze Connections Dropdown & Dashboard Summary Fix",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -158,6 +158,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.15.5",
+                "date": "2026-11-18",
+                "title": "Wyze Connections Dropdown & Dashboard Summary Fix",
+                "items": [
+                    "Fixed get_wyze_scale_summary() accepting the limit parameter and returning a structured latest object so /api/dashboard resolves integrations.wyze.connected = true and displays live synced lbs in the Connections dropdown.",
+                    "Added automatic Wyze login & scale sync when saving Wyze credentials via Save Settings (POST /api/settings) or on dashboard refresh."
+                ]
+            },
             {
                 "version": "v2.15.4",
                 "date": "2026-11-18",

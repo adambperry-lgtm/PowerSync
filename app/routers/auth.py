@@ -636,5 +636,8 @@ def disconnect_service(service: str, request: Request):
         set_setting("whoop_tokens", None, user_id=uid)
     elif service == "wyze":
         set_setting("wyze_tokens", None, user_id=uid)
+        set_setting("wyze_password", "", user_id=uid)
+        set_setting("wyze_api_key", "", user_id=uid)
     return {"success": True}
+
 

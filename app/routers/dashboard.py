@@ -76,14 +76,23 @@ def get_dashboard_data(request: Request = None):
     intervals_icu_key = get_setting("intervals_icu_api_key", "", user_id=uid)
     intervals_athlete_id = get_setting("intervals_athlete_id", "", user_id=uid)
 
-    # Auto-sync Wyze Smart Scale if connected and >15 min elapsed since last sync
+    has_wyze_creds = bool(
+        get_setting("wyze_email", "", user_id=uid)
+        and get_setting("wyze_password", "", user_id=uid)
+        and get_setting("wyze_key_id", "", user_id=uid)
+        and get_setting("wyze_api_key", "", user_id=uid)
+    )
+    has_wyze_token = bool(wyze_tokens and isinstance(wyze_tokens, dict) and wyze_tokens.get("access_token"))
+
+    # Auto-sync Wyze Smart Scale if connected (or credentials saved) and >15 min elapsed since last sync
     wyze_auth_expired = False
     now_ts = datetime.datetime.now().timestamp()
-    if wyze_tokens and isinstance(wyze_tokens, dict) and wyze_tokens.get("access_token"):
+    if has_wyze_token or has_wyze_creds:
         last_wyze_sync = float(get_setting("last_wyze_sync_timestamp", 0.0, user_id=uid) or 0.0)
         if (now_ts - last_wyze_sync) > 900:
             try:
                 from app.services.wyze_service import fetch_latest_wyze_scale_data
+                set_setting("last_wyze_sync_timestamp", now_ts, user_id=uid)
                 wyze_res = fetch_latest_wyze_scale_data(user_id=uid)
                 if wyze_res.get("auth_expired"):
                     wyze_auth_expired = True
@@ -93,10 +102,11 @@ def get_dashboard_data(request: Request = None):
     try:
         from app.services.wyze_service import get_wyze_scale_summary
         wyze_summary = get_wyze_scale_summary(user_id=uid, limit=14)
-    except Exception:
-        wyze_summary = {"connected": False, "latest": None, "history": []}
+    except Exception as e:
+        print(f"[PowerSync] Wyze summary error in dashboard: {e}")
+        wyze_summary = {"connected": bool(has_wyze_token or has_wyze_creds), "latest": None, "history": []}
 
-    wyze_connected = bool(wyze_summary.get("connected"))
+    wyze_connected = bool(has_wyze_token or has_wyze_creds or wyze_summary.get("connected"))
     weight_kg = get_athlete_weight_kg(user_id=uid)
     weight_lbs = get_athlete_weight_lbs(user_id=uid)
     ftp_w_kg = round(float(ftp) / max(30.0, weight_kg), 2)

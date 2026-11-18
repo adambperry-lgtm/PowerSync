@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.15.5] - 2026-11-18
+### Fixed
+- **Wyze Connections Dropdown & Dashboard Summary Resolution**:
+  - Fixed [`get_wyze_scale_summary()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/wyze_service.py) in [`app/services/wyze_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/wyze_service.py) to accept the `limit` parameter passed by [`GET /api/dashboard`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/dashboard.py) and [`compile_athlete_context()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) and include the structured `latest` object expected by the frontend (`#badgeWyze`, `#cardAthlete`, and `#wyzeScaleSummaryBox`). Previously, passing `limit=14` in `app/routers/dashboard.py` raised a `TypeError` caught by a fallback block that forced `integrations.wyze.connected = False` in the top Connections dropdown.
+  - Updated [`POST /api/settings`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/settings.py) and [`GET /api/dashboard`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/dashboard.py) to automatically authenticate and sync with Wyze Cloud when all four Wyze credentials (`wyze_email`, `wyze_password`, `wyze_key_id`, `wyze_api_key`) are saved via **Save Settings**.
+
 ## [2.15.4] - 2026-11-18
 ### Removed
 - **Recent Workouts (Strava) Card from Daily Training Tab**:

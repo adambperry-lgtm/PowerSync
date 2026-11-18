@@ -662,15 +662,22 @@ def fetch_latest_wyze_scale_data(days: int = 90, user_id: Optional[str] = None) 
     }
 
 
-def get_wyze_scale_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
+def get_wyze_scale_summary(user_id: Optional[str] = None, limit: int = 30) -> Dict[str, Any]:
     """
     Returns the athlete's latest Wyze Smart Scale metrics (displayed in lbs, with W/kg power reference),
     7-day and 30-day weight trends, and recent weigh-in history.
     """
     uid = user_id or get_current_user_id()
     tokens = get_setting("wyze_tokens", None, user_id=uid)
-    wyze_connected = bool(isinstance(tokens, dict) and tokens.get("access_token"))
+    has_creds = bool(
+        get_setting("wyze_email", "", user_id=uid)
+        and get_setting("wyze_password", "", user_id=uid)
+        and get_setting("wyze_key_id", "", user_id=uid)
+        and get_setting("wyze_api_key", "", user_id=uid)
+    )
+    wyze_connected = bool((isinstance(tokens, dict) and tokens.get("access_token")) or has_creds)
     ftp = int(get_setting("athlete_ftp", 250, user_id=uid) or 250)
+    safe_limit = max(5, min(100, int(limit or 30)))
 
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -679,22 +686,22 @@ def get_wyze_scale_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
         SELECT * FROM wyze_scale_records
         WHERE user_id = ?
         ORDER BY measure_ts DESC
-        LIMIT 30
+        LIMIT ?
         """,
-        (uid,),
+        (uid, max(30, safe_limit)),
     )
     rows = [dict(r) for r in cursor.fetchall()]
     conn.close()
 
     weight_kg = get_athlete_weight_kg(user_id=uid)
     weight_lbs = get_athlete_weight_lbs(user_id=uid)
-    ftp_w_kg = round(ftp / max(35.0, weight_kg), 2)
+    ftp_w_kg = round(ftp / max(30.0, weight_kg), 2)
 
     if rows:
         latest_row = rows[0]
         latest_kg = round(float(latest_row["weight_kg"]), 2)
         latest_lbs = round(float(latest_row["weight_lbs"] or (latest_kg * KG_TO_LBS)), 1)
-        ftp_w_kg = round(ftp / max(35.0, latest_kg), 2)
+        ftp_w_kg = round(ftp / max(30.0, latest_kg), 2)
 
         # Compute 7-day and 30-day weight change in lbs
         latest_ts = int(latest_row["measure_ts"])
@@ -714,8 +721,37 @@ def get_wyze_scale_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
         bone_kg = latest_row.get("bone_mass_kg")
         bone_lbs = round(float(bone_kg) * KG_TO_LBS, 1) if bone_kg else None
 
+        try:
+            athlete_tz = get_athlete_timezone(user_id=uid)
+            measured_iso = datetime.datetime.fromtimestamp(latest_ts / 1000.0, tz=datetime.timezone.utc).astimezone(athlete_tz).strftime("%Y-%m-%dT%H:%M:%S")
+        except Exception:
+            measured_iso = latest_row["date"]
+
+        latest_obj = {
+            "id": latest_row["id"],
+            "date": latest_row["date"],
+            "measure_ts": latest_ts,
+            "measured_at_iso": measured_iso,
+            "weight_lbs": latest_lbs,
+            "weight_kg": latest_kg,
+            "ftp_w_kg": ftp_w_kg,
+            "delta_7d_lbs": delta_7d_lbs,
+            "delta_30d_lbs": delta_30d_lbs,
+            "body_fat_pct": latest_row.get("body_fat_pct"),
+            "body_water_pct": latest_row.get("body_water_pct"),
+            "muscle_mass_lbs": muscle_lbs,
+            "muscle_mass_kg": muscle_kg,
+            "lean_body_mass_lbs": lbm_lbs,
+            "bone_mass_lbs": bone_lbs,
+            "bmi": latest_row.get("bmi"),
+            "bmr": latest_row.get("bmr"),
+            "visceral_fat": latest_row.get("visceral_fat"),
+            "metabolic_age": latest_row.get("metabolic_age"),
+            "protein_pct": latest_row.get("protein_pct"),
+        }
+
         history_items = []
-        for r in rows[:14]:
+        for r in rows[:safe_limit]:
             r_kg = round(float(r["weight_kg"]), 2)
             r_lbs = round(float(r["weight_lbs"] or (r_kg * KG_TO_LBS)), 1)
             history_items.append({
@@ -724,7 +760,7 @@ def get_wyze_scale_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
                 "measure_ts": r["measure_ts"],
                 "weight_lbs": r_lbs,
                 "weight_kg": r_kg,
-                "w_kg_at_ftp": round(ftp / max(35.0, r_kg), 2),
+                "w_kg_at_ftp": round(ftp / max(30.0, r_kg), 2),
                 "body_fat_pct": r.get("body_fat_pct"),
                 "body_water_pct": r.get("body_water_pct"),
                 "muscle_mass_lbs": round(float(r["muscle_mass_kg"]) * KG_TO_LBS, 1) if r.get("muscle_mass_kg") else None,
@@ -753,6 +789,7 @@ def get_wyze_scale_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
             "visceral_fat": latest_row.get("visceral_fat"),
             "metabolic_age": latest_row.get("metabolic_age"),
             "protein_pct": latest_row.get("protein_pct"),
+            "latest": latest_obj,
             "history": history_items,
         }
 
@@ -779,5 +816,7 @@ def get_wyze_scale_summary(user_id: Optional[str] = None) -> Dict[str, Any]:
         "visceral_fat": None,
         "metabolic_age": None,
         "protein_pct": None,
+        "latest": None,
         "history": [],
     }
+
