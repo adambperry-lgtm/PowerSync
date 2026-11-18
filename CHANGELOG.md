@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.13] - 2026-11-18
+### Fixed
+- **Fueling Plan Preview Alignment**:
+  - Updated `app/routers/workouts.py` (`_attach_fueling_preview`) to compute and attach `carbs_per_hour_g` via `generate_fueling_plan()` on every indoor workout option and outdoor route option returned by `/api/workouts/recommend`, `/api/workouts/current`, and `/api/workouts/outdoor-recommendation`.
+  - Replaced hardcoded duration-only `carbPreview` approximations in `renderWorkoutOptions()` and `renderOutdoorOptions()` (`app/static/js/app.js`) with `formatCarbPreview()`, displaying the exact backend `carbs_per_hour_g` (with a matching fallback to `generate_fueling_plan()`'s Jeukendrup/ACSM brackets).
+  - Bumped `app.js?v=131` in `app/static/index.html`.
+
 ## [2.11.12] - 2026-11-17
 ### Changed
 - **Removed Redundant Top Bar on Workout Archive Tab**:

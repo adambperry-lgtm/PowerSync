@@ -145,9 +145,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.12",
-        "release_name": "Streamlined Workout Archive Header",
-        "build_date": "2026-11-17",
+        "version": "2.11.13",
+        "release_name": "Accurate Fueling Plan Previews",
+        "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -156,6 +156,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.13",
+                "date": "2026-11-18",
+                "title": "Accurate Fueling Plan Previews",
+                "items": [
+                    "Backend Fueling Preview: Attached exact carbs_per_hour_g from generate_fueling_plan() to all indoor workout and outdoor route options.",
+                    "Frontend Alignment: Replaced hardcoded card approximations in renderWorkoutOptions() and renderOutdoorOptions() with formatCarbPreview() so card previews match the proposed fueling plan 1:1 (including intensity and Whoop fatigue boosts).",
+                    "Asset Cache Busting: Bumped app.js?v=131."
+                ]
+            },
             {
                 "version": "v2.11.12",
                 "date": "2026-11-17",

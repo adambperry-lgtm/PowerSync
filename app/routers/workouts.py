@@ -28,6 +28,72 @@ def is_planned_custom_ride_description(text: str) -> bool:
     ])
     return has_outdoor_route
 
+
+def _get_user_fueling_context(uid: str) -> Dict[str, Any]:
+    ftp = int(get_setting("athlete_ftp", 250))
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+    whoop_row = c.fetchone()
+    conn.close()
+    rec_score = int(whoop_row["recovery_score"]) if whoop_row else 50
+    from app.services.whoop_service import get_trailing_whoop_stats
+    whoop_trailing = get_trailing_whoop_stats(days=7)
+    strava_trailing = get_strava_trailing_stats(days=7)
+    trailing_strain = float(whoop_trailing.get("trailing_7d_strain_avg") or strava_trailing.get("trailing_7d_strain_avg") or 11.0)
+    yesterday_tss = int(strava_trailing.get("yesterday_tss", 0))
+    return {
+        "ftp": ftp,
+        "recovery_score": rec_score,
+        "trailing_strain_avg": trailing_strain,
+        "yesterday_tss": yesterday_tss,
+    }
+
+
+def _attach_fueling_preview(
+    opt: Dict[str, Any],
+    ftp: int,
+    recovery_score: int,
+    trailing_strain_avg: float,
+    yesterday_tss: int,
+    is_outdoor: bool = False,
+) -> Dict[str, Any]:
+    if not isinstance(opt, dict):
+        return opt
+    dur_val = opt.get("duration_minutes")
+    if dur_val is None:
+        dur_val = opt.get("moving_time_min")
+    if dur_val is None and opt.get("moving_time_sec"):
+        dur_val = int(opt["moving_time_sec"]) // 60
+    if dur_val == 0 or opt.get("option_type") == "rest":
+        opt["carbs_per_hour_g"] = 0
+        return opt
+    dur_min = int(dur_val or 60)
+    dist_mi = float(
+        opt.get("distance_miles")
+        or (round(opt.get("distance_km", 0.0) * 0.621371, 1) if opt.get("distance_km") else 0.0)
+    )
+    avg_w = int(opt.get("average_watts") or round(ftp * 0.68))
+    intensity = opt.get("focus_area") or opt.get("target_zone") or opt.get("zone") or ("Zone 2 Base" if is_outdoor else "Endurance")
+    title = opt.get("title") or opt.get("name") or "Selected Ride"
+    plan = generate_fueling_plan(
+        duration_min=dur_min,
+        distance_miles=dist_mi,
+        avg_power_watts=avg_w,
+        ftp=ftp,
+        intensity_type=intensity,
+        ride_title=title,
+        athlete_weight_kg=70.0,
+        temp_f=78 if is_outdoor else 74,
+        humidity_pct=60 if is_outdoor else 50,
+        is_outdoor=is_outdoor,
+        recovery_score=recovery_score,
+        trailing_strain_avg=trailing_strain_avg,
+        yesterday_tss=yesterday_tss,
+    )
+    opt["carbs_per_hour_g"] = plan["target_rates"]["carbs_per_hour_g"]
+    return opt
+
 class WorkoutGenerateRequest(BaseModel):
     duration_min: Optional[int] = None
     intensity_adjust: Optional[int] = 0
@@ -449,12 +515,21 @@ def generate_workout(req: WorkoutGenerateRequest):
                 custom_req.route_source = "gpx_upload"
 
         replaced = replace_with_custom_ride(custom_req)
+        is_cust_out = (replaced["active_workout"].get("option_type") == "custom" and replaced["active_workout"].get("route_source") != "manual")
+        _attach_fueling_preview(replaced["active_workout"], ftp, rec_score, trailing_7d_strain_avg, yesterday_tss, is_outdoor=is_cust_out)
+        for opt in bundle["all_options"]:
+            _attach_fueling_preview(opt, ftp, rec_score, trailing_7d_strain_avg, yesterday_tss, is_outdoor=False)
         return {
             "active_workout": replaced["active_workout"],
             "options": [replaced["active_workout"]] + [o for o in bundle["all_options"] if o["id"] != replaced["active_workout"]["id"]],
             "fueling_plan": replaced["fueling_plan"],
             "is_custom_replaced": True
         }
+
+    for opt in bundle["all_options"]:
+        _attach_fueling_preview(opt, ftp, rec_score, trailing_7d_strain_avg, yesterday_tss, is_outdoor=False)
+    if "carbs_per_hour_g" not in active_workout:
+        _attach_fueling_preview(active_workout, ftp, rec_score, trailing_7d_strain_avg, yesterday_tss, is_outdoor=False)
 
     response_payload: Dict[str, Any] = {
         "active_workout": active_workout,
@@ -543,12 +618,24 @@ def get_current_workout():
         workout_cache.clear()
         workout_cache.update(scheduled)
         options_cache[scheduled.get("id", "workout_scheduled")] = scheduled
+        if "carbs_per_hour_g" not in scheduled or any("carbs_per_hour_g" not in o for o in options_cache.values()):
+            ctx = _get_user_fueling_context(uid)
+            _attach_fueling_preview(scheduled, **ctx, is_outdoor=False)
+            for o in options_cache.values():
+                if "carbs_per_hour_g" not in o:
+                    _attach_fueling_preview(o, **ctx, is_outdoor=False)
         return {
             "active_workout": scheduled,
             "options": list(options_cache.values())
         }
 
     if workout_cache:
+        if "carbs_per_hour_g" not in workout_cache or any("carbs_per_hour_g" not in o for o in options_cache.values()):
+            ctx = _get_user_fueling_context(uid)
+            _attach_fueling_preview(workout_cache, **ctx, is_outdoor=False)
+            for o in options_cache.values():
+                if "carbs_per_hour_g" not in o:
+                    _attach_fueling_preview(o, **ctx, is_outdoor=False)
         return {
             "active_workout": workout_cache,
             "options": list(options_cache.values())
@@ -992,6 +1079,11 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
     outdoor_cache.update(primary_ride)
 
     ftp = int(get_setting("athlete_ftp", 250))
+    for opt in outdoor_bundle["all_options"]:
+        _attach_fueling_preview(opt, ftp, rec_score, trailing_7d_strain_avg, yesterday_tss, is_outdoor=True)
+    if "carbs_per_hour_g" not in primary_ride:
+        _attach_fueling_preview(primary_ride, ftp, rec_score, trailing_7d_strain_avg, yesterday_tss, is_outdoor=True)
+
     outdoor_fueling = generate_fueling_plan(
         duration_min=int(primary_ride.get("moving_time_min") or (primary_ride.get("moving_time_sec", 3600) // 60) or 60),
         distance_miles=float(primary_ride.get("distance_miles") or (round(primary_ride.get("distance_km", 0.0) * 0.621371, 1) if primary_ride.get("distance_km") else 25.0)),

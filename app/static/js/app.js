@@ -1112,6 +1112,39 @@ function renderProgram(p) {
   }
 }
 
+function formatCarbPreview(opt) {
+  if (!opt) return "Hydration Only";
+  if (opt.duration_minutes === 0 || opt.option_type === "rest") return "Hydrate & Rest";
+  if (typeof opt.carbs_per_hour_g === "number") {
+    return opt.carbs_per_hour_g <= 0 ? "Hydration Only" : `~${opt.carbs_per_hour_g}g/h`;
+  }
+  const durMin = Math.max(
+    20,
+    Math.round(
+      opt.duration_minutes ??
+      opt.moving_time_min ??
+      (opt.moving_time_sec ? opt.moving_time_sec / 60 : 60)
+    )
+  );
+  const intensity = String(opt.focus_area || opt.target_zone || opt.zone || "").toLowerCase();
+  const ftp = Number(state.ftp || 250);
+  let pctFtp = 0.65;
+  if (opt.average_watts && opt.average_watts > 0 && ftp > 0) {
+    pctFtp = opt.average_watts / ftp;
+  } else if (intensity.includes("race") || intensity.includes("hard") || intensity.includes("vo2") || intensity.includes("threshold") || intensity.includes("anaerobic")) {
+    pctFtp = 0.88;
+  } else if (intensity.includes("tempo") || intensity.includes("group") || intensity.includes("sweet")) {
+    pctFtp = 0.78;
+  } else if (intensity.includes("recovery")) {
+    pctFtp = 0.52;
+  }
+  if (durMin < 45) return "Hydration Only";
+  if (durMin <= 75) return pctFtp < 0.75 ? "~35g/h" : "~45g/h";
+  if (durMin <= 135) return pctFtp < 0.75 ? "~50g/h" : "~60g/h";
+  if (durMin <= 210) return pctFtp < 0.75 ? "~65g/h" : "~75g/h";
+  return pctFtp < 0.75 ? "~80g/h" : "~90g/h";
+}
+
 // Render Alternative Workouts Selection Cards
 function renderWorkoutOptions(options, activeId) {
   if (!workoutOptionsGrid || !options || options.length === 0) return;
@@ -1120,7 +1153,7 @@ function renderWorkoutOptions(options, activeId) {
     const isActive = opt.id === activeId;
     const badgeColor = opt.badge_color === "emerald" ? "var(--accent-emerald)" : 
                        (opt.badge_color === "amber" ? "var(--accent-amber)" : "var(--accent-cyan)");
-    const carbPreview = (opt.duration_minutes === 0 || opt.option_type === "rest") ? "Hydrate & Rest" : (opt.duration_minutes <= 45 ? "~30g/h" : (opt.duration_minutes <= 75 ? "~60g/h" : "~75g/h"));
+    const carbPreview = formatCarbPreview(opt);
     const strainPreview = (opt.total_xss !== undefined && opt.total_xss > 0)
       ? `<span style="color:#c084fc;font-weight:600;" title="3-Tier Strain: ${opt.low_xss || 0} Low • ${opt.high_xss || 0} High • ${opt.peak_xss || 0} Peak">⚡ ${opt.total_xss} XSS</span>`
       : `<span>⚡ ~${opt.estimated_tss} TSS</span>`;
@@ -1815,8 +1848,7 @@ function renderOutdoorOptions(options, activeId) {
         </svg>
       </div>
     ` : '';
-    const durMin = opt.moving_time_min || (opt.moving_time_sec ? Math.round(opt.moving_time_sec / 60) : 60);
-    const carbPreview = durMin <= 60 ? "~60g/h" : (durMin <= 120 ? "~75g/h" : "~90g/h");
+    const carbPreview = formatCarbPreview(opt);
     const optDistMi = opt.distance_miles || (opt.distance_km ? parseFloat((opt.distance_km * 0.621371).toFixed(1)) : 0.0);
     const optElevFt = opt.elevation_gain_ft || (opt.elevation_gain_m ? Math.round(opt.elevation_gain_m * 3.28084) : 0);
 
