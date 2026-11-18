@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.12.1] - 2026-11-18
+### Fixed
+- **Google Maps Base Tiles for Ride History Heatmap & Inspector**:
+  - Switched `renderHistoryHeatmap()` and `openRideInspectorModal()` in `app/static/js/app.js` from CartoDB tiles to PowerSync's existing `getTileLayerConfig()` Google Maps tile layer (`https://mt{s}.google.com/vt/lyrs=...`) so the Ride History heatmap and ride mini-map render without requiring an external Carto/map API key.
+  - Bumped `app.js?v=134` in `app/static/index.html`.
+
 ## [2.12.0] - 2026-11-18
 ### Added
 - **Ride History & Explorer Tab (4th Top-Level Navbar Tab)**:

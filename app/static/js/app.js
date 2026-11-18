@@ -10225,10 +10225,11 @@ function renderHistoryHeatmap(heatmapRides) {
 
   if (!historyState.map) {
     historyState.map = L.map(container, { zoomControl: true, attributionControl: false }).setView([37.77, -122.41], 10);
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      maxZoom: 18,
-      subdomains: "abcd"
-    }).addTo(historyState.map);
+    const gKey = (typeof state !== "undefined" && state && state.googleMapsApiKey) || "";
+    const tileCfg = typeof getTileLayerConfig === "function"
+      ? getTileLayerConfig((typeof outdoorBaseLayerName !== "undefined" && outdoorBaseLayerName) || "google_roads", gKey)
+      : { url: "https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", options: { maxZoom: 20, subdomains: "0123" } };
+    L.tileLayer(tileCfg.url, tileCfg.options).addTo(historyState.map);
     historyState.mapLayerGroup = L.featureGroup().addTo(historyState.map);
   } else {
     historyState.mapLayerGroup.clearLayers();
@@ -10732,7 +10733,11 @@ async function openRideInspectorModal(rideId) {
         const pts = decodeStravaPolyline(r.polyline);
         if (!pts.length) return;
         const m = L.map(mapEl, { zoomControl: true, attributionControl: false });
-        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(m);
+        const gKey = (typeof state !== "undefined" && state && state.googleMapsApiKey) || "";
+        const tileCfg = typeof getTileLayerConfig === "function"
+          ? getTileLayerConfig((typeof outdoorBaseLayerName !== "undefined" && outdoorBaseLayerName) || "google_roads", gKey)
+          : { url: "https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}", options: { maxZoom: 20, subdomains: "0123" } };
+        L.tileLayer(tileCfg.url, tileCfg.options).addTo(m);
         const line = L.polyline(pts, { color: "#FF5E00", weight: 3.5, opacity: 0.9 }).addTo(m);
         m.fitBounds(line.getBounds(), { padding: [18, 18] });
         historyState.inspectorMap = m;

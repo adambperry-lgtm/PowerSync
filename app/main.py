@@ -146,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.12.0",
-        "release_name": "Ride History & Explorer Tab",
+        "version": "2.12.1",
+        "release_name": "Ride History Google Maps Tiles",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -157,6 +157,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.12.1",
+                "date": "2026-11-18",
+                "title": "Ride History Google Maps Tiles",
+                "items": [
+                    "Google Maps Base Layer: Switched the Ride History heatmap and Single-Ride Inspector mini-map from CartoDB to PowerSync's Google Maps Leaflet tile layer (getTileLayerConfig) so no external map API key is required.",
+                    "Asset Cache Busting: Bumped app.js?v=134."
+                ]
+            },
             {
                 "version": "v2.12.0",
                 "date": "2026-11-18",
