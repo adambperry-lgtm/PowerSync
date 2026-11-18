@@ -6,6 +6,8 @@ from app.services.ride_history_service import (
     get_ride_history_analytics,
     get_single_ride_detail,
 )
+from app.services.strava_service import fetch_recent_strava_activities
+from app.services.whoop_service import fetch_latest_whoop_metrics
 
 router = APIRouter(prefix="/api/history", tags=["history"])
 
@@ -14,19 +16,34 @@ router = APIRouter(prefix="/api/history", tags=["history"])
 def get_history_analytics_endpoint(
     range: Optional[str] = Query("90d"),
     env: Optional[str] = Query("all"),
+    sync: bool = Query(False),
 ):
     """
-    Returns historical ride analytics for the Ride History tab:
-    KPIs, volume breakdown, geographic heatmap polylines, CTL/ATL/TSB PMC curve,
-    Recovery x Performance correlation matrix, MMP power curve, Year in Sport recap,
-    and searchable ride log.
+    Returns historical ride analytics for the Ride History tab.
+    When sync=true, incrementally fetches newer Strava activities and Whoop
+    recovery metrics before computing the updated analytics payload.
     """
     uid = get_current_user_id()
-    return get_ride_history_analytics(
+    synced_new = False
+    if sync and uid and uid != "usr_guest":
+        try:
+            fetch_recent_strava_activities(limit=30, user_id=uid)
+            synced_new = True
+        except Exception as e:
+            print(f"Incremental Strava sync skipped during history refresh: {e}")
+        try:
+            fetch_latest_whoop_metrics(user_id=uid)
+            synced_new = True
+        except Exception as e:
+            print(f"Incremental Whoop sync skipped during history refresh: {e}")
+
+    res = get_ride_history_analytics(
         user_id=uid,
         range_key=range or "90d",
         env_filter=env or "all",
     )
+    res["synced_incremental"] = synced_new
+    return res
 
 
 @router.get("/ride/{ride_id}")

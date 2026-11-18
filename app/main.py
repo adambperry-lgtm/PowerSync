@@ -146,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.12.2",
-        "release_name": "3-Tier Strain Distribution Fix",
+        "version": "2.13.0",
+        "release_name": "Local Ride History DB & Incremental Sync",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -157,6 +157,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.13.0",
+                "date": "2026-11-18",
+                "title": "Local Ride History DB & Incremental Sync",
+                "items": [
+                    "Local IndexedDB Persistence: Ride History analytics are now cached locally in IndexedDB (PowerSyncRideHistoryDB) scoped per user, range, and environment for instant tab loads across reloads.",
+                    "Incremental Refresh Sync: Clicking Refresh triggers sync=true on /api/history/analytics to pull newer Strava rides and Whoop metrics and update the local database.",
+                    "Asset Cache Busting: Bumped app.js?v=135."
+                ]
+            },
             {
                 "version": "v2.12.2",
                 "date": "2026-11-18",

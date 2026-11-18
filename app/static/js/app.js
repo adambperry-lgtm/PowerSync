@@ -10055,7 +10055,7 @@ function initRideHistoryTab() {
     });
 
     document.getElementById("btnHistoryRefresh")?.addEventListener("click", () => {
-      loadRideHistoryAnalytics();
+      loadRideHistoryAnalytics({ forceSync: true });
     });
 
     document.getElementById("btnHistoryMapFit")?.addEventListener("click", () => {
@@ -10084,7 +10084,7 @@ function initRideHistoryTab() {
   }
 
   if (!historyState.data) {
-    loadRideHistoryAnalytics();
+    loadRideHistoryAnalytics({ forceSync: false });
   } else {
     requestAnimationFrame(() => {
       if (historyState.map) historyState.map.invalidateSize(true);
@@ -10092,34 +10092,115 @@ function initRideHistoryTab() {
   }
 }
 
-async function loadRideHistoryAnalytics() {
+function getHistoryCacheKey(range, env) {
+  const uid = (typeof currentAthleteUser !== "undefined" && currentAthleteUser && currentAthleteUser.id)
+    ? String(currentAthleteUser.id)
+    : "guest";
+  return `${uid}:${range}:${env}`;
+}
+
+function openHistoryIndexedDb() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+    const req = indexedDB.open("PowerSyncRideHistoryDB", 1);
+    req.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("analytics_cache")) {
+        db.createObjectStore("analytics_cache", { keyPath: "cache_key" });
+      }
+    };
+    req.onsuccess = (e) => resolve(e.target.result);
+    req.onerror = () => reject(req.error || new Error("IndexedDB open failed"));
+  });
+}
+
+async function getCachedHistoryAnalytics(range, env) {
+  try {
+    const db = await openHistoryIndexedDb();
+    return await new Promise((resolve) => {
+      const tx = db.transaction("analytics_cache", "readonly");
+      const store = tx.objectStore("analytics_cache");
+      const req = store.get(getHistoryCacheKey(range, env));
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch (_) {
+    return null;
+  }
+}
+
+async function saveCachedHistoryAnalytics(range, env, payload) {
+  if (!payload || payload.is_guest) return;
+  try {
+    const db = await openHistoryIndexedDb();
+    await new Promise((resolve) => {
+      const tx = db.transaction("analytics_cache", "readwrite");
+      const store = tx.objectStore("analytics_cache");
+      store.put({
+        cache_key: getHistoryCacheKey(range, env),
+        saved_at: new Date().toISOString(),
+        payload
+      });
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch (_) {}
+}
+
+async function loadRideHistoryAnalytics(opts = {}) {
+  const forceSync = Boolean(opts && opts.forceSync);
   if (historyState.loading) return;
   historyState.loading = true;
   const countPill = document.getElementById("historyRideCountPill");
-  if (countPill) countPill.textContent = "Loading...";
+  const refreshBtn = document.getElementById("btnHistoryRefresh");
+
+  if (!forceSync) {
+    const cached = await getCachedHistoryAnalytics(historyState.range, historyState.env);
+    if (cached && cached.payload && !cached.payload.is_guest) {
+      historyState.data = cached.payload;
+      renderAllRideHistoryModules(cached.payload, { fromLocalDb: true, savedAt: cached.saved_at });
+      historyState.loading = false;
+      return;
+    }
+  }
+
+  if (countPill) countPill.textContent = forceSync ? "Syncing newer rides..." : "Loading...";
+  if (refreshBtn) {
+    refreshBtn.disabled = true;
+    refreshBtn.textContent = forceSync ? "↻ Syncing..." : "↻ Loading...";
+  }
 
   try {
-    const url = `/api/history/analytics?range=${encodeURIComponent(historyState.range)}&env=${encodeURIComponent(historyState.env)}`;
+    const url = `/api/history/analytics?range=${encodeURIComponent(historyState.range)}&env=${encodeURIComponent(historyState.env)}${forceSync ? "&sync=true" : ""}`;
     const res = await fetch(url, { credentials: "same-origin" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     historyState.data = data;
-    renderAllRideHistoryModules(data);
+    await saveCachedHistoryAnalytics(historyState.range, historyState.env, data);
+    renderAllRideHistoryModules(data, { fromLocalDb: false, synced: forceSync });
   } catch (err) {
     console.error("Failed to load ride history analytics:", err);
     if (countPill) countPill.textContent = "Error loading";
   } finally {
     historyState.loading = false;
+    if (refreshBtn) {
+      refreshBtn.disabled = false;
+      refreshBtn.textContent = "↻ Refresh";
+    }
   }
 }
 
-function renderAllRideHistoryModules(data) {
+function renderAllRideHistoryModules(data, meta = {}) {
   const countPill = document.getElementById("historyRideCountPill");
   if (data.is_guest) {
     if (countPill) countPill.textContent = "Sign in to view history";
   } else {
     const cnt = (data.kpis && data.kpis.ride_count) || 0;
-    if (countPill) countPill.textContent = `${cnt} ride${cnt === 1 ? "" : "s"}`;
+    const suffix = meta.fromLocalDb ? " · Local DB" : (meta.synced ? " · Synced" : "");
+    if (countPill) countPill.textContent = `${cnt} ride${cnt === 1 ? "" : "s"}${suffix}`;
   }
 
   renderHistoryKpis(data.kpis || {}, data.deltas || {});

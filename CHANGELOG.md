@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.13.0] - 2026-11-18
+### Added
+- **Local IndexedDB Ride History Persistence & Incremental Refresh Sync**:
+  - Added browser-side `IndexedDB` (`PowerSyncRideHistoryDB`) caching in `app/static/js/app.js` keyed by `user_id:range:env` so opening the **Ride History** tab or switching filters renders immediately from the local database without re-fetching.
+  - Updated `GET /api/history/analytics` in `app/routers/history.py` with `sync=true` to incrementally pull newer Strava activities (`fetch_recent_strava_activities`) and Whoop metrics (`fetch_latest_whoop_metrics`) when clicking **↻ Refresh**, updating the local IndexedDB cache seamlessly.
+  - Bumped `app.js?v=135` in `app/static/index.html`.
+
 ## [2.12.2] - 2026-11-18
 ### Fixed
 - **Volume & Strain Distribution 3-Tier Strain Fix**:

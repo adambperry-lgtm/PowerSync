@@ -256,6 +256,13 @@ class TestRideHistoryTab(unittest.TestCase):
         self.assertEqual(resp_detail.status_code, 200)
         self.assertEqual(resp_detail.json()["ride"]["name"], "Morning Marin Loop")
 
+        resp_sync = self.client.get(
+            "/api/history/analytics?range=30d&env=all&sync=true",
+            headers={"x-user-id": self.test_uid},
+        )
+        self.assertEqual(resp_sync.status_code, 200)
+        self.assertIn("synced_incremental", resp_sync.json())
+
 
 if __name__ == "__main__":
     unittest.main()
