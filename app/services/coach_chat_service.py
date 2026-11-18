@@ -109,14 +109,27 @@ def compile_athlete_context() -> Dict[str, Any]:
         glyc_fatigued = "glycolytic" in sys_status_str or strain_systems.get("glycolytic_fatigued", False)
         neuro_fatigued = "neuromuscular" in sys_status_str or strain_systems.get("neuromuscular_fatigued", False)
 
+    from app.database import get_athlete_weight_kg, get_athlete_weight_lbs
+    from app.services.wyze_service import get_wyze_scale_summary
+    weight_kg = get_athlete_weight_kg()
+    weight_lbs = get_athlete_weight_lbs()
+    ftp_w_kg = round(float(ftp) / max(30.0, weight_kg), 2)
+    try:
+        wyze_summary = get_wyze_scale_summary(limit=5)
+    except Exception:
+        wyze_summary = {"connected": False, "latest": None}
+
     snapshot = {
         "local_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
         "athlete": {
             "ftp_watts": ftp,
+            "ftp_w_kg": ftp_w_kg,
             "w_prime_anaerobic_capacity_kj": w_prime_kj,
             "peak_power_watts": peak_power_watts,
             "max_hr_bpm": max_hr,
-            "weight_kg": 70.0,
+            "weight_lbs": weight_lbs,
+            "weight_kg": weight_kg,
+            "wyze_body_composition": wyze_summary.get("latest"),
             "power_zones": power_zones
         },
         "whoop_readiness_today": {

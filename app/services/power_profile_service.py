@@ -9,7 +9,9 @@ from app.database import (
     delete_setting,
     get_current_user_id,
     get_athlete_date,
-    resolve_strava_local_start
+    resolve_strava_local_start,
+    get_athlete_weight_kg,
+    get_athlete_weight_lbs
 )
 from app.services.strain_model_service import get_athlete_fitness_signature, is_cycling_sport
 
@@ -409,7 +411,8 @@ def get_power_spiderweb_profile(
     ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
     w_prime_kj = float(get_setting("athlete_w_prime_kj", 20.0, user_id=uid))
     peak_power = int(get_setting("athlete_peak_power_watts", 1050, user_id=uid))
-    weight_kg = float(get_setting("athlete_weight_kg", 70.0, user_id=uid))
+    weight_kg = get_athlete_weight_kg(user_id=uid)
+    weight_lbs = get_athlete_weight_lbs(user_id=uid)
 
     # Auto-sync live Strava activities if athlete has connected tokens and >60s elapsed since last sync
     strava_tokens = get_setting("strava_tokens", {}, user_id=uid)
@@ -837,7 +840,9 @@ def get_power_spiderweb_profile(
             "ftp_watts": ftp,
             "w_prime_kj": w_prime_kj,
             "peak_power_watts": peak_power,
-            "weight_kg": weight_kg
+            "weight_kg": weight_kg,
+            "weight_lbs": weight_lbs,
+            "ftp_w_kg": round(float(ftp) / max(30.0, weight_kg), 2)
         },
         "phenotype": {
             "title": phenotype,
@@ -902,7 +907,7 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
     """
     uid = user_id or get_current_user_id()
     ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
-    weight_kg = float(get_setting("athlete_weight_kg", 70.0, user_id=uid))
+    weight_kg = get_athlete_weight_kg(user_id=uid)
 
     goal_type = payload.get("goal_type", "phenotype") # "phenotype" or "duration"
     target_key = payload.get("target_key", "Puncheur")
@@ -1080,7 +1085,7 @@ def sync_spiderweb_goal_from_program(
     """
     uid = user_id or get_current_user_id()
     ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
-    weight_kg = float(get_setting("athlete_weight_kg", 70.0, user_id=uid))
+    weight_kg = get_athlete_weight_kg(user_id=uid)
     p_goal = program_goal or str(get_setting("program_goal", "FTP_BUILD", user_id=uid))
     p_target_ftp = int(program_target_ftp or get_setting("program_target_ftp", ftp + 15, user_id=uid))
 

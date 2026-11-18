@@ -10,6 +10,8 @@ from app.database import (
     get_db_connection,
     get_setting,
     resolve_strava_local_start,
+    get_athlete_weight_kg,
+    get_athlete_weight_lbs,
 )
 from app.services.power_profile_service import calculate_activity_peak_powers
 from app.services.strain_model_service import (
@@ -139,12 +141,12 @@ def _load_normalized_rides_and_whoop(
     Loads all cycling rides from strava_activities and all whoop_metrics for user_id,
     enriched with local date, TSS, EF, 3-tier strain, and polyline.
     """
-    ftp = _safe_float(get_setting("ftp", default=250, user_id=user_id), 250.0)
+    ftp = _safe_float(get_setting("athlete_ftp", default=None, user_id=user_id) or get_setting("ftp", default=250, user_id=user_id), 250.0)
     if ftp <= 0:
         ftp = 250.0
-    weight_kg = _safe_float(get_setting("weight_kg", default=75.0, user_id=user_id), 75.0)
+    weight_kg = get_athlete_weight_kg(user_id=user_id)
     if weight_kg <= 0:
-        weight_kg = 75.0
+        weight_kg = 70.0
 
     conn = get_db_connection()
     c = conn.cursor()
@@ -768,6 +770,7 @@ def get_ride_history_analytics(
         "env": env,
         "ftp": round(ftp),
         "weight_kg": round(weight_kg, 1),
+        "weight_lbs": get_athlete_weight_lbs(user_id=uid),
         "kpis": kpis,
         "deltas": deltas,
         "volume_buckets": volume_buckets,
@@ -816,5 +819,6 @@ def get_single_ride_detail(
         "ride": target,
         "ftp": round(ftp),
         "weight_kg": round(weight_kg, 1),
+        "weight_lbs": get_athlete_weight_lbs(user_id=uid),
         "similar_rides": similar,
     }

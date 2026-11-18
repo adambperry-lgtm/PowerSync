@@ -194,12 +194,16 @@ async function loadDashboard() {
     state.dashboard = data;
     state.whoop = data.whoop;
     state.strava = data.strava;
+    state.wyzeScale = data.wyze_scale || null;
     state.dayConfig = data.day_config;
     state.coachingPreferences = data.coaching_preferences;
     state.ftp = data.athlete.ftp || 250;
     state.maxHr = data.athlete.max_hr || 185;
     state.athleteWPrime = data.athlete.w_prime_kj !== undefined ? data.athlete.w_prime_kj : 20.0;
     state.athletePeakPower = data.athlete.peak_power_watts !== undefined ? data.athlete.peak_power_watts : 1050;
+    state.weightKg = data.athlete.weight_kg || 70.0;
+    state.weightLbs = data.athlete.weight_lbs || Number((state.weightKg * 2.20462262185).toFixed(1));
+    state.ftpWkg = data.athlete.ftp_w_kg || Number((state.ftp / Math.max(30, state.weightKg)).toFixed(2));
     state.trailingStrain = data.whoop ? (data.whoop.trailing_7d_strain_avg || data.whoop.day_strain) : null;
 
     if (data.program) {
@@ -549,6 +553,44 @@ function renderAthleteProfile() {
   valFtpDisplay.innerHTML = `${state.ftp} <span style="font-size:1.1rem;color:var(--text-secondary);font-weight:600;">W</span>`;
   valMaxHrDisplay.innerHTML = `${state.maxHr} <span style="font-size:0.9rem;color:var(--text-muted);">BPM</span>`;
 
+  const ftp = state.ftp || 250;
+  const peak = state.athletePeakPower || 1050;
+  const weightKg = state.weightKg || 70.0;
+  const weightLbs = state.weightLbs || Number((weightKg * 2.20462262185).toFixed(1));
+  const ftpWkg = (ftp / Math.max(30, weightKg)).toFixed(2);
+
+  const valFtpWkgSub = document.getElementById("valFtpWkgSub");
+  if (valFtpWkgSub) {
+    valFtpWkgSub.textContent = `${ftpWkg} W/kg`;
+  }
+
+  const valWeightLbsEl = document.getElementById("valWeightLbsDisplay");
+  if (valWeightLbsEl) {
+    valWeightLbsEl.innerHTML = `${Number(weightLbs).toFixed(1)} <span style="font-size:0.85rem;color:var(--text-secondary);font-weight:600;">lbs</span>`;
+  }
+
+  const lblWeightTitle = document.getElementById("lblWeightMetricTitle");
+  const valWeightSubEl = document.getElementById("valWeightSubDisplay");
+  const latestWyze = state.wyzeScale && state.wyzeScale.latest ? state.wyzeScale.latest : null;
+  if (lblWeightTitle) {
+    lblWeightTitle.textContent = (state.wyzeScale && state.wyzeScale.connected) || latestWyze
+      ? "BODY WEIGHT (WYZE)"
+      : "BODY WEIGHT (LBS)";
+  }
+  if (valWeightSubEl) {
+    const subParts = [];
+    if (latestWyze && latestWyze.body_fat_pct !== null && latestWyze.body_fat_pct !== undefined) {
+      subParts.push(`${Number(latestWyze.body_fat_pct).toFixed(1)}% BF`);
+    }
+    if (latestWyze && latestWyze.muscle_mass_lbs !== null && latestWyze.muscle_mass_lbs !== undefined) {
+      subParts.push(`${Number(latestWyze.muscle_mass_lbs).toFixed(1)} lb muscle`);
+    }
+    if (subParts.length === 0) {
+      subParts.push(`Power ref: ${Number(weightKg).toFixed(1)} kg`);
+    }
+    valWeightSubEl.textContent = subParts.join(" • ");
+  }
+
   const valWPrimeEl = document.getElementById("valWPrimeDisplay");
   if (valWPrimeEl) {
     valWPrimeEl.innerHTML = `${state.athleteWPrime !== undefined ? state.athleteWPrime : 20.0} <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">kJ</span>`;
@@ -557,9 +599,6 @@ function renderAthleteProfile() {
   if (valPeakPowerEl) {
     valPeakPowerEl.innerHTML = `${state.athletePeakPower !== undefined ? state.athletePeakPower : 1050} <span style="font-size:1rem;color:var(--text-secondary);font-weight:600;">W</span>`;
   }
-
-  const ftp = state.ftp || 250;
-  const peak = state.athletePeakPower || 1050;
 
   const elZ1 = document.getElementById("rangeZ1");
   if (elZ1) elZ1.textContent = `< ${Math.round(ftp * 0.55)} W`;
@@ -587,7 +626,9 @@ function renderAthleteProfile() {
 
   // Update collapsed summary for athlete profile
   const collapsedFtp = document.getElementById("collapsedAthleteFtp");
-  if (collapsedFtp) collapsedFtp.textContent = `FTP: ${state.ftp}W`;
+  if (collapsedFtp) collapsedFtp.textContent = `FTP: ${state.ftp}W (${ftpWkg} W/kg)`;
+  const collapsedWeight = document.getElementById("collapsedAthleteWeight");
+  if (collapsedWeight) collapsedWeight.textContent = `Weight: ${Number(weightLbs).toFixed(1)} lbs`;
   const collapsedWPrime = document.getElementById("collapsedAthleteWPrime");
   if (collapsedWPrime) collapsedWPrime.textContent = `W': ${state.athleteWPrime !== undefined ? state.athleteWPrime : 20.0} kJ`;
   const collapsedMaxHr = document.getElementById("collapsedAthleteMaxHr");
@@ -1112,19 +1153,52 @@ function renderIntegrations(integrations) {
     }
   }
 
+  const wyzeText = document.getElementById("wyzeStatusText");
+  const wyzeDot = document.getElementById("wyzeNavDot");
+  if (wyzeText) {
+    const isWyzeConnected = Boolean(integrations.wyze?.connected);
+    const isWyzeExpired = Boolean(integrations.wyze?.auth_expired);
+    if (isWyzeExpired) {
+      wyzeText.textContent = "Auth Expired";
+      if (wyzeDot) {
+        wyzeDot.className = "dot red";
+        wyzeDot.style.background = "#f43f5e";
+        wyzeDot.style.boxShadow = "0 0 8px rgba(244,63,94,0.6)";
+      }
+    } else if (isWyzeConnected) {
+      const latestW = state.wyzeScale && state.wyzeScale.latest ? state.wyzeScale.latest : null;
+      wyzeText.textContent = latestW && latestW.weight_lbs ? `${Number(latestW.weight_lbs).toFixed(1)} lbs` : "Connected";
+      if (wyzeDot) {
+        wyzeDot.className = "dot green";
+        wyzeDot.style.background = "#10b981";
+        wyzeDot.style.boxShadow = "0 0 8px #10b981";
+      }
+    } else {
+      wyzeText.textContent = "Not connected";
+      if (wyzeDot) {
+        wyzeDot.className = "dot gray";
+        wyzeDot.style.background = "#94a3b8";
+        wyzeDot.style.boxShadow = "none";
+      }
+    }
+  }
+
   // Update Connections Dropdown Summary (pill indicator & count badge)
   const summaryDot = document.getElementById("connectionsSummaryDot");
   const countBadge = document.getElementById("connectionsCountBadge");
   const btnDropdown = document.getElementById("btnConnectionsDropdown");
 
   let connectedCount = 0;
-  const totalServices = 4;
-  const hasExpired = Boolean(integrations.whoop?.auth_expired);
+  const totalServices = 5;
+  const hasExpired = Boolean(integrations.whoop?.auth_expired || integrations.wyze?.auth_expired);
 
   if (integrations.whoop?.connected && !integrations.whoop?.auth_expired) {
     connectedCount++;
   }
   if (integrations.strava?.connected) {
+    connectedCount++;
+  }
+  if (integrations.wyze?.connected && !integrations.wyze?.auth_expired) {
     connectedCount++;
   }
   if (Boolean(integrations.intervals_icu?.configured)) {
@@ -3212,6 +3286,12 @@ function openSettingsModal() {
 
       document.getElementById("settingFtp").value = s.athlete_ftp || 250;
       document.getElementById("settingMaxHr").value = s.athlete_max_hr || 185;
+      const weightLbsInput = document.getElementById("settingAthleteWeightLbs");
+      if (weightLbsInput) {
+        const wLbs = s.athlete_weight_lbs !== undefined ? s.athlete_weight_lbs : Number(((s.athlete_weight_kg || 70.0) * 2.20462262185).toFixed(1));
+        weightLbsInput.value = Number(wLbs).toFixed(1);
+      }
+      updateSettingsLiveWkgBadge();
       const wPrimeInput = document.getElementById("settingAthleteWPrime");
       if (wPrimeInput) wPrimeInput.value = s.athlete_w_prime_kj !== undefined ? s.athlete_w_prime_kj : 20.0;
       const peakPowerInput = document.getElementById("settingAthletePeakPower");
@@ -3271,6 +3351,9 @@ function openSettingsModal() {
         btnDisconnectWhoop.style.display = s.whoop_connected ? "inline-block" : "none";
       }
 
+      // Wyze Smart Scale Connection & Fields
+      renderWyzeSettingsSummary(s);
+
       // Intervals.icu / Zwift Connection Status
       const intervalsStat = document.getElementById("intervalsConnStatus");
       if (intervalsStat) {
@@ -3288,6 +3371,90 @@ function openSettingsModal() {
     });
 }
 
+function updateSettingsLiveWkgBadge() {
+  const badge = document.getElementById("settingLiveWkgBadge");
+  if (!badge) return;
+  const ftpVal = parseFloat(document.getElementById("settingFtp")?.value) || state.ftp || 250;
+  const lbsVal = parseFloat(document.getElementById("settingAthleteWeightLbs")?.value) || state.weightLbs || 154.3;
+  const kgVal = Math.max(30.0, lbsVal / 2.20462262185);
+  const wkg = (ftpVal / kgVal).toFixed(2);
+  badge.textContent = `${wkg} W/kg`;
+}
+
+function renderWyzeSettingsSummary(s) {
+  const wyzeEmailEl = document.getElementById("settingWyzeEmail");
+  const wyzePassEl = document.getElementById("settingWyzePassword");
+  const wyzeKeyIdEl = document.getElementById("settingWyzeKeyId");
+  const wyzeApiKeyEl = document.getElementById("settingWyzeApiKey");
+  const wyzeTotpEl = document.getElementById("settingWyzeTotp");
+  const wyzeStat = document.getElementById("wyzeConnStatus");
+  const btnConnectWyze = document.getElementById("btnConnectWyze");
+  const btnSyncWyze = document.getElementById("btnSyncWyzeScale");
+  const btnDisconnectWyze = document.getElementById("btnDisconnectWyze");
+  const summaryBox = document.getElementById("wyzeScaleSummaryBox");
+  const feedbackEl = document.getElementById("wyzeConnectFeedback");
+
+  if (feedbackEl) feedbackEl.style.display = "none";
+  if (wyzeEmailEl && s.wyze_email !== undefined) wyzeEmailEl.value = s.wyze_email || "";
+  if (wyzeKeyIdEl && s.wyze_key_id !== undefined) wyzeKeyIdEl.value = s.wyze_key_id || "";
+  if (wyzePassEl) {
+    wyzePassEl.value = "";
+    wyzePassEl.placeholder = s.wyze_password_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Wyze password";
+  }
+  if (wyzeApiKeyEl) {
+    wyzeApiKeyEl.value = "";
+    wyzeApiKeyEl.placeholder = s.wyze_api_key_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Wyze API Key";
+  }
+  if (wyzeTotpEl) {
+    wyzeTotpEl.value = "";
+    wyzeTotpEl.placeholder = s.wyze_totp_secret_set ? "•••••••••••• (TOTP Secret saved — or enter 6-digit code)" : "6-digit code (or base32 TOTP secret for automatic 2FA)";
+  }
+
+  const isConnected = Boolean(s.wyze_connected || (s.wyze_summary && s.wyze_summary.connected));
+  if (wyzeStat) {
+    wyzeStat.textContent = isConnected ? "Connected ✅" : "Not connected";
+    wyzeStat.style.color = isConnected ? "#10b981" : "#94a3b8";
+  }
+  if (btnConnectWyze) {
+    btnConnectWyze.textContent = isConnected ? "🔑 Update & Re-Sync Wyze" : "🔗 Connect & Sync Wyze Scale";
+  }
+  if (btnSyncWyze) {
+    btnSyncWyze.style.display = isConnected ? "inline-block" : "none";
+  }
+  if (btnDisconnectWyze) {
+    btnDisconnectWyze.style.display = isConnected ? "inline-block" : "none";
+  }
+
+  const latest = s.wyze_summary && s.wyze_summary.latest ? s.wyze_summary.latest : null;
+  if (summaryBox) {
+    if (latest && latest.weight_lbs) {
+      summaryBox.style.display = "block";
+      const ftpVal = parseFloat(document.getElementById("settingFtp")?.value) || s.athlete_ftp || state.ftp || 250;
+      const kgVal = latest.weight_kg || (latest.weight_lbs / 2.20462262185);
+      const wkg = (ftpVal / Math.max(30.0, kgVal)).toFixed(2);
+      const wText = document.getElementById("wyzeLatestWeightText");
+      const wkgText = document.getElementById("wyzeLatestWkgText");
+      const compText = document.getElementById("wyzeLatestCompText");
+      const dateText = document.getElementById("wyzeLatestDateText");
+      if (wText) wText.textContent = `⚖️ ${Number(latest.weight_lbs).toFixed(1)} lbs`;
+      if (wkgText) wkgText.textContent = `⚡ ${wkg} W/kg`;
+      if (compText) {
+        const compParts = [];
+        if (latest.body_fat_pct !== null && latest.body_fat_pct !== undefined) compParts.push(`${Number(latest.body_fat_pct).toFixed(1)}% Body Fat`);
+        if (latest.muscle_mass_lbs !== null && latest.muscle_mass_lbs !== undefined) compParts.push(`${Number(latest.muscle_mass_lbs).toFixed(1)} lbs Muscle`);
+        if (latest.body_water_pct !== null && latest.body_water_pct !== undefined) compParts.push(`${Number(latest.body_water_pct).toFixed(1)}% Water`);
+        compText.textContent = compParts.length ? `(${compParts.join(" · ")})` : "";
+      }
+      if (dateText) {
+        const iso = latest.measured_at_iso ? latest.measured_at_iso.replace("T", " ").substring(0, 16) : "Synced";
+        dateText.textContent = `Last weigh-in: ${iso}`;
+      }
+    } else {
+      summaryBox.style.display = "none";
+    }
+  }
+}
+
 function closeSettingsModal() {
   settingsModal.classList.remove("open");
 }
@@ -3297,6 +3464,11 @@ if (btnAdjustGoal) btnAdjustGoal.addEventListener("click", openSettingsModal);
 document.getElementById("btnEditFtp").addEventListener("click", openSettingsModal);
 btnCloseSettings.addEventListener("click", closeSettingsModal);
 btnCancelSettings.addEventListener("click", closeSettingsModal);
+
+const settingWeightLbsEl = document.getElementById("settingAthleteWeightLbs");
+if (settingWeightLbsEl) {
+  settingWeightLbsEl.addEventListener("input", updateSettingsLiveWkgBadge);
+}
 
 // Coaching Preferences Directives Add & Reset Event Listeners
 const btnAddDirective = document.getElementById("btnAddDirective");
@@ -3354,6 +3526,8 @@ const btnBannerOpenConnect = document.getElementById("btnBannerOpenConnect");
 if (btnBannerOpenConnect) btnBannerOpenConnect.addEventListener("click", openSettingsModal);
 document.getElementById("badgeWhoop").addEventListener("click", openSettingsModal);
 document.getElementById("badgeStrava").addEventListener("click", openSettingsModal);
+const badgeWyzeNav = document.getElementById("badgeWyze");
+if (badgeWyzeNav) badgeWyzeNav.addEventListener("click", openSettingsModal);
 document.getElementById("badgeZwift").addEventListener("click", openSettingsModal);
 const badgeGeminiNav = document.getElementById("badgeGemini");
 if (badgeGeminiNav) badgeGeminiNav.addEventListener("click", openSettingsModal);
@@ -3483,9 +3657,165 @@ if (btnDisconnectWhoop) {
   });
 }
 
+// Wyze Smart Scale Connect, Sync & Disconnect Listeners
+const btnConnectWyze = document.getElementById("btnConnectWyze");
+if (btnConnectWyze) {
+  btnConnectWyze.addEventListener("click", async () => {
+    const email = document.getElementById("settingWyzeEmail")?.value.trim() || "";
+    const password = document.getElementById("settingWyzePassword")?.value.trim() || "";
+    const keyId = document.getElementById("settingWyzeKeyId")?.value.trim() || "";
+    const apiKey = document.getElementById("settingWyzeApiKey")?.value.trim() || "";
+    const totpRaw = document.getElementById("settingWyzeTotp")?.value.trim() || "";
+    const feedbackEl = document.getElementById("wyzeConnectFeedback");
+
+    const isSixDigitCode = /^\d{6}$/.test(totpRaw);
+    const payload = {
+      email: email || undefined,
+      password: (password && !password.includes("•")) ? password : undefined,
+      key_id: keyId || undefined,
+      api_key: (apiKey && !apiKey.includes("•")) ? apiKey : undefined,
+      totp_code: isSixDigitCode ? totpRaw : undefined,
+      totp_secret: (!isSixDigitCode && totpRaw && !totpRaw.includes("•")) ? totpRaw : undefined
+    };
+
+    const origText = btnConnectWyze.textContent;
+    btnConnectWyze.textContent = "⏳ Connecting to Wyze...";
+    btnConnectWyze.disabled = true;
+    if (feedbackEl) {
+      feedbackEl.style.display = "block";
+      feedbackEl.style.color = "var(--text-secondary)";
+      feedbackEl.style.borderColor = "var(--border-color)";
+      feedbackEl.textContent = "Authenticating with Wyze Cloud API and discovering Smart Scale records...";
+    }
+
+    try {
+      const res = await fetch("/api/auth/wyze/connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        const latest = data.summary && data.summary.latest ? data.summary.latest : (data.sync && data.sync.latest ? data.sync.latest : null);
+        if (latest && latest.weight_lbs) {
+          const wInput = document.getElementById("settingAthleteWeightLbs");
+          if (wInput) wInput.value = Number(latest.weight_lbs).toFixed(1);
+          updateSettingsLiveWkgBadge();
+        }
+        renderWyzeSettingsSummary({
+          wyze_email: email,
+          wyze_key_id: keyId,
+          wyze_password_set: true,
+          wyze_api_key_set: true,
+          wyze_connected: true,
+          wyze_summary: data.summary
+        });
+        if (feedbackEl) {
+          feedbackEl.style.display = "block";
+          feedbackEl.style.color = "#00C896";
+          feedbackEl.style.borderColor = "rgba(0,200,150,0.4)";
+          feedbackEl.textContent = `✅ ${data.message || "Connected and synced Wyze Smart Scale!"}`;
+        }
+        showToast(`⚖️ ${data.message || "Wyze Smart Scale connected!"}`);
+        await loadDashboard();
+        if (typeof loadPowerSpiderweb === "function") {
+          await loadPowerSpiderweb(typeof currentSpiderwebTimeframe !== "undefined" ? currentSpiderwebTimeframe : "30d");
+        }
+      } else {
+        if (feedbackEl) {
+          feedbackEl.style.display = "block";
+          feedbackEl.style.color = "#ef4444";
+          feedbackEl.style.borderColor = "rgba(239,68,68,0.4)";
+          feedbackEl.textContent = `⚠️ ${data.error || "Failed to connect to Wyze."}`;
+        }
+        showToast(`⚠️ ${data.error || "Wyze connection failed"}`);
+      }
+    } catch (err) {
+      if (feedbackEl) {
+        feedbackEl.style.display = "block";
+        feedbackEl.style.color = "#ef4444";
+        feedbackEl.textContent = `⚠️ Network error: ${err.message || "Could not reach server"}`;
+      }
+      showToast("⚠️ Network error connecting to Wyze");
+    } finally {
+      btnConnectWyze.textContent = origText;
+      btnConnectWyze.disabled = false;
+    }
+  });
+}
+
+const btnSyncWyzeScale = document.getElementById("btnSyncWyzeScale");
+if (btnSyncWyzeScale) {
+  btnSyncWyzeScale.addEventListener("click", async () => {
+    const feedbackEl = document.getElementById("wyzeConnectFeedback");
+    const origText = btnSyncWyzeScale.textContent;
+    btnSyncWyzeScale.textContent = "⏳ Syncing...";
+    btnSyncWyzeScale.disabled = true;
+    try {
+      const res = await fetch("/api/auth/sync/wyze", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        const latest = data.latest || (data.summary && data.summary.latest);
+        if (latest && latest.weight_lbs) {
+          const wInput = document.getElementById("settingAthleteWeightLbs");
+          if (wInput) wInput.value = Number(latest.weight_lbs).toFixed(1);
+          updateSettingsLiveWkgBadge();
+        }
+        renderWyzeSettingsSummary({
+          wyze_email: document.getElementById("settingWyzeEmail")?.value || "",
+          wyze_key_id: document.getElementById("settingWyzeKeyId")?.value || "",
+          wyze_password_set: true,
+          wyze_api_key_set: true,
+          wyze_connected: true,
+          wyze_summary: data.summary
+        });
+        if (feedbackEl) {
+          feedbackEl.style.display = "block";
+          feedbackEl.style.color = "#00C896";
+          feedbackEl.style.borderColor = "rgba(0,200,150,0.4)";
+          feedbackEl.textContent = `✅ ${data.message || "Wyze Scale synced!"}`;
+        }
+        showToast(`⚖️ ${data.message || "Wyze Scale synced!"}`);
+        await loadDashboard();
+        if (typeof loadPowerSpiderweb === "function") {
+          await loadPowerSpiderweb(typeof currentSpiderwebTimeframe !== "undefined" ? currentSpiderwebTimeframe : "30d");
+        }
+      } else {
+        if (feedbackEl) {
+          feedbackEl.style.display = "block";
+          feedbackEl.style.color = "#ef4444";
+          feedbackEl.textContent = `⚠️ ${data.error || "Unable to sync Wyze Scale."}`;
+        }
+        showToast(`⚠️ ${data.error || "Wyze sync failed"}`);
+      }
+    } catch (err) {
+      showToast("⚠️ Wyze sync network error");
+    } finally {
+      btnSyncWyzeScale.textContent = origText;
+      btnSyncWyzeScale.disabled = false;
+    }
+  });
+}
+
+const btnDisconnectWyze = document.getElementById("btnDisconnectWyze");
+if (btnDisconnectWyze) {
+  btnDisconnectWyze.addEventListener("click", async () => {
+    if (!confirm("Are you sure you want to disconnect your Wyze Smart Scale?")) return;
+    try {
+      await fetch("/api/auth/disconnect/wyze", { method: "POST" });
+      showToast("Wyze Smart Scale disconnected");
+      openSettingsModal();
+      loadDashboard();
+    } catch (err) {
+      showToast("Error disconnecting Wyze Smart Scale");
+    }
+  });
+}
+
 btnSaveSettings.addEventListener("click", async () => {
   const intervalsApiKeyVal = document.getElementById("settingIntervalsApiKey") ? document.getElementById("settingIntervalsApiKey").value.trim() : "";
   const preferredMapLayerVal = document.getElementById("settingPreferredMapLayer") ? document.getElementById("settingPreferredMapLayer").value : "google_roads";
+  const weightLbsVal = parseFloat(document.getElementById("settingAthleteWeightLbs")?.value);
 
   const payload = {
     theme_mode: currentThemeMode,
@@ -3502,6 +3832,23 @@ btnSaveSettings.addEventListener("click", async () => {
     program_weekly_xss_target: parseInt(document.getElementById("settingProgramWeeklyXss")?.value, 10) || parseInt(document.getElementById("settingProgramWeeklyTss")?.value, 10) || 360,
     preferred_map_layer: preferredMapLayerVal
   };
+
+  if (!isNaN(weightLbsVal) && weightLbsVal > 50) {
+    payload.athlete_weight_lbs = Number(weightLbsVal.toFixed(1));
+  }
+
+  const wyzeEmailVal = document.getElementById("settingWyzeEmail")?.value.trim();
+  if (wyzeEmailVal !== undefined) payload.wyze_email = wyzeEmailVal;
+  const wyzeKeyIdVal = document.getElementById("settingWyzeKeyId")?.value.trim();
+  if (wyzeKeyIdVal !== undefined) payload.wyze_key_id = wyzeKeyIdVal;
+  const wyzePassVal = document.getElementById("settingWyzePassword")?.value.trim();
+  if (wyzePassVal && !wyzePassVal.includes("•")) payload.wyze_password = wyzePassVal;
+  const wyzeApiKeyVal = document.getElementById("settingWyzeApiKey")?.value.trim();
+  if (wyzeApiKeyVal && !wyzeApiKeyVal.includes("•")) payload.wyze_api_key = wyzeApiKeyVal;
+  const wyzeTotpVal = document.getElementById("settingWyzeTotp")?.value.trim();
+  if (wyzeTotpVal && !wyzeTotpVal.includes("•") && !/^\d{6}$/.test(wyzeTotpVal)) {
+    payload.wyze_totp_secret = wyzeTotpVal;
+  }
 
   const oldGoal = (state.program?.goal_id || "").toUpperCase();
   const newGoal = (payload.program_goal || "").toUpperCase();
@@ -3623,6 +3970,7 @@ if (settingProgramGoalEl) {
 if (settingFtpEl) {
   settingFtpEl.addEventListener("input", () => {
     updateTargetFtpFromProgramGoal(false);
+    updateSettingsLiveWkgBadge();
   });
 }
 

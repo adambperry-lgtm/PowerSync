@@ -530,6 +530,36 @@ def init_db():
     );
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS wyze_scale_records (
+        user_id TEXT NOT NULL DEFAULT 'usr_default',
+        id TEXT NOT NULL,
+        date TEXT NOT NULL,
+        measure_ts INTEGER NOT NULL,
+        weight_kg REAL NOT NULL,
+        weight_lbs REAL NOT NULL,
+        body_fat_pct REAL,
+        body_water_pct REAL,
+        muscle_mass_kg REAL,
+        lean_body_mass_kg REAL,
+        bone_mass_kg REAL,
+        bmi REAL,
+        bmr REAL,
+        visceral_fat REAL,
+        metabolic_age INTEGER,
+        protein_pct REAL,
+        device_mac TEXT,
+        device_model TEXT,
+        raw_json TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, id)
+    );
+    """)
+    cursor.execute("""
+    CREATE INDEX IF NOT EXISTS idx_wyze_scale_records_user_ts
+        ON wyze_scale_records(user_id, measure_ts DESC);
+    """)
+
     # Ensure default user exists so legacy single-user data is preserved
     cursor.execute("""
         INSERT OR IGNORE INTO users (id, email, name, picture)
@@ -583,6 +613,8 @@ def migrate_strava_activities_to_local_time():
 ENV_FALLBACK_ALIASES = {
     "athlete_ftp": ["ATHLETE_FTP", "FTP"],
     "athlete_max_hr": ["ATHLETE_MAX_HR", "MAX_HR"],
+    "athlete_weight_kg": ["ATHLETE_WEIGHT_KG", "WEIGHT_KG"],
+    "athlete_weight_lbs": ["ATHLETE_WEIGHT_LBS", "WEIGHT_LBS"],
     "intervals_icu_api_key": ["INTERVALS_ICU_API_KEY", "INTERVALS_API_KEY"],
     "intervals_athlete_id": ["INTERVALS_ATHLETE_ID", "INTERVALS_ID"],
     "strava_client_id": ["STRAVA_CLIENT_ID"],
@@ -595,7 +627,17 @@ ENV_FALLBACK_ALIASES = {
     "google_client_secret": ["GOOGLE_CLIENT_SECRET", "GOOGLE_OAUTH_CLIENT_SECRET"],
     "strava_tokens": ["STRAVA_TOKENS"],
     "whoop_tokens": ["WHOOP_TOKENS"],
+    "wyze_tokens": ["WYZE_TOKENS"],
+    "wyze_email": ["WYZE_EMAIL"],
+    "wyze_password": ["WYZE_PASSWORD"],
+    "wyze_key_id": ["WYZE_KEY_ID"],
+    "wyze_api_key": ["WYZE_API_KEY"],
+    "wyze_totp_secret": ["WYZE_TOTP_SECRET", "WYZE_TOTP_KEY"],
 }
+
+KG_TO_LBS = 2.20462262185
+DEFAULT_WEIGHT_KG = 75.0
+DEFAULT_WEIGHT_LBS = 165.3
 
 # App-wide global environment keys that can be shared across all users
 GLOBAL_ENV_KEYS = {
@@ -635,7 +677,11 @@ def get_setting(key: str, default: Any = None, user_id: Optional[str] = None) ->
                     return row["value"]
             return True
         # For sensitive personal credentials, guests NEVER inherit usr_default's credentials
-        if key in ("intervals_icu_api_key", "intervals_athlete_id", "strava_tokens", "whoop_tokens"):
+        if key in (
+            "intervals_icu_api_key", "intervals_athlete_id",
+            "strava_tokens", "whoop_tokens",
+            "wyze_tokens", "wyze_credentials", "wyze_email", "wyze_password", "wyze_key_id", "wyze_api_key", "wyze_totp_secret"
+        ):
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute("SELECT value FROM settings WHERE user_id = ? AND key = ?", (uid, key))
@@ -710,6 +756,105 @@ def delete_setting(key: str, user_id: Optional[str] = None):
     cursor.execute("DELETE FROM settings WHERE user_id = ? AND key = ?", (uid, key))
     conn.commit()
     conn.close()
+
+def get_athlete_weight_kg(user_id: Optional[str] = None) -> float:
+    """
+    Resolves the athlete's active body weight in kilograms (for W/kg power references).
+    Prioritizes:
+    1. Latest synced Wyze Smart Scale reading in wyze_scale_records (if present).
+    2. Explicit athlete_weight_kg or weight_kg or athlete_weight_lbs in settings.
+    3. Default 75.0 kg (165.3 lbs).
+    """
+    uid = user_id or get_current_user_id()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT weight_kg FROM wyze_scale_records WHERE user_id = ? AND weight_kg > 20 ORDER BY measure_ts DESC LIMIT 1",
+            (uid,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row and row["weight_kg"]:
+            w_kg = float(row["weight_kg"])
+            if 25.0 <= w_kg <= 250.0:
+                return round(w_kg, 2)
+    except Exception:
+        pass
+
+    raw_kg = get_setting("athlete_weight_kg", None, user_id=uid)
+    if raw_kg is None:
+        raw_kg = get_setting("weight_kg", None, user_id=uid)
+    if raw_kg is not None:
+        try:
+            w_kg = float(raw_kg)
+            if 25.0 <= w_kg <= 250.0:
+                return round(w_kg, 2)
+        except Exception:
+            pass
+
+    raw_lbs = get_setting("athlete_weight_lbs", None, user_id=uid)
+    if raw_lbs is not None:
+        try:
+            w_lbs = float(raw_lbs)
+            if 55.0 <= w_lbs <= 550.0:
+                return round(w_lbs / KG_TO_LBS, 2)
+        except Exception:
+            pass
+
+    return DEFAULT_WEIGHT_KG
+
+def get_athlete_weight_lbs(user_id: Optional[str] = None) -> float:
+    """
+    Resolves the athlete's active body weight in pounds (lbs) for UI display.
+    """
+    uid = user_id or get_current_user_id()
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT weight_lbs, weight_kg FROM wyze_scale_records WHERE user_id = ? AND weight_kg > 20 ORDER BY measure_ts DESC LIMIT 1",
+            (uid,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            if row["weight_lbs"] and float(row["weight_lbs"]) > 45.0:
+                return round(float(row["weight_lbs"]), 1)
+            if row["weight_kg"] and float(row["weight_kg"]) > 20.0:
+                return round(float(row["weight_kg"]) * KG_TO_LBS, 1)
+    except Exception:
+        pass
+
+    raw_lbs = get_setting("athlete_weight_lbs", None, user_id=uid)
+    if raw_lbs is not None:
+        try:
+            w_lbs = float(raw_lbs)
+            if 55.0 <= w_lbs <= 550.0:
+                return round(w_lbs, 1)
+        except Exception:
+            pass
+
+    w_kg = get_athlete_weight_kg(user_id=uid)
+    return round(w_kg * KG_TO_LBS, 1)
+
+def set_athlete_weight_kg(weight_kg: float, user_id: Optional[str] = None):
+    """Persists athlete weight in both kg and lbs across settings keys."""
+    uid = user_id or get_current_user_id()
+    w_kg = round(max(30.0, min(250.0, float(weight_kg))), 2)
+    w_lbs = round(w_kg * KG_TO_LBS, 1)
+    set_setting("athlete_weight_kg", w_kg, user_id=uid)
+    set_setting("weight_kg", w_kg, user_id=uid)
+    set_setting("athlete_weight_lbs", w_lbs, user_id=uid)
+
+def set_athlete_weight_lbs(weight_lbs: float, user_id: Optional[str] = None):
+    """Persists athlete weight from pounds (lbs) input into both lbs and kg settings keys."""
+    uid = user_id or get_current_user_id()
+    w_lbs = round(max(66.0, min(550.0, float(weight_lbs))), 1)
+    w_kg = round(w_lbs / KG_TO_LBS, 2)
+    set_setting("athlete_weight_lbs", w_lbs, user_id=uid)
+    set_setting("athlete_weight_kg", w_kg, user_id=uid)
+    set_setting("weight_kg", w_kg, user_id=uid)
 
 def get_all_settings(user_id: Optional[str] = None) -> Dict[str, Any]:
     uid = user_id or get_current_user_id()
@@ -1632,6 +1777,13 @@ def claim_or_copy_default_data_to_user(target_user_id: str) -> Dict[str, Any]:
         INSERT OR IGNORE INTO target_plans (user_id, id, title, target_date, description, distance_miles, elevation_gain_ft, estimated_duration_min, estimated_tss, intensity_type, route_source, strava_id, summary_polyline, svg_path, is_active, created_at)
         SELECT ?, id, title, target_date, description, distance_miles, elevation_gain_ft, estimated_duration_min, estimated_tss, intensity_type, route_source, strava_id, summary_polyline, svg_path, is_active, created_at
         FROM target_plans WHERE user_id = 'usr_default'
+    """, (target_user_id,))
+
+    # 6. Copy wyze scale records
+    cursor.execute("""
+        INSERT OR IGNORE INTO wyze_scale_records (user_id, id, date, measure_ts, weight_kg, weight_lbs, body_fat_pct, body_water_pct, muscle_mass_kg, lean_body_mass_kg, bone_mass_kg, bmi, bmr, visceral_fat, metabolic_age, protein_pct, device_mac, device_model, raw_json, updated_at)
+        SELECT ?, id, date, measure_ts, weight_kg, weight_lbs, body_fat_pct, body_water_pct, muscle_mass_kg, lean_body_mass_kg, bone_mass_kg, bmi, bmr, visceral_fat, metabolic_age, protein_pct, device_mac, device_model, raw_json, updated_at
+        FROM wyze_scale_records WHERE user_id = 'usr_default'
     """, (target_user_id,))
 
     conn.commit()

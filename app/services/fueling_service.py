@@ -1,5 +1,6 @@
 import math
 from typing import Dict, Any, List, Optional
+from app.database import get_athlete_weight_kg
 
 def generate_fueling_plan(
     duration_min: int = 60,
@@ -8,7 +9,7 @@ def generate_fueling_plan(
     ftp: int = 250,
     intensity_type: str = "Endurance",
     ride_title: str = "Training Ride",
-    athlete_weight_kg: float = 70.0,
+    athlete_weight_kg: Optional[float] = None,
     temp_f: int = 74,
     humidity_pct: int = 50,
     is_outdoor: bool = True,
@@ -23,6 +24,8 @@ def generate_fueling_plan(
     - Outdoor ambient weather (temperature, humidity, heat index)
     - Whoop physiological recovery score & acute/chronic trailing training stress
     """
+    if athlete_weight_kg is None or athlete_weight_kg <= 0:
+        athlete_weight_kg = get_athlete_weight_kg()
     dur_min = max(20, int(duration_min))
     dur_hours = dur_min / 60.0
     

@@ -4,7 +4,9 @@ from typing import Optional, Dict, Any
 from app.database import (
     get_setting, set_setting, get_all_settings,
     get_primary_owner_email, set_primary_owner_email,
-    get_current_user_id, DEFAULT_USER_ID, GUEST_USER_ID
+    get_current_user_id, DEFAULT_USER_ID, GUEST_USER_ID,
+    get_athlete_weight_kg, get_athlete_weight_lbs,
+    set_athlete_weight_kg, set_athlete_weight_lbs
 )
 
 def require_authenticated_user(request: Request) -> str:
@@ -31,6 +33,8 @@ class SettingsUpdate(BaseModel):
     athlete_max_hr: Optional[int] = None
     athlete_w_prime_kj: Optional[float] = None
     athlete_peak_power_watts: Optional[int] = None
+    athlete_weight_lbs: Optional[float] = None
+    athlete_weight_kg: Optional[float] = None
     demo_mode: Optional[bool] = None
     gemini_api_key: Optional[str] = None
     intervals_athlete_id: Optional[str] = None
@@ -39,6 +43,11 @@ class SettingsUpdate(BaseModel):
     strava_client_secret: Optional[str] = None
     whoop_client_id: Optional[str] = None
     whoop_client_secret: Optional[str] = None
+    wyze_email: Optional[str] = None
+    wyze_password: Optional[str] = None
+    wyze_key_id: Optional[str] = None
+    wyze_api_key: Optional[str] = None
+    wyze_totp_secret: Optional[str] = None
     program_goal: Optional[str] = None
     program_target_ftp: Optional[int] = None
     program_target_date: Optional[str] = None
@@ -72,7 +81,16 @@ def get_settings_endpoint(uid: str = Depends(require_authenticated_user)):
     whoop_secret = all_s.get("whoop_client_secret", "")
     google_client_id = all_s.get("google_client_id", "")
     google_secret = all_s.get("google_client_secret", "")
+    wyze_api_key = all_s.get("wyze_api_key", "")
+    wyze_password = all_s.get("wyze_password", "")
+    wyze_totp = all_s.get("wyze_totp_secret", "")
     owner_email = get_primary_owner_email() or ""
+
+    weight_kg = get_athlete_weight_kg(user_id=uid)
+    weight_lbs = get_athlete_weight_lbs(user_id=uid)
+
+    from app.services.wyze_service import get_wyze_scale_summary
+    wyze_summary = get_wyze_scale_summary(user_id=uid)
 
     return {
         "athlete_timezone": str(all_s.get("athlete_timezone", "America/New_York")),
@@ -80,6 +98,8 @@ def get_settings_endpoint(uid: str = Depends(require_authenticated_user)):
         "athlete_max_hr": int(all_s.get("athlete_max_hr", 185)),
         "athlete_w_prime_kj": float(all_s.get("athlete_w_prime_kj", 20.0)),
         "athlete_peak_power_watts": int(all_s.get("athlete_peak_power_watts", 1050)),
+        "athlete_weight_lbs": weight_lbs,
+        "athlete_weight_kg": weight_kg,
         "demo_mode": bool(all_s.get("demo_mode", not bool(all_s.get("whoop_tokens") or all_s.get("strava_tokens")))),
         "gemini_api_key_set": is_valid_secret(gemini_key),
         "google_maps_api_key_set": is_valid_secret(google_maps_key),
@@ -93,6 +113,13 @@ def get_settings_endpoint(uid: str = Depends(require_authenticated_user)):
         "strava_connected": bool(all_s.get("strava_tokens")),
         "whoop_client_secret_set": is_valid_secret(whoop_secret),
         "whoop_connected": bool(all_s.get("whoop_tokens")),
+        "wyze_connected": bool(all_s.get("wyze_tokens")),
+        "wyze_email": str(all_s.get("wyze_email", "")),
+        "wyze_key_id": str(all_s.get("wyze_key_id", "")),
+        "wyze_api_key_set": is_valid_secret(wyze_api_key),
+        "wyze_password_set": is_valid_secret(wyze_password),
+        "wyze_totp_secret_set": is_valid_secret(wyze_totp),
+        "wyze_summary": wyze_summary,
         "program_goal": all_s.get("program_goal", "FTP_BUILD"),
         "program_target_ftp": int(all_s.get("program_target_ftp", 265)),
         "program_target_date": all_s.get("program_target_date", ""),
@@ -126,6 +153,10 @@ def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require
         set_setting("athlete_w_prime_kj", payload.athlete_w_prime_kj)
     if payload.athlete_peak_power_watts is not None:
         set_setting("athlete_peak_power_watts", payload.athlete_peak_power_watts)
+    if payload.athlete_weight_lbs is not None and payload.athlete_weight_lbs > 40:
+        set_athlete_weight_lbs(payload.athlete_weight_lbs, user_id=uid)
+    elif payload.athlete_weight_kg is not None and payload.athlete_weight_kg > 20:
+        set_athlete_weight_kg(payload.athlete_weight_kg, user_id=uid)
     if payload.demo_mode is not None:
         set_setting("demo_mode", payload.demo_mode)
     if is_valid_secret(payload.gemini_api_key):
@@ -146,6 +177,16 @@ def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require
         set_setting("whoop_client_id", payload.whoop_client_id.strip())
     if is_valid_secret(payload.whoop_client_secret):
         set_setting("whoop_client_secret", payload.whoop_client_secret.strip())
+    if payload.wyze_email is not None and payload.wyze_email.strip():
+        set_setting("wyze_email", payload.wyze_email.strip(), user_id=uid)
+    if is_valid_secret(payload.wyze_password):
+        set_setting("wyze_password", payload.wyze_password.strip(), user_id=uid)
+    if payload.wyze_key_id is not None and payload.wyze_key_id.strip():
+        set_setting("wyze_key_id", payload.wyze_key_id.strip(), user_id=uid)
+    if is_valid_secret(payload.wyze_api_key):
+        set_setting("wyze_api_key", payload.wyze_api_key.strip(), user_id=uid)
+    if is_valid_secret(payload.wyze_totp_secret):
+        set_setting("wyze_totp_secret", payload.wyze_totp_secret.strip(), user_id=uid)
     if payload.program_goal is not None:
         set_setting("program_goal", payload.program_goal, user_id=uid)
     if payload.program_target_ftp is not None:
@@ -158,7 +199,13 @@ def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require
         set_setting("program_weekly_xss_target", payload.program_weekly_xss_target, user_id=uid)
 
     # Bidirectional Sync: Keep Spiderweb Target Envelope aligned with Long-Term Fitness Goal & Program
-    if payload.program_goal is not None or payload.program_target_ftp is not None or payload.athlete_ftp is not None:
+    if (
+        payload.program_goal is not None
+        or payload.program_target_ftp is not None
+        or payload.athlete_ftp is not None
+        or payload.athlete_weight_lbs is not None
+        or payload.athlete_weight_kg is not None
+    ):
         try:
             from app.services.power_profile_service import sync_spiderweb_goal_from_program
             sync_spiderweb_goal_from_program(

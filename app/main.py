@@ -146,17 +146,28 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.14.0",
-        "release_name": "Coach FTP Test Readiness & Timing Advisor",
+        "version": "2.15.0",
+        "release_name": "Wyze Smart Scale Integration & Dual-Unit Weight Engine (lbs UI / W/kg Power)",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
+            "wyze": "Wyze Scale Cloud API (Pluto & Classic Scale)",
             "zwift": "Intervals.icu Cloud Bridge",
             "ai_coach":"Google Gemini 3 Flash / 3.8 Flash (Tool Calling)",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.15.0",
+                "date": "2026-11-18",
+                "title": "Wyze Smart Scale Integration & Dual-Unit Weight Engine",
+                "items": [
+                    "Wyze Smart Scale Cloud Sync: Added native Wyze Scale API client (app/services/wyze_service.py) supporting Scale, Scale S, Scale X, and Scale Ultra with triple-MD5 authentication, Developer Key ID + API Key, TOTP 2FA, and an Apple ID Sign-In setup guide.",
+                    "Dual-Unit Weight Architecture: Displays body weight in lbs across the UI (Athlete Power Profile, Connections menu, and Settings) while automatically converting and storing kg for all W/kg power references (5-axis Power Spiderweb, phenotype benchmarks, Ride History MMP curve, and pre-ride fueling).",
+                    "Automatic & Manual Scale Sync: Auto-syncs latest Wyze weigh-in and body composition (body fat %, muscle mass, body water %) on dashboard load with 1-click Connect & Sync in Settings."
+                ]
+            },
             {
                 "version": "v2.14.0",
                 "date": "2026-11-18",

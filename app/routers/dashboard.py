@@ -1,6 +1,9 @@
 from fastapi import APIRouter, Request
 import datetime
-from app.database import get_setting, set_setting, get_db_connection, get_current_user_id, get_user_by_id, get_athlete_date
+from app.database import (
+    get_setting, set_setting, get_db_connection, get_current_user_id,
+    get_user_by_id, get_athlete_date, get_athlete_weight_kg, get_athlete_weight_lbs
+)
 from app.services.mock_data import get_mock_whoop_data, get_mock_strava_activities, get_mock_weekly_stats
 from app.services.program_service import get_current_program
 from app.services.strain_model_service import get_coggan_power_zones
@@ -34,14 +37,19 @@ def get_dashboard_data(request: Request = None):
                 "max_hr": 185,
                 "w_prime_kj": 20.0,
                 "peak_power_watts": 1050,
+                "weight_kg": 70.0,
+                "weight_lbs": 154.3,
+                "ftp_w_kg": 3.57,
                 "power_zones": get_coggan_power_zones(250, 1050)
             },
             "integrations": {
                 "whoop": {"connected": False, "auth_expired": False},
                 "strava": {"connected": False},
+                "wyze": {"connected": False, "auth_expired": False},
                 "gemini": {"configured": False},
                 "intervals_icu": {"configured": False}
             },
+            "wyze_scale": None,
             "program": None,
             "whoop": None,
             "day_config": None,
@@ -56,16 +64,42 @@ def get_dashboard_data(request: Request = None):
     
     whoop_tokens = get_setting("whoop_tokens", None, user_id=uid)
     strava_tokens = get_setting("strava_tokens", None, user_id=uid)
+    wyze_tokens = get_setting("wyze_tokens", None, user_id=uid)
     
     # If athlete has connected real tokens, demo_mode is always False
     demo_mode_setting = get_setting("demo_mode", False, user_id=uid)
-    demo_mode = False if (whoop_tokens or strava_tokens) else bool(demo_mode_setting)
+    demo_mode = False if (whoop_tokens or strava_tokens or wyze_tokens) else bool(demo_mode_setting)
     
     ftp = get_setting("athlete_ftp", 250, user_id=uid)
     max_hr = get_setting("athlete_max_hr", 185, user_id=uid)
     gemini_key = get_setting("gemini_api_key", "", user_id=uid)
     intervals_icu_key = get_setting("intervals_icu_api_key", "", user_id=uid)
     intervals_athlete_id = get_setting("intervals_athlete_id", "", user_id=uid)
+
+    # Auto-sync Wyze Smart Scale if connected and >15 min elapsed since last sync
+    wyze_auth_expired = False
+    now_ts = datetime.datetime.now().timestamp()
+    if wyze_tokens and isinstance(wyze_tokens, dict) and wyze_tokens.get("access_token"):
+        last_wyze_sync = float(get_setting("last_wyze_sync_timestamp", 0.0, user_id=uid) or 0.0)
+        if (now_ts - last_wyze_sync) > 900:
+            try:
+                from app.services.wyze_service import fetch_latest_wyze_scale_data
+                wyze_res = fetch_latest_wyze_scale_data(user_id=uid)
+                if wyze_res.get("auth_expired"):
+                    wyze_auth_expired = True
+            except Exception as e:
+                print(f"[PowerSync] Wyze auto-sync error in dashboard: {e}")
+
+    try:
+        from app.services.wyze_service import get_wyze_scale_summary
+        wyze_summary = get_wyze_scale_summary(user_id=uid, limit=14)
+    except Exception:
+        wyze_summary = {"connected": False, "latest": None, "history": []}
+
+    wyze_connected = bool(wyze_summary.get("connected"))
+    weight_kg = get_athlete_weight_kg(user_id=uid)
+    weight_lbs = get_athlete_weight_lbs(user_id=uid)
+    ftp_w_kg = round(float(ftp) / max(30.0, weight_kg), 2)
     
     # Whoop Data: prioritize athlete's private whoop_metrics table records
     today_iso = get_athlete_date().isoformat()
@@ -261,14 +295,19 @@ def get_dashboard_data(request: Request = None):
             "max_hr": max_hr,
             "w_prime_kj": w_prime_kj,
             "peak_power_watts": peak_power,
+            "weight_kg": weight_kg,
+            "weight_lbs": weight_lbs,
+            "ftp_w_kg": ftp_w_kg,
             "power_zones": get_coggan_power_zones(ftp, peak_power)
         },
         "integrations": {
             "whoop": {"connected": whoop_connected, "auth_expired": whoop_auth_expired},
             "strava": {"connected": strava_connected},
+            "wyze": {"connected": wyze_connected, "auth_expired": wyze_auth_expired},
             "gemini": {"configured": bool(gemini_key and "•" not in gemini_key)},
             "intervals_icu": {"configured": bool(intervals_icu_key and "•" not in intervals_icu_key and intervals_athlete_id)}
         },
+        "wyze_scale": wyze_summary,
         "program": program_data,
         "whoop": whoop_data,
         "day_config": day_config,

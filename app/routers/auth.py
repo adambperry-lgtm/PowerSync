@@ -551,6 +551,79 @@ def sync_whoop():
     set_setting("last_whoop_sync_timestamp", now_ts, user_id=uid)
     return {"success": True, "metrics": metrics}
 
+
+class WyzeConnectPayload(BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = None
+    key_id: Optional[str] = None
+    api_key: Optional[str] = None
+    totp_code: Optional[str] = None
+    totp_secret: Optional[str] = None
+
+
+@router.post("/wyze/connect")
+def connect_wyze(payload: WyzeConnectPayload):
+    uid = get_current_user_id()
+    if uid == GUEST_USER_ID:
+        return {"success": False, "error": "Authentication required. Please sign in to connect your Wyze Smart Scale."}
+
+    from app.services.wyze_service import login_wyze, fetch_latest_wyze_scale_data, get_wyze_scale_summary
+    login_res = login_wyze(
+        email=payload.email,
+        password=payload.password,
+        key_id=payload.key_id,
+        api_key=payload.api_key,
+        totp_code=payload.totp_code,
+        totp_secret=payload.totp_secret,
+        user_id=uid
+    )
+    if not login_res.get("success"):
+        return login_res
+
+    sync_res = fetch_latest_wyze_scale_data(user_id=uid)
+    try:
+        from app.services.power_profile_service import sync_spiderweb_goal_from_program
+        sync_spiderweb_goal_from_program(user_id=uid)
+    except Exception:
+        pass
+
+    return {
+        "success": True,
+        "message": sync_res.get("message") or login_res.get("message") or "Connected to Wyze Smart Scale.",
+        "sync": sync_res,
+        "summary": get_wyze_scale_summary(user_id=uid)
+    }
+
+
+@router.post("/sync/wyze")
+def sync_wyze():
+    uid = get_current_user_id()
+    if uid == GUEST_USER_ID:
+        return {"success": False, "error": "Authentication required. Please sign in to sync your Wyze Smart Scale."}
+
+    from app.services.wyze_service import fetch_latest_wyze_scale_data, get_wyze_scale_summary
+    sync_res = fetch_latest_wyze_scale_data(user_id=uid)
+    if sync_res.get("success"):
+        try:
+            from app.services.power_profile_service import sync_spiderweb_goal_from_program
+            sync_spiderweb_goal_from_program(user_id=uid)
+        except Exception:
+            pass
+    return {
+        **sync_res,
+        "summary": get_wyze_scale_summary(user_id=uid)
+    }
+
+
+@router.get("/wyze/records")
+def get_wyze_records(limit: int = 30):
+    uid = get_current_user_id()
+    if uid == GUEST_USER_ID:
+        return {"connected": False, "latest": None, "history": []}
+    from app.services.wyze_service import get_wyze_scale_summary
+    return get_wyze_scale_summary(user_id=uid, limit=limit)
+
+
 @router.post("/disconnect/{service}")
 def disconnect_service(service: str, request: Request):
     uid = get_current_user_id()
@@ -561,4 +634,7 @@ def disconnect_service(service: str, request: Request):
         set_setting("strava_tokens", None, user_id=uid)
     elif service == "whoop":
         set_setting("whoop_tokens", None, user_id=uid)
+    elif service == "wyze":
+        set_setting("wyze_tokens", None, user_id=uid)
     return {"success": True}
+

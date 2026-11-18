@@ -3,6 +3,17 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.15.0] - 2026-11-18
+### Added
+- **Wyze Smart Scale Cloud API Integration & Apple ID Setup Guide**:
+  - Added [`app/services/wyze_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/wyze_service.py) implementing native Wyze Cloud authentication (`https://auth-prod.api.wyze.com/api/user/login` with triple-MD5 password hashing, Developer `Key ID` + `API Key`, token refresh, and optional RFC 6238 TOTP / 6-digit 2FA) and dual-service scale telemetry discovery across both Wyze Pluto (`Scale S`, `Scale X`, `Scale Ultra`, `BodyScan`) and Classic Scale (`JA.SC`, `JA.SC2`) services.
+  - Added `wyze_scale_records` table (strictly scoped by `(user_id, id)`) in [`app/database.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) storing normalized weight (`weight_lbs`, `weight_kg`) and body composition (`body_fat_pct`, `body_water_pct`, `muscle_mass_lbs`/`kg`, `lean_body_mass_lbs`/`kg`, `bone_mass_lbs`/`kg`, `bmi`, `bmr`, `visceral_fat`, `metabolic_age`, `protein_pct`).
+  - Added `POST /api/auth/wyze/connect`, `POST /api/auth/sync/wyze`, `GET /api/auth/wyze/records`, and `POST /api/auth/disconnect/wyze` in [`app/routers/auth.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/auth.py), plus automatic 15-minute dashboard sync in [`app/routers/dashboard.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/dashboard.py).
+  - Added the **⚖️ Wyze Smart Scale Integration** card in Settings ([`app/static/index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`app/static/js/app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js)) including a collapsible **🍎 Apple ID Login Setup Guide** explaining how Apple Sign-In users set an API password on their Apple ID email and generate a Wyze Developer API key without affecting Apple Sign-In in the Wyze mobile app.
+- **Dual-Unit Weight Architecture (`lbs` in UI, `W/kg` for Power References)**:
+  - Added `get_athlete_weight_kg()`, `get_athlete_weight_lbs()`, `set_athlete_weight_kg()`, and `set_athlete_weight_lbs()` in [`app/database.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) and unified weight resolution across [`app/services/power_profile_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py), [`app/services/ride_history_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/ride_history_service.py), [`app/services/fueling_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/fueling_service.py), and [`app/services/coach_chat_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py).
+  - Updated **Athlete Power Profile & Training Zones** (`#cardAthlete`), **Connections Dropdown** (`#badgeWyze`), and **Athlete Fitness Signature** in Settings to display weight in **`lbs`** alongside live **`W/kg`** power-to-weight ratios.
+
 ## [2.14.0] - 2026-11-18
 ### Added
 - **Coach FTP Test Readiness & Timing Advisor**:
