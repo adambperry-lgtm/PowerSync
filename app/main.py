@@ -145,8 +145,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.13",
-        "release_name": "Accurate Fueling Plan Previews",
+        "version": "2.11.14",
+        "release_name": "Outdoor Route Briefing & UI Polish",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +156,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.11.14",
+                "date": "2026-11-18",
+                "title": "Outdoor Route Briefing & UI Polish",
+                "items": [
+                    "Outdoor Alternative Route Briefings: Generated tailored ai_rationale and coaching_tips for all alternative outdoor route options so Ride Briefing • Route Analysis is always populated when switching options.",
+                    "Outdoor Header Cleanup: Restyled the Route Map header thumbnail for light-theme contrast, removed the redundant inline Collapse Tile button, and bumped style.css?v=69 & app.js?v=132."
+                ]
+            },
             {
                 "version": "v2.11.13",
                 "date": "2026-11-18",

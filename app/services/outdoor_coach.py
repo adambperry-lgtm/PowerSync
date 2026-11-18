@@ -489,7 +489,35 @@ def build_outdoor_ride_recommendation(
     for idx, alt in enumerate(alternatives):
         alt["badge"] = f"Option {idx + 2} · {alt['match_score']}%"
         alt["badge_color"] = "emerald" if alt["moving_time_min"] < primary_match["moving_time_min"] else "purple"
-        alt["zone_badge"] = target_zone
+        alt["zone_badge"] = zone_badge
+        alt["target_zone"] = target_zone
+        alt["ai_rationale"] = generate_outdoor_coaching_rationale(
+            primary_match=alt,
+            target_zone=target_zone,
+            recovery_score=recovery_score,
+            hrv_rmssd=hrv_rmssd,
+            recent_volume_hours=recent_volume_hours,
+            trailing_7d_strain_avg=trailing_7d_strain_avg,
+            trailing_7d_high_strain_count=trailing_7d_high_strain_count,
+            target_duration_min=target_duration_min,
+            ftp=ftp,
+            is_recovery_needed=is_recovery_needed,
+            recent_weighted_strain=recent_weighted_strain,
+            yesterday_strain=yesterday_strain,
+            total_tss=total_tss,
+            acute_weighted_tss=acute_weighted_tss,
+            yesterday_tss=yesterday_tss,
+            load_profile=load_profile,
+            strain_profile=strain_profile,
+            is_recent_fatigue_surge=is_recent_fatigue_surge,
+            is_front_loaded_fresh=is_front_loaded_fresh,
+            user_note=user_note
+        )
+        alt["coaching_tips"] = generate_outdoor_execution_tips(
+            primary_match=alt,
+            target_zone=target_zone,
+            ftp=ftp
+        )
 
     return {
         "primary": primary_match,

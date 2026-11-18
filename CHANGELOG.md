@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.11.14] - 2026-11-18
+### Fixed
+- **Outdoor Ride Briefing & Route Analysis Blank State**:
+  - Updated `recommend_outdoor_ride()` in `app/services/outdoor_coach.py` to generate tailored `ai_rationale` and `coaching_tips` for all alternative route options (`alternatives`) as well as `primary_match`, plus added a client-side fallback in `selectOutdoorOption()` (`app/static/js/app.js`) so selecting Option 2, 3, or 4 never leaves **Ride Briefing • Route Analysis** blank.
+- **Outdoor Ride Header & Route Map Thumbnail Cleanup**:
+  - Restyled `.outdoor-header-thumb-card` (`🗺️ Route Map`) in `app/static/css/style.css` with a crisp white card surface (`#FFFFFF`), subtle border, and compact sizing, removed the redundant `▲ Collapse Tile` button from `#outdoorContainer` (`app/static/index.html`), and bumped `style.css?v=69` and `app.js?v=132`.
+
 ## [2.11.13] - 2026-11-18
 ### Fixed
 - **Fueling Plan Preview Alignment**:

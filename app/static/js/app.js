@@ -1775,7 +1775,9 @@ function renderOutdoorRide(r) {
   if (outdoorDurationBadge) outdoorDurationBadge.textContent = r.moving_time_formatted || `${r.moving_time_min}m`;
   if (outdoorDistBadge) outdoorDistBadge.textContent = `${rDistMi} mi`;
   if (outdoorElevBadge) outdoorElevBadge.textContent = `${rElevFt.toLocaleString()} ft Elev`;
-  if (outdoorRationale) outdoorRationale.textContent = r.ai_rationale || "";
+  if (outdoorRationale) {
+    outdoorRationale.textContent = r.ai_rationale || `Matched '${r.name || "Outdoor Ride"}' (${rDistMi} mi, ${rElevFt.toLocaleString()} ft elev) to today's ${r.zone_badge || r.target_zone || "training"} target.`;
+  }
   
   // Update collapsed stage header tags for outdoor mode
   const colTitle = document.getElementById("collapsedWorkoutTitle");
