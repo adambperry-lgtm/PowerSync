@@ -272,6 +272,9 @@ async function loadDashboard() {
             if (freshData && freshData.strava) {
               state.strava = freshData.strava;
               renderStrava(freshData.strava);
+              if (typeof loadDebrief === "function") {
+                loadDebrief();
+              }
             }
           })
           .catch(syncErr => {
@@ -4661,6 +4664,8 @@ async function triggerDebriefAnalysis(note = "") {
     });
     if (!res.ok) throw new Error("Debrief regenerate failed");
     const data = await res.json();
+    state.dailyDebrief = data;
+    state.activeCoachView = "completed";
     renderDebrief(data);
     if (note) {
       const tabDebriefOutlook = document.getElementById("tabDebriefOutlook");

@@ -35,4 +35,4 @@ def regenerate_daily_debrief(req: RegenerateReviewRequest):
             "today_review": None,
             "forward_outlook": []
         }
-    return generate_ai_review_and_outlook(custom_prompt=req.user_note or "")
+    return generate_ai_review_and_outlook(custom_prompt=req.user_note or "", force_refresh=True)

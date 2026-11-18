@@ -146,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.15.0",
-        "release_name": "Wyze Smart Scale Integration & Dual-Unit Weight Engine (lbs UI / W/kg Power)",
+        "version": "2.15.1",
+        "release_name": "Sticky Daily Ride Debrief Caching",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -158,6 +158,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.15.1",
+                "date": "2026-11-18",
+                "title": "Sticky Daily Ride Debrief Caching",
+                "items": [
+                    "Persistent Daily Ride Debrief Cache: Cached the analyzed ride debrief per user by local calendar date and activity signature so reloading the tab restores the Ride Debrief instantly without re-running AI analysis.",
+                    "Automatic New-Activity Invalidation: Syncing a new Strava activity today automatically invalidates the cache and re-evaluates the day's sessions collectively; explicit Regenerate also refreshes on demand.",
+                    "Frontend Coalescing & Sticky View: Coalesced concurrent debrief fetches on startup and kept the Ride Debrief view sticky for the rest of the day (app.js?v=138)."
+                ]
+            },
             {
                 "version": "v2.15.0",
                 "date": "2026-11-18",

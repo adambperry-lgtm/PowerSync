@@ -1723,12 +1723,42 @@ def build_daily_review_and_outlook_local(
         }
     }
 
-def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
+def _build_debrief_activity_signature(today_iso: str, day_acts: List[Dict[str, Any]], latest_act: Optional[Dict[str, Any]]) -> str:
+    act_ids = sorted([str(a.get("id") or "") for a in (day_acts or []) if isinstance(a, dict) and a.get("id") is not None])
+    latest_id = str(latest_act.get("id") or "") if isinstance(latest_act, dict) else ""
+    return f"{today_iso}|{latest_id}|{','.join(act_ids)}"
+
+
+def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool = False) -> Dict[str, Any]:
     """
     Main entry point: pulls live Whoop and Strava telemetry,
     checks if Gemini LLM is enabled (and uses it for deep qualitative insights),
     or uses our local sports-science model.
+
+    Caches the generated debrief per user for the rest of the local calendar day
+    for the current activity signature so tab reloads are instant and sticky
+    unless another activity is synced or force_refresh=True is requested.
     """
+    uid = get_current_user_id()
+    today_iso = get_athlete_date(uid).isoformat()
+
+    act_info = get_today_and_recent_activities()
+    today_acts = act_info.get("today_activities", [])
+    day_acts = act_info.get("day_activities", today_acts)
+    latest_act = act_info.get("latest_activity")
+
+    activity_signature = _build_debrief_activity_signature(today_iso, day_acts, latest_act)
+    has_custom_note = bool(custom_prompt and custom_prompt.strip())
+
+    if not force_refresh and not has_custom_note:
+        cached = get_setting("cached_daily_debrief", None, user_id=uid)
+        if (
+            isinstance(cached, dict)
+            and cached.get("signature") == activity_signature
+            and isinstance(cached.get("review"), dict)
+        ):
+            return dict(cached["review"])
+
     from app.routers.dashboard import get_dashboard_data
     dash = get_dashboard_data()
     
@@ -1738,20 +1768,14 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
     program = dash.get("program", {})
     ftp = int(athlete.get("ftp", 250))
     max_hr = int(athlete.get("max_hr", 185))
-    
-    act_info = get_today_and_recent_activities()
-    today_acts = act_info.get("today_activities", [])
-    day_acts = act_info.get("day_activities", today_acts)
-    latest_act = act_info.get("latest_activity")
-    
-    today_iso = get_athlete_date().isoformat()
-    if custom_prompt and custom_prompt.strip():
-        set_setting("latest_debrief_athlete_note", custom_prompt.strip())
-        set_setting("latest_debrief_athlete_note_date", today_iso)
+
+    if has_custom_note:
+        set_setting("latest_debrief_athlete_note", custom_prompt.strip(), user_id=uid)
+        set_setting("latest_debrief_athlete_note_date", today_iso, user_id=uid)
     else:
-        saved_date = get_setting("latest_debrief_athlete_note_date", "")
+        saved_date = get_setting("latest_debrief_athlete_note_date", "", user_id=uid)
         if saved_date == today_iso:
-            custom_prompt = get_setting("latest_debrief_athlete_note", "")
+            custom_prompt = get_setting("latest_debrief_athlete_note", "", user_id=uid)
         else:
             custom_prompt = ""
 
@@ -1827,6 +1851,20 @@ def generate_ai_review_and_outlook(custom_prompt: str = "") -> Dict[str, Any]:
     else:
         if custom_prompt and "Athlete Note:" not in base_review["today_assessment"]["assessment_text"]:
             base_review["today_assessment"]["assessment_text"] += f"\n\nAthlete Note: '{custom_prompt}' — accounted for in fatigue decay and forward outlook modeling."
+
+    try:
+        review_to_cache = {k: v for k, v in base_review.items() if k != "strava"}
+        set_setting(
+            "cached_daily_debrief",
+            {
+                "signature": activity_signature,
+                "date": today_iso,
+                "review": review_to_cache,
+            },
+            user_id=uid,
+        )
+    except Exception as cache_err:
+        print(f"Failed to cache daily debrief: {cache_err}")
 
     return base_review
 

@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.15.1] - 2026-11-18
+### Changed
+- **Sticky Daily Ride Debrief Caching**:
+  - Updated `generate_ai_review_and_outlook()` in [`app/services/review_coach.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) to persist the generated ride debrief in user-scoped `cached_daily_debrief` settings keyed by local calendar date and evaluated activity IDs (`today_iso|latest_id|day_activity_ids`), so reloading the tab returns the existing debrief immediately without re-analyzing the ride.
+  - Cache automatically invalidates when a new activity is synced, when the local calendar date rolls over, or when explicitly regenerating via `POST /api/review/regenerate` (`force_refresh=True`) in [`app/routers/review.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/review.py).
+  - Updated `loadDebrief()`, background Strava auto-sync, and `triggerDebriefAnalysis()` in [`app/static/js/app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`app.js?v=138`) to coalesce concurrent debrief requests, keep Ride Debrief sticky for the rest of the day, and automatically switch to Ride Debrief when a newly synced activity is detected.
+
 ## [2.15.0] - 2026-11-18
 ### Added
 - **Wyze Smart Scale Cloud API Integration & Apple ID Setup Guide**:
