@@ -83,7 +83,6 @@ const rangeZ5 = document.getElementById("rangeZ5");
 const rangeVO2 = document.getElementById("rangeVO2");
 const rangeZ6 = document.getElementById("rangeZ6");
 const rangeZ7 = document.getElementById("rangeZ7");
-const recentActivitiesBody = document.getElementById("recentActivitiesBody");
 
 // Mode Switcher DOM
 const tabModeIndoor = document.getElementById("tabModeIndoor");
@@ -485,70 +484,6 @@ function renderStrava(strava) {
   if (collapsedStravaTss) collapsedStravaTss.textContent = `${ws.total_tss || 0} TSS`;
   const collapsedStravaForm = document.getElementById("collapsedStravaForm");
   if (collapsedStravaForm && ws.form_status) collapsedStravaForm.textContent = ws.form_status;
-
-  // Populate Activities Table
-  const acts = strava.recent_activities || [];
-  if (acts.length === 0) {
-    recentActivitiesBody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--text-muted);">No recent activities found.</td></tr>`;
-    return;
-  }
-
-  recentActivitiesBody.innerHTML = acts.map(a => {
-    const durMin = Math.round((a.moving_time_sec || 0) / 60);
-    const durStr = durMin >= 60 ? `${Math.floor(durMin / 60)}h ${durMin % 60}m` : `${durMin}m`;
-    const distMiles = a.distance_miles ? a.distance_miles.toFixed(1) : ((a.distance_meters || 0) * 0.000621371).toFixed(1);
-    const dateStr = a.start_date ? a.start_date.substring(0, 10) : "";
-    const xssVal = a.total_xss !== undefined ? Math.round(a.total_xss) : Math.round(a.suffer_score || 0);
-    const tssVal = Math.round(a.suffer_score || 0);
-    const lowXss = a.low_xss !== undefined ? Math.round(a.low_xss) : Math.round(xssVal * 0.8);
-    const highXss = a.high_xss !== undefined ? Math.round(a.high_xss) : Math.round(xssVal * 0.2);
-    const focusDuration = a.focus_duration || (a.sport_type === 'Ride' ? 'Endurance / Century (>1h Focus)' : 'Cardio');
-    
-    return `
-      <tr>
-        <td style="color:var(--text-muted);white-space:nowrap;">${dateStr}</td>
-        <td style="font-weight:600;">${a.name}</td>
-        <td><span class="badge-status" style="font-size:0.7rem;padding:0.15rem 0.4rem;">${a.sport_type}</span></td>
-        <td style="white-space:nowrap;">${durStr}</td>
-        <td style="white-space:nowrap;">${distMiles} mi</td>
-        <td style="font-weight:600;color:var(--accent-cyan);white-space:nowrap;">${Math.round(a.weighted_average_watts || a.average_watts || 0)} W</td>
-        <td style="white-space:nowrap;">${Math.round(a.average_heartrate || 0)} bpm</td>
-        <td>
-          <div style="display:flex;flex-direction:column;gap:2px;">
-            <div style="display:flex;align-items:center;gap:4px;white-space:nowrap;">
-              <span style="color:#a78bfa;font-weight:700;">⚡ ${xssVal} XSS</span>
-              <span style="font-size:0.75rem;color:var(--text-muted);font-weight:500;">(~${tssVal} TSS)</span>
-            </div>
-            <div style="font-size:0.7rem;color:var(--text-secondary);white-space:nowrap;">
-              <span style="color:#10b981;">${lowXss}L</span> • <span style="color:#f59e0b;">${highXss}H</span>
-            </div>
-          </div>
-        </td>
-        <td>
-          <span class="badge-status" style="font-size:0.7rem;padding:0.15rem 0.4rem;background:rgba(6,182,212,0.12);color:#06b6d4;border-color:rgba(6,182,212,0.25);white-space:nowrap;">
-            ${focusDuration}
-          </span>
-        </td>
-      </tr>
-    `;
-  }).join("");
-
-  // Update collapsed summary for recent workouts
-  if (acts.length > 0) {
-    const latest = acts[0];
-    const latestDurMin = Math.round((latest.moving_time_sec || 0) / 60);
-    const latestDurStr = latestDurMin >= 60 ? `${Math.floor(latestDurMin / 60)}h ${latestDurMin % 60}m` : `${latestDurMin}m`;
-    const latestTss = Math.round(latest.suffer_score || latest.total_xss || 0);
-
-    const collapsedRecentTitle = document.getElementById("collapsedRecentTitle");
-    if (collapsedRecentTitle) collapsedRecentTitle.textContent = latest.name || "Latest Workout";
-    const collapsedRecentSport = document.getElementById("collapsedRecentSport");
-    if (collapsedRecentSport) collapsedRecentSport.textContent = latest.sport_type || "Ride";
-    const collapsedRecentDur = document.getElementById("collapsedRecentDur");
-    if (collapsedRecentDur) collapsedRecentDur.textContent = latestDurStr;
-    const collapsedRecentTss = document.getElementById("collapsedRecentTss");
-    if (collapsedRecentTss) collapsedRecentTss.textContent = `${latestTss} TSS`;
-  }
 }
 
 // Render Athlete Profile
@@ -3037,39 +2972,6 @@ btnPushZwift.addEventListener("click", async () => {
   } finally {
     btnPushZwift.textContent = "🚀 Send to Zwift";
     btnPushZwift.disabled = false;
-  }
-});
-
-// Sync Strava manually
-document.getElementById("btnSyncStrava").addEventListener("click", async () => {
-  const btn = document.getElementById("btnSyncStrava");
-  btn.textContent = "Syncing...";
-  btn.disabled = true;
-  try {
-    const res = await fetch("/api/auth/sync/strava", { method: "POST" });
-    let data;
-    try {
-      data = await res.json();
-    } catch (_) {
-      throw new Error(`Server returned HTTP ${res.status}`);
-    }
-    await loadDashboard();
-    await loadWorkout(state.currentDuration, state.currentIntensity, "");
-    await loadDebrief();
-    if (data.success && data.count > 0) {
-      showToast(`✅ Synced ${data.count} Strava activities!`);
-    } else if (data.success && data.count === 0) {
-      showToast("ℹ️ Strava is up to date (no new activities).");
-    } else if (data.auth_expired) {
-      showToast("⚠️ Strava token expired. Please re-authorize or check Client Secret in Settings.");
-    } else {
-      showToast(`⚠️ Strava sync: ${data.error || "Unable to sync"}`);
-    }
-  } catch (err) {
-    showToast("⚠️ Strava sync failed: " + (err.message || "Network error"));
-  } finally {
-    btn.textContent = "Sync Now";
-    btn.disabled = false;
   }
 });
 
@@ -8850,7 +8752,6 @@ let coachTodayCollapsible = null;
 let programCollapsible = null;
 let upcomingPlanCollapsible = null;
 let coachDebriefCollapsible = null;
-let recentWorkoutsCollapsible = null;
 let powerSpiderwebCollapsible = null;
 let athleteCardCollapsible = null;
 let archiveLibraryCollapsible = null;
@@ -8976,7 +8877,7 @@ function initMainViewSwitcher() {
       if (currentActiveMainView !== "archive") {
         switchMainDashboardView("archive", true);
       }
-    } else if (["#cardWhoop", "#cardStrava", "#cardAiCoachToday", "#workoutStageSection", "#cardUpcomingPlan", "#cardCoachDebrief", "#cardRecentWorkouts"].includes(href)) {
+    } else if (["#cardWhoop", "#cardStrava", "#cardAiCoachToday", "#workoutStageSection", "#cardUpcomingPlan", "#cardCoachDebrief"].includes(href)) {
       if (currentActiveMainView !== "daily") {
         switchMainDashboardView("daily", true);
       }
@@ -9009,8 +8910,7 @@ function getAllCollapsiblesList() {
     coachTodayCollapsible,
     upcomingPlanCollapsible,
     { isCollapsed: () => isWorkoutStageCollapsed(), setCollapsed: (c, cb, um) => setWorkoutStageCollapsed(c, cb, um) },
-    coachDebriefCollapsible,
-    recentWorkoutsCollapsible
+    coachDebriefCollapsible
   ].filter(Boolean);
 }
 
@@ -9106,15 +9006,6 @@ function initAllCollapsibleTiles() {
     toggleIconId: "coachDebriefToggleIcon",
     toggleTextId: "coachDebriefToggleText",
     storageKey: "coachDebriefCollapsed"
-  });
-
-  recentWorkoutsCollapsible = setupCollapsibleTile({
-    cardId: "cardRecentWorkouts",
-    headerId: "recentWorkoutsHeader",
-    toggleBtnId: "btnToggleRecentWorkouts",
-    toggleIconId: "recentWorkoutsToggleIcon",
-    toggleTextId: "recentWorkoutsToggleText",
-    storageKey: "recentWorkoutsCollapsed"
   });
 
   powerSpiderwebCollapsible = setupCollapsibleTile({

@@ -146,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.15.3",
-        "release_name": "Ride Inspector Pop-Up Modal Fix",
+        "version": "2.15.4",
+        "release_name": "Daily Training Streamline",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -158,6 +158,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.15.4",
+                "date": "2026-11-18",
+                "title": "Daily Training Streamline",
+                "items": [
+                    "Removed Recent Workouts (Strava) from Daily Training: Removed the redundant #cardRecentWorkouts table from the Daily Training tab now that full ride logs and analytics live in the Ride History tab.",
+                    "Asset Cache Busting: Bumped app.js?v=141 and style.css?v=70."
+                ]
+            },
             {
                 "version": "v2.15.3",
                 "date": "2026-11-18",

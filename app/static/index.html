@@ -15,7 +15,7 @@
     document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.setAttribute("data-theme-mode", "light");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=69">
+  <link rel="stylesheet" href="/static/css/style.css?v=70">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -1346,57 +1346,6 @@
       </div> <!-- End #coachDebriefBody -->
     </section>
 
-    <!-- Bottom Section: Recent Activities Feed -->
-    <section class="card collapsible-tile" id="cardRecentWorkouts">
-      <div class="card-header collapsible-tile-header" id="recentWorkoutsHeader" role="button" tabindex="0" title="Click to collapse or expand Recent Workouts" aria-expanded="true">
-        <div class="card-header-left">
-          <span class="card-header-icon">🚴</span>
-          <div>
-            <span class="card-title">Recent Workouts (Strava)</span>
-            <!-- Collapsed Summary Chips (Visible when collapsed) -->
-            <div class="collapsible-tile-summary" id="recentWorkoutsCollapsedSummary" style="display:none;margin-top:0.25rem;">
-              <span class="collapsed-summary-title" id="collapsedRecentTitle">Latest Workout</span>
-              <span class="tag tag-focus" id="collapsedRecentSport">Ride</span>
-              <span class="tag tag-dur" id="collapsedRecentDur">--m</span>
-              <span class="tag tag-tss" id="collapsedRecentTss">-- TSS</span>
-            </div>
-          </div>
-        </div>
-        <div style="display:flex;align-items:center;gap:0.5rem;">
-          <button class="btn btn-secondary" style="padding:0.25rem 0.6rem;font-size:0.75rem;" id="btnSyncStrava">
-            Sync Now
-          </button>
-          <button class="btn btn-secondary btn-stage-collapse" id="btnToggleRecentWorkouts" type="button" aria-label="Collapse or expand recent workouts">
-            <span id="recentWorkoutsToggleIcon">▲</span>
-            <span id="recentWorkoutsToggleText">Collapse</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Collapsible Body Container -->
-      <div class="collapsible-tile-body" id="recentWorkoutsBody">
-        <div style="overflow-x:auto;">
-          <table class="recent-workouts-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Activity Name</th>
-                <th>Sport</th>
-                <th>Duration</th>
-                <th>Distance</th>
-                <th>Avg Power</th>
-                <th>Avg HR</th>
-                <th>Strain (XSS &amp; TSS)</th>
-                <th>Focus Duration</th>
-              </tr>
-            </thead>
-            <tbody id="recentActivitiesBody">
-              <tr><td colspan="9" style="text-align:center;color:var(--text-muted);">Loading activity logs...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
   </div> <!-- end viewDailyContainer (Daily Training & Execution) -->
 
   <!-- VIEW 2: LONG-TERM ANALYSIS & STRATEGY -->
@@ -3339,6 +3288,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=140"></script>
+  <script src="/static/js/app.js?v=141"></script>
 </body>
 </html>

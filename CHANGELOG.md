@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.15.4] - 2026-11-18
+### Removed
+- **Recent Workouts (Strava) Card from Daily Training Tab**:
+  - Removed the redundant `#cardRecentWorkouts` table and its collapsible/render logic from the Daily Training view (`app/static/index.html`, `app/static/js/app.js?v=141`, `app/static/css/style.css?v=70`), keeping workout and ride logs centralized in the dedicated **Ride History** tab.
+
 ## [2.15.3] - 2026-11-18
 ### Fixed
 - **Ride Log & Heatmap Pop-Up Inspector Modal**:
