@@ -208,6 +208,10 @@ async function loadDashboard() {
     renderWhoop(data.whoop);
     renderStrava(data.strava);
     renderAthleteProfile();
+    state.ftpTestReadiness = data.ftp_test_readiness || null;
+    if (typeof renderFtpTestReadiness === "function") {
+      renderFtpTestReadiness(state.ftpTestReadiness);
+    }
     renderIntegrations(data.integrations);
     renderAiCoachTodayCard(state.dailyDebrief, state.currentWorkout);
     if (data.power_spiderweb) {
@@ -589,6 +593,153 @@ function renderAthleteProfile() {
   const collapsedMaxHr = document.getElementById("collapsedAthleteMaxHr");
   if (collapsedMaxHr) collapsedMaxHr.textContent = `Max HR: ${state.maxHr} bpm`;
 }
+
+function renderFtpTestReadiness(r) {
+  const panel = document.getElementById("ftpTestAdvisorPanel");
+  const dailyBanner = document.getElementById("dailyFtpTestBanner");
+  if (!r) {
+    if (panel) panel.style.display = "none";
+    if (dailyBanner) dailyBanner.style.display = "none";
+    return;
+  }
+  if (panel) panel.style.display = "block";
+
+  const statusBadge = document.getElementById("ftpTestStatusBadge");
+  const scoreChip = document.getElementById("ftpTestScoreChip");
+  const headlineEl = document.getElementById("ftpTestHeadline");
+  const rationaleEl = document.getElementById("ftpTestRationale");
+  const bestWindowEl = document.getElementById("ftpTestBestWindow");
+  const protoEl = document.getElementById("ftpTestProtocolLabel");
+  const eftpEl = document.getElementById("ftpTestEftpSignal");
+  const lastTestEl = document.getElementById("ftpTestLastTested");
+  const pillarsGrid = document.getElementById("ftpTestPillarsGrid");
+
+  const statusColors = {
+    PRIME_NOW: { bg: "rgba(0,200,150,0.14)", color: "#00A87E", border: "rgba(0,200,150,0.4)" },
+    SOON: { bg: "rgba(0,82,255,0.12)", color: "#0052FF", border: "rgba(0,82,255,0.35)" },
+    HOLD: { bg: "rgba(245,158,11,0.14)", color: "#D97706", border: "rgba(245,158,11,0.4)" },
+    DEFER_EVENT: { bg: "rgba(100,116,139,0.14)", color: "#475569", border: "rgba(100,116,139,0.35)" },
+    DEFER_RECENT: { bg: "rgba(16,185,129,0.12)", color: "#059669", border: "rgba(16,185,129,0.35)" }
+  };
+  const sc = statusColors[r.status] || statusColors.HOLD;
+  if (statusBadge) {
+    statusBadge.textContent = r.status_label || r.status;
+    statusBadge.style.background = sc.bg;
+    statusBadge.style.color = sc.color;
+    statusBadge.style.borderColor = sc.border;
+  }
+  if (scoreChip) scoreChip.textContent = `${r.readiness_score ?? "--"}/100`;
+  if (headlineEl) headlineEl.textContent = r.headline || "";
+  if (rationaleEl) rationaleEl.textContent = r.rationale || "";
+  if (bestWindowEl) bestWindowEl.textContent = r.recommended_window_label || "--";
+  if (protoEl) protoEl.textContent = r.recommended_protocol_label || "--";
+  if (eftpEl) {
+    eftpEl.textContent = r.has_breakthrough
+      ? `~${r.estimated_ftp}W (+${r.eftp_delta_watts}W)`
+      : `${r.current_ftp}W (Aligned)`;
+    eftpEl.style.color = r.has_breakthrough ? "#FF5E00" : "inherit";
+  }
+  if (lastTestEl) {
+    lastTestEl.textContent = r.days_since_last_test !== null && r.days_since_last_test !== undefined
+      ? `${r.days_since_last_test}d ago`
+      : "Not recorded";
+  }
+
+  if (pillarsGrid && r.pillars) {
+    const pMeta = [
+      { key: "block_timing", label: "Block Timing" },
+      { key: "progress_signal", label: "Progress / eFTP" },
+      { key: "physiological_readiness", label: "Whoop Readiness" },
+      { key: "fatigue_clearance", label: "Fatigue Clearance" }
+    ];
+    pillarsGrid.innerHTML = pMeta.map(m => {
+      const p = r.pillars[m.key] || { score: 0, max: 25, note: "" };
+      const pct = Math.min(100, Math.round((p.score / Math.max(1, p.max)) * 100));
+      const barColor = pct >= 75 ? "#00C896" : (pct >= 50 ? "#0052FF" : "#F59E0B");
+      return `
+        <div title="${(p.note || "").replace(/"/g, "&quot;")}" style="background:#fff;border:1px solid var(--border-color);border-radius:8px;padding:0.45rem 0.6rem;">
+          <div style="display:flex;justify-content:space-between;font-size:0.7rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.25rem;">
+            <span>${m.label}</span>
+            <span style="color:${barColor};">${p.score}/${p.max}</span>
+          </div>
+          <div style="height:5px;border-radius:999px;background:rgba(17,22,37,0.08);overflow:hidden;">
+            <div style="height:100%;width:${pct}%;background:${barColor};border-radius:999px;"></div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
+  // Daily Prime FTP Test Banner
+  if (dailyBanner) {
+    if (r.status === "PRIME_NOW") {
+      dailyBanner.style.display = "flex";
+      const dHead = document.getElementById("dailyFtpTestHeadline");
+      const dSub = document.getElementById("dailyFtpTestSub");
+      if (dHead) dHead.textContent = r.headline || "Prime Window: Ready for an FTP Test Today";
+      if (dSub) dSub.textContent = `Score ${r.readiness_score}/100 • Recommended: ${r.recommended_protocol_label}`;
+    } else {
+      dailyBanner.style.display = "none";
+    }
+  }
+}
+
+async function launchRecommendedFtpTest() {
+  const r = state.ftpTestReadiness;
+  const proto = r && r.recommended_protocol === "ramp_test" ? "ramp test" : "ftp test";
+  const dur = (r && r.recommended_duration_min) ? r.recommended_duration_min : (proto === "ramp test" ? 38 : 55);
+  const tabDaily = document.getElementById("tabMainViewDaily");
+  if (tabDaily) tabDaily.click();
+  if (typeof loadWorkout === "function") {
+    await loadWorkout(dur, 0, proto);
+  }
+}
+
+async function recordFtpTestResultFlow() {
+  const currentFtp = state.ftp || 250;
+  const r = state.ftpTestReadiness;
+  const suggested = (r && r.has_breakthrough && r.estimated_ftp > currentFtp) ? r.estimated_ftp : currentFtp;
+  const raw = window.prompt(`Enter your new tested FTP in Watts (current: ${currentFtp}W):`, String(suggested));
+  if (raw === null) return;
+  const parsed = parseInt(raw.trim(), 10);
+  if (isNaN(parsed) || parsed < 80 || parsed > 600) {
+    alert("Please enter a valid FTP between 80 and 600 Watts.");
+    return;
+  }
+  try {
+    const res = await fetch("/api/power/ftp-test-record", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        new_ftp: parsed,
+        protocol: (r && r.recommended_protocol) || "20m_coggan"
+      })
+    });
+    const data = await res.json();
+    if (data.success) {
+      state.ftp = parsed;
+      state.ftpTestReadiness = data.readiness || null;
+      renderAthleteProfile();
+      renderFtpTestReadiness(state.ftpTestReadiness);
+      if (data.program) renderProgram(data.program);
+      if (typeof loadPowerSpiderweb === "function") loadPowerSpiderweb("30d");
+    } else {
+      alert(data.detail || "Failed to record FTP test result.");
+    }
+  } catch (err) {
+    console.error("Failed to record FTP test:", err);
+    alert("Error saving FTP test result.");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  const btnAdv = document.getElementById("btnAdvisorLoadFtpTest");
+  if (btnAdv) btnAdv.addEventListener("click", launchRecommendedFtpTest);
+  const btnDaily = document.getElementById("btnDailyLoadFtpTest");
+  if (btnDaily) btnDaily.addEventListener("click", launchRecommendedFtpTest);
+  const btnRec = document.getElementById("btnRecordFtpTestResult");
+  if (btnRec) btnRec.addEventListener("click", recordFtpTestResultFlow);
+});
 
 // Utility: cleanly extract text from any insights string that may contain raw JSON
 function cleanCoachInsightsText(text) {

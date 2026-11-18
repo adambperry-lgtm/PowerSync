@@ -146,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.13.0",
-        "release_name": "Local Ride History DB & Incremental Sync",
+        "version": "2.14.0",
+        "release_name": "Coach FTP Test Readiness & Timing Advisor",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -157,6 +157,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.14.0",
+                "date": "2026-11-18",
+                "title": "Coach FTP Test Readiness & Timing Advisor",
+                "items": [
+                    "FTP Test Readiness Engine: Evaluates training block timing, FTP staleness, eFTP breakthrough signals, Whoop recovery, and 48h High XSS fatigue clearance (0–100 score).",
+                    "Optimal Window & Protocol Selection: Identifies the best upcoming test day and recommends either a Coggan 20-Min Standard FTP Test or Progressive Ramp Test.",
+                    "1-Click Test Launch & Result Logging: Load the recommended FTP test directly into Today's Training (with ZWO/Intervals.icu export) or log a new FTP result to recalibrate zones and spiderweb goals."
+                ]
+            },
             {
                 "version": "v2.13.0",
                 "date": "2026-11-18",

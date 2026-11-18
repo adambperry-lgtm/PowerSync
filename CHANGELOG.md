@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.14.0] - 2026-11-18
+### Added
+- **Coach FTP Test Readiness & Timing Advisor**:
+  - Added `app/services/ftp_test_service.py` (`evaluate_ftp_test_readiness`, `build_ftp_test_workout`, `record_ftp_test_result`) to analyze 4 physiological pillars: **Block Timing & Staleness**, **Progress / eFTP Breakthrough Signals**, **Whoop Physiological Readiness**, and **48h Fatigue Clearance** (`high_xss` & yesterday's TSS).
+  - Scans Today + next 3 days against weekly schedule preferences and `coach_forecast_plan` to pinpoint the optimal test window and select the best protocol (**Coggan 20-Min Standard FTP Test** for 55m+ slots or **Progressive Ramp Test** for 35–45m weekday slots), with deferrals during event tapers (`<=7d`), deload weeks, or recent tests (`<14d`).
+  - Added `GET /api/power/ftp-test-readiness` and `POST /api/power/ftp-test-record` in `app/routers/power.py`, included `ftp_test_readiness` in `GET /api/dashboard`, added `get_ftp_test_readiness` tool in `app/services/coach_tools.py`, and added FTP/Ramp test generation via `user_note` in `app/services/ai_coach.py`.
+  - Added the **Coach FTP Test Readiness** panel in `cardAthlete` and the **Prime FTP Test Window** banner in Today's Training (`app/static/index.html`, `app/static/js/app.js?v=136`) with 1-click workout loading and result logging.
+
 ## [2.13.0] - 2026-11-18
 ### Added
 - **Local IndexedDB Ride History Persistence & Incremental Refresh Sync**:

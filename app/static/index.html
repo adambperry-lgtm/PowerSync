@@ -651,6 +651,20 @@
         </div>
       </div>
 
+      <!-- Prime FTP Test Window Banner (shown when coach detects PRIME_NOW) -->
+      <div id="dailyFtpTestBanner" style="display:none;margin:0.65rem 0;padding:0.75rem 1rem;border-radius:10px;background:linear-gradient(135deg, rgba(255,94,0,0.08), rgba(0,82,255,0.06));border:1px solid rgba(255,94,0,0.35);align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.75rem;">
+        <div style="display:flex;align-items:center;gap:0.65rem;flex:1;min-width:220px;">
+          <span style="font-size:1.25rem;">🧪</span>
+          <div>
+            <div style="font-size:0.84rem;font-weight:700;color:var(--text-primary);" id="dailyFtpTestHeadline">Prime Window: Ready for an FTP Test Today</div>
+            <div style="font-size:0.75rem;color:var(--text-secondary);" id="dailyFtpTestSub">Green recovery + cleared fatigue. Recommended: Coggan 20-Min FTP Test.</div>
+          </div>
+        </div>
+        <button type="button" class="btn btn-primary" id="btnDailyLoadFtpTest" style="padding:0.4rem 0.85rem;font-size:0.78rem;font-weight:700;background:#FF5E00;border-color:#FF5E00;color:#fff;">
+          🧪 Load FTP Test
+        </button>
+      </div>
+
       <!-- 1. INDOOR STRUCTURED WORKOUT VIEW -->
       <div id="indoorContainer">
         <!-- Alternative Workout Selection (Triad Switcher) -->
@@ -1762,6 +1776,40 @@
           <div>
             <div class="athlete-metric-lbl">MAX HEART RATE</div>
             <div class="athlete-metric-val" id="valMaxHrDisplay">185 <span style="font-size:0.85rem;color:var(--text-muted);font-weight:600;">BPM</span></div>
+          </div>
+        </div>
+
+        <!-- Coach FTP Test Readiness & Timing Advisor -->
+        <div id="ftpTestAdvisorPanel" style="margin:0.85rem 0 1.1rem 0;padding:0.95rem 1.1rem;border-radius:12px;background:linear-gradient(135deg, rgba(0,82,255,0.04), rgba(255,94,0,0.04));border:1px solid rgba(0,82,255,0.18);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.75rem;">
+            <div style="flex:1;min-width:240px;">
+              <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+                <span style="font-size:1rem;">🧪</span>
+                <span style="font-size:0.85rem;font-weight:800;color:var(--text-primary);letter-spacing:0.01em;">Coach FTP Test Readiness</span>
+                <span class="badge-status" id="ftpTestStatusBadge" style="font-size:0.7rem;padding:0.15rem 0.5rem;background:rgba(0,200,150,0.12);color:#00C896;border-color:rgba(0,200,150,0.35);">Analyzing...</span>
+                <span style="font-size:0.76rem;font-weight:700;color:#0052FF;" id="ftpTestScoreChip">--/100</span>
+              </div>
+              <div style="font-size:0.92rem;font-weight:700;color:var(--text-primary);margin-top:0.35rem;" id="ftpTestHeadline">Evaluating training block &amp; readiness...</div>
+              <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:0.2rem;line-height:1.45;" id="ftpTestRationale"></div>
+              <div style="display:flex;flex-wrap:wrap;gap:0.5rem;margin-top:0.55rem;font-size:0.73rem;color:var(--text-secondary);">
+                <span style="background:#fff;border:1px solid var(--border-color);border-radius:6px;padding:0.2rem 0.5rem;">📅 Best Window: <strong id="ftpTestBestWindow">--</strong></span>
+                <span style="background:#fff;border:1px solid var(--border-color);border-radius:6px;padding:0.2rem 0.5rem;">⚡ Protocol: <strong id="ftpTestProtocolLabel">--</strong></span>
+                <span style="background:#fff;border:1px solid var(--border-color);border-radius:6px;padding:0.2rem 0.5rem;">📈 eFTP Signal: <strong id="ftpTestEftpSignal">--</strong></span>
+                <span style="background:#fff;border:1px solid var(--border-color);border-radius:6px;padding:0.2rem 0.5rem;">⏱️ Last Test: <strong id="ftpTestLastTested">--</strong></span>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.45rem;min-width:165px;">
+              <button type="button" class="btn btn-primary" id="btnAdvisorLoadFtpTest" style="font-size:0.76rem;padding:0.45rem 0.75rem;font-weight:700;background:#FF5E00;border-color:#FF5E00;color:#fff;">
+                🧪 Load FTP Test
+              </button>
+              <button type="button" class="btn btn-secondary" id="btnRecordFtpTestResult" style="font-size:0.76rem;padding:0.4rem 0.75rem;font-weight:600;">
+                ✅ Log Test Result
+              </button>
+            </div>
+          </div>
+          <!-- 4 Pillar Mini-Bars -->
+          <div id="ftpTestPillarsGrid" style="display:grid;grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));gap:0.65rem;margin-top:0.75rem;padding-top:0.65rem;border-top:1px solid rgba(17,22,37,0.08);">
+            <!-- Populated dynamically by app.js -->
           </div>
         </div>
 
@@ -3185,6 +3233,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=135"></script>
+  <script src="/static/js/app.js?v=136"></script>
 </body>
 </html>

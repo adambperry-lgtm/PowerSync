@@ -246,6 +246,18 @@ COACH_TOOL_DECLARATIONS = [
                 }
             }
         }
+    },
+    {
+        "name": "get_ftp_test_readiness",
+        "description": (
+            "Analyzes the athlete's training block progress, FTP staleness, recent eFTP power breakthroughs, "
+            "Whoop recovery, 48h glycolytic fatigue clearance, and weekly schedule to determine if and when "
+            "it is a good time to perform an FTP test, plus the optimal test protocol (20-min Coggan or Ramp)."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {}
+        }
     }
 ]
 
@@ -913,5 +925,10 @@ def execute_coach_tool(name: str, args: Dict[str, Any], user_id: Optional[str] =
             intensity_adjust_pct=int(args.get("intensity_adjust_pct") or 0),
             user_id=uid,
         )
+    elif name == "get_ftp_test_readiness":
+        from app.services.ftp_test_service import evaluate_ftp_test_readiness
+        res = evaluate_ftp_test_readiness(user_id=uid)
+        res["tool_summary"] = f"FTP Test Readiness: {res['status_label']} ({res['readiness_score']}/100) — {res['headline']}"
+        return res
     else:
         return {"error": f"Unknown tool '{name}'", "tool_summary": f"Unknown tool '{name}'"}

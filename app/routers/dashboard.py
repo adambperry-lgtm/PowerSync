@@ -235,6 +235,17 @@ def get_dashboard_data(request: Request = None):
     except Exception:
         power_spiderweb = None
 
+    from app.services.ftp_test_service import evaluate_ftp_test_readiness
+    try:
+        ftp_test_readiness = evaluate_ftp_test_readiness(
+            user_id=uid,
+            activities=enriched_activities,
+            whoop_data=whoop_data,
+            program_data=program_data,
+        )
+    except Exception:
+        ftp_test_readiness = None
+
     return {
         "user": {
             "id": uid,
@@ -263,6 +274,7 @@ def get_dashboard_data(request: Request = None):
         "day_config": day_config,
         "coaching_preferences": coaching_prefs,
         "power_spiderweb": power_spiderweb,
+        "ftp_test_readiness": ftp_test_readiness,
         "strava": {
             "weekly_stats": weekly_stats,
             "strain_systems": strain_systems,

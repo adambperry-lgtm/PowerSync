@@ -106,3 +106,54 @@ def reset_program_block_endpoint(payload: Optional[Dict[str, Any]] = None):
         "message": f"Macrocycle block reset to Week 1 (Base Phase, {block_weeks} weeks)."
     }
 
+
+@router.get("/ftp-test-readiness")
+def get_ftp_test_readiness_endpoint():
+    """
+    Analyzes training progress, FTP staleness, eFTP breakthroughs, Whoop readiness,
+    and acute fatigue clearance to recommend when and how to perform an FTP test.
+    """
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        return {"success": True, "is_guest": True, "readiness": None}
+    from app.services.ftp_test_service import evaluate_ftp_test_readiness
+    readiness = evaluate_ftp_test_readiness(user_id=uid)
+    return {"success": True, "readiness": readiness}
+
+
+@router.post("/ftp-test-record")
+def record_ftp_test_endpoint(payload: Dict[str, Any] = Body(...)):
+    """
+    Records a completed FTP test result, updates athlete_ftp and ftp_last_tested_date,
+    and returns refreshed FTP test readiness and program state.
+    """
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if not payload or payload.get("new_ftp") is None:
+        raise HTTPException(status_code=400, detail="new_ftp is required")
+    try:
+        new_ftp = int(payload["new_ftp"])
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="new_ftp must be an integer")
+    if new_ftp < 80 or new_ftp > 600:
+        raise HTTPException(status_code=400, detail="new_ftp must be between 80 and 600 watts")
+
+    from app.services.ftp_test_service import record_ftp_test_result, evaluate_ftp_test_readiness
+    from app.services.program_service import get_current_program
+    result = record_ftp_test_result(
+        new_ftp=new_ftp,
+        protocol=str(payload.get("protocol") or "20m_coggan"),
+        test_date=payload.get("test_date"),
+        user_id=uid,
+    )
+    readiness = evaluate_ftp_test_readiness(user_id=uid)
+    program = get_current_program(user_id=uid)
+    return {
+        "success": True,
+        "result": result,
+        "readiness": readiness,
+        "program": program,
+    }
+
+

@@ -233,6 +233,15 @@ def build_adaptive_workout_local(
         c_sec = 240 if duration <= 40 else 300
         custom_matched = True
 
+        if any(k in note_clean for k in ["ftp test", "ramp test", "20m test", "20-min test", "20 min test"]):
+            from app.services.ftp_test_service import build_ftp_test_workout
+            proto = "ramp_test" if ("ramp" in note_clean or (has_explicit_duration and duration <= 45)) else "20m_coggan"
+            req_dur = duration if has_explicit_duration and duration >= 30 else None
+            test_w = build_ftp_test_workout(protocol_type=proto, ftp=ftp, duration_min=req_dur)
+            test_w["badge"] = "🧪 Coach FTP Test"
+            test_w["ai_rationale"] = f"Adapted to your instruction ('{user_note}'): {test_w['ai_rationale']}"
+            return test_w
+
         if any(k in note_clean for k in ["recovery", "easy", "flush", "zone 1", "z1", "spin", "tired", "exhausted", "sore", "light", "gentle"]):
             title = f"{duration}-Min Active Recovery & Flush"
             focus_area = "Active Recovery"
