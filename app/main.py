@@ -14,7 +14,7 @@ from app.database import (
     set_current_user_context, reset_current_user_context,
     set_current_timezone_context, reset_current_timezone_context
 )
-from app.routers import dashboard, workouts, settings, auth, review, plans, chat, power
+from app.routers import dashboard, workouts, settings, auth, review, plans, chat, power, history
 
 app = FastAPI(
     title="PowerSync - AI Fitness Dashboard",
@@ -120,6 +120,7 @@ app.include_router(review.router)
 app.include_router(plans.router)
 app.include_router(chat.router)
 app.include_router(power.router)
+app.include_router(history.router)
 
 # Mount Static Files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -145,8 +146,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.11.14",
-        "release_name": "Outdoor Route Briefing & UI Polish",
+        "version": "2.12.0",
+        "release_name": "Ride History & Explorer Tab",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
@@ -156,6 +157,17 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.12.0",
+                "date": "2026-11-18",
+                "title": "Ride History & Explorer Tab",
+                "items": [
+                    "4th Top-Level Navbar Tab: Added Ride History & Explorer with range-aware filters (7D, 30D, 90D, YTD, 1Y, All Time) and Indoor/Outdoor toggles.",
+                    "Period in Sport Recap & KPI Strip: Auto-generated highlights and prior-period delta badges for Distance, Moving Time, Elevation, Work, TSS, and Avg NP/EF.",
+                    "Volume, PMC & Recovery Matrix: Added Weekly/Monthly Volume & 3-Tier Strain chart, CTL/ATL/TSB PMC curve with Whoop Recovery % overlay, Recovery x Performance buckets & scatter plot, and MMP Power Curve.",
+                    "One Map Heatmap & Ride Inspector: Added Leaflet geographic ride heatmap with intensity bleed and a searchable Ride Log with Single-Ride Inspector modal."
+                ]
+            },
             {
                 "version": "v2.11.14",
                 "date": "2026-11-18",

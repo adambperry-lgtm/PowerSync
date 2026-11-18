@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.12.0] - 2026-11-18
+### Added
+- **Ride History & Explorer Tab (4th Top-Level Navbar Tab)**:
+  - Added `Ride History` (`#history`, `tabMainViewHistory`) to the main navbar switcher in `app/static/index.html`, `app/static/css/style.css`, and `app/static/js/app.js` with responsive mobile sizing.
+  - Built `app/services/ride_history_service.py` and `app/routers/history.py` (`GET /api/history/analytics`, `GET /api/history/ride/{ride_id}`) strictly scoped by `user_id` with guest privacy protection.
+  - **7 Baseline-Inspired Analytics Modules**: Period in Sport Recap, Range-Aware KPI Strip with prior-period deltas (`7D`, `30D`, `90D`, `YTD`, `1Y`, `All Time` + `All / Outdoor / Indoor` filters), Volume & 3-Tier Strain Distribution chart, Training Load & Readiness PMC (`CTL`/`ATL`/`TSB` with Whoop Recovery % overlay), Recovery × Performance Correlation Matrix & Efficiency Factor scatter plot, Mean Maximal Power (MMP) Curve & Breakthroughs, Leaflet Geographic "One Map" Ride Heatmap, and Searchable/Sortable Historical Ride Log with Single-Ride Inspector modal.
+  - Bumped `app.js?v=133` in `app/static/index.html`.
+
 ## [2.11.14] - 2026-11-18
 ### Fixed
 - **Outdoor Ride Briefing & Route Analysis Blank State**:

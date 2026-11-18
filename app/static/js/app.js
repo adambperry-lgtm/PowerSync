@@ -8356,23 +8356,26 @@ let archiveEditorCollapsible = null;
 let currentActiveMainView = "daily";
 
 function switchMainDashboardView(targetView, updateHistory = true) {
-  currentActiveMainView = (targetView === "analysis" || targetView === "archive") ? targetView : "daily";
+  currentActiveMainView = (targetView === "analysis" || targetView === "archive" || targetView === "history") ? targetView : "daily";
   const tabDaily = document.getElementById("tabMainViewDaily");
   const tabAnalysis = document.getElementById("tabMainViewAnalysis");
   const tabArchive = document.getElementById("tabMainViewArchive");
+  const tabHistory = document.getElementById("tabMainViewHistory");
   const paneDaily = document.getElementById("viewDailyContainer");
   const paneAnalysis = document.getElementById("viewAnalysisContainer");
   const paneArchive = document.getElementById("viewArchiveContainer");
+  const paneHistory = document.getElementById("viewHistoryContainer");
   const toolbarTitle = document.getElementById("dashboardToolbarTitle");
   const dashboardToolbar = document.querySelector(".dashboard-toolbar");
   if (dashboardToolbar) {
-    dashboardToolbar.style.display = currentActiveMainView === "archive" ? "none" : "";
+    dashboardToolbar.style.display = (currentActiveMainView === "archive" || currentActiveMainView === "history") ? "none" : "";
   }
 
   const tabs = [
     { key: "daily", tab: tabDaily, pane: paneDaily },
     { key: "analysis", tab: tabAnalysis, pane: paneAnalysis },
-    { key: "archive", tab: tabArchive, pane: paneArchive }
+    { key: "archive", tab: tabArchive, pane: paneArchive },
+    { key: "history", tab: tabHistory, pane: paneHistory }
   ];
 
   tabs.forEach(({ key, tab, pane }) => {
@@ -8404,6 +8407,11 @@ function switchMainDashboardView(targetView, updateHistory = true) {
         drawArchiveEditorCanvas();
       }
     });
+  } else if (currentActiveMainView === "history") {
+    if (toolbarTitle) toolbarTitle.textContent = "🗺️ Ride History & Explorer";
+    if (typeof initRideHistoryTab === "function") {
+      initRideHistoryTab();
+    }
   } else {
     if (toolbarTitle) toolbarTitle.textContent = "⚡ Daily Training & Recovery";
     requestAnimationFrame(() => {
@@ -8433,16 +8441,18 @@ function initMainViewSwitcher() {
   const tabDaily = document.getElementById("tabMainViewDaily");
   const tabAnalysis = document.getElementById("tabMainViewAnalysis");
   const tabArchive = document.getElementById("tabMainViewArchive");
+  const tabHistory = document.getElementById("tabMainViewHistory");
 
   tabDaily?.addEventListener("click", () => switchMainDashboardView("daily"));
   tabAnalysis?.addEventListener("click", () => switchMainDashboardView("analysis"));
   tabArchive?.addEventListener("click", () => switchMainDashboardView("archive"));
+  tabHistory?.addEventListener("click", () => switchMainDashboardView("history"));
 
   // Always default to opening on the Daily Training view ("daily") on startup
   const initialView = "daily";
   try {
     localStorage.setItem("powersync_main_view", "daily");
-    if (window.location.hash && (window.location.hash.toLowerCase() === "#analysis" || window.location.hash.toLowerCase() === "#archive")) {
+    if (window.location.hash && ["#analysis", "#archive", "#history"].includes(window.location.hash.toLowerCase())) {
       history.replaceState(null, "", "#daily");
     }
   } catch (_) {}
@@ -9939,3 +9949,806 @@ if (document.readyState === "loading") {
 }
 
 
+
+// ============================================================================
+// RIDE HISTORY & EXPLORER (Baseline-Inspired Historical Analytics)
+// ============================================================================
+
+let historyState = {
+  initialized: false,
+  loading: false,
+  range: "90d",
+  env: "all",
+  volumeMode: "env",
+  showWhoopOverlay: true,
+  search: "",
+  sort: "date_desc",
+  data: null,
+  map: null,
+  mapLayerGroup: null,
+  inspectorMap: null,
+};
+
+function decodeStravaPolyline(encoded) {
+  if (!encoded || typeof encoded !== "string") return [];
+  let index = 0;
+  const len = encoded.length;
+  let lat = 0;
+  let lng = 0;
+  const coords = [];
+
+  while (index < len) {
+    let b, shift = 0, result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20 && index < len);
+    const dlat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20 && index < len);
+    const dlng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += dlng;
+
+    coords.push([lat * 1e-5, lng * 1e-5]);
+  }
+  return coords;
+}
+
+function escapeHistoryHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function formatHistoryDuration(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function initRideHistoryTab() {
+  if (!historyState.initialized) {
+    historyState.initialized = true;
+
+    document.querySelectorAll("#historyRangePills .history-pill-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#historyRangePills .history-pill-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        historyState.range = btn.dataset.range || "90d";
+        loadRideHistoryAnalytics();
+      });
+    });
+
+    document.querySelectorAll("#historyEnvPills .history-pill-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#historyEnvPills .history-pill-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        historyState.env = btn.dataset.env || "all";
+        loadRideHistoryAnalytics();
+      });
+    });
+
+    document.querySelectorAll("#historyVolumeModePills .history-pill-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll("#historyVolumeModePills .history-pill-btn").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        historyState.volumeMode = btn.dataset.vmode || "env";
+        if (historyState.data) renderHistoryVolumeChart(historyState.data.volume_buckets || []);
+      });
+    });
+
+    document.getElementById("chkPmcWhoopOverlay")?.addEventListener("change", (e) => {
+      historyState.showWhoopOverlay = !!e.target.checked;
+      if (historyState.data) renderHistoryPmcChart(historyState.data.pmc_series || []);
+    });
+
+    document.getElementById("btnHistoryRefresh")?.addEventListener("click", () => {
+      loadRideHistoryAnalytics();
+    });
+
+    document.getElementById("btnHistoryMapFit")?.addEventListener("click", () => {
+      if (historyState.map && historyState.mapLayerGroup) {
+        try {
+          const bounds = historyState.mapLayerGroup.getBounds();
+          if (bounds.isValid()) historyState.map.fitBounds(bounds, { padding: [20, 20] });
+        } catch (_) {}
+      }
+    });
+
+    document.getElementById("historyRideSearch")?.addEventListener("input", (e) => {
+      historyState.search = (e.target.value || "").trim().toLowerCase();
+      if (historyState.data) renderHistoryRideTable(historyState.data.rides || []);
+    });
+
+    document.getElementById("historyRideSort")?.addEventListener("change", (e) => {
+      historyState.sort = e.target.value || "date_desc";
+      if (historyState.data) renderHistoryRideTable(historyState.data.rides || []);
+    });
+
+    document.getElementById("btnCloseRideInspector")?.addEventListener("click", closeRideInspectorModal);
+    document.getElementById("modalRideInspector")?.addEventListener("click", (e) => {
+      if (e.target && e.target.id === "modalRideInspector") closeRideInspectorModal();
+    });
+  }
+
+  if (!historyState.data) {
+    loadRideHistoryAnalytics();
+  } else {
+    requestAnimationFrame(() => {
+      if (historyState.map) historyState.map.invalidateSize(true);
+    });
+  }
+}
+
+async function loadRideHistoryAnalytics() {
+  if (historyState.loading) return;
+  historyState.loading = true;
+  const countPill = document.getElementById("historyRideCountPill");
+  if (countPill) countPill.textContent = "Loading...";
+
+  try {
+    const url = `/api/history/analytics?range=${encodeURIComponent(historyState.range)}&env=${encodeURIComponent(historyState.env)}`;
+    const res = await fetch(url, { credentials: "same-origin" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    historyState.data = data;
+    renderAllRideHistoryModules(data);
+  } catch (err) {
+    console.error("Failed to load ride history analytics:", err);
+    if (countPill) countPill.textContent = "Error loading";
+  } finally {
+    historyState.loading = false;
+  }
+}
+
+function renderAllRideHistoryModules(data) {
+  const countPill = document.getElementById("historyRideCountPill");
+  if (data.is_guest) {
+    if (countPill) countPill.textContent = "Sign in to view history";
+  } else {
+    const cnt = (data.kpis && data.kpis.ride_count) || 0;
+    if (countPill) countPill.textContent = `${cnt} ride${cnt === 1 ? "" : "s"}`;
+  }
+
+  renderHistoryKpis(data.kpis || {}, data.deltas || {});
+  renderHistoryHeatmap(data.heatmap_rides || []);
+  renderHistoryVolumeChart(data.volume_buckets || []);
+  renderHistoryPmcChart(data.pmc_series || []);
+  renderHistoryRecoveryMatrix(data.recovery_matrix || { buckets: {}, scatter: [] });
+  renderHistoryPowerCurve(data.power_curve || { curve: [], breakthroughs: [] });
+  renderHistoryRecap(data.year_in_sport || {});
+  renderHistoryRideTable(data.rides || []);
+}
+
+function formatDeltaBadge(val) {
+  if (val === null || val === undefined) return "";
+  const cls = val >= 0 ? "up" : "down";
+  const sign = val >= 0 ? "+" : "";
+  return `<span class="history-delta-badge ${cls}">${sign}${val}%</span>`;
+}
+
+function renderHistoryKpis(kpis, deltas) {
+  const setKpi = (id, subId, val, subHtml) => {
+    const el = document.getElementById(id);
+    const sub = document.getElementById(subId);
+    if (el) el.textContent = val;
+    if (sub) sub.innerHTML = subHtml;
+  };
+
+  if (!kpis || !kpis.ride_count) {
+    setKpi("hkpiDistance", "hkpiDistanceSub", "0 km", "No rides in range");
+    setKpi("hkpiTime", "hkpiTimeSub", "0 hrs", "--");
+    setKpi("hkpiElevation", "hkpiElevationSub", "0 m", "--");
+    setKpi("hkpiWork", "hkpiWorkSub", "0 kJ", "--");
+    setKpi("hkpiTss", "hkpiTssSub", "0", "--");
+    setKpi("hkpiNpEf", "hkpiNpEfSub", "--", "No power/HR data");
+    return;
+  }
+
+  setKpi(
+    "hkpiDistance",
+    "hkpiDistanceSub",
+    `${kpis.distance_km.toLocaleString()} km`,
+    `${kpis.distance_mi.toLocaleString()} mi ${formatDeltaBadge(deltas.distance_km)}`
+  );
+  setKpi(
+    "hkpiTime",
+    "hkpiTimeSub",
+    `${kpis.moving_hours} hrs`,
+    `${kpis.ride_count} rides ${formatDeltaBadge(deltas.moving_hours)}`
+  );
+  setKpi(
+    "hkpiElevation",
+    "hkpiElevationSub",
+    `${Number(kpis.elevation_m).toLocaleString()} m`,
+    `${Number(kpis.elevation_ft).toLocaleString()} ft ${formatDeltaBadge(deltas.elevation_m)}`
+  );
+  setKpi(
+    "hkpiWork",
+    "hkpiWorkSub",
+    `${Number(kpis.kilojoules).toLocaleString()} kJ`,
+    `Mechanical work ${formatDeltaBadge(deltas.kilojoules)}`
+  );
+  setKpi(
+    "hkpiTss",
+    "hkpiTssSub",
+    `${Number(kpis.tss).toLocaleString()}`,
+    `Training load ${formatDeltaBadge(deltas.tss)}`
+  );
+  const npTxt = kpis.avg_np ? `${Math.round(kpis.avg_np)} W` : "--";
+  const efTxt = kpis.avg_ef ? `EF ${kpis.avg_ef}` : "EF --";
+  setKpi(
+    "hkpiNpEf",
+    "hkpiNpEfSub",
+    npTxt,
+    `${efTxt}${kpis.avg_hr ? ` · ${Math.round(kpis.avg_hr)} bpm` : ""}`
+  );
+}
+
+function renderHistoryHeatmap(heatmapRides) {
+  const container = document.getElementById("historyHeatmapContainer");
+  const emptyEl = document.getElementById("historyMapEmpty");
+  const subtitleEl = document.getElementById("historyMapSubtitle");
+  if (!container) return;
+
+  if (!window.L) {
+    container.style.display = "none";
+    if (emptyEl) {
+      emptyEl.style.display = "block";
+      emptyEl.textContent = "Leaflet map library unavailable.";
+    }
+    return;
+  }
+
+  if (!heatmapRides || heatmapRides.length === 0) {
+    container.style.display = "none";
+    if (emptyEl) emptyEl.style.display = "block";
+    if (subtitleEl) subtitleEl.textContent = "0 GPS routes in this filter";
+    return;
+  }
+
+  container.style.display = "block";
+  if (emptyEl) emptyEl.style.display = "none";
+  if (subtitleEl) subtitleEl.textContent = `${heatmapRides.length} outdoor route${heatmapRides.length === 1 ? "" : "s"} layered with intensity bleed`;
+
+  if (!historyState.map) {
+    historyState.map = L.map(container, { zoomControl: true, attributionControl: false }).setView([37.77, -122.41], 10);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      maxZoom: 18,
+      subdomains: "abcd"
+    }).addTo(historyState.map);
+    historyState.mapLayerGroup = L.featureGroup().addTo(historyState.map);
+  } else {
+    historyState.mapLayerGroup.clearLayers();
+  }
+
+  // Draw outer soft glow + inner crisp line for Baseline "bleed" effect
+  heatmapRides.forEach((ride) => {
+    const pts = decodeStravaPolyline(ride.polyline);
+    if (!pts.length) return;
+
+    // Outer bleed
+    L.polyline(pts, {
+      color: "#FF5E00",
+      weight: 6,
+      opacity: 0.14,
+      interactive: false
+    }).addTo(historyState.mapLayerGroup);
+
+    // Core route line
+    const core = L.polyline(pts, {
+      color: "#FF8A3D",
+      weight: 2.2,
+      opacity: 0.55
+    }).addTo(historyState.mapLayerGroup);
+
+    core.bindTooltip(
+      `<strong>${escapeHistoryHtml(ride.name)}</strong><br>${ride.date} · ${ride.distance_km} km · ${Math.round(ride.tss)} TSS`,
+      { sticky: true }
+    );
+    core.on("click", () => openRideInspectorModal(ride.id));
+  });
+
+  requestAnimationFrame(() => {
+    historyState.map.invalidateSize(true);
+    try {
+      const bounds = historyState.mapLayerGroup.getBounds();
+      if (bounds.isValid()) historyState.map.fitBounds(bounds, { padding: [20, 20] });
+    } catch (_) {}
+  });
+}
+
+function renderHistoryVolumeChart(buckets) {
+  const wrap = document.getElementById("historyVolumeChart");
+  if (!wrap) return;
+  if (!buckets || !buckets.length) {
+    wrap.innerHTML = `<div style="padding:3rem 1rem;text-align:center;color:var(--text-muted);font-size:0.84rem;">No ride volume in this range.</div>`;
+    return;
+  }
+
+  const W = 560, H = 240;
+  const padL = 38, padR = 14, padT = 18, padB = 34;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+  const isStrain = historyState.volumeMode === "strain";
+
+  const totals = buckets.map((b) =>
+    isStrain ? (b.strain_low + b.strain_high + b.strain_peak) : b.hours_total
+  );
+  const maxVal = Math.max(1, ...totals);
+  const barSlot = chartW / buckets.length;
+  const barW = Math.max(6, Math.min(28, barSlot * 0.65));
+
+  let barsSvg = "";
+  let labelsSvg = "";
+  const labelStep = Math.max(1, Math.ceil(buckets.length / 8));
+
+  buckets.forEach((b, i) => {
+    const x = padL + i * barSlot + (barSlot - barW) / 2;
+    const total = totals[i];
+
+    if (isStrain) {
+      const hLow = (b.strain_low / maxVal) * chartH;
+      const hHigh = (b.strain_high / maxVal) * chartH;
+      const hPeak = (b.strain_peak / maxVal) * chartH;
+      let y = padT + chartH;
+      if (hLow > 0) {
+        y -= hLow;
+        barsSvg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hLow.toFixed(1)}" rx="2" fill="#0052FF"><title>${b.label}: Low ${b.strain_low} | High ${b.strain_high} | Peak ${b.strain_peak}</title></rect>`;
+      }
+      if (hHigh > 0) {
+        y -= hHigh;
+        barsSvg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hHigh.toFixed(1)}" rx="2" fill="#F59E0B"><title>${b.label}: High Strain ${b.strain_high}</title></rect>`;
+      }
+      if (hPeak > 0) {
+        y -= hPeak;
+        barsSvg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hPeak.toFixed(1)}" rx="2" fill="#EF4444"><title>${b.label}: Peak Strain ${b.strain_peak}</title></rect>`;
+      }
+    } else {
+      const hOut = (b.hours_outdoor / maxVal) * chartH;
+      const hIn = (b.hours_indoor / maxVal) * chartH;
+      let y = padT + chartH;
+      if (hOut > 0) {
+        y -= hOut;
+        barsSvg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hOut.toFixed(1)}" rx="2" fill="#10B981"><title>${b.label}: Outdoor ${b.hours_outdoor}h | Indoor ${b.hours_indoor}h (${b.rides} rides)</title></rect>`;
+      }
+      if (hIn > 0) {
+        y -= hIn;
+        barsSvg += `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${barW.toFixed(1)}" height="${hIn.toFixed(1)}" rx="2" fill="#0052FF"><title>${b.label}: Indoor ${b.hours_indoor}h (${b.rides} rides)</title></rect>`;
+      }
+    }
+
+    if (i % labelStep === 0 || i === buckets.length - 1) {
+      labelsSvg += `<text x="${(x + barW / 2).toFixed(1)}" y="${H - 12}" text-anchor="middle" font-size="9.5" fill="var(--text-muted)">${escapeHistoryHtml(b.label)}</text>`;
+    }
+  });
+
+  // Grid lines
+  let gridSvg = "";
+  for (let g = 0; g <= 3; g++) {
+    const val = (maxVal * g) / 3;
+    const y = padT + chartH - (g / 3) * chartH;
+    gridSvg += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" stroke="var(--border-color)" stroke-dasharray="3,3" />`;
+    gridSvg += `<text x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="9.5" fill="var(--text-muted)">${isStrain ? Math.round(val) : val.toFixed(1) + "h"}</text>`;
+  }
+
+  const legend = isStrain
+    ? `<span style="color:#0052FF;">■ Low</span> &nbsp;<span style="color:#F59E0B;">■ High</span> &nbsp;<span style="color:#EF4444;">■ Peak</span>`
+    : `<span style="color:#10B981;">■ Outdoor</span> &nbsp;<span style="color:#0052FF;">■ Indoor/Zwift</span>`;
+
+  wrap.innerHTML = `
+    <div style="text-align:right;font-size:0.72rem;font-weight:600;margin-bottom:0.25rem;">${legend}</div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      ${gridSvg}
+      ${barsSvg}
+      ${labelsSvg}
+    </svg>
+  `;
+}
+
+function renderHistoryPmcChart(series) {
+  const wrap = document.getElementById("historyPmcChart");
+  if (!wrap) return;
+  if (!series || series.length < 2) {
+    wrap.innerHTML = `<div style="padding:3rem 1rem;text-align:center;color:var(--text-muted);font-size:0.84rem;">Not enough historical days to plot CTL/ATL/TSB.</div>`;
+    return;
+  }
+
+  const W = 960, H = 250;
+  const padL = 42, padR = 38, padT = 16, padB = 32;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  const allVals = [];
+  series.forEach((p) => {
+    allVals.push(p.ctl, p.atl, p.tsb);
+  });
+  const minV = Math.min(-25, ...allVals);
+  const maxV = Math.max(40, ...allVals);
+  const span = Math.max(10, maxV - minV);
+
+  const xFor = (i) => padL + (i / (series.length - 1)) * chartW;
+  const yFor = (v) => padT + chartH - ((v - minV) / span) * chartH;
+
+  const buildPath = (key) =>
+    series.map((p, i) => `${i === 0 ? "M" : "L"}${xFor(i).toFixed(1)},${yFor(p[key]).toFixed(1)}`).join(" ");
+
+  let whoopDots = "";
+  if (historyState.showWhoopOverlay) {
+    series.forEach((p, i) => {
+      if (p.recovery === null || p.recovery === undefined) return;
+      const x = xFor(i);
+      const y = padT + chartH - (Math.min(100, Math.max(0, p.recovery)) / 100) * chartH;
+      const col = p.recovery >= 67 ? "#10B981" : p.recovery >= 34 ? "#F59E0B" : "#EF4444";
+      whoopDots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="2.6" fill="${col}" opacity="0.65"><title>${p.date}: Whoop ${p.recovery}% | CTL ${p.ctl} | ATL ${p.atl} | TSB ${p.tsb}</title></circle>`;
+    });
+  }
+
+  let gridSvg = "";
+  const zeroY = yFor(0);
+  gridSvg += `<line x1="${padL}" y1="${zeroY.toFixed(1)}" x2="${W - padR}" y2="${zeroY.toFixed(1)}" stroke="var(--text-muted)" stroke-opacity="0.45" stroke-dasharray="4,3" />`;
+  for (let g = 0; g <= 4; g++) {
+    const val = minV + (span * g) / 4;
+    const y = yFor(val);
+    gridSvg += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - padR}" y2="${y.toFixed(1)}" stroke="var(--border-color)" stroke-dasharray="2,3" />`;
+    gridSvg += `<text x="${padL - 6}" y="${(y + 3).toFixed(1)}" text-anchor="end" font-size="10" fill="var(--text-muted)">${Math.round(val)}</text>`;
+  }
+
+  // Right axis for Recovery %
+  if (historyState.showWhoopOverlay) {
+    [0, 50, 100].forEach((pct) => {
+      const y = padT + chartH - (pct / 100) * chartH;
+      gridSvg += `<text x="${W - padR + 6}" y="${(y + 3).toFixed(1)}" text-anchor="start" font-size="9.5" fill="#10B981">${pct}%</text>`;
+    });
+  }
+
+  let xLabels = "";
+  const step = Math.max(1, Math.floor(series.length / 7));
+  series.forEach((p, i) => {
+    if (i % step === 0 || i === series.length - 1) {
+      xLabels += `<text x="${xFor(i).toFixed(1)}" y="${H - 10}" text-anchor="middle" font-size="10" fill="var(--text-muted)">${p.date.slice(5)}</text>`;
+    }
+  });
+
+  const latest = series[series.length - 1];
+  const subEl = document.getElementById("historyPmcSubtitle");
+  if (subEl && latest) {
+    subEl.textContent = `Latest: CTL (Fitness) ${latest.ctl} · ATL (Fatigue) ${latest.atl} · TSB (Form) ${latest.tsb >= 0 ? "+" : ""}${latest.tsb}`;
+  }
+
+  wrap.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      ${gridSvg}
+      ${whoopDots}
+      <path d="${buildPath("tsb")}" fill="none" stroke="#10B981" stroke-width="1.8" stroke-dasharray="4,2" />
+      <path d="${buildPath("atl")}" fill="none" stroke="#FF5E00" stroke-width="2" />
+      <path d="${buildPath("ctl")}" fill="none" stroke="#0052FF" stroke-width="2.6" />
+      ${xLabels}
+    </svg>
+  `;
+}
+
+function renderHistoryRecoveryMatrix(matrix) {
+  const bucketsEl = document.getElementById("historyRecoveryBuckets");
+  const scatterEl = document.getElementById("historyRecoveryScatter");
+  const buckets = matrix.buckets || {};
+
+  if (bucketsEl) {
+    const order = ["green", "yellow", "red"];
+    bucketsEl.innerHTML = order
+      .map((k) => {
+        const b = buckets[k] || { label: k.toUpperCase(), ride_count: 0 };
+        return `
+          <div class="history-rec-bucket ${k}">
+            <div class="history-rec-title">${escapeHistoryHtml(b.label || k)}</div>
+            <div class="history-rec-stats">
+              <div><strong>${b.ride_count || 0}</strong> rides</div>
+              <div>Avg NP: <strong>${b.avg_np ? Math.round(b.avg_np) + " W" : "--"}</strong></div>
+              <div>Avg EF: <strong>${b.avg_ef ?? "--"}</strong></div>
+              <div>Avg TSS: <strong>${b.avg_tss ? Math.round(b.avg_tss) : "--"}</strong></div>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  if (!scatterEl) return;
+  const pts = (matrix.scatter || []).filter((p) => p.ef !== null && p.ef !== undefined);
+  if (pts.length < 2) {
+    scatterEl.innerHTML = `<div style="padding:2rem 1rem;text-align:center;color:var(--text-muted);font-size:0.82rem;">Sync Whoop + Strava rides with power &amp; HR to unlock Recovery × Efficiency scatter.</div>`;
+    return;
+  }
+
+  const W = 500, H = 195;
+  const padL = 42, padR = 16, padT = 14, padB = 28;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  const efVals = pts.map((p) => p.ef);
+  const minEf = Math.max(0.5, Math.min(...efVals) - 0.1);
+  const maxEf = Math.max(minEf + 0.3, Math.max(...efVals) + 0.1);
+
+  let dots = "";
+  pts.forEach((p) => {
+    const x = padL + (Math.min(100, Math.max(0, p.recovery)) / 100) * chartW;
+    const y = padT + chartH - ((p.ef - minEf) / (maxEf - minEf)) * chartH;
+    const col = p.zone === "green" ? "#10B981" : p.zone === "yellow" ? "#F59E0B" : "#EF4444";
+    dots += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${col}" fill-opacity="0.78" stroke="#FFFFFF" stroke-width="0.8" style="cursor:pointer;" onclick="openRideInspectorModal('${escapeHistoryHtml(p.id)}')"><title>${p.date} · ${escapeHistoryHtml(p.name)}\nWhoop: ${p.recovery}% | EF: ${p.ef} | NP: ${p.np_watts || '--'}W</title></circle>`;
+  });
+
+  scatterEl.innerHTML = `
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+      <line x1="${padL}" y1="${padT + chartH}" x2="${W - padR}" y2="${padT + chartH}" stroke="var(--border-color)" />
+      <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + chartH}" stroke="var(--border-color)" />
+      <text x="${padL + chartW / 2}" y="${H - 6}" text-anchor="middle" font-size="9.5" fill="var(--text-muted)">Morning Whoop Recovery (%)</text>
+      <text x="${padL - 6}" y="${padT + 8}" text-anchor="end" font-size="9.5" fill="var(--text-muted)">${maxEf.toFixed(2)}</text>
+      <text x="${padL - 6}" y="${padT + chartH}" text-anchor="end" font-size="9.5" fill="var(--text-muted)">${minEf.toFixed(2)}</text>
+      ${dots}
+    </svg>
+  `;
+}
+
+function renderHistoryPowerCurve(powerCurveData) {
+  const chartEl = document.getElementById("historyPowerCurveChart");
+  const btEl = document.getElementById("historyBreakthroughs");
+  const curve = powerCurveData.curve || [];
+  const breakthroughs = powerCurveData.breakthroughs || [];
+
+  if (chartEl) {
+    const maxW = Math.max(100, ...curve.map((c) => Math.max(c.all_time_watts || 0, c.range_watts || 0)));
+    if (!curve.length || maxW <= 100 && curve.every((c) => !c.all_time_watts)) {
+      chartEl.innerHTML = `<div style="padding:2rem 1rem;text-align:center;color:var(--text-muted);font-size:0.82rem;">No power meter data in this range.</div>`;
+    } else {
+      const W = 500, H = 195;
+      const padL = 42, padR = 18, padT = 18, padB = 30;
+      const chartW = W - padL - padR;
+      const chartH = H - padT - padB;
+      const xFor = (i) => padL + (i / (curve.length - 1)) * chartW;
+      const yFor = (w) => padT + chartH - (w / maxW) * chartH;
+
+      const allPath = curve.map((c, i) => `${i === 0 ? "M" : "L"}${xFor(i).toFixed(1)},${yFor(c.all_time_watts || 0).toFixed(1)}`).join(" ");
+      const rngPath = curve.map((c, i) => `${i === 0 ? "M" : "L"}${xFor(i).toFixed(1)},${yFor(c.range_watts || 0).toFixed(1)}`).join(" ");
+
+      let pointsSvg = "";
+      curve.forEach((c, i) => {
+        const x = xFor(i);
+        const yAll = yFor(c.all_time_watts || 0);
+        const yRng = yFor(c.range_watts || 0);
+        pointsSvg += `<circle cx="${x.toFixed(1)}" cy="${yAll.toFixed(1)}" r="3.5" fill="#94A3B8"><title>All-Time ${c.label}: ${c.all_time_watts}W (${c.all_time_w_kg} W/kg) on ${c.all_time_date || ''}</title></circle>`;
+        pointsSvg += `<circle cx="${x.toFixed(1)}" cy="${yRng.toFixed(1)}" r="4" fill="#FF5E00"><title>Range ${c.label}: ${c.range_watts}W (${c.range_w_kg} W/kg)</title></circle>`;
+        pointsSvg += `<text x="${x.toFixed(1)}" y="${H - 10}" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-muted)">${c.key}</text>`;
+      });
+
+      chartEl.innerHTML = `
+        <div style="text-align:right;font-size:0.72rem;font-weight:600;margin-bottom:0.2rem;">
+          <span style="color:#FF5E00;">● Selected Range</span> &nbsp; <span style="color:#94A3B8;">● All-Time PR</span>
+        </div>
+        <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet">
+          <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + chartH}" stroke="var(--border-color)" />
+          <line x1="${padL}" y1="${padT + chartH}" x2="${W - padR}" y2="${padT + chartH}" stroke="var(--border-color)" />
+          <text x="${padL - 6}" y="${padT + 8}" text-anchor="end" font-size="9.5" fill="var(--text-muted)">${maxW}W</text>
+          <text x="${padL - 6}" y="${padT + chartH}" text-anchor="end" font-size="9.5" fill="var(--text-muted)">0W</text>
+          <path d="${allPath}" fill="none" stroke="#94A3B8" stroke-width="2" stroke-dasharray="4,3" />
+          <path d="${rngPath}" fill="none" stroke="#FF5E00" stroke-width="2.5" />
+          ${pointsSvg}
+        </svg>
+      `;
+    }
+  }
+
+  if (btEl) {
+    btEl.innerHTML = breakthroughs
+      .map(
+        (b) => `
+      <div class="history-breakthrough-pill" onclick="openRideInspectorModal('${escapeHistoryHtml(b.ride_id)}')">
+        <div class="history-bt-badge">${escapeHistoryHtml(b.badge)}</div>
+        <div class="history-bt-val">${escapeHistoryHtml(b.value)}</div>
+        <div class="history-bt-ride">${escapeHistoryHtml(b.ride_name)} · ${b.date}</div>
+      </div>
+    `
+      )
+      .join("");
+  }
+}
+
+function renderHistoryRecap(recap) {
+  const el = document.getElementById("historyRecapContent");
+  if (!el) return;
+  if (!recap || !recap.has_data) {
+    el.innerHTML = `<div style="color:var(--text-muted);font-size:0.84rem;">No rides recorded in this window yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="history-recap-item">
+      <div class="history-recap-lbl">Favorite Ride Day</div>
+      <div class="history-recap-val">${escapeHistoryHtml(recap.favorite_day)}</div>
+      <div class="history-recap-sub">${recap.favorite_day_count} rides on ${escapeHistoryHtml(recap.favorite_day)}s</div>
+    </div>
+    <div class="history-recap-item">
+      <div class="history-recap-lbl">Best Streak</div>
+      <div class="history-recap-val">${recap.longest_streak_days} days</div>
+      <div class="history-recap-sub">${recap.active_days} active riding days</div>
+    </div>
+    <div class="history-recap-item">
+      <div class="history-recap-lbl">Outdoor vs Indoor</div>
+      <div class="history-recap-val">${recap.outdoor_pct}% / ${recap.indoor_pct}%</div>
+      <div class="history-recap-sub">Road/Gravel vs Zwift</div>
+    </div>
+    <div class="history-recap-item">
+      <div class="history-recap-lbl">Everests Climbed</div>
+      <div class="history-recap-val">${recap.everests}×</div>
+      <div class="history-recap-sub">8,849 m vertical each</div>
+    </div>
+    <div class="history-recap-item">
+      <div class="history-recap-lbl">Energy Burned</div>
+      <div class="history-recap-val">🍕 ${Number(recap.pizza_slices).toLocaleString()}</div>
+      <div class="history-recap-sub">Pizza slices equivalent</div>
+    </div>
+  `;
+}
+
+function renderHistoryRideTable(rides) {
+  const tbody = document.getElementById("historyRideTableBody");
+  if (!tbody) return;
+
+  let filtered = Array.isArray(rides) ? [...rides] : [];
+  if (historyState.search) {
+    filtered = filtered.filter((r) => (r.name || "").toLowerCase().includes(historyState.search));
+  }
+
+  const sortKey = historyState.sort || "date_desc";
+  filtered.sort((a, b) => {
+    if (sortKey === "tss_desc") return (b.tss || 0) - (a.tss || 0);
+    if (sortKey === "dist_desc") return (b.distance_km || 0) - (a.distance_km || 0);
+    if (sortKey === "elev_desc") return (b.elevation_m || 0) - (a.elevation_m || 0);
+    if (sortKey === "np_desc") return (b.np_watts || 0) - (a.np_watts || 0);
+    if (sortKey === "ef_desc") return (b.ef || 0) - (a.ef || 0);
+    return String(b.date).localeCompare(String(a.date));
+  });
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:1.5rem;color:var(--text-muted);">No matching rides found.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered
+    .slice(0, 150)
+    .map((r) => {
+      const envTag = r.is_indoor
+        ? `<span class="history-env-tag indoor">Indoor</span>`
+        : `<span class="history-env-tag outdoor">Outdoor</span>`;
+      const pwr = r.avg_watts ? `${Math.round(r.avg_watts)} / ${Math.round(r.np_watts || r.avg_watts)} W` : "--";
+      const hr = r.avg_hr ? `${Math.round(r.avg_hr)} bpm` : "--";
+      const ef = r.ef ? r.ef : "--";
+      const rec = r.whoop_recovery !== null && r.whoop_recovery !== undefined ? `${r.whoop_recovery}%` : "--";
+      return `
+        <tr onclick="openRideInspectorModal('${escapeHistoryHtml(r.id)}')">
+          <td>${escapeHistoryHtml(r.date)}</td>
+          <td class="history-ride-name-cell" title="${escapeHistoryHtml(r.name)}">${escapeHistoryHtml(r.name)}</td>
+          <td>${envTag}</td>
+          <td>${r.distance_km} km</td>
+          <td>${formatHistoryDuration(r.moving_time_sec)}</td>
+          <td>${Math.round(r.elevation_m)} m</td>
+          <td>${pwr}</td>
+          <td>${hr}</td>
+          <td>${ef}</td>
+          <td><strong>${Math.round(r.tss)}</strong></td>
+          <td>${rec}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+async function openRideInspectorModal(rideId) {
+  const modal = document.getElementById("modalRideInspector");
+  const titleEl = document.getElementById("rideInspectorTitle");
+  const subEl = document.getElementById("rideInspectorSubtitle");
+  const bodyEl = document.getElementById("rideInspectorBody");
+  if (!modal || !bodyEl) return;
+
+  modal.style.display = "flex";
+  if (titleEl) titleEl.textContent = "Loading ride telemetry...";
+  if (subEl) subEl.textContent = "";
+  bodyEl.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--text-muted);">Loading...</div>`;
+
+  try {
+    const res = await fetch(`/api/history/ride/${encodeURIComponent(rideId)}`, { credentials: "same-origin" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const payload = await res.json();
+    const r = payload.ride;
+    const similar = payload.similar_rides || [];
+
+    if (titleEl) titleEl.textContent = r.name;
+    if (subEl) subEl.textContent = `${r.date} · ${r.is_indoor ? "Indoor / Virtual" : "Outdoor"} · ${r.sport_type}`;
+
+    const totalStrain = Math.max(0.1, (r.strain_low || 0) + (r.strain_high || 0) + (r.strain_peak || 0));
+    const pLow = Math.round(((r.strain_low || 0) / totalStrain) * 100);
+    const pHigh = Math.round(((r.strain_high || 0) / totalStrain) * 100);
+    const pPeak = Math.max(0, 100 - pLow - pHigh);
+
+    const whoopHtml =
+      r.whoop_recovery !== null && r.whoop_recovery !== undefined
+        ? `<div class="history-inspector-stat"><div class="history-kpi-label">Morning Whoop</div><div style="font-weight:800;">${r.whoop_recovery}% Recovery</div><div style="font-size:0.72rem;color:var(--text-muted);">HRV ${r.whoop_hrv ?? "--"} ms · RHR ${r.whoop_rhr ?? "--"}</div></div>`
+        : `<div class="history-inspector-stat"><div class="history-kpi-label">Morning Whoop</div><div style="font-weight:700;color:var(--text-muted);">Not synced</div></div>`;
+
+    bodyEl.innerHTML = `
+      ${r.has_polyline ? `<div id="rideInspectorMiniMap" class="history-inspector-minimap"></div>` : ""}
+      <div class="history-inspector-stats">
+        <div class="history-inspector-stat"><div class="history-kpi-label">Distance / Time</div><div style="font-weight:800;">${r.distance_km} km</div><div style="font-size:0.72rem;color:var(--text-muted);">${formatHistoryDuration(r.moving_time_sec)} · ${Math.round(r.elevation_m)}m elev</div></div>
+        <div class="history-inspector-stat"><div class="history-kpi-label">Power</div><div style="font-weight:800;">${r.np_watts ? Math.round(r.np_watts) + " W NP" : "--"}</div><div style="font-size:0.72rem;color:var(--text-muted);">Avg ${r.avg_watts ? Math.round(r.avg_watts) + "W" : "--"} · IF ${r.intensity_factor ?? "--"}</div></div>
+        <div class="history-inspector-stat"><div class="history-kpi-label">Load &amp; Efficiency</div><div style="font-weight:800;">${Math.round(r.tss)} TSS</div><div style="font-size:0.72rem;color:var(--text-muted);">EF ${r.ef ?? "--"} · ${r.avg_hr ? Math.round(r.avg_hr) + " bpm" : "--"}</div></div>
+        ${whoopHtml}
+      </div>
+      <div>
+        <div style="font-size:0.74rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.3rem;">3-Tier Mechanical Strain Split (Low ${r.strain_low} · High ${r.strain_high} · Peak ${r.strain_peak})</div>
+        <div style="display:flex;height:10px;border-radius:999px;overflow:hidden;background:var(--border-color);">
+          <div style="width:${pLow}%;background:#0052FF;"></div>
+          <div style="width:${pHigh}%;background:#F59E0B;"></div>
+          <div style="width:${pPeak}%;background:#EF4444;"></div>
+        </div>
+      </div>
+      ${
+        similar.length
+          ? `<div>
+              <div style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.35rem;">Similar Duration Rides Comparison</div>
+              <div style="display:flex;flex-direction:column;gap:0.3rem;">
+                ${similar
+                  .map(
+                    (s) => `<div style="display:flex;justify-content:space-between;font-size:0.76rem;padding:0.35rem 0.55rem;border-radius:7px;border:1px solid var(--border-color);cursor:pointer;" onclick="openRideInspectorModal('${escapeHistoryHtml(s.id)}')">
+                      <span><strong>${escapeHistoryHtml(s.date)}</strong> · ${escapeHistoryHtml(s.name)}</span>
+                      <span>${s.np_watts ? Math.round(s.np_watts) + "W" : "--"} · EF ${s.ef ?? "--"} · ${Math.round(s.tss)} TSS</span>
+                    </div>`
+                  )
+                  .join("")}
+              </div>
+            </div>`
+          : ""
+      }
+    `;
+
+    if (r.has_polyline && window.L) {
+      requestAnimationFrame(() => {
+        const mapEl = document.getElementById("rideInspectorMiniMap");
+        if (!mapEl) return;
+        if (historyState.inspectorMap) {
+          historyState.inspectorMap.remove();
+          historyState.inspectorMap = null;
+        }
+        const pts = decodeStravaPolyline(r.polyline);
+        if (!pts.length) return;
+        const m = L.map(mapEl, { zoomControl: true, attributionControl: false });
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(m);
+        const line = L.polyline(pts, { color: "#FF5E00", weight: 3.5, opacity: 0.9 }).addTo(m);
+        m.fitBounds(line.getBounds(), { padding: [18, 18] });
+        historyState.inspectorMap = m;
+      });
+    }
+  } catch (err) {
+    console.error("Failed to open ride inspector:", err);
+    bodyEl.innerHTML = `<div style="padding:1rem;color:#EF4444;">Failed to load ride details.</div>`;
+  }
+}
+
+function closeRideInspectorModal() {
+  const modal = document.getElementById("modalRideInspector");
+  if (modal) modal.style.display = "none";
+  if (historyState.inspectorMap) {
+    historyState.inspectorMap.remove();
+    historyState.inspectorMap = null;
+  }
+}

@@ -95,6 +95,17 @@
           <span class="main-view-tab-title">Workout Archive</span>
           <span class="main-view-tab-badge">Library</span>
         </button>
+        <button class="main-view-tab-btn" id="tabMainViewHistory" type="button" role="tab" aria-selected="false" data-view="history">
+          <span class="main-view-tab-icon" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"></polygon>
+              <line x1="9" y1="3" x2="9" y2="18"></line>
+              <line x1="15" y1="6" x2="15" y2="21"></line>
+            </svg>
+          </span>
+          <span class="main-view-tab-title">Ride History</span>
+          <span class="main-view-tab-badge">Explore</span>
+        </button>
       </div>
     </nav>
     
@@ -1992,6 +2003,235 @@
     </div>
   </div> <!-- end viewArchiveContainer (Workout Archive & Library) -->
 
+  <!-- ========================================================================= -->
+  <!-- VIEW 4: RIDE HISTORY & EXPLORER (Baseline-Inspired Historical Analytics)  -->
+  <!-- ========================================================================= -->
+  <div id="viewHistoryContainer" class="main-view-pane hidden-pane" role="tabpanel" aria-labelledby="tabMainViewHistory" style="display:none;">
+
+    <!-- Top Range & Environment Filter Bar -->
+    <section class="card history-controls-bar" id="historyControlsBar">
+      <div class="history-controls-left">
+        <div class="history-range-pills" id="historyRangePills" role="group" aria-label="Time Range">
+          <button type="button" class="history-pill-btn" data-range="7d">7D</button>
+          <button type="button" class="history-pill-btn" data-range="30d">30D</button>
+          <button type="button" class="history-pill-btn active" data-range="90d">90D</button>
+          <button type="button" class="history-pill-btn" data-range="ytd">YTD</button>
+          <button type="button" class="history-pill-btn" data-range="1y">1Y</button>
+          <button type="button" class="history-pill-btn" data-range="all">All Time</button>
+        </div>
+        <div class="history-env-pills" id="historyEnvPills" role="group" aria-label="Ride Environment">
+          <button type="button" class="history-pill-btn active" data-env="all">All Rides</button>
+          <button type="button" class="history-pill-btn" data-env="outdoor">Outdoor</button>
+          <button type="button" class="history-pill-btn" data-env="indoor">Indoor / Zwift</button>
+        </div>
+      </div>
+      <div class="history-controls-right">
+        <span class="history-meta-pill" id="historyRideCountPill">-- rides</span>
+        <button type="button" class="btn btn-secondary btn-xs" id="btnHistoryRefresh" title="Refresh Historical Analytics">↻ Refresh</button>
+      </div>
+    </section>
+
+    <!-- MODULE 7: Year in Sport / Period Recap Card -->
+    <section class="card history-recap-card" id="cardHistoryRecap">
+      <div class="card-header" style="margin-bottom:0.5rem;">
+        <div class="card-header-left">
+          <h2 style="font-size:1.05rem;">🏆 Period in Sport Recap</h2>
+          <div class="card-subtitle" id="historyRecapSubtitle" style="font-size:0.76rem;color:var(--text-muted);">
+            Auto-generated highlights for the selected window
+          </div>
+        </div>
+      </div>
+      <div id="historyRecapContent" class="history-recap-grid"></div>
+    </section>
+
+    <!-- MODULE 1: Range-Aware KPI Strip -->
+    <section class="history-kpi-grid" id="historyKpiGrid">
+      <div class="card history-kpi-card">
+        <div class="history-kpi-label">Distance</div>
+        <div class="history-kpi-value" id="hkpiDistance">--</div>
+        <div class="history-kpi-sub" id="hkpiDistanceSub">--</div>
+      </div>
+      <div class="card history-kpi-card">
+        <div class="history-kpi-label">Moving Time</div>
+        <div class="history-kpi-value" id="hkpiTime">--</div>
+        <div class="history-kpi-sub" id="hkpiTimeSub">--</div>
+      </div>
+      <div class="card history-kpi-card">
+        <div class="history-kpi-label">Elevation Gain</div>
+        <div class="history-kpi-value" id="hkpiElevation">--</div>
+        <div class="history-kpi-sub" id="hkpiElevationSub">--</div>
+      </div>
+      <div class="card history-kpi-card">
+        <div class="history-kpi-label">Total Work</div>
+        <div class="history-kpi-value" id="hkpiWork">--</div>
+        <div class="history-kpi-sub" id="hkpiWorkSub">--</div>
+      </div>
+      <div class="card history-kpi-card">
+        <div class="history-kpi-label">Total Load (TSS)</div>
+        <div class="history-kpi-value" id="hkpiTss">--</div>
+        <div class="history-kpi-sub" id="hkpiTssSub">--</div>
+      </div>
+      <div class="card history-kpi-card">
+        <div class="history-kpi-label">Avg NP / Efficiency</div>
+        <div class="history-kpi-value" id="hkpiNpEf">--</div>
+        <div class="history-kpi-sub" id="hkpiNpEfSub">--</div>
+      </div>
+    </section>
+
+    <!-- MODULE 1B: Volume Breakdown -->
+    <section class="card history-volume-card" id="cardHistoryVolume" style="margin-bottom:1rem;">
+      <div class="card-header" style="margin-bottom:0.65rem;">
+        <div class="card-header-left">
+          <h2 style="font-size:1.05rem;">📊 Volume &amp; Strain Distribution</h2>
+          <div class="card-subtitle" style="font-size:0.76rem;color:var(--text-muted);">
+            Weekly / monthly hours &amp; 3-tier mechanical strain
+          </div>
+        </div>
+        <div class="history-env-pills" id="historyVolumeModePills">
+          <button type="button" class="history-pill-btn active" data-vmode="env">Indoor vs Outdoor</button>
+          <button type="button" class="history-pill-btn" data-vmode="strain">3-Tier Strain</button>
+        </div>
+      </div>
+      <div id="historyVolumeChart" class="history-svg-chart-wrap"></div>
+    </section>
+
+    <!-- MODULE 3: Training Load & Readiness Curve (PMC: CTL / ATL / TSB + Whoop) -->
+    <section class="card history-pmc-card" id="cardHistoryPmc">
+      <div class="card-header" style="margin-bottom:0.65rem;">
+        <div class="card-header-left">
+          <h2 style="font-size:1.05rem;">📈 Training Load &amp; Readiness (CTL · ATL · TSB)</h2>
+          <div class="card-subtitle" id="historyPmcSubtitle" style="font-size:0.76rem;color:var(--text-muted);">
+            Fitness (42d), Fatigue (7d), and Form overlaid with morning Whoop Recovery
+          </div>
+        </div>
+        <div class="card-header-actions" style="display:flex;align-items:center;gap:0.6rem;flex-wrap:wrap;">
+          <label class="history-toggle-label">
+            <input type="checkbox" id="chkPmcWhoopOverlay" checked />
+            <span>Overlay Whoop Recovery %</span>
+          </label>
+          <div class="history-pmc-legend">
+            <span class="legend-dot" style="background:#0052FF;"></span>CTL
+            <span class="legend-dot" style="background:#FF5E00;"></span>ATL
+            <span class="legend-dot" style="background:#10B981;"></span>TSB
+          </div>
+        </div>
+      </div>
+      <div id="historyPmcChart" class="history-svg-chart-wrap" style="min-height:240px;"></div>
+    </section>
+
+    <!-- MODULE 4 & 5: Recovery x Performance Matrix + Historical Power Curve -->
+    <div class="history-two-col-grid">
+      <!-- Recovery x Performance Matrix -->
+      <section class="card" id="cardHistoryRecoveryMatrix">
+        <div class="card-header" style="margin-bottom:0.65rem;">
+          <div class="card-header-left">
+            <h2 style="font-size:1.05rem;">💚 Recovery × Performance Matrix</h2>
+            <div class="card-subtitle" style="font-size:0.76rem;color:var(--text-muted);">
+              How your Whoop morning readiness translates into cycling output &amp; Efficiency Factor (NP ÷ HR)
+            </div>
+          </div>
+        </div>
+        <div id="historyRecoveryBuckets" class="history-recovery-buckets"></div>
+        <div id="historyRecoveryScatter" class="history-svg-chart-wrap" style="margin-top:0.75rem;min-height:190px;"></div>
+      </section>
+
+      <!-- Historical Power Curve & Breakthroughs -->
+      <section class="card" id="cardHistoryPowerCurve">
+        <div class="card-header" style="margin-bottom:0.65rem;">
+          <div class="card-header-left">
+            <h2 style="font-size:1.05rem;">⚡ Mean Maximal Power Curve &amp; PRs</h2>
+            <div class="card-subtitle" style="font-size:0.76rem;color:var(--text-muted);">
+              Selected range peak power vs. All-Time PRs (Watts &amp; W/kg)
+            </div>
+          </div>
+        </div>
+        <div id="historyPowerCurveChart" class="history-svg-chart-wrap" style="min-height:195px;"></div>
+        <div id="historyBreakthroughs" class="history-breakthroughs-grid"></div>
+      </section>
+    </div>
+
+    <!-- MODULE 2: Geographic Heatmap ("One Map") -->
+    <section class="card history-heatmap-card" id="cardHistoryHeatmap" style="margin-bottom:1rem;">
+      <div class="card-header" style="margin-bottom:0.65rem;">
+        <div class="card-header-left">
+          <h2 style="font-size:1.05rem;">🗺️ One Map — Ride Heatmap</h2>
+          <div class="card-subtitle" id="historyMapSubtitle" style="font-size:0.76rem;color:var(--text-muted);">
+            Every outdoor route layered with intensity bleed
+          </div>
+        </div>
+        <div class="card-header-actions" style="display:flex;gap:0.4rem;">
+          <button type="button" class="btn btn-secondary btn-xs" id="btnHistoryMapFit">Fit Routes</button>
+        </div>
+      </div>
+      <div id="historyHeatmapContainer" class="history-heatmap-canvas"></div>
+      <div class="history-map-empty" id="historyMapEmpty" style="display:none;">
+        No outdoor GPS polylines found in this range. Switch to <strong>All Time</strong> or <strong>Outdoor</strong> to explore routes.
+      </div>
+    </section>
+
+    <!-- MODULE 6: Searchable & Sortable Ride Log -->
+    <section class="card" id="cardHistoryRideLog">
+      <div class="card-header" style="margin-bottom:0.75rem;">
+        <div class="card-header-left">
+          <h2 style="font-size:1.05rem;">🚴 Historical Ride Log</h2>
+          <div class="card-subtitle" style="font-size:0.76rem;color:var(--text-muted);">
+            Click any ride to inspect telemetry, route map, Whoop context &amp; similar rides
+          </div>
+        </div>
+        <div class="card-header-actions" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
+          <input type="search" id="historyRideSearch" class="archive-input" placeholder="Search ride title..." style="width:200px;padding:0.35rem 0.65rem;font-size:0.8rem;" />
+          <select id="historyRideSort" class="archive-input" style="width:auto;padding:0.35rem 0.6rem;font-size:0.8rem;">
+            <option value="date_desc">Newest First</option>
+            <option value="tss_desc">Highest TSS</option>
+            <option value="dist_desc">Longest Distance</option>
+            <option value="elev_desc">Biggest Climb</option>
+            <option value="np_desc">Highest NP</option>
+            <option value="ef_desc">Best Efficiency (EF)</option>
+          </select>
+        </div>
+      </div>
+      <div class="history-table-wrap">
+        <table class="history-ride-table" id="historyRideTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Ride</th>
+              <th>Type</th>
+              <th>Distance</th>
+              <th>Duration</th>
+              <th>Elev</th>
+              <th>Avg / NP</th>
+              <th>Avg HR</th>
+              <th>EF</th>
+              <th>TSS</th>
+              <th>Whoop</th>
+            </tr>
+          </thead>
+          <tbody id="historyRideTableBody">
+            <tr><td colspan="11" style="text-align:center;padding:1.5rem;color:var(--text-muted);">Select the Ride History tab to load analytics...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </div> <!-- end viewHistoryContainer -->
+
+  <!-- Single-Ride Inspector Modal -->
+  <div id="modalRideInspector" class="modal-backdrop" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="rideInspectorTitle">
+    <div class="modal-card history-inspector-modal">
+      <div class="modal-header">
+        <div>
+          <h3 id="rideInspectorTitle" style="margin:0;font-size:1.15rem;">Ride Telemetry</h3>
+          <div id="rideInspectorSubtitle" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">--</div>
+        </div>
+        <button type="button" class="btn-close-modal" id="btnCloseRideInspector" aria-label="Close">✕</button>
+      </div>
+      <div id="rideInspectorBody" class="history-inspector-body">
+        Loading...
+      </div>
+    </div>
+  </div>
+
   </main>
 
   <!-- Version Tracker Footer -->
@@ -2945,6 +3185,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=132"></script>
+  <script src="/static/js/app.js?v=133"></script>
 </body>
 </html>
