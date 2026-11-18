@@ -560,6 +560,33 @@ def init_db():
         ON wyze_scale_records(user_id, measure_ts DESC);
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS apple_health_records (
+        user_id TEXT NOT NULL DEFAULT 'usr_default',
+        date TEXT NOT NULL,
+        source TEXT NOT NULL DEFAULT 'webhook',
+        hrv_sdnn REAL,
+        resting_heart_rate INTEGER,
+        sleep_duration_hours REAL,
+        sleep_deep_hours REAL,
+        sleep_rem_hours REAL,
+        sleep_efficiency_pct REAL,
+        weight_kg REAL,
+        weight_lbs REAL,
+        body_fat_pct REAL,
+        vo2_max REAL,
+        active_energy_kcal REAL,
+        recovery_score INTEGER,
+        raw_json TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, date)
+    );
+    """)
+    cursor.execute("""
+    CREATE INDEX IF NOT EXISTS idx_apple_health_records_user_date
+        ON apple_health_records(user_id, date DESC);
+    """)
+
     # Ensure default user exists so legacy single-user data is preserved
     cursor.execute("""
         INSERT OR IGNORE INTO users (id, email, name, picture)

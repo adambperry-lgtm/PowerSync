@@ -46,10 +46,12 @@ def get_dashboard_data(request: Request = None):
                 "whoop": {"connected": False, "auth_expired": False},
                 "strava": {"connected": False},
                 "wyze": {"connected": False, "auth_expired": False},
+                "apple_health": {"connected": False, "has_records": False},
                 "gemini": {"configured": False},
                 "intervals_icu": {"configured": False}
             },
             "wyze_scale": None,
+            "apple_health": None,
             "program": None,
             "whoop": None,
             "day_config": None,
@@ -65,10 +67,20 @@ def get_dashboard_data(request: Request = None):
     whoop_tokens = get_setting("whoop_tokens", None, user_id=uid)
     strava_tokens = get_setting("strava_tokens", None, user_id=uid)
     wyze_tokens = get_setting("wyze_tokens", None, user_id=uid)
+
+    try:
+        from app.services.apple_health_service import get_apple_health_summary, get_latest_apple_health_as_recovery
+        apple_health_summary = get_apple_health_summary(user_id=uid, limit=14)
+    except Exception as e:
+        print(f"[PowerSync] Apple Health summary error in dashboard: {e}")
+        apple_health_summary = {"connected": False, "has_token": False, "has_records": False, "latest": None, "history": []}
+        get_latest_apple_health_as_recovery = None
+
+    apple_health_connected = bool(apple_health_summary.get("connected"))
     
-    # If athlete has connected real tokens, demo_mode is always False
+    # If athlete has connected real tokens or Apple Health records, demo_mode is always False
     demo_mode_setting = get_setting("demo_mode", False, user_id=uid)
-    demo_mode = False if (whoop_tokens or strava_tokens or wyze_tokens) else bool(demo_mode_setting)
+    demo_mode = False if (whoop_tokens or strava_tokens or wyze_tokens or apple_health_summary.get("has_records")) else bool(demo_mode_setting)
     
     ftp = get_setting("athlete_ftp", 250, user_id=uid)
     max_hr = get_setting("athlete_max_hr", 185, user_id=uid)
@@ -314,10 +326,12 @@ def get_dashboard_data(request: Request = None):
             "whoop": {"connected": whoop_connected, "auth_expired": whoop_auth_expired},
             "strava": {"connected": strava_connected},
             "wyze": {"connected": wyze_connected, "auth_expired": wyze_auth_expired},
+            "apple_health": {"connected": apple_health_connected, "has_records": bool(apple_health_summary.get("has_records"))},
             "gemini": {"configured": bool(gemini_key and "•" not in gemini_key)},
             "intervals_icu": {"configured": bool(intervals_icu_key and "•" not in intervals_icu_key and intervals_athlete_id)}
         },
         "wyze_scale": wyze_summary,
+        "apple_health": apple_health_summary,
         "program": program_data,
         "whoop": whoop_data,
         "day_config": day_config,

@@ -121,6 +121,7 @@ app.include_router(plans.router)
 app.include_router(chat.router)
 app.include_router(power.router)
 app.include_router(history.router)
+app.include_router(apple_health.router)
 
 # Mount Static Files
 static_dir = os.path.join(os.path.dirname(__file__), "static")
@@ -146,18 +147,30 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.15.5",
-        "release_name": "Wyze Connections Dropdown & Dashboard Summary Fix",
+        "version": "2.16.0",
+        "release_name": "Apple Health Webhook Push & Manual Biometrics",
         "build_date": "2026-11-18",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
             "wyze": "Wyze Scale Cloud API (Pluto & Classic Scale)",
+            "apple_health": "Auto-Export Webhook (Health Auto Export / Shortcuts) & Manual Entry",
             "zwift": "Intervals.icu Cloud Bridge",
             "ai_coach":"Google Gemini 3 Flash / 3.8 Flash (Tool Calling)",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.16.0",
+                "date": "2026-11-18",
+                "title": "Apple Health Webhook Push & Manual Biometrics",
+                "items": [
+                    "Automated iPhone Push (POST /api/apple-health/ingest): Personal per-user Bearer token webhook supporting Health Auto Export (iOS) JSON and Apple Shortcuts JSON payloads.",
+                    "Manual Biometric Entry (POST /api/apple-health/manual): Inline Settings form for logging Resting HR, HRV, Sleep, Weight, Body Fat %, VO2 Max, and Readiness.",
+                    "Readiness & Weight Sync: Automatically powers the dashboard Readiness & Recovery card when Whoop is not connected and keeps athlete weight in sync.",
+                    "In-App Setup Guide & Connections Badge: Step-by-step iOS setup instructions in Settings and live status in the Connections dropdown (app.js?v=142)."
+                ]
+            },
             {
                 "version": "v2.15.5",
                 "date": "2026-11-18",

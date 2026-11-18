@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.16.0] - 2026-11-18
+### Added
+- **Apple Health Integration (Auto-Export Webhook Push & Manual Entry)**:
+  - Added user-scoped `apple_health_records` table in [`app/database.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) storing HRV (SDNN), Resting HR, Sleep duration/stages, Body Weight (`weight_lbs`, `weight_kg`), Body Fat %, VO2 Max, Active Energy, and Readiness Score.
+  - Added [`app/services/apple_health_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/apple_health_service.py) and [`app/routers/apple_health.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/apple_health.py) supporting per-user personal Bearer webhook tokens (`POST /api/apple-health/ingest`), **Health Auto Export (iOS)** REST API JSON payloads, **Apple Shortcuts** flat JSON payloads, token rotation (`POST /api/apple-health/token/regenerate`), and manual biometric entry (`POST /api/apple-health/manual`).
+  - Integrated Apple Health into [`GET /api/dashboard`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/dashboard.py) as an automatic Readiness & Recovery fallback when Whoop is not connected, and synced recorded body weight into the athlete profile.
+  - Added the **Apple Health** card in Settings (`app/static/index.html`, `app/static/js/app.js?v=142`) and the top **Connections** dropdown (`#badgeAppleHealth`) with copyable Webhook URL & Bearer token, step-by-step iPhone setup guides for Health Auto Export and Apple Shortcuts, and an inline Manual Biometric Entry form.
+
 ## [2.15.5] - 2026-11-18
 ### Fixed
 - **Wyze Connections Dropdown & Dashboard Summary Resolution**:

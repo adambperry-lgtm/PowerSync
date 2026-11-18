@@ -194,6 +194,7 @@ async function loadDashboard() {
     state.whoop = data.whoop;
     state.strava = data.strava;
     state.wyzeScale = data.wyze_scale || null;
+    state.appleHealth = data.apple_health || null;
     state.dayConfig = data.day_config;
     state.coachingPreferences = data.coaching_preferences;
     state.ftp = data.athlete.ftp || 250;
@@ -1121,13 +1122,49 @@ function renderIntegrations(integrations) {
     }
   }
 
+  const ahText = document.getElementById("appleHealthStatusText");
+  const ahDot = document.getElementById("appleHealthNavDot");
+  if (ahText) {
+    const isAhConnected = Boolean(integrations.apple_health?.connected);
+    const hasAhRecords = Boolean(integrations.apple_health?.has_records);
+    if (hasAhRecords) {
+      const latestAh = state.appleHealth && state.appleHealth.latest ? state.appleHealth.latest : null;
+      if (latestAh && latestAh.hrv_sdnn) {
+        ahText.textContent = `${Number(latestAh.hrv_sdnn).toFixed(0)} ms HRV`;
+      } else if (latestAh && latestAh.resting_heart_rate) {
+        ahText.textContent = `${latestAh.resting_heart_rate} bpm RHR`;
+      } else {
+        ahText.textContent = "Synced";
+      }
+      if (ahDot) {
+        ahDot.className = "dot green";
+        ahDot.style.background = "#10b981";
+        ahDot.style.boxShadow = "0 0 8px #10b981";
+      }
+    } else if (isAhConnected) {
+      ahText.textContent = "Webhook Ready";
+      if (ahDot) {
+        ahDot.className = "dot amber";
+        ahDot.style.background = "#f59e0b";
+        ahDot.style.boxShadow = "none";
+      }
+    } else {
+      ahText.textContent = "Not connected";
+      if (ahDot) {
+        ahDot.className = "dot gray";
+        ahDot.style.background = "#94a3b8";
+        ahDot.style.boxShadow = "none";
+      }
+    }
+  }
+
   // Update Connections Dropdown Summary (pill indicator & count badge)
   const summaryDot = document.getElementById("connectionsSummaryDot");
   const countBadge = document.getElementById("connectionsCountBadge");
   const btnDropdown = document.getElementById("btnConnectionsDropdown");
 
   let connectedCount = 0;
-  const totalServices = 5;
+  const totalServices = 6;
   const hasExpired = Boolean(integrations.whoop?.auth_expired || integrations.wyze?.auth_expired);
 
   if (integrations.whoop?.connected && !integrations.whoop?.auth_expired) {
@@ -1137,6 +1174,9 @@ function renderIntegrations(integrations) {
     connectedCount++;
   }
   if (integrations.wyze?.connected && !integrations.wyze?.auth_expired) {
+    connectedCount++;
+  }
+  if (integrations.apple_health?.has_records) {
     connectedCount++;
   }
   if (Boolean(integrations.intervals_icu?.configured)) {
@@ -3433,7 +3473,188 @@ document.getElementById("badgeWhoop").addEventListener("click", openSettingsModa
 document.getElementById("badgeStrava").addEventListener("click", openSettingsModal);
 const badgeWyzeNav = document.getElementById("badgeWyze");
 if (badgeWyzeNav) badgeWyzeNav.addEventListener("click", openSettingsModal);
+const badgeAppleHealthNav = document.getElementById("badgeAppleHealth");
+if (badgeAppleHealthNav) badgeAppleHealthNav.addEventListener("click", openSettingsModal);
 document.getElementById("badgeZwift").addEventListener("click", openSettingsModal);
+
+function showAppleHealthFeedback(msg, isError = false) {
+  const fb = document.getElementById("appleHealthFeedback");
+  if (!fb) return;
+  fb.style.display = "block";
+  fb.style.color = isError ? "#ef4444" : "#10b981";
+  fb.style.borderColor = isError ? "rgba(239,68,68,0.35)" : "rgba(16,185,129,0.35)";
+  fb.textContent = msg;
+}
+
+function renderAppleHealthSummaryData(ahData) {
+  const statusEl = document.getElementById("appleHealthConnStatus");
+  const summaryBox = document.getElementById("appleHealthSummaryBox");
+  const metricsEl = document.getElementById("appleHealthLatestMetrics");
+  const dateEl = document.getElementById("appleHealthLatestDateText");
+  const urlEl = document.getElementById("appleHealthWebhookUrl");
+  const tokEl = document.getElementById("appleHealthToken");
+  const manualDateEl = document.getElementById("ahManualDate");
+
+  if (urlEl && ahData.webhook_url) urlEl.value = ahData.webhook_url;
+  if (tokEl && ahData.token) tokEl.value = ahData.token;
+  if (manualDateEl && !manualDateEl.value) {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, "0");
+    const dd = String(now.getDate()).padStart(2, "0");
+    manualDateEl.value = `${yyyy}-${mm}-${dd}`;
+  }
+
+  const latest = ahData.latest;
+  if (statusEl) {
+    if (latest) {
+      statusEl.textContent = latest.source === "manual" ? "Manual Data ✅" : "Synced ✅";
+      statusEl.style.color = "#10b981";
+    } else if (ahData.token) {
+      statusEl.textContent = "Webhook Ready";
+      statusEl.style.color = "#f59e0b";
+    } else {
+      statusEl.textContent = "Not connected";
+      statusEl.style.color = "#94a3b8";
+    }
+  }
+
+  if (summaryBox && metricsEl && dateEl) {
+    if (latest) {
+      const parts = [];
+      if (latest.recovery_score != null) parts.push(`Readiness ${latest.recovery_score}%`);
+      if (latest.hrv_sdnn != null) parts.push(`HRV ${Number(latest.hrv_sdnn).toFixed(1)} ms`);
+      if (latest.resting_heart_rate != null) parts.push(`RHR ${latest.resting_heart_rate} bpm`);
+      if (latest.sleep_duration_hours != null) parts.push(`Sleep ${Number(latest.sleep_duration_hours).toFixed(1)}h`);
+      if (latest.weight_lbs != null) parts.push(`${Number(latest.weight_lbs).toFixed(1)} lbs`);
+      if (latest.vo2_max != null) parts.push(`VO2 ${Number(latest.vo2_max).toFixed(1)}`);
+      metricsEl.textContent = parts.length ? parts.join(" • ") : "Apple Health record saved";
+      dateEl.textContent = `Last (${latest.source || "webhook"}): ${latest.date}`;
+      summaryBox.style.display = "block";
+    } else {
+      summaryBox.style.display = "none";
+    }
+  }
+}
+
+async function loadAppleHealthSettingsSummary() {
+  try {
+    const res = await fetch("/api/apple-health/status");
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data && data.success) {
+      renderAppleHealthSummaryData(data);
+    }
+  } catch (err) {
+    console.warn("Failed to load Apple Health status:", err);
+  }
+}
+
+const btnCopyAhUrl = document.getElementById("btnCopyAppleHealthUrl");
+if (btnCopyAhUrl) {
+  btnCopyAhUrl.addEventListener("click", async () => {
+    const el = document.getElementById("appleHealthWebhookUrl");
+    if (!el || !el.value) return;
+    try {
+      await navigator.clipboard.writeText(el.value);
+      const orig = btnCopyAhUrl.textContent;
+      btnCopyAhUrl.textContent = "Copied ✓";
+      setTimeout(() => { btnCopyAhUrl.textContent = orig; }, 1600);
+    } catch {
+      el.select();
+      document.execCommand("copy");
+    }
+  });
+}
+
+const btnCopyAhTok = document.getElementById("btnCopyAppleHealthToken");
+if (btnCopyAhTok) {
+  btnCopyAhTok.addEventListener("click", async () => {
+    const el = document.getElementById("appleHealthToken");
+    if (!el || !el.value) return;
+    try {
+      await navigator.clipboard.writeText(el.value);
+      const orig = btnCopyAhTok.textContent;
+      btnCopyAhTok.textContent = "Copied ✓";
+      setTimeout(() => { btnCopyAhTok.textContent = orig; }, 1600);
+    } catch {
+      el.select();
+      document.execCommand("copy");
+    }
+  });
+}
+
+const btnRegenAhTok = document.getElementById("btnRegenAppleHealthToken");
+if (btnRegenAhTok) {
+  btnRegenAhTok.addEventListener("click", async () => {
+    if (!confirm("Rotate your Apple Health Bearer token? Existing iOS Shortcuts / Health Auto Export automations using the old token will need to be updated.")) return;
+    btnRegenAhTok.disabled = true;
+    try {
+      const res = await fetch("/api/apple-health/token/regenerate", { method: "POST" });
+      const data = await res.json();
+      if (data.success && data.token) {
+        const tokEl = document.getElementById("appleHealthToken");
+        if (tokEl) tokEl.value = data.token;
+        showAppleHealthFeedback("New Apple Health Bearer token generated. Update your iOS automation with the new token.");
+      } else {
+        showAppleHealthFeedback(data.detail || "Failed to rotate token.", true);
+      }
+    } catch (err) {
+      showAppleHealthFeedback("Network error rotating token.", true);
+    } finally {
+      btnRegenAhTok.disabled = false;
+    }
+  });
+}
+
+const btnSaveAhManual = document.getElementById("btnSaveAppleHealthManual");
+if (btnSaveAhManual) {
+  btnSaveAhManual.addEventListener("click", async () => {
+    const payload = {};
+    const dVal = document.getElementById("ahManualDate")?.value;
+    if (dVal) payload.date = dVal;
+    const rhrVal = document.getElementById("ahManualRhr")?.value;
+    if (rhrVal !== "" && rhrVal != null) payload.resting_heart_rate = parseInt(rhrVal, 10);
+    const hrvVal = document.getElementById("ahManualHrv")?.value;
+    if (hrvVal !== "" && hrvVal != null) payload.hrv_sdnn = parseFloat(hrvVal);
+    const sleepVal = document.getElementById("ahManualSleep")?.value;
+    if (sleepVal !== "" && sleepVal != null) payload.sleep_duration_hours = parseFloat(sleepVal);
+    const weightVal = document.getElementById("ahManualWeightLbs")?.value;
+    if (weightVal !== "" && weightVal != null) payload.weight_lbs = parseFloat(weightVal);
+    const bfVal = document.getElementById("ahManualBodyFat")?.value;
+    if (bfVal !== "" && bfVal != null) payload.body_fat_pct = parseFloat(bfVal);
+    const vo2Val = document.getElementById("ahManualVo2Max")?.value;
+    if (vo2Val !== "" && vo2Val != null) payload.vo2_max = parseFloat(vo2Val);
+    const recVal = document.getElementById("ahManualRecovery")?.value;
+    if (recVal !== "" && recVal != null) payload.recovery_score = parseInt(recVal, 10);
+
+    const origText = btnSaveAhManual.textContent;
+    btnSaveAhManual.textContent = "⏳ Saving...";
+    btnSaveAhManual.disabled = true;
+    try {
+      const res = await fetch("/api/apple-health/manual", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        showAppleHealthFeedback(data.detail || data.error || "Please enter at least one metric to save.", true);
+      } else {
+        showAppleHealthFeedback(`Saved Apple Health entry for ${data.dates?.[0] || payload.date || "today"}!`);
+        await loadAppleHealthSettingsSummary();
+        if (typeof loadDashboard === "function") {
+          loadDashboard();
+        }
+      }
+    } catch (err) {
+      showAppleHealthFeedback("Network error saving Apple Health entry.", true);
+    } finally {
+      btnSaveAhManual.textContent = origText;
+      btnSaveAhManual.disabled = false;
+    }
+  });
+}
 const badgeGeminiNav = document.getElementById("badgeGemini");
 if (badgeGeminiNav) badgeGeminiNav.addEventListener("click", openSettingsModal);
 const badgeCardGeminiEl = document.getElementById("badgeCardGeminiStatus");
