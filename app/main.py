@@ -14,7 +14,7 @@ from app.database import (
     set_current_user_context, reset_current_user_context,
     set_current_timezone_context, reset_current_timezone_context
 )
-from app.routers import dashboard, workouts, settings, auth, review, plans, chat, power, history
+from app.routers import dashboard, workouts, settings, auth, review, plans, chat, power, history, apple_health
 
 app = FastAPI(
     title="PowerSync - AI Fitness Dashboard",
