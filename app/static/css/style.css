@@ -7610,3 +7610,65 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Per-Connection Enable/Disable Toggle Switch in Settings */
+.conn-toggle-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.conn-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 19px;
+  flex-shrink: 0;
+}
+
+.conn-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.conn-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background-color: #cbd5e1;
+  transition: 0.2s;
+  border-radius: 999px;
+}
+
+.conn-slider:before {
+  position: absolute;
+  content: "";
+  height: 13px;
+  width: 13px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #ffffff;
+  transition: 0.2s;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.conn-switch input:checked + .conn-slider {
+  background-color: #10b981;
+}
+
+.conn-switch input:checked + .conn-slider:before {
+  transform: translateX(15px);
+}
+
+.conn-card-disabled {
+  opacity: 0.58;
+  transition: opacity 0.2s ease;
+}
+

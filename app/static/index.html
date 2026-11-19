@@ -15,7 +15,7 @@
     document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.setAttribute("data-theme-mode", "light");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=70">
+  <link rel="stylesheet" href="/static/css/style.css?v=71">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -2437,16 +2437,25 @@
         </div>
 
         <!-- Google Gemini AI Key -->
-        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:1rem;border-radius:8px;">
+        <div class="form-group" id="settingsGeminiCard" style="background:#F4F7FA;border:1px solid rgba(0, 82, 255, 0.25);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
             <div style="display:flex;align-items:center;gap:0.45rem;">
               <span style="font-size:1.15rem;">✨</span>
               <label style="color:var(--accent-cyan);font-weight:700;margin:0;">AI Coach Engine (Directeur Sportive)</label>
             </div>
-            <span id="geminiConnStatus" class="badge-status badge-gemini connected" style="font-size:0.75rem;padding:0.18rem 0.55rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.35);color:#00C896;font-weight:600;">
-              <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #00C896;background:#00C896;border-radius:50%;"></span>
-              <span id="txtGeminiConnStatus">Active (Gemini 2.5 Flash)</span>
-            </span>
+            <div style="display:flex;align-items:center;gap:0.65rem;">
+              <span id="geminiConnStatus" class="badge-status badge-gemini connected" style="font-size:0.75rem;padding:0.18rem 0.55rem;border-radius:12px;display:inline-flex;align-items:center;gap:0.35rem;background:rgba(0,200,150,0.12);border:1px solid rgba(0,200,150,0.35);color:#00C896;font-weight:600;">
+                <span class="dot green" style="width:6px;height:6px;box-shadow:0 0 6px #00C896;background:#00C896;border-radius:50%;"></span>
+                <span id="txtGeminiConnStatus">Active (Gemini 2.5 Flash)</span>
+              </span>
+              <label class="conn-toggle-wrap" title="Enable or disable AI Coach Engine connection">
+                <span>Enabled</span>
+                <span class="conn-switch">
+                  <input type="checkbox" id="toggleEnableGemini" class="conn-enable-toggle" data-conn-service="gemini" data-card-id="settingsGeminiCard" checked />
+                  <span class="conn-slider"></span>
+                </span>
+              </label>
+            </div>
           </div>
           <p class="form-hint" style="color:var(--text-secondary);margin:0.4rem 0 0 0;font-size:0.8rem;">
             Powers conversational sports-science reasoning, daily ride debriefs, and automatic schedule adaptation.
@@ -2549,13 +2558,22 @@
         </div>
 
         <!-- Strava Integration Card -->
-        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(255, 94, 0, 0.25);padding:1rem;border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="form-group" id="settingsStravaCard" style="background:#F4F7FA;border:1px solid rgba(255, 94, 0, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">🚴</span>
               <label style="color:#FF5E00;font-weight:700;margin:0;">Strava Integration</label>
             </div>
-            <span id="stravaConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
+            <div style="display:flex;align-items:center;gap:0.65rem;">
+              <span id="stravaConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
+              <label class="conn-toggle-wrap" title="Enable or disable Strava connection">
+                <span>Enabled</span>
+                <span class="conn-switch">
+                  <input type="checkbox" id="toggleEnableStrava" class="conn-enable-toggle" data-conn-service="strava" data-card-id="settingsStravaCard" checked />
+                  <span class="conn-slider"></span>
+                </span>
+              </label>
+            </div>
           </div>
           <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
             Syncs historical training load, ride GPS tracks, weighted power telemetry, and outdoor route matching.
@@ -2571,13 +2589,22 @@
         </div>
 
         <!-- Whoop Biometrics Card -->
-        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 200, 150, 0.25);padding:1rem;border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="form-group" id="settingsWhoopCard" style="background:#F4F7FA;border:1px solid rgba(0, 200, 150, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">🔋</span>
               <label style="color:#00C896;font-weight:700;margin:0;">Whoop Biometrics</label>
             </div>
-            <span id="whoopConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
+            <div style="display:flex;align-items:center;gap:0.65rem;">
+              <span id="whoopConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
+              <label class="conn-toggle-wrap" title="Enable or disable Whoop connection">
+                <span>Enabled</span>
+                <span class="conn-switch">
+                  <input type="checkbox" id="toggleEnableWhoop" class="conn-enable-toggle" data-conn-service="whoop" data-card-id="settingsWhoopCard" checked />
+                  <span class="conn-slider"></span>
+                </span>
+              </label>
+            </div>
           </div>
           <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
             Syncs real-time Recovery Score, HRV baseline shift, Sleep Performance, and Day Strain rings.
@@ -2593,15 +2620,22 @@
         </div>
 
         <!-- Wyze Smart Scale Integration Card -->
-        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(0, 200, 150, 0.3);padding:1rem;border-radius:8px;">
+        <div class="form-group" id="settingsWyzeCard" style="background:#F4F7FA;border:1px solid rgba(0, 200, 150, 0.3);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">⚖️</span>
               <label style="color:#00C896;font-weight:700;margin:0;">Wyze Smart Scale (Auto-Sync Weight &amp; W/kg)</label>
             </div>
-            <div style="display:flex;align-items:center;gap:0.6rem;">
+            <div style="display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;">
               <a href="https://developer-api-console.wyze.com/#/apikey/view" target="_blank" rel="noopener" style="color:#0052FF;font-size:0.75rem;text-decoration:underline;">Wyze API Console ↗</a>
               <span id="wyzeConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
+              <label class="conn-toggle-wrap" title="Enable or disable Wyze Smart Scale connection">
+                <span>Enabled</span>
+                <span class="conn-switch">
+                  <input type="checkbox" id="toggleEnableWyze" class="conn-enable-toggle" data-conn-service="wyze" data-card-id="settingsWyzeCard" checked />
+                  <span class="conn-slider"></span>
+                </span>
+              </label>
             </div>
           </div>
           <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
@@ -2684,7 +2718,16 @@
               <span style="font-size:1.25rem;">❤️</span>
               <label style="color:#FF2D55;font-weight:700;margin:0;">Apple Health (Auto-Export Webhook &amp; Manual Entry)</label>
             </div>
-            <span id="appleHealthConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
+            <div style="display:flex;align-items:center;gap:0.65rem;">
+              <span id="appleHealthConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
+              <label class="conn-toggle-wrap" title="Enable or disable Apple Health connection">
+                <span>Enabled</span>
+                <span class="conn-switch">
+                  <input type="checkbox" id="toggleEnableAppleHealth" class="conn-enable-toggle" data-conn-service="apple_health" data-card-id="settingsAppleHealthCard" checked />
+                  <span class="conn-slider"></span>
+                </span>
+              </label>
+            </div>
           </div>
           <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
             Sync HRV, Resting HR, Sleep, Weight, and VO2 Max from your iPhone / Apple Watch via automated push or manual entry. When Whoop is not connected, Apple Health automatically powers your Readiness &amp; Recovery card.
@@ -2797,15 +2840,22 @@
         </div>
 
         <!-- Zwift & Intervals.icu Cloud Bridge Card -->
-        <div class="form-group" style="background:#F4F7FA;border:1px solid rgba(255, 94, 0, 0.25);padding:1rem;border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="form-group" id="settingsZwiftCard" style="background:#F4F7FA;border:1px solid rgba(255, 94, 0, 0.25);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
             <div style="display:flex;align-items:center;gap:0.5rem;">
               <span style="font-size:1.25rem;">📺</span>
               <label style="color:#FF5E00;font-weight:700;margin:0;">Zwift Direct Sync (Intervals.icu Bridge)</label>
             </div>
-            <div style="display:flex;align-items:center;gap:0.6rem;">
+            <div style="display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;">
               <a href="https://intervals.icu/settings" target="_blank" style="color:#FF5E00;font-size:0.75rem;text-decoration:underline;">Developer Settings ↗</a>
               <span id="intervalsConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not configured</span>
+              <label class="conn-toggle-wrap" title="Enable or disable Zwift Direct Sync connection">
+                <span>Enabled</span>
+                <span class="conn-switch">
+                  <input type="checkbox" id="toggleEnableZwift" class="conn-enable-toggle" data-conn-service="zwift" data-card-id="settingsZwiftCard" checked />
+                  <span class="conn-slider"></span>
+                </span>
+              </label>
             </div>
           </div>
           <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
@@ -3414,6 +3464,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=142"></script>
+  <script src="/static/js/app.js?v=143"></script>
 </body>
 </html>

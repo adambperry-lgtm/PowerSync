@@ -147,9 +147,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.16.0",
-        "release_name": "Apple Health Webhook Push & Manual Biometrics",
-        "build_date": "2026-11-18",
+        "version": "2.17.0",
+        "release_name": "Per-Connection Enable/Disable Toggles",
+        "build_date": "2026-11-19",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.0",
+                "date": "2026-11-19",
+                "title": "Per-Connection Enable/Disable Toggles",
+                "items": [
+                    "Per-Connection Enable Switches in Settings: Toggle any integration (Strava, Whoop, Wyze Scale, Apple Health, Zwift, AI Coach) on or off with instant persistence (POST /api/settings/connections/toggle).",
+                    "Skip Disabled Syncs: Dashboard and backend auto-sync skip disabled integrations so unused services are never polled or checked.",
+                    "Filtered Connections Indicator: The top Connections dropdown and X/Y status pill now display and count only enabled connections (style.css?v=71, app.js?v=143)."
+                ]
+            },
             {
                 "version": "v2.16.0",
                 "date": "2026-11-18",

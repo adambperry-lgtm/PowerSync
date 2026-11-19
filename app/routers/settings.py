@@ -6,7 +6,8 @@ from app.database import (
     get_primary_owner_email, set_primary_owner_email,
     get_current_user_id, DEFAULT_USER_ID, GUEST_USER_ID,
     get_athlete_weight_kg, get_athlete_weight_lbs,
-    set_athlete_weight_kg, set_athlete_weight_lbs
+    set_athlete_weight_kg, set_athlete_weight_lbs,
+    CONNECTION_KEYS, get_enabled_connections, set_enabled_connections
 )
 
 def require_authenticated_user(request: Request) -> str:
@@ -60,6 +61,7 @@ class SettingsUpdate(BaseModel):
     google_client_secret: Optional[str] = None
     primary_owner_email: Optional[str] = None
     reset_block: Optional[bool] = None
+    enabled_connections: Optional[Dict[str, bool]] = None
 
 def is_valid_secret(secret: Optional[str]) -> bool:
     if not secret or not secret.strip():
@@ -127,11 +129,14 @@ def get_settings_endpoint(uid: str = Depends(require_authenticated_user)):
         "program_weekly_xss_target": int(all_s.get("program_weekly_xss_target", all_s.get("program_weekly_tss_target", 360))),
         "theme_mode": all_s.get("theme_mode", "system"),
         "primary_owner_email": owner_email if uid == DEFAULT_USER_ID else "",
-        "primary_owner_locked": bool(owner_email)
+        "primary_owner_locked": bool(owner_email),
+        "enabled_connections": get_enabled_connections(user_id=uid)
     }
 
 @router.post("")
 def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require_authenticated_user)):
+    if payload.enabled_connections is not None:
+        set_enabled_connections(payload.enabled_connections, user_id=uid)
     if payload.primary_owner_email is not None and payload.primary_owner_email.strip():
         existing_owner = get_primary_owner_email()
         uid = get_current_user_id()
@@ -288,3 +293,26 @@ def reset_preferences_endpoint():
         "message": "Coaching preferences reset to defaults",
         "preferences": restored
     }
+
+
+class ConnectionTogglePayload(BaseModel):
+    service: str
+    enabled: bool
+
+
+@router.post("/connections/toggle")
+def toggle_connection_endpoint(
+    payload: ConnectionTogglePayload,
+    uid: str = Depends(require_authenticated_user),
+):
+    svc = (payload.service or "").strip().lower()
+    if svc not in CONNECTION_KEYS:
+        raise HTTPException(status_code=400, detail=f"Unknown connection service: {svc}")
+    updated = set_enabled_connections({svc: payload.enabled}, user_id=uid)
+    return {
+        "success": True,
+        "service": svc,
+        "enabled": updated[svc],
+        "enabled_connections": updated,
+    }
+

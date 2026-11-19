@@ -686,6 +686,28 @@ def get_env_fallback(key: str) -> Optional[Any]:
                 return val
     return None
 
+CONNECTION_KEYS = ("whoop", "strava", "wyze", "apple_health", "zwift", "gemini")
+
+def get_enabled_connections(user_id: Optional[str] = None) -> Dict[str, bool]:
+    uid = user_id or get_current_user_id()
+    raw = get_setting("enabled_connections", None, user_id=uid)
+    defaults = {k: True for k in CONNECTION_KEYS}
+    if isinstance(raw, dict):
+        for k in CONNECTION_KEYS:
+            if k in raw:
+                defaults[k] = bool(raw[k])
+    return defaults
+
+def set_enabled_connections(updates: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, bool]:
+    uid = user_id or get_current_user_id()
+    current = get_enabled_connections(user_id=uid)
+    if isinstance(updates, dict):
+        for k in CONNECTION_KEYS:
+            if k in updates and updates[k] is not None:
+                current[k] = bool(updates[k])
+    set_setting("enabled_connections", current, user_id=uid)
+    return current
+
 def get_setting(key: str, default: Any = None, user_id: Optional[str] = None) -> Any:
     uid = user_id or get_current_user_id()
 

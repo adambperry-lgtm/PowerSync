@@ -2,7 +2,8 @@ from fastapi import APIRouter, Request
 import datetime
 from app.database import (
     get_setting, set_setting, get_db_connection, get_current_user_id,
-    get_user_by_id, get_athlete_date, get_athlete_weight_kg, get_athlete_weight_lbs
+    get_user_by_id, get_athlete_date, get_athlete_weight_kg, get_athlete_weight_lbs,
+    get_enabled_connections
 )
 from app.services.mock_data import get_mock_whoop_data, get_mock_strava_activities, get_mock_weekly_stats
 from app.services.program_service import get_current_program
@@ -43,12 +44,12 @@ def get_dashboard_data(request: Request = None):
                 "power_zones": get_coggan_power_zones(250, 1050)
             },
             "integrations": {
-                "whoop": {"connected": False, "auth_expired": False},
-                "strava": {"connected": False},
-                "wyze": {"connected": False, "auth_expired": False},
-                "apple_health": {"connected": False, "has_records": False},
-                "gemini": {"configured": False},
-                "intervals_icu": {"configured": False}
+                "whoop": {"connected": False, "auth_expired": False, "enabled": True},
+                "strava": {"connected": False, "enabled": True},
+                "wyze": {"connected": False, "auth_expired": False, "enabled": True},
+                "apple_health": {"connected": False, "has_records": False, "enabled": True},
+                "gemini": {"configured": False, "enabled": True},
+                "intervals_icu": {"configured": False, "enabled": True}
             },
             "wyze_scale": None,
             "apple_health": None,
@@ -64,19 +65,24 @@ def get_dashboard_data(request: Request = None):
             }
         }
     
-    whoop_tokens = get_setting("whoop_tokens", None, user_id=uid)
-    strava_tokens = get_setting("strava_tokens", None, user_id=uid)
-    wyze_tokens = get_setting("wyze_tokens", None, user_id=uid)
+    enabled_conns = get_enabled_connections(user_id=uid)
+    whoop_tokens = get_setting("whoop_tokens", None, user_id=uid) if enabled_conns["whoop"] else None
+    strava_tokens = get_setting("strava_tokens", None, user_id=uid) if enabled_conns["strava"] else None
+    wyze_tokens = get_setting("wyze_tokens", None, user_id=uid) if enabled_conns["wyze"] else None
 
-    try:
-        from app.services.apple_health_service import get_apple_health_summary, get_latest_apple_health_as_recovery
-        apple_health_summary = get_apple_health_summary(user_id=uid, limit=14)
-    except Exception as e:
-        print(f"[PowerSync] Apple Health summary error in dashboard: {e}")
+    if enabled_conns["apple_health"]:
+        try:
+            from app.services.apple_health_service import get_apple_health_summary, get_latest_apple_health_as_recovery
+            apple_health_summary = get_apple_health_summary(user_id=uid, limit=14)
+        except Exception as e:
+            print(f"[PowerSync] Apple Health summary error in dashboard: {e}")
+            apple_health_summary = {"connected": False, "has_token": False, "has_records": False, "latest": None, "history": []}
+            get_latest_apple_health_as_recovery = None
+    else:
         apple_health_summary = {"connected": False, "has_token": False, "has_records": False, "latest": None, "history": []}
         get_latest_apple_health_as_recovery = None
 
-    apple_health_connected = bool(apple_health_summary.get("connected"))
+    apple_health_connected = bool(enabled_conns["apple_health"] and apple_health_summary.get("connected"))
     
     # If athlete has connected real tokens or Apple Health records, demo_mode is always False
     demo_mode_setting = get_setting("demo_mode", False, user_id=uid)
@@ -84,22 +90,23 @@ def get_dashboard_data(request: Request = None):
     
     ftp = get_setting("athlete_ftp", 250, user_id=uid)
     max_hr = get_setting("athlete_max_hr", 185, user_id=uid)
-    gemini_key = get_setting("gemini_api_key", "", user_id=uid)
-    intervals_icu_key = get_setting("intervals_icu_api_key", "", user_id=uid)
-    intervals_athlete_id = get_setting("intervals_athlete_id", "", user_id=uid)
+    gemini_key = get_setting("gemini_api_key", "", user_id=uid) if enabled_conns["gemini"] else ""
+    intervals_icu_key = get_setting("intervals_icu_api_key", "", user_id=uid) if enabled_conns["zwift"] else ""
+    intervals_athlete_id = get_setting("intervals_athlete_id", "", user_id=uid) if enabled_conns["zwift"] else ""
 
     has_wyze_creds = bool(
-        get_setting("wyze_email", "", user_id=uid)
+        enabled_conns["wyze"]
+        and get_setting("wyze_email", "", user_id=uid)
         and get_setting("wyze_password", "", user_id=uid)
         and get_setting("wyze_key_id", "", user_id=uid)
         and get_setting("wyze_api_key", "", user_id=uid)
     )
-    has_wyze_token = bool(wyze_tokens and isinstance(wyze_tokens, dict) and wyze_tokens.get("access_token"))
+    has_wyze_token = bool(enabled_conns["wyze"] and wyze_tokens and isinstance(wyze_tokens, dict) and wyze_tokens.get("access_token"))
 
-    # Auto-sync Wyze Smart Scale if connected (or credentials saved) and >15 min elapsed since last sync
+    # Auto-sync Wyze Smart Scale if enabled & connected (or credentials saved) and >15 min elapsed since last sync
     wyze_auth_expired = False
     now_ts = datetime.datetime.now().timestamp()
-    if has_wyze_token or has_wyze_creds:
+    if enabled_conns["wyze"] and (has_wyze_token or has_wyze_creds):
         last_wyze_sync = float(get_setting("last_wyze_sync_timestamp", 0.0, user_id=uid) or 0.0)
         if (now_ts - last_wyze_sync) > 900:
             try:
@@ -111,62 +118,64 @@ def get_dashboard_data(request: Request = None):
             except Exception as e:
                 print(f"[PowerSync] Wyze auto-sync error in dashboard: {e}")
 
-    try:
-        from app.services.wyze_service import get_wyze_scale_summary
-        wyze_summary = get_wyze_scale_summary(user_id=uid, limit=14)
-    except Exception as e:
-        print(f"[PowerSync] Wyze summary error in dashboard: {e}")
-        wyze_summary = {"connected": bool(has_wyze_token or has_wyze_creds), "latest": None, "history": []}
+    if enabled_conns["wyze"]:
+        try:
+            from app.services.wyze_service import get_wyze_scale_summary
+            wyze_summary = get_wyze_scale_summary(user_id=uid, limit=14)
+        except Exception as e:
+            print(f"[PowerSync] Wyze summary error in dashboard: {e}")
+            wyze_summary = {"connected": bool(has_wyze_token or has_wyze_creds), "latest": None, "history": []}
+        wyze_connected = bool(has_wyze_token or has_wyze_creds or wyze_summary.get("connected"))
+    else:
+        wyze_summary = {"connected": False, "latest": None, "history": []}
+        wyze_connected = False
 
-    wyze_connected = bool(has_wyze_token or has_wyze_creds or wyze_summary.get("connected"))
     weight_kg = get_athlete_weight_kg(user_id=uid)
     weight_lbs = get_athlete_weight_lbs(user_id=uid)
     ftp_w_kg = round(float(ftp) / max(30.0, weight_kg), 2)
     
-    # Whoop Data: prioritize athlete's private whoop_metrics table records
+    # Whoop Data: prioritize athlete's private whoop_metrics table records (only when Whoop is enabled)
     today_iso = get_athlete_date().isoformat()
     whoop_auth_expired = False
-    
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
-    row = c.fetchone()
-    conn.close()
+    row = None
 
-    whoop_tokens = get_setting("whoop_tokens", {}, user_id=uid)
+    if enabled_conns["whoop"]:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+        row = c.fetchone()
+        conn.close()
 
-    # Auto-sync live Whoop metrics if:
-    # 1. Athlete has connected Whoop tokens AND:
-    # 2. No record exists for today OR today's recovery is unfinalized (missing/0) OR
-    # 3. More than 15 minutes have elapsed since last sync
-    last_whoop_sync_key = "last_whoop_sync_timestamp"
-    last_whoop_sync_time = float(get_setting(last_whoop_sync_key, 0.0, user_id=uid) or 0.0)
-    now_ts = datetime.datetime.now().timestamp()
+        whoop_tokens = get_setting("whoop_tokens", {}, user_id=uid)
 
-    needs_whoop_sync = False
-    if whoop_tokens:
-        if not row or row["date"] != today_iso:
-            needs_whoop_sync = True
-        elif not row["recovery_score"] or row["recovery_score"] <= 0:
-            needs_whoop_sync = True
-        elif (now_ts - last_whoop_sync_time) > 120:  # 2 minutes auto-sync window
-            needs_whoop_sync = True
+        last_whoop_sync_key = "last_whoop_sync_timestamp"
+        last_whoop_sync_time = float(get_setting(last_whoop_sync_key, 0.0, user_id=uid) or 0.0)
+        now_ts = datetime.datetime.now().timestamp()
 
-    if needs_whoop_sync:
-        try:
-            from app.services.whoop_service import fetch_latest_whoop_metrics
-            sync_res = fetch_latest_whoop_metrics(user_id=uid)
-            if sync_res.get("success"):
-                set_setting(last_whoop_sync_key, now_ts, user_id=uid)
-                conn = get_db_connection()
-                c = conn.cursor()
-                c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
-                row = c.fetchone()
-                conn.close()
-            elif sync_res.get("auth_expired"):
-                whoop_auth_expired = True
-        except Exception as e:
-            print(f"[PowerSync] Whoop auto-sync error in dashboard: {e}")
+        needs_whoop_sync = False
+        if whoop_tokens:
+            if not row or row["date"] != today_iso:
+                needs_whoop_sync = True
+            elif not row["recovery_score"] or row["recovery_score"] <= 0:
+                needs_whoop_sync = True
+            elif (now_ts - last_whoop_sync_time) > 120:  # 2 minutes auto-sync window
+                needs_whoop_sync = True
+
+        if needs_whoop_sync:
+            try:
+                from app.services.whoop_service import fetch_latest_whoop_metrics
+                sync_res = fetch_latest_whoop_metrics(user_id=uid)
+                if sync_res.get("success"):
+                    set_setting(last_whoop_sync_key, now_ts, user_id=uid)
+                    conn = get_db_connection()
+                    c = conn.cursor()
+                    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+                    row = c.fetchone()
+                    conn.close()
+                elif sync_res.get("auth_expired"):
+                    whoop_auth_expired = True
+            except Exception as e:
+                print(f"[PowerSync] Whoop auto-sync error in dashboard: {e}")
 
     if row:
         from app.services.whoop_service import get_trailing_whoop_stats
@@ -209,10 +218,10 @@ def get_dashboard_data(request: Request = None):
     rows = c.fetchall()
     conn.close()
 
-    strava_tokens = get_setting("strava_tokens", {}, user_id=uid)
+    strava_tokens = get_setting("strava_tokens", {}, user_id=uid) if enabled_conns["strava"] else {}
 
-    # Auto-sync live Strava activities if athlete has connected tokens and no activity today (or 60s elapsed)
-    if strava_tokens:
+    # Auto-sync live Strava activities if enabled and athlete has connected tokens and no activity today (or 60s elapsed)
+    if enabled_conns["strava"] and strava_tokens:
         has_today = any((resolve_strava_local_start(dict(r), user_id=uid) or dict(r).get("start_date", "")).startswith(today_iso) for r in rows)
         last_sync_key = "last_strava_sync_timestamp"
         last_sync_time = float(get_setting(last_sync_key, 0.0, user_id=uid))
@@ -323,12 +332,12 @@ def get_dashboard_data(request: Request = None):
             "power_zones": get_coggan_power_zones(ftp, peak_power)
         },
         "integrations": {
-            "whoop": {"connected": whoop_connected, "auth_expired": whoop_auth_expired},
-            "strava": {"connected": strava_connected},
-            "wyze": {"connected": wyze_connected, "auth_expired": wyze_auth_expired},
-            "apple_health": {"connected": apple_health_connected, "has_records": bool(apple_health_summary.get("has_records"))},
-            "gemini": {"configured": bool(gemini_key and "•" not in gemini_key)},
-            "intervals_icu": {"configured": bool(intervals_icu_key and "•" not in intervals_icu_key and intervals_athlete_id)}
+            "whoop": {"connected": whoop_connected, "auth_expired": whoop_auth_expired, "enabled": enabled_conns["whoop"]},
+            "strava": {"connected": strava_connected, "enabled": enabled_conns["strava"]},
+            "wyze": {"connected": wyze_connected, "auth_expired": wyze_auth_expired, "enabled": enabled_conns["wyze"]},
+            "apple_health": {"connected": apple_health_connected, "has_records": bool(apple_health_summary.get("has_records")), "enabled": enabled_conns["apple_health"]},
+            "gemini": {"configured": bool(enabled_conns["gemini"] and gemini_key and "•" not in gemini_key), "enabled": enabled_conns["gemini"]},
+            "intervals_icu": {"configured": bool(enabled_conns["zwift"] and intervals_icu_key and "•" not in intervals_icu_key and intervals_athlete_id), "enabled": enabled_conns["zwift"]}
         },
         "wyze_scale": wyze_summary,
         "apple_health": apple_health_summary,

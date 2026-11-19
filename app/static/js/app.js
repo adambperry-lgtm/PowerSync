@@ -1021,59 +1021,77 @@ function renderIntegrations(integrations) {
     banner.style.display = isDemo ? "flex" : "none";
   }
 
+  const whoopEnabled = integrations.whoop?.enabled !== false;
+  const stravaEnabled = integrations.strava?.enabled !== false;
+  const zwiftEnabled = integrations.intervals_icu?.enabled !== false;
+  const geminiEnabled = integrations.gemini?.enabled !== false;
+  const wyzeEnabled = integrations.wyze?.enabled !== false;
+  const ahEnabled = integrations.apple_health?.enabled !== false;
+
   const whoopBadge = document.getElementById("badgeWhoop");
+  if (whoopBadge) whoopBadge.style.display = whoopEnabled ? "" : "none";
   const whoopDot = whoopBadge ? whoopBadge.querySelector(".dot") : null;
-  if (integrations.whoop?.auth_expired) {
-    whoopText.textContent = "Session Expired";
-    if (whoopDot) whoopDot.className = "dot red";
-  } else if (integrations.whoop?.connected) {
-    whoopText.textContent = "Connected";
-    if (whoopDot) whoopDot.className = "dot green";
-  } else {
-    whoopText.textContent = isDemo ? "Demo Mode" : "Not connected";
-    if (whoopDot) whoopDot.className = isDemo ? "dot amber" : "dot gray";
+  if (whoopEnabled && whoopText) {
+    if (integrations.whoop?.auth_expired) {
+      whoopText.textContent = "Session Expired";
+      if (whoopDot) whoopDot.className = "dot red";
+    } else if (integrations.whoop?.connected) {
+      whoopText.textContent = "Connected";
+      if (whoopDot) whoopDot.className = "dot green";
+    } else {
+      whoopText.textContent = isDemo ? "Demo Mode" : "Not connected";
+      if (whoopDot) whoopDot.className = isDemo ? "dot amber" : "dot gray";
+    }
   }
 
   const stravaBadge = document.getElementById("badgeStrava");
+  if (stravaBadge) stravaBadge.style.display = stravaEnabled ? "" : "none";
   const stravaDot = stravaBadge ? stravaBadge.querySelector(".dot") : null;
-  if (integrations.strava?.connected) {
-    stravaText.textContent = "Connected";
-    if (stravaDot) {
-      stravaDot.className = "dot green";
-      stravaDot.style.background = "#10b981";
-      stravaDot.style.boxShadow = "0 0 8px #10b981";
-    }
-  } else {
-    stravaText.textContent = isDemo ? "Demo Mode" : "Not connected";
-    if (stravaDot) {
-      stravaDot.className = isDemo ? "dot amber" : "dot gray";
-      stravaDot.style.background = isDemo ? "var(--accent-amber)" : "#94a3b8";
-      stravaDot.style.boxShadow = "none";
+  if (stravaEnabled && stravaText) {
+    if (integrations.strava?.connected) {
+      stravaText.textContent = "Connected";
+      if (stravaDot) {
+        stravaDot.className = "dot green";
+        stravaDot.style.background = "#10b981";
+        stravaDot.style.boxShadow = "0 0 8px #10b981";
+      }
+    } else {
+      stravaText.textContent = isDemo ? "Demo Mode" : "Not connected";
+      if (stravaDot) {
+        stravaDot.className = isDemo ? "dot amber" : "dot gray";
+        stravaDot.style.background = isDemo ? "var(--accent-amber)" : "#94a3b8";
+        stravaDot.style.boxShadow = "none";
+      }
     }
   }
 
   const zwiftBadge = document.getElementById("badgeZwift");
+  if (zwiftBadge) zwiftBadge.style.display = zwiftEnabled ? "" : "none";
   const zwiftDot = zwiftBadge ? (document.getElementById("zwiftNavDot") || zwiftBadge.querySelector(".dot")) : null;
   const isZwiftConnected = Boolean(integrations.intervals_icu?.configured);
-  if (isZwiftConnected) {
-    zwiftText.textContent = "Connected";
-    if (zwiftDot) {
-      zwiftDot.className = "dot green";
-      zwiftDot.style.background = "#10b981";
-      zwiftDot.style.boxShadow = "0 0 8px #10b981";
-    }
-  } else {
-    zwiftText.textContent = isDemo ? "Demo Mode" : "Not connected";
-    if (zwiftDot) {
-      zwiftDot.className = isDemo ? "dot amber" : "dot gray";
-      zwiftDot.style.background = isDemo ? "var(--accent-amber)" : "#94a3b8";
-      zwiftDot.style.boxShadow = "none";
+  if (zwiftEnabled && zwiftText) {
+    if (isZwiftConnected) {
+      zwiftText.textContent = "Connected";
+      if (zwiftDot) {
+        zwiftDot.className = "dot green";
+        zwiftDot.style.background = "#10b981";
+        zwiftDot.style.boxShadow = "0 0 8px #10b981";
+      }
+    } else {
+      zwiftText.textContent = isDemo ? "Demo Mode" : "Not connected";
+      if (zwiftDot) {
+        zwiftDot.className = isDemo ? "dot amber" : "dot gray";
+        zwiftDot.style.background = isDemo ? "var(--accent-amber)" : "#94a3b8";
+        zwiftDot.style.boxShadow = "none";
+      }
     }
   }
 
+  const geminiBadge = document.getElementById("badgeGemini");
+  if (geminiBadge) geminiBadge.style.display = geminiEnabled ? "" : "none";
   const geminiText = document.getElementById("geminiNavStatusText");
   const geminiDot = document.getElementById("geminiNavDot");
-  if (geminiText) {
+  if (geminiEnabled && geminiText) {
     const isGeminiConfigured = Boolean(integrations.gemini?.configured);
     if (isGeminiConfigured) {
       geminiText.textContent = "Connected";
@@ -1092,9 +1110,11 @@ function renderIntegrations(integrations) {
     }
   }
 
+  const wyzeBadge = document.getElementById("badgeWyze");
+  if (wyzeBadge) wyzeBadge.style.display = wyzeEnabled ? "" : "none";
   const wyzeText = document.getElementById("wyzeStatusText");
   const wyzeDot = document.getElementById("wyzeNavDot");
-  if (wyzeText) {
+  if (wyzeEnabled && wyzeText) {
     const isWyzeConnected = Boolean(integrations.wyze?.connected);
     const isWyzeExpired = Boolean(integrations.wyze?.auth_expired);
     if (isWyzeExpired) {
@@ -1122,9 +1142,11 @@ function renderIntegrations(integrations) {
     }
   }
 
+  const ahBadge = document.getElementById("badgeAppleHealth");
+  if (ahBadge) ahBadge.style.display = ahEnabled ? "" : "none";
   const ahText = document.getElementById("appleHealthStatusText");
   const ahDot = document.getElementById("appleHealthNavDot");
-  if (ahText) {
+  if (ahEnabled && ahText) {
     const isAhConnected = Boolean(integrations.apple_health?.connected);
     const hasAhRecords = Boolean(integrations.apple_health?.has_records);
     if (hasAhRecords) {
@@ -1158,32 +1180,41 @@ function renderIntegrations(integrations) {
     }
   }
 
-  // Update Connections Dropdown Summary (pill indicator & count badge)
+  // Update Connections Dropdown Summary (pill indicator & count badge) across ENABLED services only
   const summaryDot = document.getElementById("connectionsSummaryDot");
   const countBadge = document.getElementById("connectionsCountBadge");
   const btnDropdown = document.getElementById("btnConnectionsDropdown");
 
   let connectedCount = 0;
-  const totalServices = 6;
-  const hasExpired = Boolean(integrations.whoop?.auth_expired || integrations.wyze?.auth_expired);
+  let totalServices = 0;
+  const hasExpired = Boolean(
+    (whoopEnabled && integrations.whoop?.auth_expired) ||
+    (wyzeEnabled && integrations.wyze?.auth_expired)
+  );
 
-  if (integrations.whoop?.connected && !integrations.whoop?.auth_expired) {
-    connectedCount++;
+  if (whoopEnabled) {
+    totalServices++;
+    if (integrations.whoop?.connected && !integrations.whoop?.auth_expired) connectedCount++;
   }
-  if (integrations.strava?.connected) {
-    connectedCount++;
+  if (stravaEnabled) {
+    totalServices++;
+    if (integrations.strava?.connected) connectedCount++;
   }
-  if (integrations.wyze?.connected && !integrations.wyze?.auth_expired) {
-    connectedCount++;
+  if (wyzeEnabled) {
+    totalServices++;
+    if (integrations.wyze?.connected && !integrations.wyze?.auth_expired) connectedCount++;
   }
-  if (integrations.apple_health?.has_records) {
-    connectedCount++;
+  if (ahEnabled) {
+    totalServices++;
+    if (integrations.apple_health?.has_records) connectedCount++;
   }
-  if (Boolean(integrations.intervals_icu?.configured)) {
-    connectedCount++;
+  if (zwiftEnabled) {
+    totalServices++;
+    if (Boolean(integrations.intervals_icu?.configured)) connectedCount++;
   }
-  if (Boolean(integrations.gemini?.configured) || (!isDemo && state.dashboard?.has_gemini)) {
-    connectedCount++;
+  if (geminiEnabled) {
+    totalServices++;
+    if (Boolean(integrations.gemini?.configured) || (!isDemo && state.dashboard?.has_gemini)) connectedCount++;
   }
 
   if (countBadge) {
@@ -1191,7 +1222,7 @@ function renderIntegrations(integrations) {
   }
 
   if (btnDropdown) {
-    btnDropdown.title = `Connected Services: ${connectedCount} of ${totalServices} active`;
+    btnDropdown.title = `Connected Services: ${connectedCount} of ${totalServices} enabled active`;
   }
 
   if (summaryDot) {
@@ -1199,7 +1230,7 @@ function renderIntegrations(integrations) {
       summaryDot.className = "dot red";
       summaryDot.style.background = "var(--accent-rose, #f43f5e)";
       summaryDot.style.boxShadow = "0 0 8px rgba(244, 63, 94, 0.6)";
-    } else if (connectedCount >= 3) {
+    } else if (totalServices > 0 && (connectedCount === totalServices || connectedCount >= 3)) {
       summaryDot.className = "dot green";
       summaryDot.style.background = "var(--accent-emerald, #10b981)";
       summaryDot.style.boxShadow = "0 0 8px var(--accent-emerald, #10b981)";
@@ -3312,9 +3343,52 @@ function openSettingsModal() {
       updateGeminiConnectedIndicators(isGeminiSet);
       checkCoachGeminiStatus();
 
+      // Per-Connection Enable/Disable Toggles
+      applyConnectionTogglesUI(s.enabled_connections || {});
+
       settingsModal.classList.add("open");
     });
 }
+
+function applyConnectionTogglesUI(enabledMap) {
+  const toggles = document.querySelectorAll(".conn-enable-toggle");
+  toggles.forEach((chk) => {
+    const svc = chk.dataset.connService;
+    const cardId = chk.dataset.cardId;
+    const isEnabled = enabledMap && svc in enabledMap ? Boolean(enabledMap[svc]) : true;
+    chk.checked = isEnabled;
+    if (cardId) {
+      const card = document.getElementById(cardId);
+      if (card) card.classList.toggle("conn-card-disabled", !isEnabled);
+    }
+  });
+}
+
+document.querySelectorAll(".conn-enable-toggle").forEach((chk) => {
+  chk.addEventListener("change", async () => {
+    const svc = chk.dataset.connService;
+    const cardId = chk.dataset.cardId;
+    const isEnabled = Boolean(chk.checked);
+    if (cardId) {
+      const card = document.getElementById(cardId);
+      if (card) card.classList.toggle("conn-card-disabled", !isEnabled);
+    }
+    try {
+      const res = await fetch("/api/settings/connections/toggle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ service: svc, enabled: isEnabled }),
+      });
+      if (res.ok) {
+        if (typeof loadDashboard === "function") {
+          loadDashboard();
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to toggle connection:", svc, err);
+    }
+  });
+});
 
 function updateSettingsLiveWkgBadge() {
   const badge = document.getElementById("settingLiveWkgBadge");

@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.0] - 2026-11-19
+### Added
+- **Per-Connection Enable/Disable Toggles**:
+  - Added user-scoped `enabled_connections` settings helpers (`CONNECTION_KEYS`, `get_enabled_connections()`, `set_enabled_connections()`) in [`app/database.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) and `POST /api/settings/connections/toggle` in [`app/routers/settings.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/settings.py).
+  - Updated [`GET /api/dashboard`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/dashboard.py) to skip auto-syncing and querying disabled integrations (e.g., skipping Apple Health when Whoop is enabled, or skipping Whoop when Apple Health is enabled) and return `enabled` flags in `integrations`.
+  - Added **Enabled** toggle switches to every integration card in Settings (`AI Coach Engine`, `Strava`, `Whoop`, `Wyze Smart Scale`, `Apple Health`, `Zwift`) in [`app/static/index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`app/static/css/style.css`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/css/style.css?v=71), and [`app/static/js/app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js?v=143).
+  - Updated `renderIntegrations()` in [`app/static/js/app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) so the top **Connections** dropdown and `X/Y` status badge only display and count **enabled** connections.
+
 ## [2.16.0] - 2026-11-18
 ### Added
 - **Apple Health Integration (Auto-Export Webhook Push & Manual Entry)**:
