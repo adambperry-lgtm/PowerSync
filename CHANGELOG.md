@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.1] - 2026-11-19
+### Changed
+- **Gemini `gemini-flash-latest` Default Model**:
+  - Updated `_CACHED_WORKING_MODEL` and `models_to_try` in [`app/services/coach_chat_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py), [`app/routers/chat.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/chat.py), and [`app/services/review_coach.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) to use `gemini-flash-latest` as the primary Gemini model while retaining `gemini-3.8-flash` and `gemini-3-flash-preview` as automatic fallbacks.
+
 ## [2.17.0] - 2026-11-19
 ### Added
 - **Per-Connection Enable/Disable Toggles**:

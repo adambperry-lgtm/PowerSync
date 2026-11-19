@@ -1870,7 +1870,7 @@ def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool 
 
 def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_data: Dict[str, Any], custom_prompt: str = "") -> Optional[Dict[str, str]]:
     """Invokes Google Gemini to generate natural-sounding qualitative coach feedback."""
-    models_to_try = ["gemini-3-flash-preview", "gemini-3.8-flash", "gemini-3.1-flash-lite", "gemini-flash-latest"]
+    models_to_try = ["gemini-flash-latest", "gemini-3.8-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite"]
     sess = review_data["today_assessment"]
     is_today = bool(sess.get("is_today"))
     is_yesterday = bool(sess.get("is_yesterday"))

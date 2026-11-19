@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.0",
-        "release_name": "Per-Connection Enable/Disable Toggles",
+        "version": "2.17.1",
+        "release_name": "Gemini Flash-Latest Default Model",
         "build_date": "2026-11-19",
         "services": {
             "whoop": "v2 REST API",
@@ -156,10 +156,18 @@ def version_info():
             "wyze": "Wyze Scale Cloud API (Pluto & Classic Scale)",
             "apple_health": "Auto-Export Webhook (Health Auto Export / Shortcuts) & Manual Entry",
             "zwift": "Intervals.icu Cloud Bridge",
-            "ai_coach":"Google Gemini 3 Flash / 3.8 Flash (Tool Calling)",
+            "ai_coach":"Google Gemini Flash-Latest (Tool Calling)",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.1",
+                "date": "2026-11-19",
+                "title": "Gemini Flash-Latest Default Model",
+                "items": [
+                    "Default AI Coach Model: Updated Coach Chat (coach_chat_service.py), Chat Status/Test (chat.py), and Daily Ride Debriefs (review_coach.py) to prioritize gemini-flash-latest first, keeping gemini-3.8-flash and gemini-3-flash-preview as automatic fallbacks."
+                ]
+            },
             {
                 "version": "v2.17.0",
                 "date": "2026-11-19",
