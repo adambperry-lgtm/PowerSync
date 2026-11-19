@@ -134,7 +134,7 @@ def test_gemini_connection_endpoint(payload: Optional[TestConnectionPayload] = N
     if not key or "•" in key:
         return {"success": False, "message": "No valid Gemini API key found to test."}
 
-    from app.services.coach_chat_service import call_gemini_api
+    from app.services.coach_chat_service import call_gemini_api, get_last_gemini_error
     reply, _ = call_gemini_api(key, "You are a cycling coach.", [], "Ping test")
     if reply:
         from app.services.coach_chat_service import _CACHED_WORKING_MODEL
@@ -144,9 +144,10 @@ def test_gemini_connection_endpoint(payload: Optional[TestConnectionPayload] = N
             "model": model,
             "message": f"Successfully connected to Google Gemini ({model})!"
         }
+    err_detail = get_last_gemini_error()
     return {
         "success": False,
-        "message": "Could not connect to Gemini API. Please check your key or network connection."
+        "message": f"Could not connect to Gemini API{f' ({err_detail})' if err_detail else '. Please check your key or network connection.'}"
     }
 
 @router.post("/save-key", dependencies=[Depends(require_authenticated_user)])

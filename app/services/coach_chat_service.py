@@ -709,6 +709,11 @@ def clean_model_output(text: str) -> str:
     return cleaned.strip()
 
 _CACHED_WORKING_MODEL: Optional[Tuple[str, str]] = ("v1beta", "gemini-flash-latest")
+_LAST_GEMINI_ERROR_BY_USER: Dict[str, str] = {}
+
+def get_last_gemini_error(user_id: Optional[str] = None) -> str:
+    uid = user_id or get_current_user_id()
+    return _LAST_GEMINI_ERROR_BY_USER.get(uid, "")
 
 def call_gemini_api(
     api_key: str,
@@ -726,11 +731,13 @@ def call_gemini_api(
     from app.services.coach_tools import COACH_TOOL_DECLARATIONS, execute_coach_tool
 
     uid = user_id or get_current_user_id()
+    _LAST_GEMINI_ERROR_BY_USER.pop(uid, None)
 
     models_to_try = [
         ("v1beta", "gemini-flash-latest"),
         ("v1beta", "gemini-3.8-flash"),
         ("v1beta", "gemini-3-flash-preview"),
+        ("v1beta", "gemini-3.5-flash-lite"),
         ("v1beta", "gemini-3.1-flash-lite"),
     ]
 
@@ -766,11 +773,12 @@ def call_gemini_api(
     headers = {"Content-Type": "application/json"}
     tools_config = [{"functionDeclarations": COACH_TOOL_DECLARATIONS}]
     deadline = time.monotonic() + 32.0
-    rate_limit_hits = 0
+    last_err = ""
 
     for api_ver, model in models_to_try:
         remaining = deadline - time.monotonic()
         if remaining <= 2.0:
+            last_err = last_err or "Request deadline exceeded (32s)"
             print("Gemini API deadline reached; returning to fallback.")
             break
 
@@ -801,14 +809,20 @@ def call_gemini_api(
                 req_timeout = min(15.0, max(3.0, remaining))
                 res = requests.post(url, headers=headers, json=payload, timeout=req_timeout)
                 if res.status_code != 200:
-                    print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {res.text[:200]}")
-                    if res.status_code == 429:
-                        rate_limit_hits += 1
+                    err_snippet = res.text[:180].replace("\n", " ")
+                    try:
+                        err_json = res.json().get("error", {})
+                        err_snippet = err_json.get("message", err_snippet)[:160]
+                    except Exception:
+                        pass
+                    last_err = f"{model}: HTTP {res.status_code} ({err_snippet})"
+                    print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {err_snippet}")
                     break
 
                 data = res.json()
                 candidates = data.get("candidates", [])
                 if not candidates:
+                    last_err = f"{model}: empty candidates"
                     print(f"Gemini {api_ver}/{model} returned empty candidates: {str(data)[:200]}")
                     break
 
@@ -825,9 +839,11 @@ def call_gemini_api(
                     clean_text = clean_model_output(full_text)
                     if clean_text:
                         _CACHED_WORKING_MODEL = (api_ver, model)
+                        _LAST_GEMINI_ERROR_BY_USER.pop(uid, None)
                         print(f"Gemini API success using {api_ver}/{model} with {len(executed_tools)} tool call(s)")
                         return clean_text, executed_tools
                     if not function_calls:
+                        last_err = f"{model}: empty text response (finishReason={cand.get('finishReason')})"
                         break
 
                 # Model wants to call one or more tools
@@ -868,12 +884,11 @@ def call_gemini_api(
                 })
 
         except Exception as e:
+            last_err = f"{model}: {type(e).__name__}: {str(e)[:120]}"
             print(f"Gemini API error with {api_ver}/{model}: {e}")
 
-        if rate_limit_hits >= 2:
-            print("Multiple Gemini 429 rate-limit responses; skipping remaining models.")
-            break
-
+    if last_err:
+        _LAST_GEMINI_ERROR_BY_USER[uid] = last_err
     return None, []
 
 def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[str, Any]) -> str:
@@ -1326,7 +1341,9 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     # 6. Sports-science rule-based fallback
     fallback_reply = generate_sports_science_fallback_response(user_message, snapshot)
     if api_key:
-        fallback_reply = "*(Gemini API temporarily unavailable or rate-limited — showing offline telemetry summary)*\n\n" + fallback_reply
+        err_detail = get_last_gemini_error(uid)
+        reason_str = f" ({err_detail})" if err_detail else ""
+        fallback_reply = f"*(Gemini API unavailable{reason_str} — showing offline telemetry summary)*\n\n" + fallback_reply
     if learned_notice:
         fallback_reply = learned_notice + fallback_reply
     proposed_action = build_sports_science_action(user_message, snapshot)

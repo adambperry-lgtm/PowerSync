@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.3",
-        "release_name": "AI Coach Chat Hang & Timeout Fix",
+        "version": "2.17.4",
+        "release_name": "Flash-Lite 500-RPD Fallback & Error Diagnostics",
         "build_date": "2026-11-19",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.4",
+                "date": "2026-11-19",
+                "title": "Flash-Lite 500-RPD Fallback & Error Diagnostics",
+                "items": [
+                    "Flash-Lite 500-RPD Fallback: Added gemini-3.5-flash-lite and removed the early 429 break in call_gemini_api() so Free-Tier keys that hit the 20-RPD Flash cap seamlessly fall through to 500-RPD Flash-Lite models.",
+                    "Per-User Error Diagnostics: Recorded the exact Gemini API error reason per user (_LAST_GEMINI_ERROR_BY_USER) and surfaced it in the offline fallback notice and /api/chat/test-connection."
+                ]
+            },
             {
                 "version": "v2.17.3",
                 "date": "2026-11-19",

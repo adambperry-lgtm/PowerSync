@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.4] - 2026-11-19
+### Fixed
+- **Flash-Lite 500-RPD Fallback & Exact Error Diagnostics**:
+  - Added `gemini-3.5-flash-lite` to `models_to_try` in [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) and removed the early `429` break so Free-Tier keys that exhaust the 20-RPD Flash quota still reach `gemini-3.5-flash-lite` and `gemini-3.1-flash-lite` (500 RPD).
+  - Tracked per-user `_LAST_GEMINI_ERROR_BY_USER` and surfaced the exact HTTP status/error message in the offline fallback notice and [`POST /api/chat/test-connection`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/chat.py).
+
 ## [2.17.3] - 2026-11-19
 ### Fixed
 - **AI Coach Chat Hang on "Analyzing telemetry..."**:
