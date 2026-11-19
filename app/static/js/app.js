@@ -7102,16 +7102,24 @@ async function sendCoachMessage(text) {
 
   showCoachTypingIndicator();
 
+  let chatTimeoutId = null;
   try {
+    const controller = new AbortController();
+    chatTimeoutId = setTimeout(() => controller.abort(), 45000);
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
       body: JSON.stringify({
         message: cleanMsg,
         history: coachChatHistory.slice(-10)
       })
     });
+    clearTimeout(chatTimeoutId);
 
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
     const data = await res.json();
     removeCoachTypingIndicator();
 
@@ -7172,9 +7180,13 @@ async function sendCoachMessage(text) {
       appendCoachChatMessage("coach", "⚠️ I encountered an issue analyzing your telemetry. Please try again.");
     }
   } catch (err) {
+    if (chatTimeoutId) clearTimeout(chatTimeoutId);
     removeCoachTypingIndicator();
     console.error("Coach chat error:", err);
-    appendCoachChatMessage("coach", "⚠️ Connection error contacting coach engine. Please verify the PowerSync server is running.");
+    const msg = err && err.name === "AbortError"
+      ? "⏱️ The AI Coach request timed out after 45s (Gemini may be busy or rate-limited). Please try again."
+      : "⚠️ Connection error contacting coach engine. Please verify the PowerSync server is running.";
+    appendCoachChatMessage("coach", msg);
   } finally {
     isCoachChatLoading = false;
     if (btnSendCoachMessage) btnSendCoachMessage.disabled = false;

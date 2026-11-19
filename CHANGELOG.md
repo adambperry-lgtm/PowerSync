@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.3] - 2026-11-19
+### Fixed
+- **AI Coach Chat Hang on "Analyzing telemetry..."**:
+  - Added a 32-second overall deadline (`15s` per request) in [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py), trimmed `models_to_try` to active Free-Tier Flash models, removed the slow `ListModels` fallback loop, and added early exit after 2 HTTP 429 rate-limit responses so chat never hangs for 100+ seconds.
+  - Moved `maybe_update_conversation_memory()` to a background daemon thread in [`handle_coach_chat()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py).
+  - Added a 45-second `AbortController` timeout and `!res.ok` check to `sendCoachMessage()` in [`app/static/js/app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`app.js?v=144` in [`app/static/index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html)).
+
 ## [2.17.2] - 2026-11-19
 ### Fixed
 - **AI Coach Tool-Calling Loop & Weekly Analysis Fallback**:

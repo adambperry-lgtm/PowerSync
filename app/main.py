@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.2",
-        "release_name": "AI Coach Tool-Calling Loop & Weekly Fallback Fix",
+        "version": "2.17.3",
+        "release_name": "AI Coach Chat Hang & Timeout Fix",
         "build_date": "2026-11-19",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.3",
+                "date": "2026-11-19",
+                "title": "AI Coach Chat Hang & Timeout Fix",
+                "items": [
+                    "32s Backend Deadline & Rate-Limit Bailout: Enforced a 32-second overall deadline (15s per request) in call_gemini_api(), trimmed fallback models to active Free-Tier Flash models, removed the slow ListModels catalog loop, and bailed out cleanly after 2 HTTP 429 responses so chat never hangs waiting on 100+ seconds of retries.",
+                    "Async Memory Distillation: Moved maybe_update_conversation_memory() to a background thread so Gemini chat replies return immediately.",
+                    "45s Frontend Timeout Guard: Added an AbortController 45s timeout and HTTP status check to sendCoachMessage() (app.js?v=144) so the 'Analyzing telemetry...' indicator never gets stuck."
+                ]
+            },
             {
                 "version": "v2.17.2",
                 "date": "2026-11-19",

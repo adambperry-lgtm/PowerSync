@@ -1,6 +1,8 @@
 import os
 import re
 import json
+import time
+import threading
 import requests
 import datetime
 from typing import Dict, Any, List, Optional, Tuple
@@ -729,11 +731,7 @@ def call_gemini_api(
         ("v1beta", "gemini-flash-latest"),
         ("v1beta", "gemini-3.8-flash"),
         ("v1beta", "gemini-3-flash-preview"),
-        ("v1beta", "gemini-3.5-flash"),
-        ("v1beta", "gemini-3.7-flash"),
         ("v1beta", "gemini-3.1-flash-lite"),
-        ("v1beta", "gemini-2.5-pro"),
-        ("v1beta", "gemini-pro-latest"),
     ]
 
     if _CACHED_WORKING_MODEL and _CACHED_WORKING_MODEL in models_to_try:
@@ -767,15 +765,25 @@ def call_gemini_api(
 
     headers = {"Content-Type": "application/json"}
     tools_config = [{"functionDeclarations": COACH_TOOL_DECLARATIONS}]
+    deadline = time.monotonic() + 32.0
+    rate_limit_hits = 0
 
     for api_ver, model in models_to_try:
+        remaining = deadline - time.monotonic()
+        if remaining <= 2.0:
+            print("Gemini API deadline reached; returning to fallback.")
+            break
+
         url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent?key={api_key}"
         cur_contents = [dict(c) for c in contents]
         executed_tools = []
-        max_tool_turns = 5
+        max_tool_turns = 4
 
         try:
             for turn_idx in range(max_tool_turns):
+                remaining = deadline - time.monotonic()
+                if remaining <= 2.0:
+                    break
                 is_final_turn = (turn_idx == max_tool_turns - 1)
                 payload = {
                     "systemInstruction": {
@@ -790,9 +798,12 @@ def call_gemini_api(
                 if not is_final_turn:
                     payload["tools"] = tools_config
 
-                res = requests.post(url, headers=headers, json=payload, timeout=25)
+                req_timeout = min(15.0, max(3.0, remaining))
+                res = requests.post(url, headers=headers, json=payload, timeout=req_timeout)
                 if res.status_code != 200:
                     print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {res.text[:200]}")
+                    if res.status_code == 429:
+                        rate_limit_hits += 1
                     break
 
                 data = res.json()
@@ -859,39 +870,9 @@ def call_gemini_api(
         except Exception as e:
             print(f"Gemini API error with {api_ver}/{model}: {e}")
 
-    # Fallback to ListModels if predefined failed (capped to 3 flash models to respect Free Tier RPM)
-    try:
-        list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
-        l_res = requests.get(list_url, timeout=10)
-        if l_res.status_code == 200:
-            models_data = l_res.json().get("models", [])
-            valid_models = []
-            for m in models_data:
-                methods = m.get("supportedGenerationMethods", [])
-                if "generateContent" in methods:
-                    m_name = m.get("name", "")
-                    if m_name.startswith("models/"):
-                        m_name = m_name[len("models/"):]
-                    if m_name and m_name.startswith("gemini") and "flash" in m_name and "tts" not in m_name and "image" not in m_name:
-                        valid_models.append(m_name)
-            for vm in valid_models[:3]:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{vm}:generateContent?key={api_key}"
-                try:
-                    res = requests.post(url, headers=headers, json={"systemInstruction": {"parts": [{"text": system_instruction}]}, "contents": contents}, timeout=25)
-                    if res.status_code == 200:
-                        data = res.json()
-                        candidates = data.get("candidates", [])
-                        if candidates:
-                            parts = candidates[0].get("content", {}).get("parts", [])
-                            text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text") and not p.get("thought")]
-                            clean_text = clean_model_output("\n".join(text_parts).strip())
-                            if clean_text:
-                                _CACHED_WORKING_MODEL = ("v1beta", vm)
-                                return clean_text, []
-                except Exception as ex:
-                    print(f"Error querying discovered model {vm}: {ex}")
-    except Exception as e:
-        print(f"ListModels diagnostic error: {e}")
+        if rate_limit_hits >= 2:
+            print("Multiple Gemini 429 rate-limit responses; skipping remaining models.")
+            break
 
     return None, []
 
@@ -1309,7 +1290,12 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                     model=model_used,
                     user_id=uid
                 )
-                maybe_update_conversation_memory(uid, api_key=api_key)
+                threading.Thread(
+                    target=maybe_update_conversation_memory,
+                    args=(uid,),
+                    kwargs={"api_key": api_key},
+                    daemon=True,
+                ).start()
             except Exception as e:
                 print(f"Error persisting coach chat reply/memory: {e}")
 
