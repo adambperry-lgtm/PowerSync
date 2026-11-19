@@ -398,7 +398,7 @@ def distill_conversation_memory(
                 f"EXISTING KEY FACTS: {json.dumps(prev_facts)}\n\n"
                 f"NEW CONVERSATION TURNS:\n{transcript}"
             )
-            model = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-flash-latest"
+            model = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3.8-flash"
             api_ver = _CACHED_WORKING_MODEL[0] if _CACHED_WORKING_MODEL else "v1beta"
             url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent?key={api_key}"
             res = requests.post(
@@ -708,7 +708,7 @@ def clean_model_output(text: str) -> str:
             cleaned = "\n".join(lines).strip()
     return cleaned.strip()
 
-_CACHED_WORKING_MODEL: Optional[Tuple[str, str]] = ("v1beta", "gemini-flash-latest")
+_CACHED_WORKING_MODEL: Optional[Tuple[str, str]] = ("v1beta", "gemini-3.8-flash")
 _LAST_GEMINI_ERROR_BY_USER: Dict[str, str] = {}
 
 def get_last_gemini_error(user_id: Optional[str] = None) -> str:
@@ -734,11 +734,11 @@ def call_gemini_api(
     _LAST_GEMINI_ERROR_BY_USER.pop(uid, None)
 
     models_to_try = [
-        ("v1beta", "gemini-flash-latest"),
         ("v1beta", "gemini-3.8-flash"),
+        ("v1beta", "gemini-flash-latest"),
+        ("v1beta", "gemini-3.1-pro-preview"),
         ("v1beta", "gemini-3-flash-preview"),
         ("v1beta", "gemini-3.5-flash-lite"),
-        ("v1beta", "gemini-3.1-flash-lite"),
     ]
 
     if _CACHED_WORKING_MODEL and _CACHED_WORKING_MODEL in models_to_try:
@@ -1243,7 +1243,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         system_prompt = build_system_prompt(snapshot, memory=conversation_memory)
         gemini_reply, executed_tools = call_gemini_api(api_key, system_prompt, effective_history, user_message, user_id=uid)
         if gemini_reply:
-            model_used = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-flash-latest"
+            model_used = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3.8-flash"
             clean_reply, proposed_action = extract_action_from_response(gemini_reply)
             if not proposed_action:
                 has_action_request = any(k in user_message.lower() for k in [

@@ -102,7 +102,7 @@ def get_chat_status():
     workout = snapshot["today_prescribed_workout"]["title"]
 
     from app.services.coach_chat_service import _CACHED_WORKING_MODEL
-    model_name = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-flash-latest"
+    model_name = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3.8-flash"
 
     suggested = [
         f"🎯 How should I tackle today's {workout} with my {rec}% recovery?",
@@ -138,7 +138,7 @@ def test_gemini_connection_endpoint(payload: Optional[TestConnectionPayload] = N
     reply, _ = call_gemini_api(key, "You are a cycling coach.", [], "Ping test")
     if reply:
         from app.services.coach_chat_service import _CACHED_WORKING_MODEL
-        model = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-flash-latest"
+        model = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3.8-flash"
         return {
             "success": True,
             "model": model,

@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.6",
-        "release_name": "Low-Thinking Latency & Multi-Model Error Trace",
+        "version": "2.17.7",
+        "release_name": "Gemini 3.8 Flash Paid-Tier Upgrade",
         "build_date": "2026-11-19",
         "services": {
             "whoop": "v2 REST API",
@@ -156,10 +156,19 @@ def version_info():
             "wyze": "Wyze Scale Cloud API (Pluto & Classic Scale)",
             "apple_health": "Auto-Export Webhook (Health Auto Export / Shortcuts) & Manual Entry",
             "zwift": "Intervals.icu Cloud Bridge",
-            "ai_coach":"Google Gemini Flash-Latest (Tool Calling)",
+            "ai_coach":"Google Gemini 3.8 Flash (Paid Tier • Tool Calling)",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.7",
+                "date": "2026-11-19",
+                "title": "Gemini 3.8 Flash Paid-Tier Upgrade",
+                "items": [
+                    "Primary Model Upgrade: Upgraded Coach Chat (coach_chat_service.py), Chat Status/Test (chat.py), and Daily Ride Debriefs (review_coach.py) to gemini-3.8-flash as the primary Paid-Tier model.",
+                    "Paid-Tier Fallbacks: Added gemini-3.1-pro-preview alongside gemini-flash-latest, gemini-3-flash-preview, and gemini-3.5-flash-lite for automatic resilience."
+                ]
+            },
             {
                 "version": "v2.17.6",
                 "date": "2026-11-19",
