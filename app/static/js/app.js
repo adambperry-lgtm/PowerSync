@@ -7105,7 +7105,7 @@ async function sendCoachMessage(text) {
   let chatTimeoutId = null;
   try {
     const controller = new AbortController();
-    chatTimeoutId = setTimeout(() => controller.abort(), 45000);
+    chatTimeoutId = setTimeout(() => controller.abort(), 60000);
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -7184,7 +7184,7 @@ async function sendCoachMessage(text) {
     removeCoachTypingIndicator();
     console.error("Coach chat error:", err);
     const msg = err && err.name === "AbortError"
-      ? "⏱️ The AI Coach request timed out after 45s (Gemini may be busy or rate-limited). Please try again."
+      ? "⏱️ The AI Coach request timed out after 60s (Gemini may be busy or rate-limited). Please try again."
       : "⚠️ Connection error contacting coach engine. Please verify the PowerSync server is running.";
     appendCoachChatMessage("coach", msg);
   } finally {

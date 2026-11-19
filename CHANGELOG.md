@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.5] - 2026-11-19
+### Fixed
+- **Gemini `ReadTimeout` Budget Expansion**:
+  - Increased [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) overall deadline from `32s` to `48s` (`22s` per HTTP request) and frontend `sendCoachMessage()` timeout from `45s` to `60s` (`app.js?v=145` in [`app/static/index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html)) so `gemini-3.1-flash-lite` has enough time to finish after earlier Flash fallbacks.
+
 ## [2.17.4] - 2026-11-19
 ### Fixed
 - **Flash-Lite 500-RPD Fallback & Exact Error Diagnostics**:

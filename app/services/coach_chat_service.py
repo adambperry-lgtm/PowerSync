@@ -772,13 +772,13 @@ def call_gemini_api(
 
     headers = {"Content-Type": "application/json"}
     tools_config = [{"functionDeclarations": COACH_TOOL_DECLARATIONS}]
-    deadline = time.monotonic() + 32.0
+    deadline = time.monotonic() + 48.0
     last_err = ""
 
     for api_ver, model in models_to_try:
         remaining = deadline - time.monotonic()
-        if remaining <= 2.0:
-            last_err = last_err or "Request deadline exceeded (32s)"
+        if remaining <= 3.0:
+            last_err = last_err or "Request deadline exceeded (48s)"
             print("Gemini API deadline reached; returning to fallback.")
             break
 
@@ -790,7 +790,7 @@ def call_gemini_api(
         try:
             for turn_idx in range(max_tool_turns):
                 remaining = deadline - time.monotonic()
-                if remaining <= 2.0:
+                if remaining <= 3.0:
                     break
                 is_final_turn = (turn_idx == max_tool_turns - 1)
                 payload = {
@@ -806,7 +806,7 @@ def call_gemini_api(
                 if not is_final_turn:
                     payload["tools"] = tools_config
 
-                req_timeout = min(15.0, max(3.0, remaining))
+                req_timeout = min(22.0, max(5.0, remaining))
                 res = requests.post(url, headers=headers, json=payload, timeout=req_timeout)
                 if res.status_code != 200:
                     err_snippet = res.text[:180].replace("\n", " ")

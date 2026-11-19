@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.4",
-        "release_name": "Flash-Lite 500-RPD Fallback & Error Diagnostics",
+        "version": "2.17.5",
+        "release_name": "Gemini ReadTimeout Budget Expansion",
         "build_date": "2026-11-19",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.5",
+                "date": "2026-11-19",
+                "title": "Gemini ReadTimeout Budget Expansion",
+                "items": [
+                    "Extended Per-Model & Overall Timeout Budget: Increased call_gemini_api() overall deadline to 48s (22s per HTTP call) and frontend AbortController timeout to 60s (app.js?v=145) so fallback to gemini-3.1-flash-lite has sufficient time to complete generation without ReadTimeout."
+                ]
+            },
             {
                 "version": "v2.17.4",
                 "date": "2026-11-19",
