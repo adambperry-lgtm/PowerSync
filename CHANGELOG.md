@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.6] - 2026-11-19
+### Fixed
+- **Low-Thinking Latency & Multi-Model Error Trace**:
+  - Set `thinkingConfig: {"thinkingLevel": "low"}` for `gemini-3-flash-preview` and `gemini-3.1-flash-lite` in [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) to eliminate 20s+ hidden thinking delays.
+  - Raised per-request timeout to `35s` (`55s` overall deadline) and frontend `sendCoachMessage()` timeout to `65s` (`app.js?v=146` in [`app/static/index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html)).
+  - Recorded errors across attempted models in `_LAST_GEMINI_ERROR_BY_USER` for clear diagnostics.
+
 ## [2.17.5] - 2026-11-19
 ### Fixed
 - **Gemini `ReadTimeout` Budget Expansion**:

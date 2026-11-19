@@ -772,13 +772,13 @@ def call_gemini_api(
 
     headers = {"Content-Type": "application/json"}
     tools_config = [{"functionDeclarations": COACH_TOOL_DECLARATIONS}]
-    deadline = time.monotonic() + 48.0
-    last_err = ""
+    deadline = time.monotonic() + 55.0
+    model_errors: List[str] = []
 
     for api_ver, model in models_to_try:
         remaining = deadline - time.monotonic()
-        if remaining <= 3.0:
-            last_err = last_err or "Request deadline exceeded (48s)"
+        if remaining <= 4.0:
+            model_errors.append("deadline exceeded (55s)")
             print("Gemini API deadline reached; returning to fallback.")
             break
 
@@ -787,10 +787,19 @@ def call_gemini_api(
         executed_tools = []
         max_tool_turns = 4
 
+        gen_config: Dict[str, Any] = {
+            "temperature": 0.7,
+            "maxOutputTokens": 8192
+        }
+        # Gemini 3 Preview / Flash-Lite default to high thinking which can exceed 20s per turn;
+        # use 'low' thinking for fast conversational & tool-calling latency.
+        if model in ("gemini-3-flash-preview", "gemini-3.1-flash-lite"):
+            gen_config["thinkingConfig"] = {"thinkingLevel": "low"}
+
         try:
             for turn_idx in range(max_tool_turns):
                 remaining = deadline - time.monotonic()
-                if remaining <= 3.0:
+                if remaining <= 4.0:
                     break
                 is_final_turn = (turn_idx == max_tool_turns - 1)
                 payload = {
@@ -798,31 +807,28 @@ def call_gemini_api(
                         "parts": [{"text": system_instruction}]
                     },
                     "contents": cur_contents,
-                    "generationConfig": {
-                        "temperature": 0.7,
-                        "maxOutputTokens": 8192
-                    }
+                    "generationConfig": gen_config
                 }
                 if not is_final_turn:
                     payload["tools"] = tools_config
 
-                req_timeout = min(22.0, max(5.0, remaining))
+                req_timeout = min(35.0, max(5.0, remaining))
                 res = requests.post(url, headers=headers, json=payload, timeout=req_timeout)
                 if res.status_code != 200:
-                    err_snippet = res.text[:180].replace("\n", " ")
+                    err_snippet = res.text[:140].replace("\n", " ")
                     try:
                         err_json = res.json().get("error", {})
-                        err_snippet = err_json.get("message", err_snippet)[:160]
+                        err_snippet = err_json.get("message", err_snippet)[:120]
                     except Exception:
                         pass
-                    last_err = f"{model}: HTTP {res.status_code} ({err_snippet})"
+                    model_errors.append(f"{model}: HTTP {res.status_code} ({err_snippet})")
                     print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {err_snippet}")
                     break
 
                 data = res.json()
                 candidates = data.get("candidates", [])
                 if not candidates:
-                    last_err = f"{model}: empty candidates"
+                    model_errors.append(f"{model}: empty candidates")
                     print(f"Gemini {api_ver}/{model} returned empty candidates: {str(data)[:200]}")
                     break
 
@@ -843,7 +849,7 @@ def call_gemini_api(
                         print(f"Gemini API success using {api_ver}/{model} with {len(executed_tools)} tool call(s)")
                         return clean_text, executed_tools
                     if not function_calls:
-                        last_err = f"{model}: empty text response (finishReason={cand.get('finishReason')})"
+                        model_errors.append(f"{model}: empty text (finishReason={cand.get('finishReason')})")
                         break
 
                 # Model wants to call one or more tools
@@ -884,11 +890,11 @@ def call_gemini_api(
                 })
 
         except Exception as e:
-            last_err = f"{model}: {type(e).__name__}: {str(e)[:120]}"
+            model_errors.append(f"{model}: {type(e).__name__}")
             print(f"Gemini API error with {api_ver}/{model}: {e}")
 
-    if last_err:
-        _LAST_GEMINI_ERROR_BY_USER[uid] = last_err
+    if model_errors:
+        _LAST_GEMINI_ERROR_BY_USER[uid] = " | ".join(model_errors[-3:])
     return None, []
 
 def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[str, Any]) -> str:

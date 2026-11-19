@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.5",
-        "release_name": "Gemini ReadTimeout Budget Expansion",
+        "version": "2.17.6",
+        "release_name": "Low-Thinking Latency & Multi-Model Error Trace",
         "build_date": "2026-11-19",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.6",
+                "date": "2026-11-19",
+                "title": "Low-Thinking Latency & Multi-Model Error Trace",
+                "items": [
+                    "Low Thinking Level for Fast Chat: Configured thinkingConfig: {thinkingLevel: 'low'} on gemini-3-flash-preview and gemini-3.1-flash-lite so Gemini doesn't spend 20+ seconds thinking before answering.",
+                    "55s Backend / 65s Frontend Budget: Raised per-request timeout to 35s (55s overall) and frontend AbortController to 65s (app.js?v=146).",
+                    "Multi-Model Error Trace: Surfaces errors from up to 3 attempted models when falling back so any rate limit or timeout is immediately visible."
+                ]
+            },
             {
                 "version": "v2.17.5",
                 "date": "2026-11-19",

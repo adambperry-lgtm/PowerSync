@@ -7105,7 +7105,7 @@ async function sendCoachMessage(text) {
   let chatTimeoutId = null;
   try {
     const controller = new AbortController();
-    chatTimeoutId = setTimeout(() => controller.abort(), 60000);
+    chatTimeoutId = setTimeout(() => controller.abort(), 65000);
     const res = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
