@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.2] - 2026-11-19
+### Fixed
+- **AI Coach Tool-Calling Loop & Weekly Analysis Fallback**:
+  - Fixed [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) exiting the tool-calling loop after `max_tool_turns = 3` without synthesizing a final text response when Gemini invoked tools across 3 turns (e.g. `"analyze my week so far"`). Increased `max_tool_turns` to `5` and omitted `tools` on the final turn to force synthesis.
+  - Capped the `ListModels` fallback in [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) to 3 Flash models to avoid burning Free Tier RPM quotas.
+  - Added a weekly training summary branch to [`generate_sports_science_fallback_response()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) and a clear notice when Gemini falls back to offline telemetry mode.
+
 ## [2.17.1] - 2026-11-19
 ### Changed
 - **Gemini `gemini-flash-latest` Default Model**:

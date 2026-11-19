@@ -772,30 +772,33 @@ def call_gemini_api(
         url = f"https://generativelanguage.googleapis.com/{api_ver}/models/{model}:generateContent?key={api_key}"
         cur_contents = [dict(c) for c in contents]
         executed_tools = []
-        max_tool_turns = 3
+        max_tool_turns = 5
 
         try:
-            for _ in range(max_tool_turns):
+            for turn_idx in range(max_tool_turns):
+                is_final_turn = (turn_idx == max_tool_turns - 1)
                 payload = {
                     "systemInstruction": {
                         "parts": [{"text": system_instruction}]
                     },
                     "contents": cur_contents,
-                    "tools": tools_config,
                     "generationConfig": {
                         "temperature": 0.7,
                         "maxOutputTokens": 8192
                     }
                 }
+                if not is_final_turn:
+                    payload["tools"] = tools_config
 
                 res = requests.post(url, headers=headers, json=payload, timeout=25)
                 if res.status_code != 200:
-                    print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {res.text[:120]}")
+                    print(f"Gemini {api_ver}/{model} returned HTTP {res.status_code}: {res.text[:200]}")
                     break
 
                 data = res.json()
                 candidates = data.get("candidates", [])
                 if not candidates:
+                    print(f"Gemini {api_ver}/{model} returned empty candidates: {str(data)[:200]}")
                     break
 
                 cand = candidates[0]
@@ -804,7 +807,7 @@ def call_gemini_api(
 
                 # Check for functionCall parts
                 function_calls = [p for p in parts if "functionCall" in p]
-                if not function_calls:
+                if not function_calls or is_final_turn:
                     # Model provided final text answer
                     text_parts = [p.get("text", "") for p in parts if "text" in p and p.get("text") and not p.get("thought")]
                     full_text = "\n".join(text_parts).strip()
@@ -813,6 +816,8 @@ def call_gemini_api(
                         _CACHED_WORKING_MODEL = (api_ver, model)
                         print(f"Gemini API success using {api_ver}/{model} with {len(executed_tools)} tool call(s)")
                         return clean_text, executed_tools
+                    if not function_calls:
+                        break
 
                 # Model wants to call one or more tools
                 # Preserve the model's message exactly (including thoughtSignature if present)
@@ -854,7 +859,7 @@ def call_gemini_api(
         except Exception as e:
             print(f"Gemini API error with {api_ver}/{model}: {e}")
 
-    # Fallback to ListModels if predefined failed
+    # Fallback to ListModels if predefined failed (capped to 3 flash models to respect Free Tier RPM)
     try:
         list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={api_key}"
         l_res = requests.get(list_url, timeout=10)
@@ -867,9 +872,9 @@ def call_gemini_api(
                     m_name = m.get("name", "")
                     if m_name.startswith("models/"):
                         m_name = m_name[len("models/"):]
-                    if m_name and m_name.startswith("gemini"):
+                    if m_name and m_name.startswith("gemini") and "flash" in m_name and "tts" not in m_name and "image" not in m_name:
                         valid_models.append(m_name)
-            for vm in valid_models:
+            for vm in valid_models[:3]:
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/{vm}:generateContent?key={api_key}"
                 try:
                     res = requests.post(url, headers=headers, json={"systemInstruction": {"parts": [{"text": system_instruction}]}, "contents": contents}, timeout=25)
@@ -1108,6 +1113,25 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
             f"- **Timing**: Because your recovery is at {rec}%, start taking carbs early at minute 15 rather than waiting until you feel fatigued."
         )
 
+    # 6b. Weekly Training Load / "analyze my week" Summary
+    if any(k in msg for k in ["week", "so far", "weekly", "summary", "progress", "analyze"]):
+        strava_load = snapshot.get("training_load_strava", {})
+        wk = strava_load.get("weekly_stats", {}) or {}
+        rides_cnt = wk.get("rides", len(recent))
+        wk_miles = wk.get("distance_miles", round(sum(r.get("distance_miles", 0) for r in recent), 1))
+        wk_hours = wk.get("moving_time_hours", round(sum(r.get("duration_min", 0) for r in recent) / 60.0, 1))
+        rides_lines = "\n".join(
+            f"- **{r['date']} — {r['name']}**: {r['duration_min']}m · {r['distance_miles']} mi · NP {r['normalized_power_watts']}W ({r['pct_ftp']}% FTP) · {r['tss']} TSS"
+            for r in recent[:5]
+        ) or "- No recent rides logged yet."
+        return (
+            f"Here is your training summary so far:\n\n"
+            f"- **Weekly Volume**: **{rides_cnt} ride(s)** · **{wk_hours} hrs** · **{wk_miles} mi**\n"
+            f"- **Today's Readiness**: **{rec}%** ({rec_zone}) · HRV **{hrv} ms** · Daytime Strain **{today_strain}**\n"
+            f"- **Today's Prescription**: **{prescribed}** ({prescribed_dur} mins, ~{tss} TSS)\n\n"
+            f"**Recent Sessions:**\n{rides_lines}"
+        )
+
     # 7. Yesterday's Ride or Strava History
     if any(k in msg for k in ["yesterday", "recent", "strava", "last ride", "review my ride"]):
         if last_ride:
@@ -1315,6 +1339,8 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
 
     # 6. Sports-science rule-based fallback
     fallback_reply = generate_sports_science_fallback_response(user_message, snapshot)
+    if api_key:
+        fallback_reply = "*(Gemini API temporarily unavailable or rate-limited — showing offline telemetry summary)*\n\n" + fallback_reply
     if learned_notice:
         fallback_reply = learned_notice + fallback_reply
     proposed_action = build_sports_science_action(user_message, snapshot)

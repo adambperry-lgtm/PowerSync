@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.1",
-        "release_name": "Gemini Flash-Latest Default Model",
+        "version": "2.17.2",
+        "release_name": "AI Coach Tool-Calling Loop & Weekly Fallback Fix",
         "build_date": "2026-11-19",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.2",
+                "date": "2026-11-19",
+                "title": "AI Coach Tool-Calling Loop & Weekly Fallback Fix",
+                "items": [
+                    "Tool-Calling Synthesis Fix: Increased max_tool_turns to 5 in call_gemini_api() and omitted tool declarations on the final turn so multi-tool queries (e.g. 'analyze my week so far') always produce a synthesized Gemini response instead of dropping out of the loop.",
+                    "Free-Tier Rate-Limit Protection: Capped ListModels fallback to 3 Flash models instead of querying every Gemini model in the catalog.",
+                    "Weekly Summary Fallback & Transparency: Added a weekly training load & recent rides summary branch to generate_sports_science_fallback_response() and a clear offline-fallback notice when the Gemini API is unavailable or rate-limited."
+                ]
+            },
             {
                 "version": "v2.17.1",
                 "date": "2026-11-19",
