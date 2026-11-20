@@ -1431,3 +1431,56 @@ def download_archive_zwo(req: ArchiveWorkoutPreviewRequest):
     )
 
 
+class ArchivePushGarminRequest(BaseModel):
+    ride_id: str
+    course_name: Optional[str] = None
+
+
+@router.post("/archive/push-garmin")
+def push_archive_route_to_garmin(req: ArchivePushGarminRequest):
+    """
+    Fetches high-res GPS (or polyline fallback) for a prior outdoor ride,
+    generates a GPX course, and pushes it directly to Garmin Connect Courses.
+    """
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        raise HTTPException(status_code=401, detail="Sign in required to send routes to Garmin.")
+
+    from app.services.garmin_service import fetch_activity_gpx_data, push_course_to_garmin
+
+    gpx_res = fetch_activity_gpx_data(req.ride_id, user_id=uid)
+    if not gpx_res.get("success"):
+        return gpx_res
+
+    course_name = (req.course_name or gpx_res.get("name") or "PowerSync Route").strip()
+    return push_course_to_garmin(
+        course_name=course_name,
+        gpx_xml=gpx_res["gpx_xml"],
+        sport_type=gpx_res.get("sport_type", "Ride"),
+        user_id=uid,
+    )
+
+
+@router.get("/archive/outdoor/{ride_id}/download-gpx")
+def download_archive_outdoor_gpx(ride_id: str):
+    """Generates and downloads a .gpx file for a prior outdoor ride."""
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        raise HTTPException(status_code=401, detail="Sign in required to download GPX routes.")
+
+    from app.services.garmin_service import fetch_activity_gpx_data
+
+    gpx_res = fetch_activity_gpx_data(ride_id, user_id=uid)
+    if not gpx_res.get("success"):
+        raise HTTPException(status_code=404, detail=gpx_res.get("error", "Route not found."))
+
+    safe_title = re.sub(r"[^A-Za-z0-9_-]+", "_", gpx_res.get("name") or "PowerSync_Route").strip("_")
+    filename = f"{safe_title or 'PowerSync_Route'}.gpx"
+    return Response(
+        content=gpx_res["gpx_xml"],
+        media_type="application/gpx+xml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+

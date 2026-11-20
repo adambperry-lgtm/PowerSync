@@ -409,3 +409,158 @@ def resolve_workout_by_identifier(
                 return w
 
     return None
+
+
+def get_archived_outdoor_routes(
+    user_id: Optional[str] = None,
+    ftp: int = 250,
+    query: Optional[str] = None,
+    min_duration_min: Optional[int] = None,
+    max_duration_min: Optional[int] = None,
+    min_distance_mi: Optional[float] = None,
+    max_distance_mi: Optional[float] = None,
+    sort_by: str = "recent",
+) -> List[Dict[str, Any]]:
+    """
+    Retrieves all prior outdoor rides from `strava_activities` for `user_id`,
+    decodes their route polylines into SVG previews, and supports filtering by
+    text query, duration range, and distance range.
+    """
+    import ast
+    from app.services.outdoor_coach import decode_polyline, format_relative_date, generate_svg_path, sample_coordinates
+
+    uid = user_id or get_current_user_id()
+    if uid == "usr_guest":
+        return []
+
+    q = (query or "").strip().lower()
+    ftp = max(50, int(ftp or 250))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, name, sport_type, start_date, moving_time_sec, distance_meters,
+               total_elevation_gain, average_watts, weighted_average_watts,
+               average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
+        FROM strava_activities
+        WHERE user_id = ?
+          AND sport_type IN ('Ride', 'MountainBikeRide', 'GravelRide', 'EBikeRide', 'OutdoorRide')
+          AND moving_time_sec >= 600
+        ORDER BY start_date DESC
+        """,
+        (uid,),
+    )
+    rows = cursor.fetchall()
+    conn.close()
+
+    results: List[Dict[str, Any]] = []
+    for r in rows:
+        d = dict(r)
+        dur_sec = int(d.get("moving_time_sec") or 0)
+        dur_min = max(1, round(dur_sec / 60.0))
+        dist_m = float(d.get("distance_meters") or 0.0)
+        dist_km = round(dist_m / 1000.0, 1)
+        dist_mi = round(dist_m * 0.000621371, 1)
+        elev_m = round(float(d.get("total_elevation_gain") or 0.0))
+        elev_ft = round(elev_m * 3.28084)
+
+        if min_duration_min is not None and dur_min < min_duration_min:
+            continue
+        if max_duration_min is not None and dur_min > max_duration_min:
+            continue
+        if min_distance_mi is not None and dist_mi < min_distance_mi:
+            continue
+        if max_distance_mi is not None and dist_mi > max_distance_mi:
+            continue
+
+        title = d.get("name") or "Outdoor Ride"
+        sport = d.get("sport_type") or "Ride"
+        date_str = str(d.get("start_date") or "")[:10]
+
+        if q:
+            haystack = f"{title} {sport} {date_str}".lower()
+            if q not in haystack:
+                continue
+
+        raw = d.get("raw_json")
+        poly = ""
+        if raw:
+            raw_d = None
+            try:
+                raw_d = json.loads(raw)
+            except Exception:
+                try:
+                    raw_d = ast.literal_eval(raw)
+                except Exception:
+                    raw_d = None
+            if isinstance(raw_d, dict):
+                poly = raw_d.get("map", {}).get("summary_polyline") or ""
+
+        pts = decode_polyline(poly)
+        svg_path, start_xy, end_xy = generate_svg_path(pts, 380, 160, padding=14) if pts else ("", None, None)
+        thumb_svg, _, _ = generate_svg_path(pts, 140, 64, padding=6) if pts else ("", None, None)
+
+        is_loop = False
+        orientation_label = "Outdoor Route"
+        if pts and len(pts) >= 2:
+            d_se = math.sqrt(((pts[0][0] - pts[-1][0]) * 111.0) ** 2 + ((pts[0][1] - pts[-1][1]) * 85.0) ** 2)
+            if d_se < 0.8:
+                is_loop = True
+                orientation_label = "Loop Route"
+            elif d_se < 2.0:
+                orientation_label = "Out-and-Back"
+            else:
+                orientation_label = "Point-to-Point"
+
+        avg_w = round(float(d.get("average_watts") or 0))
+        np_w = round(float(d.get("weighted_average_watts") or avg_w or 0))
+        if np_w > 0 and dur_sec > 0:
+            if_val = round(np_w / float(ftp), 2)
+            est_tss = max(1, round(((dur_sec * np_w * if_val) / (float(ftp) * 3600.0)) * 100.0))
+        else:
+            if_val = 0.0
+            est_tss = round(float(d.get("suffer_score") or 0))
+
+        ride_id = str(d.get("id") or "")
+        results.append({
+            "id": ride_id,
+            "source": "outdoor",
+            "title": title,
+            "sport_type": sport,
+            "date": date_str,
+            "date_relative": format_relative_date(d.get("start_date") or ""),
+            "duration_minutes": dur_min,
+            "moving_time_formatted": f"{dur_min // 60}h {dur_min % 60}m" if dur_min >= 60 else f"{dur_min}m",
+            "distance_miles": dist_mi,
+            "distance_km": dist_km,
+            "elevation_gain_ft": elev_ft,
+            "elevation_gain_m": elev_m,
+            "average_watts": avg_w,
+            "normalized_power_watts": np_w,
+            "intensity_factor": if_val,
+            "estimated_tss": est_tss,
+            "has_gps": len(pts) >= 2,
+            "svg_path": svg_path,
+            "thumbnail_svg": thumb_svg,
+            "start_xy": start_xy,
+            "end_xy": end_xy,
+            "is_loop": is_loop,
+            "orientation_label": orientation_label,
+            "map_points": sample_coordinates(pts, 100) if pts else [],
+            "strava_url": f"https://www.strava.com/activities/{ride_id}",
+        })
+
+    if sort_by == "duration_desc":
+        results.sort(key=lambda x: x["duration_minutes"], reverse=True)
+    elif sort_by == "duration_asc":
+        results.sort(key=lambda x: x["duration_minutes"])
+    elif sort_by == "distance_desc":
+        results.sort(key=lambda x: x["distance_miles"], reverse=True)
+    elif sort_by == "distance_asc":
+        results.sort(key=lambda x: x["distance_miles"])
+    elif sort_by == "elevation_desc":
+        results.sort(key=lambda x: x["elevation_gain_ft"], reverse=True)
+
+    return results
+

@@ -3,6 +3,21 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.18.0] - 2026-11-20
+### Added
+- **Outdoor Routes in Workout Archive & Time/Distance Preset Search**:
+  - Added an **Indoor Workouts | Outdoor Routes** pill toggle in `#viewArchiveContainer` ([`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js)) to keep indoor structured workouts and prior outdoor rides cleanly separated.
+  - Added [`get_archived_outdoor_routes()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/workout_archive_service.py) querying all user-scoped outdoor rides from `strava_activities` with SVG route previews, duration, distance (mi/km), elevation gain (ft/m), NP, and TSS.
+  - Added preset **Time** (`< 45m`, `45–75m`, `75–90m`, `90–120m`, `2h+`) and **Distance** (`< 15 mi`, `15–25 mi`, `25–40 mi`, `40–60 mi`, `60+ mi`) filter pills plus sorting (`Most Recent`, `Longest Time`, `Longest Distance`, `Most Climbing`).
+- **1-Click Garmin Connect Course Push & GPX Export**:
+  - Created [`app/services/garmin_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/garmin_service.py) using `garminconnect` with per-user session token persistence, optional 2FA/MFA support, high-resolution Strava GPS/altitude stream upgrade (with `summary_polyline` fallback), `.gpx` generation, and 1-click upload to **Garmin Connect Courses**.
+  - Added Garmin Connect login card in Settings (`POST /api/settings/garmin/connect`, `POST /api/settings/garmin/disconnect`) and Route Inspector actions (`POST /api/workouts/archive/push-garmin`, `GET /api/workouts/archive/outdoor/{ride_id}/download-gpx`).
+
+### Fixed
+- **Outdoor Ride Recommendation Duration Range Matching**:
+  - Updated [`get_candidate_outdoor_rides()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/outdoor_coach.py) to evaluate up to 300 historical outdoor rides (instead of 40) so older 90+ minute rides are never excluded.
+  - Updated [`build_outdoor_ride_recommendation()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/outdoor_coach.py) to parse duration ranges (such as `75-90 minute`) and prioritize in-window rides over shorter out-of-window rides.
+
 ## [2.17.14] - 2026-11-20
 ### Fixed
 - **Fueling Protocol Timeline & Packing Checklist Cleanup**:

@@ -1876,12 +1876,18 @@
         </div>
 
         <div class="collapsible-tile-body" id="archiveLibraryBody">
-          <!-- Search, Zone Filter Pills & Library Duration Selector -->
+          <!-- Indoor Workouts vs Outdoor Routes Pill Toggle -->
+          <div class="archive-mode-toggle" id="archiveModeToggle" role="tablist" aria-label="Archive mode">
+            <button type="button" class="archive-mode-btn active" data-mode="indoor" role="tab" aria-selected="true">🏋️ Indoor Workouts</button>
+            <button type="button" class="archive-mode-btn" data-mode="outdoor" role="tab" aria-selected="false">🗺️ Outdoor Routes</button>
+          </div>
+
+          <!-- Search & Context Controls -->
           <div class="archive-toolbar">
             <div class="archive-search-box">
               <input type="text" id="archiveSearchInput" placeholder="Search workouts (e.g. Criss-Cross, Over-Under, 40/20, Tempo)..." autocomplete="off" />
             </div>
-            <div class="archive-duration-control" title="Filter archive by duration and scale Coach Library templates">
+            <div class="archive-duration-control" id="archiveIndoorDurationWrap" title="Filter archive by duration and scale Coach Library templates">
               <label for="archiveLibraryDuration" style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">Duration:</label>
               <select id="archiveLibraryDuration">
                 <option value="all" selected>All Durations</option>
@@ -1893,8 +1899,18 @@
                 <option value="120">120 min</option>
               </select>
             </div>
+            <div class="archive-duration-control" id="archiveOutdoorSortWrap" style="display:none;" title="Sort prior outdoor routes">
+              <label for="archiveOutdoorSort" style="font-size:0.75rem;font-weight:700;color:var(--text-secondary);white-space:nowrap;">Sort:</label>
+              <select id="archiveOutdoorSort">
+                <option value="recent" selected>Most Recent</option>
+                <option value="duration_desc">Longest Time</option>
+                <option value="distance_desc">Longest Distance</option>
+                <option value="elevation_desc">Most Climbing</option>
+              </select>
+            </div>
           </div>
 
+          <!-- Indoor Zone Filter Pills -->
           <div class="archive-filter-pills" id="archiveFilterPills" role="tablist" aria-label="Filter workouts by category">
             <button type="button" class="archive-pill active" data-filter="all">All Workouts</button>
             <button type="button" class="archive-pill" data-filter="archive">My Archive (Prior &amp; Saved)</button>
@@ -1905,6 +1921,28 @@
             <button type="button" class="archive-pill" data-filter="express">Express</button>
           </div>
 
+          <!-- Outdoor Time & Distance Preset Pills -->
+          <div id="archiveOutdoorFilters" style="display:none;">
+            <div class="archive-outdoor-filter-row" id="archiveOutdoorTimePills">
+              <span class="archive-outdoor-filter-lbl">⏱️ Time</span>
+              <button type="button" class="archive-pill active" data-min-dur="" data-max-dur="">All</button>
+              <button type="button" class="archive-pill" data-min-dur="0" data-max-dur="44">&lt; 45m</button>
+              <button type="button" class="archive-pill" data-min-dur="45" data-max-dur="74">45–75m</button>
+              <button type="button" class="archive-pill" data-min-dur="75" data-max-dur="90">75–90m</button>
+              <button type="button" class="archive-pill" data-min-dur="90" data-max-dur="120">90–120m</button>
+              <button type="button" class="archive-pill" data-min-dur="121" data-max-dur="">2h+</button>
+            </div>
+            <div class="archive-outdoor-filter-row" id="archiveOutdoorDistPills">
+              <span class="archive-outdoor-filter-lbl">📏 Dist</span>
+              <button type="button" class="archive-pill active" data-min-dist="" data-max-dist="">All</button>
+              <button type="button" class="archive-pill" data-min-dist="0" data-max-dist="14.9">&lt; 15 mi</button>
+              <button type="button" class="archive-pill" data-min-dist="15" data-max-dist="24.9">15–25 mi</button>
+              <button type="button" class="archive-pill" data-min-dist="25" data-max-dist="39.9">25–40 mi</button>
+              <button type="button" class="archive-pill" data-min-dist="40" data-max-dist="59.9">40–60 mi</button>
+              <button type="button" class="archive-pill" data-min-dist="60" data-max-dist="">60+ mi</button>
+            </div>
+          </div>
+
           <div id="archiveWorkoutsGrid" class="archive-cards-grid" style="margin-top:0.85rem;">
             <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">
               Loading Workout Archive &amp; Library...
@@ -1913,11 +1951,11 @@
         </div>
       </section>
 
-      <!-- Right: Interactive Workout Editor & Zwift Sender -->
+      <!-- Right: Interactive Workout Editor & Zwift / Garmin Sender -->
       <aside class="card collapsible-tile archive-editor-panel" id="archiveEditorPanel">
         <div class="card-header collapsible-tile-header" id="archiveEditorHeader" role="button" tabindex="0" title="Click to collapse or expand Workout Customizer" aria-expanded="true" style="padding-bottom:0.65rem;border-bottom:1px solid var(--border-color);">
           <div class="card-header-left">
-            <span class="card-header-icon">🛠️</span>
+            <span class="card-header-icon" id="archiveEditorIcon">🛠️</span>
             <div>
               <span class="card-title" id="archiveEditorHeading">Workout Customizer</span>
               <div class="collapsible-tile-subtitle" style="font-size:0.72rem;color:var(--text-muted);" id="archiveEditorSourceLabel">Select any workout to edit or create a custom session</div>
@@ -2014,6 +2052,57 @@
             </button>
             <button type="button" class="btn btn-primary" id="btnArchivePushZwift" style="flex:1.3;background:linear-gradient(135deg,#0052FF,#FF5E00);border:none;">
               🚀 Send to Zwift
+            </button>
+          </div>
+        </div>
+
+        <!-- Outdoor Route Inspector & Garmin Sender -->
+        <div class="collapsible-tile-body archive-editor-body" id="archiveOutdoorInspectorBody" style="display:none;padding-top:0.85rem;flex-direction:column;gap:0.85rem;">
+          <div>
+            <label for="archiveOutdoorTitle" style="display:block;font-size:0.72rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.25rem;">Route / Course Name (sent to Garmin)</label>
+            <input type="text" id="archiveOutdoorTitle" class="archive-input" placeholder="e.g. Sunday Gravel Loop" />
+          </div>
+
+          <div class="archive-route-map-wrap" id="archiveOutdoorMapWrap">
+            <svg id="archiveOutdoorMapSvg" viewBox="0 0 380 160" style="width:100%;height:150px;display:block;"></svg>
+          </div>
+
+          <div class="archive-metrics-strip">
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">Time</span>
+              <span class="archive-metric-val" id="archiveOutdoorDur">--</span>
+            </div>
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">Distance</span>
+              <span class="archive-metric-val" id="archiveOutdoorDist">-- mi</span>
+            </div>
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">Elevation</span>
+              <span class="archive-metric-val" id="archiveOutdoorElev">-- ft</span>
+            </div>
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">NP / Avg</span>
+              <span class="archive-metric-val" id="archiveOutdoorNP">-- W</span>
+            </div>
+            <div class="archive-metric-box">
+              <span class="archive-metric-lbl">Est. TSS</span>
+              <span class="archive-metric-val" id="archiveOutdoorTSS">--</span>
+            </div>
+          </div>
+
+          <div id="archiveOutdoorMetaLine" style="font-size:0.76rem;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem;">
+            <span id="archiveOutdoorOrientation">Outdoor Route</span>
+            <a id="archiveOutdoorStravaLink" href="#" target="_blank" rel="noopener" style="color:var(--accent-cyan);font-weight:600;text-decoration:none;display:none;">View on Strava ↗</a>
+          </div>
+
+          <div id="archiveGarminFeedback" style="display:none;font-size:0.77rem;padding:0.5rem 0.65rem;border-radius:8px;border:1px solid var(--border-color);"></div>
+
+          <div class="archive-editor-actions">
+            <button type="button" class="btn btn-secondary" id="btnArchiveDownloadGpx" title="Download .gpx route file">
+              ⬇️ .GPX
+            </button>
+            <button type="button" class="btn btn-primary" id="btnArchivePushGarmin" style="flex:1.5;background:linear-gradient(135deg,#007CC3,#0052FF);border:none;">
+              📡 Send to Garmin
             </button>
           </div>
         </div>
@@ -2706,6 +2795,46 @@
               🔄 Sync Scale Now
             </button>
             <button type="button" id="btnDisconnectWyze" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#ef4444;border-color:rgba(239,68,68,0.3);display:none;">
+              Disconnect
+            </button>
+          </div>
+        </div>
+
+        <!-- Garmin Connect Integration Card (1-Click Route Push) -->
+        <div class="form-group" id="settingsGarminCard" style="background:#F4F7FA;border:1px solid rgba(0, 124, 195, 0.30);padding:1rem;border-radius:8px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
+            <div style="display:flex;align-items:center;gap:0.5rem;">
+              <span style="font-size:1.25rem;">📡</span>
+              <label style="color:#007CC3;font-weight:700;margin:0;">Garmin Connect (1-Click Route Sync)</label>
+            </div>
+            <span id="garminConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
+          </div>
+          <p class="setting-hint" style="margin-top:0.35rem;font-size:0.78rem;color:var(--text-secondary);">
+            Sign in once to push outdoor routes from your Workout Archive directly to <b>Garmin Connect Courses</b> (syncs to your Garmin Edge/Forerunner).
+          </p>
+
+          <div class="settings-form-grid" style="margin-top:0.65rem;">
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Garmin Connect Email</label>
+              <input type="email" id="settingGarminEmail" placeholder="you@example.com" autocomplete="off" />
+            </div>
+            <div>
+              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Garmin Connect Password</label>
+              <input type="password" id="settingGarminPassword" placeholder="Garmin password" autocomplete="new-password" />
+            </div>
+            <div class="grid-col-span-2" id="garminMfaGroup" style="display:none;">
+              <label style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem;display:block;">2FA Verification Code (sent by Garmin)</label>
+              <input type="text" id="settingGarminMfaCode" placeholder="Enter 6-digit code" autocomplete="off" />
+            </div>
+          </div>
+
+          <div id="garminConnectFeedback" style="display:none;margin-top:0.6rem;font-size:0.76rem;padding:0.45rem 0.65rem;border-radius:6px;background:#FFFFFF;border:1px solid var(--border-color);"></div>
+
+          <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;">
+            <button type="button" id="btnConnectGarmin" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#007CC3;color:#007CC3;font-weight:600;">
+              🔗 Connect Garmin
+            </button>
+            <button type="button" id="btnDisconnectGarmin" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#ef4444;border-color:rgba(239,68,68,0.3);display:none;">
               Disconnect
             </button>
           </div>

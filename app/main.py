@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.14",
-        "release_name": "Fueling Timeline & Packing Checklist Cleanup",
+        "version": "2.18.0",
+        "release_name": "Outdoor Route Archive, Time/Distance Search & Garmin Course Sync",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -156,10 +156,21 @@ def version_info():
             "wyze": "Wyze Scale Cloud API (Pluto & Classic Scale)",
             "apple_health": "Auto-Export Webhook (Health Auto Export / Shortcuts) & Manual Entry",
             "zwift": "Intervals.icu Cloud Bridge",
+            "garmin": "Garmin Connect Courses Bridge (1-Click GPX Route Sync)",
             "ai_coach":"Google Gemini 2.5 Flash (Zero-Thinking Fast Mode • Tool Calling)",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.18.0",
+                "date": "2026-11-20",
+                "title": "Outdoor Route Archive, Time/Distance Search & Garmin Course Sync",
+                "items": [
+                    "Outdoor Routes in Workout Archive: Added Indoor Workouts | Outdoor Routes pill toggle with Time (<45m to 2h+) and Distance (<15 mi to 60+ mi) preset search pills and SVG route previews.",
+                    "1-Click Garmin Connect Course Push: Added Garmin Connect login in Settings (with 2FA support) and direct 1-click GPX course upload to Garmin Connect Courses (plus .GPX download).",
+                    "Outdoor Ride Recommendation Fix: Expanded candidate history from 40 to 300 rides and added range parsing (e.g. 75-90 min) so in-window rides are prioritized above shorter rides."
+                ]
+            },
             {
                 "version": "v2.17.14",
                 "date": "2026-11-20",

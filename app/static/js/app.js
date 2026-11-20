@@ -3329,6 +3329,7 @@ function openSettingsModal() {
 
       // Wyze Smart Scale Connection & Fields
       renderWyzeSettingsSummary(s);
+      if (typeof renderGarminSettingsSummary === "function") renderGarminSettingsSummary(s);
 
       // Intervals.icu / Zwift Connection Status
       const intervalsStat = document.getElementById("intervalsConnStatus");
@@ -9955,13 +9956,21 @@ window.addEventListener("focus", () => {
 
 const archiveState = {
   ftp: 250,
+  mode: "indoor", // "indoor" | "outdoor"
   priorWorkouts: [],
   libraryWorkouts: [],
+  outdoorRoutes: [],
   filter: "all",
   search: "",
   durationFilter: "all",
   libraryDuration: 60,
+  outdoorMinDur: null,
+  outdoorMaxDur: null,
+  outdoorMinDist: null,
+  outdoorMaxDist: null,
+  outdoorSort: "recent",
   editingWorkout: null,
+  selectedOutdoorRoute: null,
   initialized: false
 };
 
@@ -10328,11 +10337,251 @@ function openArchiveEditor(workout) {
   renderArchiveGrid();
 }
 
+function setArchiveMode(mode) {
+  archiveState.mode = mode === "outdoor" ? "outdoor" : "indoor";
+  const isOutdoor = archiveState.mode === "outdoor";
+
+  document.querySelectorAll("#archiveModeToggle .archive-mode-btn").forEach(btn => {
+    const active = btn.dataset.mode === archiveState.mode;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-selected", active ? "true" : "false");
+  });
+
+  const indoorDurWrap = document.getElementById("archiveIndoorDurationWrap");
+  const outdoorSortWrap = document.getElementById("archiveOutdoorSortWrap");
+  const indoorPills = document.getElementById("archiveFilterPills");
+  const outdoorFilters = document.getElementById("archiveOutdoorFilters");
+  const indoorBody = document.getElementById("archiveEditorBody");
+  const outdoorBody = document.getElementById("archiveOutdoorInspectorBody");
+  const newBtn = document.getElementById("btnArchiveNewWorkout");
+  const searchInput = document.getElementById("archiveSearchInput");
+  const editorIcon = document.getElementById("archiveEditorIcon");
+  const editorHeading = document.getElementById("archiveEditorHeading");
+  const editorSub = document.getElementById("archiveEditorSourceLabel");
+
+  if (indoorDurWrap) indoorDurWrap.style.display = isOutdoor ? "none" : "flex";
+  if (outdoorSortWrap) outdoorSortWrap.style.display = isOutdoor ? "flex" : "none";
+  if (indoorPills) indoorPills.style.display = isOutdoor ? "none" : "flex";
+  if (outdoorFilters) outdoorFilters.style.display = isOutdoor ? "block" : "none";
+  if (indoorBody) indoorBody.style.display = isOutdoor ? "none" : "flex";
+  if (outdoorBody) outdoorBody.style.display = isOutdoor ? "flex" : "none";
+  if (newBtn) newBtn.style.display = isOutdoor ? "none" : "inline-flex";
+
+  if (searchInput) {
+    searchInput.placeholder = isOutdoor
+      ? "Search outdoor routes by name, sport, or date..."
+      : "Search workouts (e.g. Criss-Cross, Over-Under, 40/20, Tempo)...";
+  }
+
+  if (isOutdoor) {
+    if (editorIcon) editorIcon.textContent = "🗺️";
+    if (editorHeading) editorHeading.textContent = "Route Inspector";
+    if (archiveState.selectedOutdoorRoute) {
+      openOutdoorRouteInspector(archiveState.selectedOutdoorRoute);
+    } else if (archiveState.outdoorRoutes.length > 0) {
+      openOutdoorRouteInspector(archiveState.outdoorRoutes[0]);
+    } else if (editorSub) {
+      editorSub.textContent = "Select any prior outdoor route to inspect or send to Garmin";
+    }
+  } else {
+    if (editorIcon) editorIcon.textContent = "🛠️";
+    if (editorHeading) editorHeading.textContent = "Workout Customizer";
+    if (archiveState.editingWorkout) {
+      if (editorSub) editorSub.textContent = archiveState.editingWorkout.source === "archive"
+        ? `Editing Archived Workout${archiveState.editingWorkout.date ? ` (${archiveState.editingWorkout.date})` : ""}`
+        : `Customizing Coach Template (${archiveState.editingWorkout.zone_label || "Library"})`;
+    } else if (editorSub) {
+      editorSub.textContent = "Select any workout to edit or create a custom session";
+    }
+  }
+
+  renderArchiveGrid();
+}
+
+function openOutdoorRouteInspector(route) {
+  if (!route) return;
+  archiveState.selectedOutdoorRoute = route;
+  const titleEl = document.getElementById("archiveOutdoorTitle");
+  const svgEl = document.getElementById("archiveOutdoorMapSvg");
+  const durEl = document.getElementById("archiveOutdoorDur");
+  const distEl = document.getElementById("archiveOutdoorDist");
+  const elevEl = document.getElementById("archiveOutdoorElev");
+  const npEl = document.getElementById("archiveOutdoorNP");
+  const tssEl = document.getElementById("archiveOutdoorTSS");
+  const orientEl = document.getElementById("archiveOutdoorOrientation");
+  const stravaEl = document.getElementById("archiveOutdoorStravaLink");
+  const subEl = document.getElementById("archiveEditorSourceLabel");
+  const fbEl = document.getElementById("archiveGarminFeedback");
+
+  if (fbEl) fbEl.style.display = "none";
+  if (titleEl) titleEl.value = route.title || "Outdoor Route";
+  if (subEl) subEl.textContent = `${route.sport_type || "Ride"} • ${route.date_relative || route.date || ""}`;
+  if (durEl) durEl.textContent = route.moving_time_formatted || `${route.duration_minutes || 0}m`;
+  if (distEl) distEl.textContent = `${route.distance_miles || 0} mi`;
+  if (elevEl) elevEl.textContent = `${(route.elevation_gain_ft || 0).toLocaleString()} ft`;
+  if (npEl) npEl.textContent = route.normalized_power_watts ? `${route.normalized_power_watts} W` : "-- W";
+  if (tssEl) tssEl.textContent = route.estimated_tss != null ? `${route.estimated_tss}` : "--";
+  if (orientEl) orientEl.textContent = `${route.orientation_label || "Outdoor Route"} • ${route.distance_km || 0} km`;
+
+  if (stravaEl) {
+    if (route.strava_url && /^\d+$/.test(String(route.id || ""))) {
+      stravaEl.href = route.strava_url;
+      stravaEl.style.display = "inline";
+    } else {
+      stravaEl.style.display = "none";
+    }
+  }
+
+  if (svgEl) {
+    if (route.svg_path) {
+      const startCircle = route.start_xy ? `<circle cx="${route.start_xy[0]}" cy="${route.start_xy[1]}" r="5" fill="#10B981" stroke="#fff" stroke-width="1.5"/>` : "";
+      const endCircle = route.end_xy && !route.is_loop ? `<circle cx="${route.end_xy[0]}" cy="${route.end_xy[1]}" r="5" fill="#EF4444" stroke="#fff" stroke-width="1.5"/>` : "";
+      svgEl.innerHTML = `<path d="${route.svg_path}" fill="none" stroke="#007CC3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${startCircle}${endCircle}`;
+    } else {
+      svgEl.innerHTML = `<text x="190" y="85" text-anchor="middle" fill="#94a3b8" font-size="13">No GPS polyline stored for this ride</text>`;
+    }
+  }
+
+  renderArchiveGrid();
+}
+
+async function pushOutdoorRouteToGarmin(rideId, courseName, btnEl) {
+  if (!rideId) return;
+  const fbEl = document.getElementById("archiveGarminFeedback");
+  const origText = btnEl ? btnEl.textContent : "📡 Send to Garmin";
+  if (btnEl) {
+    btnEl.disabled = true;
+    btnEl.textContent = "⏳ Sending...";
+  }
+  if (fbEl) fbEl.style.display = "none";
+
+  try {
+    const res = await fetch("/api/workouts/archive/push-garmin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ride_id: String(rideId), course_name: courseName || null })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`📡 ${data.message || "Sent route to Garmin Connect!"}`);
+      if (fbEl) {
+        const linkHtml = data.course_url ? ` <a href="${data.course_url}" target="_blank" rel="noopener" style="color:#007CC3;font-weight:700;text-decoration:underline;">Open in Garmin Connect ↗</a>` : "";
+        fbEl.innerHTML = `✅ ${data.message}${linkHtml}`;
+        fbEl.style.color = "#059669";
+        fbEl.style.borderColor = "rgba(16, 185, 129, 0.35)";
+        fbEl.style.display = "block";
+      }
+    } else {
+      const errMsg = data.error || "Failed to send route to Garmin.";
+      showToast(`⚠️ ${errMsg}`);
+      if (fbEl) {
+        fbEl.textContent = `⚠️ ${errMsg}`;
+        fbEl.style.color = "#DC2626";
+        fbEl.style.borderColor = "rgba(239, 68, 68, 0.35)";
+        fbEl.style.display = "block";
+      }
+    }
+  } catch (e) {
+    showToast("⚠️ Network error sending route to Garmin.");
+  } finally {
+    if (btnEl) {
+      btnEl.disabled = false;
+      btnEl.textContent = origText;
+    }
+  }
+}
+
+function downloadOutdoorRouteGpx(rideId) {
+  if (!rideId) return;
+  window.location.href = `/api/workouts/archive/outdoor/${encodeURIComponent(rideId)}/download-gpx`;
+}
+
 function renderArchiveGrid() {
   const grid = document.getElementById("archiveWorkoutsGrid");
   if (!grid) return;
 
   const q = (archiveState.search || "").trim().toLowerCase();
+  const badgeEl = document.getElementById("archiveCountBadge");
+
+  if (archiveState.mode === "outdoor") {
+    let routes = [...archiveState.outdoorRoutes];
+    if (q) {
+      routes = routes.filter(r => `${r.title || ""} ${r.sport_type || ""} ${r.date || ""} ${r.date_relative || ""}`.toLowerCase().includes(q));
+    }
+    if (archiveState.outdoorMinDur !== null) {
+      routes = routes.filter(r => (Number(r.duration_minutes) || 0) >= archiveState.outdoorMinDur);
+    }
+    if (archiveState.outdoorMaxDur !== null) {
+      routes = routes.filter(r => (Number(r.duration_minutes) || 0) <= archiveState.outdoorMaxDur);
+    }
+    if (archiveState.outdoorMinDist !== null) {
+      routes = routes.filter(r => (Number(r.distance_miles) || 0) >= archiveState.outdoorMinDist);
+    }
+    if (archiveState.outdoorMaxDist !== null) {
+      routes = routes.filter(r => (Number(r.distance_miles) || 0) <= archiveState.outdoorMaxDist);
+    }
+
+    const sortBy = archiveState.outdoorSort || "recent";
+    if (sortBy === "duration_desc") routes.sort((a, b) => (b.duration_minutes || 0) - (a.duration_minutes || 0));
+    else if (sortBy === "distance_desc") routes.sort((a, b) => (b.distance_miles || 0) - (a.distance_miles || 0));
+    else if (sortBy === "elevation_desc") routes.sort((a, b) => (b.elevation_gain_ft || 0) - (a.elevation_gain_ft || 0));
+
+    if (badgeEl) {
+      badgeEl.textContent = `${routes.length} of ${archiveState.outdoorRoutes.length} Outdoor Routes`;
+    }
+
+    if (routes.length === 0) {
+      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">No matching outdoor routes found. Try adjusting your Time or Distance pills.</div>`;
+      return;
+    }
+
+    const selId = archiveState.selectedOutdoorRoute ? archiveState.selectedOutdoorRoute.id : null;
+    grid.innerHTML = routes.map(r => {
+      const isSelected = selId && r.id === selId;
+      const safeTitle = (r.title || "Outdoor Ride").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const miniMap = r.thumbnail_svg
+        ? `<svg viewBox="0 0 140 64" style="width:100%;height:56px;display:block;"><path d="${r.thumbnail_svg}" fill="none" stroke="#007CC3" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+        : `<div style="height:56px;display:flex;align-items:center;justify-content:center;font-size:0.72rem;color:var(--text-muted);">No GPS Map</div>`;
+      return `
+        <div class="archive-workout-card ${isSelected ? "selected" : ""}" data-outdoor-id="${r.id}">
+          <div class="archive-card-top">
+            <span class="archive-card-badge badge-archive">🗺️ ${r.sport_type || "Ride"} • ${r.date || ""}</span>
+          </div>
+          <div class="archive-card-title">${safeTitle}</div>
+          <div class="archive-card-sub">${r.orientation_label || "Outdoor Route"}</div>
+          <div class="archive-card-spark">${miniMap}</div>
+          <div class="archive-card-stats">
+            <span>⏱️ ${r.moving_time_formatted || `${r.duration_minutes || 0}m`}</span>
+            <span>📏 ${r.distance_miles || 0} mi</span>
+            <span>⛰️ ${(r.elevation_gain_ft || 0).toLocaleString()} ft</span>
+            <span>🔥 ${r.estimated_tss || 0} TSS</span>
+          </div>
+          <div class="archive-card-actions">
+            <button type="button" class="btn btn-secondary btn-xs archive-btn-inspect" style="flex:1;">🗺️ Inspect</button>
+            <button type="button" class="btn btn-primary btn-xs archive-btn-garmin" style="flex:1.2;background:linear-gradient(135deg,#007CC3,#0052FF);border:none;">📡 Send to Garmin</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    grid.querySelectorAll(".archive-workout-card[data-outdoor-id]").forEach(cardEl => {
+      const rid = cardEl.dataset.outdoorId;
+      const routeObj = archiveState.outdoorRoutes.find(x => String(x.id) === String(rid));
+      if (!routeObj) return;
+
+      cardEl.addEventListener("click", (e) => {
+        if (e.target.closest(".archive-btn-garmin")) return;
+        openOutdoorRouteInspector(routeObj);
+      });
+
+      cardEl.querySelector(".archive-btn-garmin")?.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        await pushOutdoorRouteToGarmin(routeObj.id, routeObj.title, e.currentTarget);
+      });
+    });
+    return;
+  }
+
   const filter = archiveState.filter || "all";
 
   let items = [];
@@ -10356,7 +10605,6 @@ function renderArchiveGrid() {
     items = items.filter(w => Math.abs((Number(w.duration_minutes) || 0) - targetDur) <= 5);
   }
 
-  const badgeEl = document.getElementById("archiveCountBadge");
   if (badgeEl) {
     badgeEl.textContent = `${archiveState.priorWorkouts.length} Archived • ${archiveState.libraryWorkouts.length} Library`;
   }
@@ -10444,8 +10692,13 @@ async function loadWorkoutArchive() {
       archiveState.ftp = data.ftp || 250;
       archiveState.priorWorkouts = data.prior_workouts || [];
       archiveState.libraryWorkouts = data.library_workouts || [];
+      archiveState.outdoorRoutes = data.outdoor_routes || [];
       renderArchiveGrid();
-      if (!archiveState.editingWorkout && (archiveState.priorWorkouts.length > 0 || archiveState.libraryWorkouts.length > 0)) {
+      if (archiveState.mode === "outdoor") {
+        if (!archiveState.selectedOutdoorRoute && archiveState.outdoorRoutes.length > 0) {
+          openOutdoorRouteInspector(archiveState.outdoorRoutes[0]);
+        }
+      } else if (!archiveState.editingWorkout && (archiveState.priorWorkouts.length > 0 || archiveState.libraryWorkouts.length > 0)) {
         openArchiveEditor(archiveState.priorWorkouts[0] || archiveState.libraryWorkouts[0]);
       }
     }
@@ -10665,7 +10918,160 @@ function initWorkoutArchive() {
     await pushArchiveWorkoutToZwift({ workout: archiveState.editingWorkout });
     if (btn) { btn.disabled = false; btn.textContent = "🚀 Send to Zwift"; }
   });
+
+  // Indoor Workouts vs Outdoor Routes pill toggle
+  document.querySelectorAll("#archiveModeToggle .archive-mode-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      setArchiveMode(btn.dataset.mode || "indoor");
+    });
+  });
+
+  // Outdoor Time preset pills
+  document.querySelectorAll("#archiveOutdoorTimePills .archive-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll("#archiveOutdoorTimePills .archive-pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      archiveState.outdoorMinDur = pill.dataset.minDur !== "" ? Number(pill.dataset.minDur) : null;
+      archiveState.outdoorMaxDur = pill.dataset.maxDur !== "" ? Number(pill.dataset.maxDur) : null;
+      renderArchiveGrid();
+    });
+  });
+
+  // Outdoor Distance preset pills
+  document.querySelectorAll("#archiveOutdoorDistPills .archive-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll("#archiveOutdoorDistPills .archive-pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      archiveState.outdoorMinDist = pill.dataset.minDist !== "" ? Number(pill.dataset.minDist) : null;
+      archiveState.outdoorMaxDist = pill.dataset.maxDist !== "" ? Number(pill.dataset.maxDist) : null;
+      renderArchiveGrid();
+    });
+  });
+
+  // Outdoor Sort selector
+  document.getElementById("archiveOutdoorSort")?.addEventListener("change", (e) => {
+    archiveState.outdoorSort = e.target.value || "recent";
+    renderArchiveGrid();
+  });
+
+  // Outdoor Inspector: Download .GPX & 1-Click Send to Garmin
+  document.getElementById("btnArchiveDownloadGpx")?.addEventListener("click", () => {
+    if (!archiveState.selectedOutdoorRoute) return;
+    downloadOutdoorRouteGpx(archiveState.selectedOutdoorRoute.id);
+  });
+
+  document.getElementById("btnArchivePushGarmin")?.addEventListener("click", async () => {
+    if (!archiveState.selectedOutdoorRoute) return;
+    const btn = document.getElementById("btnArchivePushGarmin");
+    const titleEl = document.getElementById("archiveOutdoorTitle");
+    const courseName = titleEl?.value?.trim() || archiveState.selectedOutdoorRoute.title;
+    await pushOutdoorRouteToGarmin(archiveState.selectedOutdoorRoute.id, courseName, btn);
+  });
 }
+
+function renderGarminSettingsSummary(s) {
+  const emailEl = document.getElementById("settingGarminEmail");
+  const passEl = document.getElementById("settingGarminPassword");
+  const mfaGroup = document.getElementById("garminMfaGroup");
+  const mfaInput = document.getElementById("settingGarminMfaCode");
+  const statEl = document.getElementById("garminConnStatus");
+  const btnConn = document.getElementById("btnConnectGarmin");
+  const btnDisc = document.getElementById("btnDisconnectGarmin");
+  const fbEl = document.getElementById("garminConnectFeedback");
+
+  if (fbEl) fbEl.style.display = "none";
+  if (emailEl && s.garmin_email !== undefined) emailEl.value = s.garmin_email || "";
+  if (passEl) {
+    passEl.value = "";
+    passEl.placeholder = s.garmin_password_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Garmin password";
+  }
+  if (mfaGroup) mfaGroup.style.display = "none";
+  if (mfaInput) mfaInput.value = "";
+
+  const isConnected = Boolean(s.garmin_connected || s.garmin_has_tokens);
+  if (statEl) {
+    statEl.textContent = isConnected ? "Connected ✅" : "Not connected";
+    statEl.style.color = isConnected ? "#10b981" : "#94a3b8";
+  }
+  if (btnConn) {
+    btnConn.textContent = isConnected ? "🔑 Re-Authenticate Garmin" : "🔗 Connect Garmin";
+  }
+  if (btnDisc) {
+    btnDisc.style.display = isConnected ? "inline-flex" : "none";
+  }
+}
+
+document.getElementById("btnConnectGarmin")?.addEventListener("click", async () => {
+  const email = document.getElementById("settingGarminEmail")?.value.trim() || "";
+  const password = document.getElementById("settingGarminPassword")?.value || "";
+  const mfaCode = document.getElementById("settingGarminMfaCode")?.value.trim() || "";
+  const fbEl = document.getElementById("garminConnectFeedback");
+  const mfaGroup = document.getElementById("garminMfaGroup");
+  const btn = document.getElementById("btnConnectGarmin");
+  if (!btn) return;
+
+  const origText = btn.textContent;
+  btn.textContent = "⏳ Connecting to Garmin...";
+  btn.disabled = true;
+  if (fbEl) fbEl.style.display = "none";
+
+  try {
+    const res = await fetch("/api/settings/garmin/connect", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, mfa_code: mfaCode || null })
+    });
+    const data = await res.json();
+    if (data.success) {
+      renderGarminSettingsSummary({ garmin_connected: true, garmin_has_tokens: true, garmin_email: data.email || email, garmin_password_set: true });
+      if (fbEl) {
+        fbEl.textContent = `✅ ${data.message || "Connected to Garmin Connect!"}`;
+        fbEl.style.color = "#059669";
+        fbEl.style.borderColor = "rgba(16, 185, 129, 0.35)";
+        fbEl.style.display = "block";
+      }
+      showToast("✅ Garmin Connect linked!");
+    } else if (data.mfa_required) {
+      if (mfaGroup) mfaGroup.style.display = "block";
+      if (fbEl) {
+        fbEl.textContent = `🔐 ${data.error}`;
+        fbEl.style.color = "#D97706";
+        fbEl.style.borderColor = "rgba(245, 158, 11, 0.4)";
+        fbEl.style.display = "block";
+      }
+      btn.textContent = "🔐 Verify 2FA Code";
+    } else {
+      if (fbEl) {
+        fbEl.textContent = `⚠️ ${data.error || "Could not connect to Garmin."}`;
+        fbEl.style.color = "#DC2626";
+        fbEl.style.borderColor = "rgba(239, 68, 68, 0.35)";
+        fbEl.style.display = "block";
+      }
+    }
+  } catch (e) {
+    if (fbEl) {
+      fbEl.textContent = "⚠️ Network error connecting to Garmin.";
+      fbEl.style.color = "#DC2626";
+      fbEl.style.display = "block";
+    }
+  } finally {
+    if (btn.textContent.startsWith("⏳")) btn.textContent = origText;
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("btnDisconnectGarmin")?.addEventListener("click", async () => {
+  try {
+    const res = await fetch("/api/settings/garmin/disconnect", { method: "POST" });
+    const data = await res.json();
+    if (data.success) {
+      renderGarminSettingsSummary({ garmin_connected: false, garmin_has_tokens: false, garmin_email: document.getElementById("settingGarminEmail")?.value || "", garmin_password_set: false });
+      showToast("Garmin Connect disconnected.");
+    }
+  } catch (e) {
+    console.warn("Could not disconnect Garmin:", e);
+  }
+});
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initWorkoutArchive);

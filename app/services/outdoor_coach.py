@@ -83,7 +83,7 @@ def generate_svg_path(coords: List[List[float]], width: int = 400, height: int =
             
     return ' '.join(path_cmds), start_pt, end_pt
 
-def get_candidate_outdoor_rides() -> List[Dict[str, Any]]:
+def get_candidate_outdoor_rides(limit: int = 300) -> List[Dict[str, Any]]:
     """
     Retrieves outdoor rides from SQLite database (or falls back to mock data).
     Filters out virtual rides, commutes, very short errand rides (< 20 min).
@@ -104,8 +104,8 @@ def get_candidate_outdoor_rides() -> List[Dict[str, Any]]:
               AND sport_type IN ('Ride', 'MountainBikeRide', 'GravelRide', 'EBikeRide', 'OutdoorRide')
               AND moving_time_sec >= 1200
             ORDER BY start_date DESC
-            LIMIT 40
-        """, (uid,))
+            LIMIT ?
+        """, (uid, max(40, int(limit))))
         rows = c.fetchall()
         conn.close()
         for r in rows:
@@ -194,17 +194,54 @@ def build_outdoor_ride_recommendation(
 
     import re
     note_clean = (user_note or "").strip().lower()
+    target_min_low: Optional[int] = None
+    target_min_high: Optional[int] = None
+    has_explicit_dur_req = False
+
     if note_clean:
+        range_min_match = re.search(
+            r'\b(\d{2,3})\s*(?:m|min|mins|minute|minutes)?\s*(?:-|–|—|to)\s*(\d{2,3})\s*(?:m|min|mins|minute|minutes)\b',
+            note_clean,
+        )
+        range_hr_match = re.search(
+            r'\b(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)?\s*(?:-|–|—|to)\s*(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b',
+            note_clean,
+        )
         dur_min_match = re.search(r'\b(\d{2,3})\s*(?:m|min|mins|minute|minutes)\b', note_clean)
         dur_hr_match = re.search(r'\b(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b', note_clean)
-        if dur_min_match:
+
+        if range_min_match:
+            low_d = int(range_min_match.group(1))
+            high_d = int(range_min_match.group(2))
+            if low_d > high_d:
+                low_d, high_d = high_d, low_d
+            if 20 <= low_d <= 360 and 20 <= high_d <= 360:
+                target_min_low, target_min_high = low_d, high_d
+                target_duration_min = (low_d + high_d) // 2
+                has_explicit_dur_req = True
+        elif range_hr_match:
+            low_d = round(float(range_hr_match.group(1)) * 60)
+            high_d = round(float(range_hr_match.group(2)) * 60)
+            if low_d > high_d:
+                low_d, high_d = high_d, low_d
+            if 20 <= low_d <= 360 and 20 <= high_d <= 360:
+                target_min_low, target_min_high = low_d, high_d
+                target_duration_min = (low_d + high_d) // 2
+                has_explicit_dur_req = True
+        elif dur_min_match:
             parsed_d = int(dur_min_match.group(1))
-            if 20 <= parsed_d <= 300:
+            if 20 <= parsed_d <= 360:
                 target_duration_min = parsed_d
+                target_min_low = max(20, parsed_d - 10)
+                target_min_high = min(360, parsed_d + 10)
+                has_explicit_dur_req = True
         elif dur_hr_match:
             parsed_d = round(float(dur_hr_match.group(1)) * 60)
-            if 20 <= parsed_d <= 300:
+            if 20 <= parsed_d <= 360:
                 target_duration_min = parsed_d
+                target_min_low = max(20, parsed_d - 10)
+                target_min_high = min(360, parsed_d + 10)
+                has_explicit_dur_req = True
 
     # Determine desired physiological stimulus today
     today_acts = today_activities or []
@@ -313,9 +350,26 @@ def build_outdoor_ride_recommendation(
         # Elevation climbing density (m per km)
         climbing_ratio = r_elev_m / max(1.0, r_dist_km)
 
-        # 1. Duration match penalty (relative to target_duration_min)
-        dur_diff = abs(r_min - target_duration_min)
-        dur_score = max(0, 100 - (dur_diff * 1.5))
+        # 1. Duration match score (with range awareness)
+        in_requested_window = False
+        if target_min_low is not None and target_min_high is not None:
+            if target_min_low <= r_min <= target_min_high:
+                in_requested_window = True
+                # Gentle preference toward midpoint of requested range
+                mid_diff = abs(r_min - target_duration_min)
+                dur_score = max(92.0, 100.0 - (mid_diff * 0.4))
+            else:
+                outside_diff = (target_min_low - r_min) if r_min < target_min_low else (r_min - target_min_high)
+                if outside_diff <= 5:
+                    in_requested_window = True
+                    dur_score = max(80.0, 90.0 - (outside_diff * 2.0))
+                else:
+                    dur_score = max(0.0, 75.0 - (outside_diff * 3.5))
+        else:
+            dur_diff = abs(r_min - target_duration_min)
+            if dur_diff <= 8:
+                in_requested_window = True
+            dur_score = max(0.0, 100.0 - (dur_diff * 1.8))
 
         # 2. Intensity match score
         pct_diff = abs(r_pct_ftp - target_pct_ftp)
@@ -339,9 +393,12 @@ def build_outdoor_ride_recommendation(
             if r_elev_m >= 350:
                 terrain_score += 15
 
-        # Total fit score (0-100)
-        total_score = (dur_score * 0.45) + (intensity_score * 0.35) + (terrain_score * 0.20)
-        total_score = min(99, max(40, round(total_score)))
+        # Total fit score (0-100): heavily favor duration compliance when user specifies a time/range
+        if has_explicit_dur_req:
+            total_score = (dur_score * 0.65) + (intensity_score * 0.22) + (terrain_score * 0.13)
+        else:
+            total_score = (dur_score * 0.48) + (intensity_score * 0.32) + (terrain_score * 0.20)
+        total_score = min(99, max(30, round(total_score)))
 
         # Map decoding & SVG generation
         poly = ride.get("summary_polyline") or ""
@@ -389,6 +446,7 @@ def build_outdoor_ride_recommendation(
             "pct_ftp": r_pct_ftp if r_watts else None,
             "suffer_score": int(r_suffer) if r_suffer else None,
             "match_score": total_score,
+            "in_requested_window": in_requested_window,
             "strava_url": f"https://www.strava.com/activities/{ride_id_str}",
             "summary_polyline": poly,
             "map_points": sampled_pts,
@@ -405,8 +463,11 @@ def build_outdoor_ride_recommendation(
         }
         scored_rides.append(ride_annotated)
 
-    # Sort descending by match score
-    scored_rides.sort(key=lambda x: x["match_score"], reverse=True)
+    # Sort descending by in-window priority (when explicit duration requested) then match score
+    if has_explicit_dur_req:
+        scored_rides.sort(key=lambda x: (1 if x.get("in_requested_window") else 0, x["match_score"]), reverse=True)
+    else:
+        scored_rides.sort(key=lambda x: x["match_score"], reverse=True)
 
     if not scored_rides:
         # Fallback if no outdoor rides found

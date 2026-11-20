@@ -49,6 +49,8 @@ class SettingsUpdate(BaseModel):
     wyze_key_id: Optional[str] = None
     wyze_api_key: Optional[str] = None
     wyze_totp_secret: Optional[str] = None
+    garmin_email: Optional[str] = None
+    garmin_password: Optional[str] = None
     program_goal: Optional[str] = None
     program_target_ftp: Optional[int] = None
     program_target_date: Optional[str] = None
@@ -198,6 +200,10 @@ def update_settings_endpoint(payload: SettingsUpdate, uid: str = Depends(require
     if is_valid_secret(payload.wyze_totp_secret):
         set_setting("wyze_totp_secret", payload.wyze_totp_secret.strip(), user_id=uid)
         wyze_cred_updated = True
+    if payload.garmin_email is not None and payload.garmin_email.strip():
+        set_setting("garmin_email", payload.garmin_email.strip(), user_id=uid)
+    if is_valid_secret(payload.garmin_password):
+        set_setting("garmin_password", payload.garmin_password.strip(), user_id=uid)
 
     if wyze_cred_updated or not get_setting("wyze_tokens", None, user_id=uid):
         if (
@@ -315,4 +321,31 @@ def toggle_connection_endpoint(
         "enabled": updated[svc],
         "enabled_connections": updated,
     }
+
+
+class GarminConnectPayload(BaseModel):
+    email: Optional[str] = None
+    password: Optional[str] = None
+    mfa_code: Optional[str] = None
+
+
+@router.post("/garmin/connect")
+def connect_garmin_endpoint(
+    payload: GarminConnectPayload,
+    uid: str = Depends(require_authenticated_user),
+):
+    from app.services.garmin_service import connect_garmin
+    return connect_garmin(
+        email=payload.email,
+        password=payload.password,
+        mfa_code=payload.mfa_code,
+        user_id=uid,
+    )
+
+
+@router.post("/garmin/disconnect")
+def disconnect_garmin_endpoint(uid: str = Depends(require_authenticated_user)):
+    from app.services.garmin_service import disconnect_garmin
+    return disconnect_garmin(user_id=uid)
+
 
