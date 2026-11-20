@@ -172,7 +172,8 @@ def compile_athlete_context() -> Dict[str, Any]:
                     "title": act.get("name"),
                     "duration_min": round((act.get("moving_time_sec") or 0) / 60),
                     "distance_miles": round((act.get("distance_meters") or 0.0) / 1609.34, 1),
-                    "weighted_watts": act.get("weighted_average_watts") or 0,
+                    "normalized_power_watts": act.get("weighted_average_watts") or 0,
+                    "avg_power_watts": act.get("average_watts") or 0,
                     "tss": round(act.get("suffer_score") or 0),
                     "avg_hr": act.get("average_heartrate") or 0
                 } for act in today_acts

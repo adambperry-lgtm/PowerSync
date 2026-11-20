@@ -824,7 +824,7 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
       val1.style.color = "var(--text-primary)";
     }
 
-    if (lbl2) lbl2.textContent = "Avg Power";
+    if (lbl2) lbl2.textContent = "Norm. Power";
     if (val2) {
       val2.textContent = assessment.weighted_watts ? `${assessment.weighted_watts} W` : "--";
       val2.style.color = "var(--accent-cyan)";
@@ -4614,9 +4614,10 @@ function renderDebrief(data) {
         const borderCol = isPrimary ? "rgba(16, 185, 129, 0.4)" : "rgba(56, 189, 248, 0.3)";
         const icon = isPrimary ? "⚡" : "🌀";
         const role = isPrimary ? "Primary Workout" : "Cooldown / Flush";
+        const wattsPill = s.weighted_watts ? ` • ${s.weighted_watts}W NP` : "";
         return `<span style="font-size:0.75rem;padding:0.25rem 0.55rem;border-radius:6px;background:${badgeBg};border:1px solid ${borderCol};color:#f1f5f9;display:inline-flex;align-items:center;gap:0.35rem;">` +
           `<span>${icon} <strong>${s.name}</strong> <span style="color:var(--text-muted);">(${role})</span></span>` +
-          `<span style="color:var(--text-muted);margin-left:0.2rem;">• ${s.moving_time_formatted} • ${s.weighted_watts}W • ${s.tss} TSS</span>` +
+          `<span style="color:var(--text-muted);margin-left:0.2rem;">• ${s.moving_time_formatted}${wattsPill} • ${s.tss} TSS</span>` +
         `</span>`;
       }).join("");
     } else {
@@ -4642,10 +4643,10 @@ function renderDebrief(data) {
   if (debriefMetricVerdict) debriefMetricVerdict.textContent = assessment.verdict || "Target Fidelity";
   
   if (debriefMetricWatts) {
-    debriefMetricWatts.textContent = assessment.weighted_watts ? `${assessment.weighted_watts}W` : "0W";
+    debriefMetricWatts.textContent = assessment.weighted_watts ? `${assessment.weighted_watts}W NP` : "0W NP";
   }
   if (debriefMetricTargetWatts) {
-    debriefMetricTargetWatts.textContent = `Target: ${assessment.target_watts || 0}W (${assessment.target_zone || ""})`;
+    debriefMetricTargetWatts.textContent = `Target: ${assessment.target_watts || 0}W NP (${assessment.target_zone || ""})`;
   }
   if (debriefMetricTime) debriefMetricTime.textContent = assessment.moving_time_formatted || "0m";
   const debriefDistMi = assessment.distance_miles || (assessment.distance_km ? (assessment.distance_km * 0.621371).toFixed(1) : 0);

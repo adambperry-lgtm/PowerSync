@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.18.3",
-        "release_name": "Garmin Connections Dropdown & Session Token Import",
+        "version": "2.18.4",
+        "release_name": "Ride Debrief Normalized Power Labels",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -161,6 +161,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.18.4",
+                "date": "2026-11-20",
+                "title": "Ride Debrief Normalized Power Labels",
+                "items": [
+                    "Ride Debrief NP Labels: Relabeled the Ride Debrief power card from 'Avg Power' to 'Norm. Power', updated the Full Debrief card to 'NP vs Target' with 'W NP' units, and added 'NP' tags to multi-session pills.",
+                    "Accurate Coach Debrief Copy: Fixed local debrief prose ('W avg' → 'W NP'), explicitly tagged all Gemini debrief prompt power metrics as Normalized Power (NP) with a no-'average power' guardrail, and clarified today_completed_activity NP vs avg power fields for Coach Chat."
+                ]
+            },
             {
                 "version": "v2.18.3",
                 "date": "2026-11-20",

@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.18.4] - 2026-11-20
+### Fixed
+- **Ride Debrief Normalized Power (NP) Labels & Coach Copy**:
+  - Updated [`renderAiCoachTodayCard()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) and [`renderDebrief()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`app.js?v=150`) plus [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) to relabel the Ride Debrief power metric from **Avg Power** to **Norm. Power**, label the Full Debrief card as **NP vs Target** with `W NP` units, and tag multi-session breakdown pills with `W NP`.
+  - Updated [`build_daily_review_and_outlook_local()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) fallback debrief copy to report `{act_watts}W NP` instead of `{act_watts}W avg`, and updated [`call_gemini_coach_review()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) so single-session, multi-session, and target wattage values are explicitly tagged `W NP` with a guardrail against calling NP "average power".
+  - Bumped `DEBRIEF_CACHE_VERSION` in [`app/services/review_coach.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) so previously cached debriefs auto-refresh with corrected NP wording, and split `today_completed_activity` power keys in [`app/services/coach_chat_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) into `normalized_power_watts` and `avg_power_watts`.
+
 ## [2.18.3] - 2026-11-20
 ### Added
 - **Garmin Connect in Connections Dropdown & Session Token Import**:
