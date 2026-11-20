@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.14] - 2026-11-20
+### Fixed
+- **Fueling Protocol Timeline & Packing Checklist Cleanup**:
+  - Updated [`generate_fueling_plan()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/fueling_service.py) to fold short `<= 15`-minute tails (e.g. `63` min) into the previous hour instead of creating a tiny `Hour 2 (60–63 min)` card with a full hour of food.
+  - Aligned all hour labels, `Min X–Y` / `Min Z` ride-clock timestamps, and item carbohydrate totals so every item sums to the hour's carb target.
+  - Restricted `2x Electrolyte Salt Capsules` in the packing checklist to very hot and humid outdoor rides (`temp >= 82°F` & `humidity >= 60%`, or `temp >= 88°F`), and fixed singular/plural bottle, gel, and scoop labels.
+
 ## [2.17.13] - 2026-11-20
 ### Fixed
 - **Clean Plain-Text `W'` Formatting & Anaerobic Battery Context**:

@@ -163,59 +163,92 @@ def generate_fueling_plan(
 
     # 6. Hour-by-Hour On-the-Bike Feeding Timeline
     hourly_schedule = []
-    num_hours = math.ceil(dur_hours)
-    
-    for h in range(1, num_hours + 1):
-        is_final_hour = (h == num_hours)
-        hour_fraction = 1.0 if not is_final_hour else (dur_hours - (h - 1))
-        hour_carbs = round(target_carbs_per_hour * hour_fraction)
-        
-        if dur_min < 45:
+    if dur_min < 45:
+        hourly_schedule.append({
+            "hour": 1,
+            "label": f"Hour 1 (0–{dur_min} min)",
+            "carbs_g": 0,
+            "fluid_ml": round(fluid_ml_per_hour * dur_hours),
+            "sodium_mg": round(sodium_mg_per_hour * dur_hours),
+            "fuel_items": [
+                {"time": f"Min 0–{dur_min}", "item": "Sip plain water or light electrolyte drink", "carbs": 0}
+            ],
+            "coach_note": "No exogenous carbs needed. Muscle glycogen is fully adequate for short sessions."
+        })
+    else:
+        # Build hour windows; fold a tiny tail (<= 15 min past an hour mark) into the previous hour
+        # so we never show a 3-minute "Hour 2 (60-63 min)" block.
+        windows = []
+        full_hours = dur_min // 60
+        rem_min = dur_min % 60
+        if full_hours == 0:
+            windows.append((0, dur_min))
+        else:
+            for idx in range(full_hours):
+                s_min = idx * 60
+                e_min = (idx + 1) * 60
+                if idx == full_hours - 1 and 0 < rem_min <= 15:
+                    e_min = dur_min
+                windows.append((s_min, e_min))
+            if rem_min > 15:
+                windows.append((full_hours * 60, dur_min))
+
+        for h, (start_min, end_min) in enumerate(windows, start=1):
+            window_min = end_min - start_min
+            hour_fraction = window_min / 60.0
+            hour_carbs = round(target_carbs_per_hour * hour_fraction)
+            items = []
+
+            if h == 1:
+                if hour_carbs == 0:
+                    items.append({"time": f"Min 0–{end_min}", "item": "Sip plain water or light electrolyte drink", "carbs": 0})
+                elif hour_carbs <= 40:
+                    items.append({"time": f"Min 0–{end_min}", "item": f"Sip carb drink mix steadily ({hour_carbs}g carbs in bottle)", "carbs": hour_carbs})
+                else:
+                    bottle_g = 35
+                    gel_g = hour_carbs - bottle_g
+                    items.append({"time": f"Min 0–{end_min}", "item": f"Sip drink mix steadily ({bottle_g}g carbs in bottle)", "carbs": bottle_g})
+                    items.append({"time": "Min 40", "item": "1 Energy Gel or 4 Chews", "carbs": gel_g})
+                note = "Start fueling early at minute 15–20. The gut absorbs carbs most efficiently before core temperature and dehydration rise."
+            else:
+                if window_min <= 35:
+                    t_mark = start_min + min(15, max(5, window_min // 2))
+                    if hour_carbs >= 18:
+                        items.append({"time": f"Min {t_mark}", "item": "1 Energy Gel or 3–4 Chews", "carbs": hour_carbs})
+                    else:
+                        items.append({"time": f"Min {start_min}–{end_min}", "item": "Sip carb drink mix in bottle", "carbs": hour_carbs})
+                else:
+                    if hour_carbs >= 70:
+                        first_g = 25
+                        second_g = 25
+                        bottle_g = hour_carbs - (first_g + second_g)
+                        items.append({"time": f"Min {start_min + 15}", "item": "Solid bite (Stroopwafel or Rice Cake)" if h == 2 else "1 Energy Gel with caffeine (25–50mg)", "carbs": first_g})
+                        items.append({"time": f"Min {start_min + 40}", "item": "1 Energy Gel or Energy Chews", "carbs": second_g})
+                        items.append({"time": f"Min {start_min}–{end_min}", "item": "Sip high-carb drink mix in bottle", "carbs": bottle_g})
+                    elif hour_carbs >= 40:
+                        first_g = round(hour_carbs * 0.45)
+                        second_g = hour_carbs - first_g
+                        items.append({"time": f"Min {start_min + 15}", "item": "Solid bite (Stroopwafel or Rice Cake)" if h == 2 else "1 Energy Gel with caffeine (25–50mg)", "carbs": first_g})
+                        items.append({"time": f"Min {start_min + 40}", "item": "1 Energy Gel + water/electrolyte sip", "carbs": second_g})
+                    else:
+                        items.append({"time": f"Min {start_min + 20}", "item": "1 Energy Gel or 4 Chews", "carbs": hour_carbs})
+
+                if h == 2:
+                    note = "Steady carbohydrate flow prevents liver glycogen depletion and late-ride fade."
+                elif h == 3:
+                    note = "Caffeine stimulates central nervous system alertness and mobilizes free fatty acids during late-ride fatigue."
+                else:
+                    note = "Rely primarily on liquid and hydrogel fuel now. Blood flow to the GI tract decreases as cardiac drift increases."
+
             hourly_schedule.append({
                 "hour": h,
-                "label": f"0–{dur_min} min",
-                "carbs_g": 0,
+                "label": f"Hour {h} ({start_min}–{end_min} min)",
+                "carbs_g": hour_carbs,
                 "fluid_ml": round(fluid_ml_per_hour * hour_fraction),
                 "sodium_mg": round(sodium_mg_per_hour * hour_fraction),
-                "fuel_items": [
-                    {"time": "Every 15 min", "item": "Sip plain water or light electrolyte drink", "carbs": 0}
-                ],
-                "coach_note": "No exogenous carbs needed. Muscle glycogen is fully adequate for short sessions."
+                "fuel_items": items,
+                "coach_note": note
             })
-            break
-
-        items = []
-        if h == 1:
-            items.append({"time": "Min 0–30", "item": "Drink mix (35g carbs in bottle)", "carbs": 35})
-            if target_carbs_per_hour >= 50:
-                items.append({"time": "Min 45", "item": "1 Energy Gel or 4 Chews", "carbs": target_carbs_per_hour - 35})
-            note = "Start fueling early at minute 15–20. The gut absorbs carbs most efficiently before core temperature and dehydration rise."
-        elif h == 2:
-            items.append({"time": "Min 15", "item": "Solid bite (Stroopwafel or Rice Cake)", "carbs": 25})
-            items.append({"time": "Min 40", "item": "1 Energy Gel + electrolyte sip", "carbs": 30})
-            if target_carbs_per_hour >= 70:
-                items.append({"time": "Throughout", "item": "Sip high-carb drink mix in second bottle", "carbs": target_carbs_per_hour - 55})
-            note = "Steady carbohydrate flow prevents the catastrophic liver glycogen depletion that causes mid-ride bonking."
-        elif h == 3:
-            items.append({"time": "Min 20", "item": "1 Energy Gel with caffeine (25–50mg)", "carbs": 25})
-            items.append({"time": "Min 45", "item": "Energy Chews (3–4 pieces) + water", "carbs": 25})
-            if target_carbs_per_hour >= 65:
-                items.append({"time": "Throughout", "item": "High-electrolyte carb drink mix", "carbs": target_carbs_per_hour - 50})
-            note = "Caffeine stimulates central nervous system alertness and mobilizes free fatty acids during late-ride fatigue."
-        else: # Hour 4+
-            items.append({"time": "Min 20", "item": "1 Liquid hydrogel / isotonic gel", "carbs": 30})
-            items.append({"time": "Min 45", "item": "Chews or carb drink sip", "carbs": max(20, target_carbs_per_hour - 30)})
-            note = "Rely primarily on liquid and hydrogel fuel now. Blood flow to the GI tract decreases as cardiac drift increases."
-
-        hourly_schedule.append({
-            "hour": h,
-            "label": f"Hour {h} ({int((h-1)*60)}–{int(min(dur_min, h*60))} min)",
-            "carbs_g": hour_carbs,
-            "fluid_ml": round(fluid_ml_per_hour * hour_fraction),
-            "sodium_mg": round(sodium_mg_per_hour * hour_fraction),
-            "fuel_items": items,
-            "coach_note": note
-        })
 
     # 7. Post-Ride Recovery Protocol
     recovery_carbs_g = round(athlete_weight_kg * (0.9 if dur_min < 75 else 1.2))
@@ -232,16 +265,22 @@ def generate_fueling_plan(
     chews_or_solids = math.ceil(total_carbs_on_bike * 0.35 / 30.0) if dur_min >= 90 else 0
     drink_mix_servings = min(bottles_needed, max(1, math.ceil(total_carbs_on_bike * 0.35 / 40.0))) if total_carbs_on_bike > 0 else 0
 
+    bottle_label = "1x 750ml Cycling Water Bottle" if bottles_needed == 1 else f"{bottles_needed}x 750ml Cycling Water Bottles"
+    bottle_detail = "Filled with electrolyte carb mix" if bottles_needed == 1 else "1 with electrolyte carb mix, remaining with pure water"
     checklist = [
-        {"item": f"{bottles_needed}x 750ml Cycling Water Bottles", "detail": f"1 with electrolyte carb mix, 1 with pure water", "icon": "🍼"},
-        {"item": f"{gels_needed}x Energy Gels (~25g carbs ea)", "detail": "Include 1 with caffeine for the second half of the ride", "icon": "⚡"},
+        {"item": bottle_label, "detail": bottle_detail, "icon": "🍼"},
     ]
+    if gels_needed > 0:
+        gel_label = "1x Energy Gel (~25g carbs)" if gels_needed == 1 else f"{gels_needed}x Energy Gels (~25g carbs ea)"
+        gel_detail = "Carry in pocket for mid-ride boost" if gels_needed == 1 else "Include 1 with caffeine for the second half of the ride"
+        checklist.append({"item": gel_label, "detail": gel_detail, "icon": "⚡"})
     if chews_or_solids > 0:
         checklist.append({"item": f"{chews_or_solids}x Solid Fuel Pack (Chews / Stroopwafel)", "detail": "Easy to digest on flat or gentle gradient sections", "icon": "🧇"})
     if drink_mix_servings > 0:
-        checklist.append({"item": f"{drink_mix_servings}x Scoop High-Carb Drink Mix", "detail": "Dissolved in main bottle before rolling out", "icon": "🧪"})
-    if sodium_mg_per_hour >= 650 or temp_f >= 80:
-        checklist.append({"item": "2x Electrolyte Salt Capsules", "detail": "Carried in pocket to prevent cramping in warm/humid weather", "icon": "🧂"})
+        scoop_label = "1x Scoop High-Carb Drink Mix" if drink_mix_servings == 1 else f"{drink_mix_servings}x Scoops High-Carb Drink Mix"
+        checklist.append({"item": scoop_label, "detail": "Dissolved in main bottle before rolling out", "icon": "🧪"})
+    if is_outdoor and ((temp_f >= 82 and humidity_pct >= 60) or temp_f >= 88):
+        checklist.append({"item": "2x Electrolyte Salt Capsules", "detail": "Carried in pocket to prevent cramping in very hot/humid weather", "icon": "🧂"})
 
     return {
         "success": True,

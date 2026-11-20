@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.13",
-        "release_name": "Plain-Text W' Formatting & Anaerobic Battery Context",
+        "version": "2.17.14",
+        "release_name": "Fueling Timeline & Packing Checklist Cleanup",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.14",
+                "date": "2026-11-20",
+                "title": "Fueling Timeline & Packing Checklist Cleanup",
+                "items": [
+                    "Consistent Ride-Clock Fueling Timeline: Folded <=15m tails into the previous hour, replaced relative Min 15/Min 40 timestamps with actual ride-clock minutes, and ensured item carbs sum to each hour's target.",
+                    "Weather-Accurate Packing Checklist: Restricted Electrolyte Salt Capsules to very hot & humid outdoor rides (>=82°F & >=60% humidity, or >=88°F) and fixed singular/plural bottle & gel labels."
+                ]
+            },
             {
                 "version": "v2.17.13",
                 "date": "2026-11-20",
