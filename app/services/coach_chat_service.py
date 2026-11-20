@@ -214,7 +214,7 @@ def compile_athlete_context() -> Dict[str, Any]:
 
 def build_system_prompt(snapshot: Dict[str, Any], memory: Optional[Dict[str, Any]] = None) -> str:
     """Builds the conversational sports-science system instruction for Gemini."""
-    snapshot_json = json.dumps(snapshot, indent=2)
+    snapshot_json = json.dumps(snapshot, separators=(",", ":"))
     return (
         "You are PowerSync AI Coach, a world-class cycling coach and sports physiologist. "
         "You speak directly, naturally, and warmly with your athlete Adam—just like an elite, friendly personal coach messaging with them.\n\n"
@@ -741,7 +741,7 @@ def clean_model_output(text: str) -> str:
             cleaned = "\n".join(lines).strip()
     return cleaned.strip()
 
-_CACHED_WORKING_MODEL: Optional[Tuple[str, str]] = ("v1beta", "gemini-3.8-flash")
+_CACHED_WORKING_MODEL: Optional[Tuple[str, str]] = ("v1beta", "gemini-2.5-flash")
 _LAST_GEMINI_ERROR_BY_USER: Dict[str, str] = {}
 
 def get_last_gemini_error(user_id: Optional[str] = None) -> str:
@@ -767,11 +767,10 @@ def call_gemini_api(
     _LAST_GEMINI_ERROR_BY_USER.pop(uid, None)
 
     models_to_try = [
-        ("v1beta", "gemini-3.8-flash"),
-        ("v1beta", "gemini-flash-latest"),
-        ("v1beta", "gemini-3.1-pro-preview"),
+        ("v1beta", "gemini-2.5-flash"),
         ("v1beta", "gemini-3-flash-preview"),
-        ("v1beta", "gemini-3.5-flash-lite"),
+        ("v1beta", "gemini-flash-latest"),
+        ("v1beta", "gemini-2.5-flash-lite"),
     ]
 
     if _CACHED_WORKING_MODEL and _CACHED_WORKING_MODEL in models_to_try:
@@ -787,9 +786,11 @@ def call_gemini_api(
         text = (msg.get("text") or msg.get("content") or "").strip()
         role = "user" if msg.get("role") in ["user", "athlete"] else "model"
         if text and text != user_message:
+            if len(text) > 1200:
+                text = text[:1197] + "..."
             clean_history.append({"role": role, "text": text})
 
-    for msg in clean_history[-14:]:
+    for msg in clean_history[-10:]:
         role = msg["role"]
         text = msg["text"]
         if contents and contents[-1]["role"] == role:
@@ -805,13 +806,13 @@ def call_gemini_api(
 
     headers = {"Content-Type": "application/json"}
     tools_config = [{"functionDeclarations": COACH_TOOL_DECLARATIONS}]
-    deadline = time.monotonic() + 40.0
+    deadline = time.monotonic() + 38.0
     model_errors: List[str] = []
 
     for api_ver, model in models_to_try:
         remaining = deadline - time.monotonic()
         if remaining <= 4.0:
-            model_errors.append("deadline exceeded (40s)")
+            model_errors.append("deadline exceeded (38s)")
             print("Gemini API deadline reached; returning to fallback.")
             break
 
@@ -822,11 +823,12 @@ def call_gemini_api(
 
         gen_config: Dict[str, Any] = {
             "temperature": 0.7,
-            "maxOutputTokens": 8192
+            "maxOutputTokens": 2048
         }
-        # Gemini 3 models default to high thinking which can exceed 20s per turn;
-        # use 'low' thinking for fast conversational & tool-calling latency.
-        if model in ("gemini-3.8-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite"):
+        # Disable/minimize hidden thinking tokens so Flash responds in 2-5s instead of 20s+
+        if model in ("gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"):
+            gen_config["thinkingConfig"] = {"thinkingBudget": 0}
+        elif model in ("gemini-3-flash-preview", "gemini-3.1-flash-lite"):
             gen_config["thinkingConfig"] = {"thinkingLevel": "low"}
 
         try:
@@ -845,8 +847,12 @@ def call_gemini_api(
                 if not is_final_turn:
                     payload["tools"] = tools_config
 
-                req_timeout = min(14.0, max(4.0, remaining))
+                req_timeout = min(15.0, max(4.0, remaining))
                 res = requests.post(url, headers=headers, json=payload, timeout=req_timeout)
+                if res.status_code == 400 and "thinkingConfig" in gen_config:
+                    gen_config.pop("thinkingConfig", None)
+                    payload["generationConfig"] = gen_config
+                    res = requests.post(url, headers=headers, json=payload, timeout=req_timeout)
                 if res.status_code != 200:
                     err_snippet = res.text[:140].replace("\n", " ")
                     try:
@@ -1303,7 +1309,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         system_prompt = build_system_prompt(snapshot, memory=conversation_memory)
         gemini_reply, executed_tools = call_gemini_api(api_key, system_prompt, effective_history, user_message, user_id=uid)
         if gemini_reply:
-            model_used = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-3.8-flash"
+            model_used = _CACHED_WORKING_MODEL[1] if _CACHED_WORKING_MODEL else "gemini-2.5-flash"
             clean_reply, proposed_action = extract_action_from_response(gemini_reply)
             if not proposed_action:
                 has_action_request = any(k in user_message.lower() for k in [

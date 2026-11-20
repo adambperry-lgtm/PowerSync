@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.11",
-        "release_name": "Duration Fallback & Gemini Timeout Resilience",
+        "version": "2.17.12",
+        "release_name": "Gemini 2.5 Flash Latency & Payload Tuning",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -156,10 +156,19 @@ def version_info():
             "wyze": "Wyze Scale Cloud API (Pluto & Classic Scale)",
             "apple_health": "Auto-Export Webhook (Health Auto Export / Shortcuts) & Manual Entry",
             "zwift": "Intervals.icu Cloud Bridge",
-            "ai_coach":"Google Gemini 3.8 Flash (Paid Tier • Tool Calling)",
+            "ai_coach":"Google Gemini 2.5 Flash (Zero-Thinking Fast Mode • Tool Calling)",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.12",
+                "date": "2026-11-20",
+                "title": "Gemini 2.5 Flash Latency & Payload Tuning",
+                "items": [
+                    "Primary Model & Zero-Thinking Fast Mode: Switched primary Coach Chat model to gemini-2.5-flash with thinkingBudget: 0 (and low thinkingLevel on Gemini 3 previews) to eliminate 20s+ ReadTimeouts.",
+                    "Leaner Prompt Payload: Compacted athlete snapshot JSON, capped history to 10 turns (1,200 chars/turn), and set maxOutputTokens to 2048 for 2–5s responses."
+                ]
+            },
             {
                 "version": "v2.17.11",
                 "date": "2026-11-20",

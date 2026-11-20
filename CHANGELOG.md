@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.12] - 2026-11-20
+### Changed
+- **Gemini Latency & Model Tuning**:
+  - Switched primary Coach Chat model in [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) and [`app/routers/chat.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/chat.py) to **`gemini-2.5-flash`** (with `gemini-3-flash-preview`, `gemini-flash-latest`, and `gemini-2.5-flash-lite` fallbacks), eliminating cold-start `ReadTimeout` stalls on `gemini-3.8-flash`.
+  - Configured `thinkingConfig: {"thinkingBudget": 0}` on Gemini 2.5 / `gemini-flash-latest` models (with automatic HTTP 400 fallback) and `thinkingLevel: "low"` on Gemini 3 preview models.
+  - Compacted athlete snapshot JSON, capped chat history window to 10 turns (1,200 chars/turn), and tuned `maxOutputTokens` to `2048` for fast 2–5s responses.
+
 ## [2.17.11] - 2026-11-20
 ### Fixed
 - **Longer Duration Fallback & Gemini Timeout Resilience**:
