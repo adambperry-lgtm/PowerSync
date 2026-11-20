@@ -427,7 +427,10 @@ def get_archived_outdoor_routes(
     text query, duration range, and distance range.
     """
     import ast
+    from app.database import get_setting
     from app.services.outdoor_coach import decode_polyline, format_relative_date, generate_svg_path, sample_coordinates
+    from app.services.ride_history_service import _is_indoor_ride
+    from app.services.strain_model_service import is_cycling_sport
 
     uid = user_id or get_current_user_id()
     if uid == "usr_guest":
@@ -440,13 +443,12 @@ def get_archived_outdoor_routes(
     cursor = conn.cursor()
     cursor.execute(
         """
-        SELECT id, name, sport_type, start_date, moving_time_sec, distance_meters,
+        SELECT id, name, sport_type, start_date, moving_time_sec, elapsed_time_sec, distance_meters,
                total_elevation_gain, average_watts, weighted_average_watts,
                average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
         FROM strava_activities
         WHERE user_id = ?
-          AND sport_type IN ('Ride', 'MountainBikeRide', 'GravelRide', 'EBikeRide', 'OutdoorRide')
-          AND moving_time_sec >= 600
+          AND COALESCE(moving_time_sec, elapsed_time_sec, 0) >= 600
         ORDER BY start_date DESC
         """,
         (uid,),
@@ -454,10 +456,55 @@ def get_archived_outdoor_routes(
     rows = cursor.fetchall()
     conn.close()
 
+    if not rows and get_setting("strava_tokens", None, user_id=uid):
+        try:
+            from app.services.strava_service import fetch_recent_strava_activities
+            fetch_recent_strava_activities(limit=50, user_id=uid)
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                """
+                SELECT id, name, sport_type, start_date, moving_time_sec, elapsed_time_sec, distance_meters,
+                       total_elevation_gain, average_watts, weighted_average_watts,
+                       average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
+                FROM strava_activities
+                WHERE user_id = ?
+                  AND COALESCE(moving_time_sec, elapsed_time_sec, 0) >= 600
+                ORDER BY start_date DESC
+                """,
+                (uid,),
+            )
+            rows = cursor.fetchall()
+            conn.close()
+        except Exception:
+            pass
+
     results: List[Dict[str, Any]] = []
     for r in rows:
         d = dict(r)
-        dur_sec = int(d.get("moving_time_sec") or 0)
+        sport = str(d.get("sport_type") or "Ride")
+        if not is_cycling_sport(sport):
+            continue
+
+        title = d.get("name") or "Outdoor Ride"
+        raw = d.get("raw_json")
+        raw_d: Dict[str, Any] = {}
+        if raw:
+            parsed = None
+            try:
+                parsed = json.loads(raw)
+            except Exception:
+                try:
+                    parsed = ast.literal_eval(raw)
+                except Exception:
+                    parsed = None
+            if isinstance(parsed, dict):
+                raw_d = parsed
+
+        if _is_indoor_ride(sport, raw_d, title):
+            continue
+
+        dur_sec = int(d.get("moving_time_sec") or d.get("elapsed_time_sec") or 0)
         dur_min = max(1, round(dur_sec / 60.0))
         dist_m = float(d.get("distance_meters") or 0.0)
         dist_km = round(dist_m / 1000.0, 1)
@@ -474,8 +521,6 @@ def get_archived_outdoor_routes(
         if max_distance_mi is not None and dist_mi > max_distance_mi:
             continue
 
-        title = d.get("name") or "Outdoor Ride"
-        sport = d.get("sport_type") or "Ride"
         date_str = str(d.get("start_date") or "")[:10]
 
         if q:
@@ -483,19 +528,7 @@ def get_archived_outdoor_routes(
             if q not in haystack:
                 continue
 
-        raw = d.get("raw_json")
-        poly = ""
-        if raw:
-            raw_d = None
-            try:
-                raw_d = json.loads(raw)
-            except Exception:
-                try:
-                    raw_d = ast.literal_eval(raw)
-                except Exception:
-                    raw_d = None
-            if isinstance(raw_d, dict):
-                poly = raw_d.get("map", {}).get("summary_polyline") or ""
+        poly = ((raw_d.get("map") or {}).get("summary_polyline") or "").strip()
 
         pts = decode_polyline(poly)
         svg_path, start_xy, end_xy = generate_svg_path(pts, 380, 160, padding=14) if pts else ("", None, None)

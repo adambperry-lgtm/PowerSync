@@ -10383,6 +10383,9 @@ function setArchiveMode(mode) {
   if (isOutdoor) {
     if (editorIcon) editorIcon.textContent = "🗺️";
     if (editorHeading) editorHeading.textContent = "Route Inspector";
+    if (archiveState.outdoorRoutes.length === 0) {
+      loadWorkoutArchive();
+    }
     if (archiveState.selectedOutdoorRoute) {
       openOutdoorRouteInspector(archiveState.selectedOutdoorRoute);
     } else if (archiveState.outdoorRoutes.length > 0) {

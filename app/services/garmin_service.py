@@ -269,7 +269,7 @@ def fetch_activity_gpx_data(activity_id: str, user_id: Optional[str] = None) -> 
                 except Exception:
                     raw_d = None
             if isinstance(raw_d, dict):
-                poly = raw_d.get("map", {}).get("summary_polyline") or ""
+                poly = (raw_d.get("map") or {}).get("summary_polyline") or ""
         coords = decode_polyline(poly)
         elevations = None
 

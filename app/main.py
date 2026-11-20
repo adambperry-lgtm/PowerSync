@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.18.1",
-        "release_name": "Outdoor Recommendation Duration Inheritance",
+        "version": "2.18.2",
+        "release_name": "Outdoor Routes Archive Null-Map Fix",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -161,6 +161,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.18.2",
+                "date": "2026-11-20",
+                "title": "Outdoor Routes Archive Null-Map Fix",
+                "items": [
+                    "Outdoor Routes Display Fix: Fixed a crash when Strava activities have map: null in raw_json, aligned outdoor cycling detection with Ride History, and added automatic Strava fetch fallback."
+                ]
+            },
             {
                 "version": "v2.18.1",
                 "date": "2026-11-20",

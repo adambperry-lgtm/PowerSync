@@ -122,7 +122,7 @@ def get_candidate_outdoor_rides(limit: int = 300) -> List[Dict[str, Any]]:
                     except Exception:
                         raw_d = None
                 if isinstance(raw_d, dict):
-                    poly = raw_d.get("map", {}).get("summary_polyline")
+                    poly = (raw_d.get("map") or {}).get("summary_polyline")
             r_dict["summary_polyline"] = poly
             rides.append(r_dict)
 

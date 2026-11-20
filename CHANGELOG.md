@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.18.2] - 2026-11-20
+### Fixed
+- **Outdoor Routes Archive `map: null` Crash & Auto-Sync Fallback**:
+  - Fixed `AttributeError` in [`get_archived_outdoor_routes()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/workout_archive_service.py), [`get_candidate_outdoor_rides()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/outdoor_coach.py), and [`fetch_activity_gpx_data()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/garmin_service.py) when any Strava activity in `strava_activities` has `"map": null` in `raw_json` (which previously caused `/api/workouts/archive` to fail and show `0 OF 0 OUTDOOR ROUTES`).
+  - Aligned outdoor route detection with [`is_cycling_sport()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strain_model_service.py) / [`_is_indoor_ride()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/ride_history_service.py), added automatic Strava activity fetch if `strava_activities` is empty for the user, and triggered [`loadWorkoutArchive()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) when toggling to **Outdoor Routes** if empty.
+
 ## [2.18.1] - 2026-11-20
 ### Fixed
 - **Outdoor Recommendation Inherits Today's Scheduled / Active Workout Duration**:

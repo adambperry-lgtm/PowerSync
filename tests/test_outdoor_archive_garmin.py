@@ -212,6 +212,36 @@ class TestOutdoorArchiveAndGarmin(unittest.TestCase):
         finally:
             reset_current_user_context(tok)
 
+    def test_map_null_and_virtual_ride_handling(self):
+        conn = get_db_connection()
+        c = conn.cursor()
+        # Insert a ride with map: null and a VirtualRide
+        c.execute(
+            """
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec, distance_meters,
+                total_elevation_gain, raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (self.user_a, "900004", "Outdoor No Map", "Ride", "2026-11-16T08:00:00", 3600, 25000.0, 200.0, json.dumps({"map": None, "start_latlng": [40.0, -74.0]})),
+        )
+        c.execute(
+            """
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec, distance_meters,
+                total_elevation_gain, raw_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (self.user_a, "900005", "Zwift - Watopia", "VirtualRide", "2026-11-17T08:00:00", 3600, 30000.0, 300.0, json.dumps({"map": None, "trainer": True})),
+        )
+        conn.commit()
+        conn.close()
+
+        routes = get_archived_outdoor_routes(user_id=self.user_a, ftp=250)
+        ids = {r["id"] for r in routes}
+        self.assertIn("900004", ids)
+        self.assertNotIn("900005", ids)
+
 
 if __name__ == "__main__":
     unittest.main()
