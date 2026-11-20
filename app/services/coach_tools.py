@@ -21,7 +21,7 @@ COACH_TOOL_DECLARATIONS = [
     {
         "name": "get_strava_activity_details",
         "description": (
-            "Retrieves granular telemetry, interval lap splits (avg watts, HR, duration, cadence), "
+            "Retrieves detailed ride data, interval lap splits (avg watts, HR, duration, cadence), "
             "segment efforts, 3-tier XSS strain (Low, High, Peak), and anaerobic W' battery depletion "
             "for a specific Strava workout. Use this whenever the athlete asks about their latest ride, "
             "yesterday's ride, how their intervals went, pacing stability, or wattage breakdown."
@@ -43,7 +43,7 @@ COACH_TOOL_DECLARATIONS = [
     {
         "name": "get_strava_activity_streams_and_power_curve",
         "description": (
-            "Analyzes second-by-second telemetry streams (watts, heart rate, cadence) for a Strava activity "
+            "Analyzes second-by-second ride data streams (watts, heart rate, cadence) for a Strava activity "
             "to calculate peak power intervals (best 5s sprint, 1m anaerobic, 5m VO2 max, 20m threshold), "
             "interval fatigue index (decay from 1st interval to final interval), and aerobic decoupling (cardiac drift)."
         ),
@@ -458,7 +458,7 @@ def tool_get_strava_activity_details(activity_id: str = "latest", user_id: Optio
         "laps": laps_formatted,
         "has_laps": len(laps_formatted) > 0,
         "segment_efforts": segments_formatted,
-        "tool_summary": f"Analyzed telemetry & {len(laps_formatted)} laps for '{act_data.get('name')}' ({dur_min}m, {np_watts}W NP, {round(strain.get('total_xss', 0))} XSS)"
+        "tool_summary": f"Analyzed ride data & {len(laps_formatted)} laps for '{act_data.get('name')}' ({dur_min}m, {np_watts}W NP, {round(strain.get('total_xss', 0))} XSS)"
     }
 
 def tool_get_strava_activity_streams_and_power_curve(activity_id: str = "latest", user_id: Optional[str] = None) -> Dict[str, Any]:

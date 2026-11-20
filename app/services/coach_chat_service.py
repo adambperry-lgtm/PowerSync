@@ -218,7 +218,7 @@ def build_system_prompt(snapshot: Dict[str, Any], memory: Optional[Dict[str, Any
     return (
         "You are PowerSync AI Coach, a world-class cycling coach and sports physiologist. "
         "You speak directly, naturally, and warmly with your athlete Adam—just like an elite, friendly personal coach messaging with them.\n\n"
-        "ATHLETE'S LIVE TELEMETRY & CONTEXT SNAPSHOT:\n"
+        "ATHLETE'S LIVE TRAINING DATA & CONTEXT SNAPSHOT:\n"
         f"```json\n{snapshot_json}\n```\n\n"
         "COACHING & CONVERSATIONAL DIRECTIVES:\n"
         "1. DIRECTLY ANSWER THE QUESTION FIRST: Always answer whatever specific question, dilemma, or idea Adam brings up immediately and clearly. Never give evasive, canned, or generic template speeches.\n"
@@ -282,10 +282,10 @@ def build_system_prompt(snapshot: Dict[str, Any], memory: Optional[Dict[str, Any
         "  * Always calibrate interval intensity and volume to his active target plan and current recovery state.\n"
         "- PREFERENCES MEMORY & LEARNING:\n"
         "  * If Adam mentions a new preference, constraint, or rule in chat (e.g., 'Remember that I prefer...', 'From now on...', 'I like/hate...'), confirm warmly that you have remembered and permanently saved it to his PowerSync coaching engine.\n"
-        "10. STRAVA & WHOOP FUNCTION CALLING TOOLS (LIVE TELEMETRY ON DEMAND):\n"
-        "You have direct access to function calling tools to query granular Strava and Whoop telemetry:\n"
+        "10. STRAVA & WHOOP FUNCTION CALLING TOOLS (LIVE DATA ON DEMAND):\n"
+        "You have direct access to function calling tools to query detailed Strava and Whoop data:\n"
         "- `get_strava_activity_details(activity_id)`: Fetches full interval splits (avg watts, HR, duration, cadence), segment PRs, 3-tier XSS strain, and W' battery depletion for any ride ('latest', 'yesterday', or specific ID). Proactively call this whenever Adam asks about a recent workout, how his intervals went, his pacing, or cadence.\n"
-        "- `get_strava_activity_streams_and_power_curve(activity_id)`: Calculates his peak power profile (5s, 1m, 5m, 20m watts), interval power decay, and aerobic decoupling (cardiac drift) from second-by-second telemetry.\n"
+        "- `get_strava_activity_streams_and_power_curve(activity_id)`: Calculates his peak power profile (5s, 1m, 5m, 20m watts), interval power decay, and aerobic decoupling (cardiac drift) from second-by-second ride data.\n"
         "- `search_strava_activities(query, sport_type, days_back)`: Searches his historical rides by keywords or sport.\n"
         "- `get_whoop_biometrics_timeline(days)`: Retrieves multi-day Whoop recovery, HRV, and sleep trends.\n"
         "- `search_workout_archive_and_library(query, zone, source, duration_min)`: Searches Adam's saved/prior Workout Archive and the 19-workout structured Coach Library.\n"
@@ -1104,7 +1104,7 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
     if any(k in msg for k in ["hi", "hello", "hey", "how are you", "what's up", "who are you", "good morning", "good evening"]):
         return (
             f"Hey Adam! I'm locked in and ready to coach. "
-            f"Looking at your live telemetry, you're at **{rec}% Whoop recovery** ({rec_zone}) with an HRV of **{hrv} ms** today. "
+            f"Looking at your latest numbers, you're at **{rec}% Whoop recovery** ({rec_zone}) with an HRV of **{hrv} ms** today. "
             f"We've got **{prescribed}** ({prescribed_dur} mins, ~{tss} TSS) on deck. "
             f"How are the legs feeling today—ready to roll, or do you want to adjust the plan?"
         )
@@ -1401,7 +1401,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     if api_key:
         err_detail = get_last_gemini_error(uid)
         reason_str = f" ({err_detail})" if err_detail else ""
-        fallback_reply = f"*(Gemini API unavailable{reason_str} — showing offline telemetry summary)*\n\n" + fallback_reply
+        fallback_reply = f"*(Gemini API unavailable{reason_str} — showing offline training summary)*\n\n" + fallback_reply
     if learned_notice:
         fallback_reply = learned_notice + fallback_reply
     proposed_action = build_sports_science_action(user_message, snapshot)
@@ -1456,7 +1456,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     if any(k in user_message.lower() for k in ["lap", "split", "power numbers", "breakdown", "telemetry"]):
         fallback_tools.append({
             "name": "get_strava_activity_details",
-            "summary": "Retrieved Strava activity lap splits & power telemetry"
+            "summary": "Retrieved Strava activity lap splits & power data"
         })
 
     try:

@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.9",
-        "release_name": "Whoop Metrics Column Key Hotfix",
+        "version": "2.17.10",
+        "release_name": "Plain-English Coaching Copy",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.10",
+                "date": "2026-11-20",
+                "title": "Plain-English Coaching Copy",
+                "items": [
+                    "Plain-English UI & Agent Copy: Replaced 'telemetry' with natural, plain-English phrasing ('training data', 'ride data', 'Ride Details', 'Reviewing your training data...') across index.html, app.js (v=148), coach_chat_service.py, and coach_tools.py."
+                ]
+            },
             {
                 "version": "v2.17.9",
                 "date": "2026-11-20",

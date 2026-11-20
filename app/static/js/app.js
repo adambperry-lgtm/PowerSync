@@ -6630,11 +6630,11 @@ async function checkCoachGeminiStatus() {
       const subtitle = document.getElementById("coachChatSubtitle");
       if (subtitle) {
         if (data.gemini_configured) {
-          subtitle.textContent = "Google Gemini • Live Telemetry";
-          subtitle.title = `Model: ${data.gemini_model || "Gemini Flash"} • Real-time telemetry connected`;
+          subtitle.textContent = "Google Gemini • Live Training Data";
+          subtitle.title = `Model: ${data.gemini_model || "Gemini Flash"} • Real-time training data connected`;
           subtitle.style.color = "var(--accent-cyan)";
         } else {
-          subtitle.textContent = "Sports-Science Telemetry • Built-in Rules";
+          subtitle.textContent = "Sports-Science Engine • Built-in Rules";
           subtitle.title = "Add Google Gemini API key in Settings for AI coaching";
           subtitle.style.color = "var(--text-muted)";
         }
@@ -6858,7 +6858,7 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
       toolsHtml = `
         <div class="chat-tools-container" style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.75rem;">
           ${executedTools.map(t => {
-            const summary = t.summary || 'Inspected Strava telemetry';
+            const summary = t.summary || 'Checked Strava ride data';
             return `
               <div class="chat-tool-pill" title="Gemini Function Call: ${t.name || 'tool'}">
                 <span class="chat-tool-icon">⚡</span>
@@ -7074,7 +7074,7 @@ function showCoachTypingIndicator() {
         <span class="typing-dot"></span>
         <span class="typing-dot"></span>
       </div>
-      <span class="chat-typing-label" style="display:inline-block;white-space:nowrap;font-size:0.78rem;font-weight:500;">Analyzing telemetry...</span>
+      <span class="chat-typing-label" style="display:inline-block;white-space:nowrap;font-size:0.78rem;font-weight:500;">Reviewing your training data...</span>
     </div>
   `;
 
@@ -7183,13 +7183,13 @@ async function sendCoachMessage(text) {
           subtitle.title = `Model: ${data.model || "Gemini 3 Flash"} • Live Strava & Whoop function calling enabled`;
           subtitle.style.color = "var(--accent-cyan)";
         } else {
-          subtitle.textContent = "Sports-Science Telemetry • Built-in Rules";
+          subtitle.textContent = "Sports-Science Engine • Built-in Rules";
           subtitle.title = "Built-in sports science rules active";
           subtitle.style.color = "var(--text-muted)";
         }
       }
     } else {
-      appendCoachChatMessage("coach", "⚠️ I encountered an issue analyzing your telemetry. Please try again.");
+      appendCoachChatMessage("coach", "⚠️ I encountered an issue reviewing your training data. Please try again.");
     }
   } catch (err) {
     if (chatTimeoutId) clearTimeout(chatTimeoutId);
@@ -11469,7 +11469,7 @@ async function openRideInspectorModal(rideId) {
 
   modal.classList.add("open");
   modal.style.display = "flex";
-  if (titleEl) titleEl.textContent = "Loading ride telemetry...";
+  if (titleEl) titleEl.textContent = "Loading ride data...";
   if (subEl) subEl.textContent = "";
   bodyEl.innerHTML = `<div style="padding:1.5rem;text-align:center;color:var(--text-muted);">Loading...</div>`;
 

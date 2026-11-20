@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="PowerSync">
   <meta name="theme-color" content="#FFFFFF">
-  <title>PowerSync | Personalized AI Cycling Coach &amp; Telemetry</title>
+  <title>PowerSync | Personalized AI Cycling Coach &amp; Training Data</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -201,7 +201,7 @@
         Sign In to PowerSync
       </h2>
       <p style="font-size:0.88rem;color:var(--text-muted);margin:0 0 1.75rem 0;line-height:1.5;">
-        Athlete biometric telemetry, Strava training load, and AI coaching directives are strictly private and only accessible when signed in.
+        Athlete recovery stats, Strava training load, and AI coaching directives are strictly private and only accessible when signed in.
       </p>
 
       <!-- Immediate Email Sign-In -->
@@ -2193,7 +2193,7 @@
         <div class="card-header-left">
           <h2 style="font-size:1.05rem;">🚴 Historical Ride Log</h2>
           <div class="card-subtitle" style="font-size:0.76rem;color:var(--text-muted);">
-            Click any ride to inspect telemetry, route map, Whoop context &amp; similar rides
+            Click any ride to inspect ride data, route map, Whoop context &amp; similar rides
           </div>
         </div>
         <div class="card-header-actions" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center;">
@@ -2239,7 +2239,7 @@
     <div class="modal-dialog history-inspector-modal" style="max-width:720px;">
       <div class="modal-header">
         <div>
-          <h3 id="rideInspectorTitle" style="margin:0;font-size:1.15rem;">Ride Telemetry</h3>
+          <h3 id="rideInspectorTitle" style="margin:0;font-size:1.15rem;">Ride Details</h3>
           <div id="rideInspectorSubtitle" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">--</div>
         </div>
         <button type="button" class="modal-close" id="btnCloseRideInspector" aria-label="Close" title="Close">&times;</button>
@@ -2576,7 +2576,7 @@
             </div>
           </div>
           <p class="form-hint" style="margin-top:0.35rem;color:var(--text-secondary);font-size:0.8rem;">
-            Syncs historical training load, ride GPS tracks, weighted power telemetry, and outdoor route matching.
+            Syncs historical training load, ride GPS tracks, weighted power data, and outdoor route matching.
           </p>
           <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.75rem;">
             <a href="/api/auth/strava/login" id="btnConnectStravaOAuth" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#FF5E00;color:#FF5E00;text-decoration:none;font-weight:600;">
@@ -3404,7 +3404,7 @@
               <span id="txtCoachGeminiStatus">Connected</span>
             </span>
           </div>
-          <div class="coach-chat-subtitle" id="coachChatSubtitle">Directeur Sportive • Live Telemetry</div>
+          <div class="coach-chat-subtitle" id="coachChatSubtitle">Directeur Sportive • Live Training Data</div>
         </div>
       </div>
       <div class="coach-chat-header-actions">
@@ -3464,6 +3464,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=147"></script>
+  <script src="/static/js/app.js?v=148"></script>
 </body>
 </html>

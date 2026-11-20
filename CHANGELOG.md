@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.10] - 2026-11-20
+### Changed
+- **Plain-English Copy Throughout UI & AI Coach**:
+  - Replaced `"telemetry"` with plain-English phrasing (`"training data"`, `"ride data"`, `"Ride Details"`, `"latest numbers"`, `"Reviewing your training data..."`) across [`app/static/index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`app/static/js/app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=148`), [`app/services/coach_chat_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py), and [`app/services/coach_tools.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_tools.py).
+
 ## [2.17.9] - 2026-11-20
 ### Fixed
 - **`whoop_metrics` Column Name Fix in Plan Clear & Travel-Week Clear**:
