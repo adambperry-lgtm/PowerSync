@@ -6821,6 +6821,10 @@ function scrollCoachChatToBottom() {
 function formatCoachMarkdown(text) {
   if (!text) return "";
   let html = text
+    .replace(/\$\s*W'\s*(?:_\{?bal\}?)?\s*\$/g, m => m.includes("bal") ? "W'bal" : "W'")
+    .replace(/\$\s*W_\{?bal\}?\s*\$/g, "W'bal")
+    .replace(/\$\s*P_\{?max\}?\s*\$/g, "Pmax")
+    .replace(/\$\s*(FTP|NP|IF|TSS|XSS|HRV|VO2max)\s*\$/g, "$1")
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/^### (.*$)/gim, '<h3>$1</h3>')
     .replace(/^## (.*$)/gim, '<h3>$1</h3>')

@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.13] - 2026-11-20
+### Fixed
+- **Clean Plain-Text `W'` Formatting & Anaerobic Battery Context**:
+  - Updated [`build_system_prompt()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py), [`clean_model_output()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py), and [`formatCoachMarkdown()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`app.js?v=149`) to forbid and strip raw LaTeX wrappers like `$W'$` and `$W'_{bal}$` into plain text (`W'`, `W'bal`).
+  - Clarified in the coach prompt that `w_prime_anaerobic_capacity_kj` (`20.0` kJ default) is a configured baseline setting so the coach doesn't assume an unusually large anaerobic battery on unrelated questions.
+
 ## [2.17.12] - 2026-11-20
 ### Changed
 - **Gemini Latency & Model Tuning**:

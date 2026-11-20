@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.12",
-        "release_name": "Gemini 2.5 Flash Latency & Payload Tuning",
+        "version": "2.17.13",
+        "release_name": "Plain-Text W' Formatting & Anaerobic Battery Context",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.13",
+                "date": "2026-11-20",
+                "title": "Plain-Text W' Formatting & Anaerobic Battery Context",
+                "items": [
+                    "No Raw LaTeX in Chat: Stripped $W'$, $W'_{bal}$, and similar LaTeX wrappers in both clean_model_output() and app.js (v=149) and instructed Gemini to use plain text.",
+                    "Anaerobic Battery Baseline Context: Clarified in the coach prompt that the default 20 kJ W' setting is a baseline capacity rather than an unusually large anaerobic battery."
+                ]
+            },
             {
                 "version": "v2.17.12",
                 "date": "2026-11-20",

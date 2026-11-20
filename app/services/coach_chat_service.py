@@ -226,7 +226,7 @@ def build_system_prompt(snapshot: Dict[str, Any], memory: Optional[Dict[str, Any
         "3. GROUNDED IN REAL METRICS (WITHOUT INFODUMPING): You know Adam's Whoop recovery score, HRV, today's daytime strain, FTP, recent rides, and target event. Weave these relevant numbers in naturally when they support your answer, but do NOT dump an unsolicited list of stats unless Adam explicitly asks for a metrics breakdown.\n"
         "4. ACTIONABLE & SPECIFIC: When recommending pacing, intervals, or nutrition, give exact numbers: target watts, heart rate zones, duration, or grams of carbohydrates per hour.\n"
         "5. FLEXIBLE & COLLABORATIVE: If Adam wants to ride outdoors instead of indoors, do an easy spin instead of intervals, or take a rest day, collaborate with him enthusiastically and explain how to adjust while keeping weekly goals intact.\n"
-        "6. NO CANNED INTRODUCTIONS OR DISCLAIMERS: Do not begin with 'As your AI coach' or repeat boilerplate disclaimers. Jump right into the answer.\n"
+        "6. NO CANNED INTRODUCTIONS OR DISCLAIMERS: Do not begin with 'As your AI coach' or repeat boilerplate disclaimers. Jump right into the answer. Never use LaTeX or dollar-sign math formatting (write W', W'bal, FTP, NP, TSS, XSS in plain text—never $W'$ or $W'_{bal}$).\n"
         "7. TWO-WAY WORKOUT PROPOSAL & SCHEDULING ACTION:\n"
         "Whenever Adam asks you to create, modify, design, replace, or schedule a workout or ride, OR tells you about an upcoming event or ride, append a structured JSON action proposal block at the very end of your response inside a fenced code block with identifier ```json:powersync_action\n\n"
         "There are THREE distinct action types—choose the appropriate one carefully:\n"
@@ -262,7 +262,7 @@ def build_system_prompt(snapshot: Dict[str, Any], memory: Optional[Dict[str, Any
         "```\n"
         "Only output the powersync_action block when proposing, scheduling, or clearing a specific workout or plan.\n"
         "8. 3-TIER PHYSIOLOGICAL STRAIN ENGINE (XSS & W'bal EQUIVALENT):\n"
-        "PowerSync tracks Adam's 3-parameter fitness signature (Critical Power/FTP, W' Anaerobic Work Capacity in kJ, and Peak Power P_max in Watts) and dynamically partitions training into Low (aerobic), High (glycolytic W' depletion), and Peak (neuromuscular sprint) strain alongside Skiba W'bal battery tracking. If Adam asks about training impact, XSS vs TSS, anaerobic battery depletion, or his fitness signature, reference these exact values and his current battery status.\n"
+        "PowerSync tracks Adam's 3-parameter fitness signature (Critical Power/FTP, configured W' Anaerobic Work Capacity baseline in kJ, and Peak Power P_max in Watts) and partitions training into Low (aerobic), High (glycolytic), and Peak (neuromuscular sprint) strain alongside per-ride W'bal battery tracking. Only reference W' or anaerobic battery depletion when Adam asks about anaerobic/sprint pacing, strain breakdown, or how a ride depleted his battery—never assume a default 20 kJ W' setting means he has an unusually large anaerobic battery.\n"
         "9. ATHLETE'S PERMANENT WORKOUT & SCHEDULE PREFERENCES (MANDATORY INVARIANTS):\n"
         "Adam has established strict permanent scheduling and interval training preferences that you MUST strictly respect in all advice and workout proposals:\n"
         "- WEEKDAY DURATION CONSTRAINTS:\n"
@@ -739,6 +739,11 @@ def clean_model_output(text: str) -> str:
         else:
             lines = [l for l in cleaned.splitlines() if not re.match(r'^\s*\*\s*(Input|Role|Goal|Option|Since|As a|The user):', l)]
             cleaned = "\n".join(lines).strip()
+    # Strip LaTeX dollar-sign wrappers around cycling metrics (e.g. $W'$ -> W', $W'_{bal}$ -> W'bal)
+    cleaned = re.sub(r"\$\s*W'\s*(?:_\{?bal\}?)?\s*\$", lambda m: "W'bal" if "bal" in m.group(0) else "W'", cleaned)
+    cleaned = re.sub(r"\$\s*W_\{?bal\}?\s*\$", "W'bal", cleaned)
+    cleaned = re.sub(r"\$\s*P_\{?max\}?\s*\$", "Pmax", cleaned)
+    cleaned = re.sub(r"\$\s*(FTP|NP|IF|TSS|XSS|HRV|VO2max)\s*\$", r"\1", cleaned)
     return cleaned.strip()
 
 _CACHED_WORKING_MODEL: Optional[Tuple[str, str]] = ("v1beta", "gemini-2.5-flash")
