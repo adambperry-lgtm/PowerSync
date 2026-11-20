@@ -174,5 +174,25 @@ class TestTravelRecoveryWeekClearPlan(unittest.TestCase):
         self.assertFalse(res.get("is_recovery_week"))
         self.assertFalse(get_setting("travel_recovery_week_active", False, user_id=self.user_id))
 
+    def test_longer_duration_fallback_respects_75_minutes(self):
+        snapshot = {
+            "athlete": {"ftp_watts": 250},
+            "whoop_readiness_today": {
+                "recovery_score_pct": 86,
+                "recovery_zone": "Green (Ready)",
+                "hrv_rmssd_ms": 60.0,
+                "day_strain_today": 4.0
+            },
+            "today_prescribed_workout": {
+                "title": "45-Min Aerobic Base",
+                "duration_minutes": 45,
+                "estimated_tss": 35
+            },
+            "training_load_strava": {"recent_rides": []}
+        }
+        reply = generate_sports_science_fallback_response("i'd like to go longer, 75-90 minutes today", snapshot)
+        self.assertIn("75 minutes", reply)
+        self.assertNotIn("30–45 minutes", reply)
+
 if __name__ == "__main__":
     unittest.main()

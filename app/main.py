@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.10",
-        "release_name": "Plain-English Coaching Copy",
+        "version": "2.17.11",
+        "release_name": "Duration Fallback & Gemini Timeout Resilience",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.11",
+                "date": "2026-11-20",
+                "title": "Duration Fallback & Gemini Timeout Resilience",
+                "items": [
+                    "Accurate Duration Adaptation: Updated offline coach duration adaptation to prescribe the exact requested duration (e.g. 75–90m aerobic endurance) instead of a hardcoded 30–45m response.",
+                    "Faster Gemini Fallback Chain: Enabled low thinkingLevel on gemini-3.8-flash and tightened per-model timeout to 14s so backup Gemini models are reached within the 40s budget."
+                ]
+            },
             {
                 "version": "v2.17.10",
                 "date": "2026-11-20",

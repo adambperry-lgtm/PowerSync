@@ -824,9 +824,9 @@ def call_gemini_api(
             "temperature": 0.7,
             "maxOutputTokens": 8192
         }
-        # Gemini 3 Preview / Flash-Lite default to high thinking which can exceed 20s per turn;
+        # Gemini 3 models default to high thinking which can exceed 20s per turn;
         # use 'low' thinking for fast conversational & tool-calling latency.
-        if model in ("gemini-3-flash-preview", "gemini-3.1-flash-lite"):
+        if model in ("gemini-3.8-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite"):
             gen_config["thinkingConfig"] = {"thinkingLevel": "low"}
 
         try:
@@ -845,7 +845,7 @@ def call_gemini_api(
                 if not is_final_turn:
                     payload["tools"] = tools_config
 
-                req_timeout = min(20.0, max(4.0, remaining))
+                req_timeout = min(14.0, max(4.0, remaining))
                 res = requests.post(url, headers=headers, json=payload, timeout=req_timeout)
                 if res.status_code != 200:
                     err_snippet = res.text[:140].replace("\n", " ")
@@ -1127,13 +1127,33 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
         )
 
     # 4. Modifying Duration / Shorter or Longer Ride
-    if any(k in msg for k in ["30 min", "45 min", "shorter", "short on time", "longer", "more time", "duration"]):
+    if any(k in msg for k in ["20 min", "25 min", "30 min", "35 min", "40 min", "45 min", "50 min", "60 min", "75 min", "90 min", "105 min", "120 min", "shorter", "short on time", "longer", "more time", "duration"]):
+        dur_match = re.search(r'\b(20|25|30|35|40|45|50|60|75|90|105|120)\s*(?:m|min|mins|minutes)?\b', msg)
+        wants_longer = any(k in msg for k in ["longer", "more time", "extend", "75", "90", "105", "120", "60"]) and not any(k in msg for k in ["shorter", "short on time"])
+        if dur_match:
+            req_dur = int(dur_match.group(1))
+        else:
+            req_dur = 75 if wants_longer else 35
+
+        if req_dur >= 60 or wants_longer:
+            main_min = max(35, req_dur - 12)
+            est_tss = round(req_dur * 0.65)
+            return (
+                f"Great call extending today's ride to **{req_dur} minutes**! With your recovery at **{rec}%**, you have plenty of headroom to build aerobic volume.\n\n"
+                f"- **Warmup**: 7-minute progressive ramp from 45% to 75% FTP ({round(ftp * 0.45)}W → {round(ftp * 0.75)}W).\n"
+                f"- **Main Set**: {main_min} minutes of steady Zone 2 aerobic endurance at **65–74% FTP ({round(ftp * 0.65)}–{round(ftp * 0.74)}W)**, keeping cadence smooth at 88–92 rpm.\n"
+                f"- **Cooldown**: 5-minute progressive spin-down from 65% to 40% FTP.\n\n"
+                f"That delivers ~**{est_tss} TSS** of high-value aerobic work without digging an unnecessary fatigue hole. Tap **Apply as Today's Workout** below to load it onto your dashboard!"
+            )
+
+        main_block_min = max(6, (req_dur - 14) // 2)
+        est_tss = round(req_dur * 0.80)
         return (
-            f"We can adapt that easily! If you only have 30–45 minutes today, quality and consistency always beat skipping the session entirely.\n\n"
-            f"- **Warmup**: 6 minutes spinning up to {round(ftp * 0.65)}W.\n"
-            f"- **Main Set**: 2 blocks of 8 minutes at Sweet Spot (**{round(ftp * 0.88)}–{round(ftp * 0.92)}W**), with 3 minutes easy spinning in between.\n"
-            f"- **Cooldown**: 5 minutes easy.\n\n"
-            f"That gives you a great training impulse (~35 TSS) in just 30 minutes without overloading your current **{rec}% recovery**."
+            f"We can adapt that easily! When you have **{req_dur} minutes** today, focused quality beats skipping the session.\n\n"
+            f"- **Warmup**: 6-minute progressive ramp up to {round(ftp * 0.75)}W.\n"
+            f"- **Main Set**: 2 blocks of {main_block_min} minutes at Sweet Spot (**{round(ftp * 0.88)}–{round(ftp * 0.92)}W**), with 3 minutes easy spinning in between.\n"
+            f"- **Cooldown**: 5-minute progressive spin-down.\n\n"
+            f"That gives you a sharp training stimulus (~**{est_tss} TSS**) in {req_dur} minutes without overloading your current **{rec}% recovery**."
         )
 
     # 5. Daily Nutrition vs Meal Questions (Dinner, Breakfast, Post-workout)

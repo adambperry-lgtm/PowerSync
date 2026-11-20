@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.11] - 2026-11-20
+### Fixed
+- **Longer Duration Fallback & Gemini Timeout Resilience**:
+  - Updated [`generate_sports_science_fallback_response()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) duration adaptation so requests like `"go longer, 75-90 minutes today"` prescribe the requested duration (`75+` min) instead of the hardcoded `30–45` minute response.
+  - Enabled `thinkingConfig: {"thinkingLevel": "low"}` on `gemini-3.8-flash` and lowered per-model timeout to `14s` in [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) so fallback models are reached well within the `40s` budget.
+
 ## [2.17.10] - 2026-11-20
 ### Changed
 - **Plain-English Copy Throughout UI & AI Coach**:
