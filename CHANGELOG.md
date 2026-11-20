@@ -3,6 +3,17 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.8] - 2026-11-20
+### Fixed
+- **Prevent False Auto-Scheduled Workouts & Mistaken Travel/Recovery Week Activation**:
+  - Tightened [`build_sports_science_action()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py), [`handle_coach_chat()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py), and [`parse_chat_schedule_directives()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/forecast_service.py) so casual questions, negations, and error/glitch reports no longer auto-schedule a 45-minute workout or activate `travel_recovery_week_active`.
+  - Updated [`execute_clear_plan()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/plan_service.py) to respect the `is_recovery_week` flag instead of unconditionally setting `travel_recovery_week_active = True`.
+- **Clear Travel & Recovery Week Tag Support**:
+  - Added [`execute_clear_travel_recovery_week()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/plan_service.py), the `clear_travel_recovery_week` Gemini tool in [`app/services/coach_tools.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_tools.py), and chat/action routing in [`app/routers/chat.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/chat.py) so athletes can clear a mistaken Travel & Recovery Week tag via chat and immediately restore normal daily workouts and 3-day forecasts.
+- **Coach Chat Timeout & HTTP Error Diagnostics**:
+  - Reduced [`call_gemini_api()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) overall deadline to `40s` (`20s` per request) and moved fallback conversation memory distillation into a background daemon thread so `/api/chat` never hits Railway's 60s proxy timeout.
+  - Updated [`app/static/js/app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=147`) to refresh the dashboard on `cleared_travel_week` and surface actual HTTP error details instead of the misleading `"Connection error contacting coach engine"` message.
+
 ## [2.17.7] - 2026-11-19
 ### Changed
 - **Gemini `gemini-3.8-flash` Paid-Tier Upgrade**:

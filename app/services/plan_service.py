@@ -538,11 +538,15 @@ def execute_clear_plan(user_id: Optional[str] = None, is_recovery_week: bool = T
     clear_athlete_planned_session(user_id=uid)
     clear_active_spiderweb_goal(user_id=uid)
 
-    # 2. Persist travel / recovery week state
-    set_setting("travel_recovery_week_active", True, user_id=uid)
-    set_setting("travel_recovery_week_start", today_iso, user_id=uid)
-    if notes:
-        set_setting("travel_recovery_week_notes", notes, user_id=uid)
+    # 2. Persist travel / recovery week state only when requested
+    set_setting("travel_recovery_week_active", bool(is_recovery_week), user_id=uid)
+    if is_recovery_week:
+        set_setting("travel_recovery_week_start", today_iso, user_id=uid)
+        if notes:
+            set_setting("travel_recovery_week_notes", notes, user_id=uid)
+    else:
+        set_setting("travel_recovery_week_start", "", user_id=uid)
+        set_setting("travel_recovery_week_notes", "", user_id=uid)
 
     # 3. Retrieve Whoop recovery baseline & build rest/recovery workout bundle
     conn = get_db_connection()
@@ -607,9 +611,119 @@ def execute_clear_plan(user_id: Optional[str] = None, is_recovery_week: bool = T
     return {
         "success": True,
         "action_type": "clear_upcoming_plan",
-        "is_recovery_week": True,
+        "is_recovery_week": bool(is_recovery_week),
         "plan_cleared": True,
-        "message": "Training plan cleared! Activated Rest & Travel Recovery Week with light cross-training and mobility.",
+        "message": (
+            "Training plan cleared! Activated Rest & Travel Recovery Week with light cross-training and mobility."
+            if is_recovery_week
+            else "Training plan cleared and normal training readiness restored."
+        ),
+        "active_workout": primary_w,
+        "workout": primary_w,
+        "options": all_opts,
+        "forecast": refreshed_outlook,
+        "program": updated_program
+    }
+
+
+def execute_clear_travel_recovery_week(user_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Deactivates the Travel & Recovery Week flag and restores normal daily workout,
+    3-day forecast, and macrocycle program phase.
+    """
+    from app.database import (
+        get_current_user_id,
+        get_athlete_date,
+        set_setting,
+        get_setting,
+        get_db_connection
+    )
+    from app.services.forecast_service import save_coach_forecast_plan
+    from app.services.review_coach import build_preference_aligned_outlook_days
+    from app.services.program_service import get_current_program
+    from app.services.ai_coach import build_workout_bundle
+    from app.services.preferences_service import get_day_target_config
+    from app.routers.workouts import USER_WORKOUT_CACHE, USER_OPTIONS_CACHE
+
+    uid = user_id or get_current_user_id()
+    today_dt = get_athlete_date(uid)
+
+    # 1. Clear Travel & Recovery Week flags
+    set_setting("travel_recovery_week_active", False, user_id=uid)
+    set_setting("travel_recovery_week_start", "", user_id=uid)
+    set_setting("travel_recovery_week_notes", "", user_id=uid)
+
+    # 2. Retrieve Whoop recovery baseline & athlete FTP
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("SELECT * FROM whoop_metrics WHERE user_id = ? ORDER BY date DESC LIMIT 1", (uid,))
+    whoop_row = c.fetchone()
+    conn.close()
+
+    rec_score = int(whoop_row["recovery_score"]) if whoop_row and whoop_row["recovery_score"] else 65
+    hrv_val = float(whoop_row["hrv"]) if whoop_row and whoop_row["hrv"] else 45.0
+    sleep_sc = int(whoop_row["sleep_score"]) if whoop_row and whoop_row["sleep_score"] else 75
+    try:
+        athlete_ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+    except Exception:
+        athlete_ftp = 250
+
+    day_cfg = get_day_target_config(today_dt)
+    if day_cfg.get("is_default_rest") or day_cfg.get("is_directive_rest"):
+        target_dur = 0
+    else:
+        pref_dur = day_cfg.get("preferred_duration_min", 45)
+        target_dur = pref_dur if pref_dur > 0 else 45
+
+    bundle = build_workout_bundle(
+        recovery_score=rec_score,
+        hrv_rmssd=hrv_val,
+        sleep_score=sleep_sc,
+        recent_volume_hours=4.5,
+        recent_high_intensity=False,
+        target_duration_min=target_dur,
+        ftp=athlete_ftp,
+        target_date=today_dt
+    )
+
+    primary_w = bundle["primary"]
+    all_opts = bundle["all_options"]
+
+    w_cache = USER_WORKOUT_CACHE.setdefault(uid, {})
+    o_cache = USER_OPTIONS_CACHE.setdefault(uid, {})
+    w_cache.clear()
+    w_cache.update(primary_w)
+    o_cache.clear()
+    for opt in all_opts:
+        o_cache[opt["id"]] = opt
+
+    # 3. Refresh 3-day forecast
+    refreshed_outlook = []
+    try:
+        refreshed_outlook = build_preference_aligned_outlook_days(
+            today=today_dt,
+            today_recovery=rec_score,
+            today_strain=0.0,
+            workout_strain=0.0,
+            is_today=False,
+            is_yesterday=False,
+            has_trained_today=False,
+            session_summary={},
+            ftp=athlete_ftp,
+            program={}
+        )
+        save_coach_forecast_plan(uid, refreshed_outlook)
+    except Exception as e:
+        print("Error refreshing outlook in execute_clear_travel_recovery_week:", e)
+
+    updated_program = get_current_program(user_id=uid)
+
+    return {
+        "success": True,
+        "action_type": "clear_travel_recovery_week",
+        "travel_week_cleared": True,
+        "is_recovery_week": False,
+        "message": "Travel & Recovery Week tag cleared! Normal training schedule and daily prescription restored.",
         "active_workout": primary_w,
         "workout": primary_w,
         "options": all_opts,

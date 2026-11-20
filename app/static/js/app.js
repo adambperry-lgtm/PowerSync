@@ -6877,6 +6877,7 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
     const isToday = actionData.action_type === "apply_today_workout";
     const isScheduleWorkout = actionData.action_type === "schedule_workout";
     const isClear = actionData.action_type === "clear_upcoming_plan";
+    const isClearTravelWeek = actionData.action_type === "clear_travel_recovery_week";
     const isUpcomingPlan = actionData.action_type === "schedule_upcoming_plan";
     const actionCard = document.createElement("div");
     actionCard.className = "chat-workout-action-card";
@@ -6890,6 +6891,9 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
       const d = actionData.target_date || "Tomorrow";
       badgeLabel = `📅 Scheduled for ${d}`;
       btnLabel = "🚀 Sync to Zwift Calendar";
+    } else if (isClearTravelWeek) {
+      badgeLabel = "🔄 Normal Training Restored";
+      btnLabel = actionData.already_applied ? "✓ Travel Week Tag Cleared! 🔄" : "🔄 Clear Travel & Recovery Tag";
     } else if (isClear) {
       badgeLabel = "🗑️ Plan Cleared";
       btnLabel = actionData.already_applied ? "✓ Plan Cleared! 🗑️" : "🗑️ Confirm Clear Plan";
@@ -6903,7 +6907,7 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
     const tssStr = actionData.estimated_tss ? `~${actionData.estimated_tss} TSS` : "";
     const distStr = (!isIndoor && actionData.distance_miles && actionData.distance_miles > 0) ? `${actionData.distance_miles} mi` : "";
     const elevStr = (!isIndoor && actionData.elevation_gain_ft && actionData.elevation_gain_ft > 0) ? `${actionData.elevation_gain_ft} ft` : "";
-    const focusStr = actionData.focus_area || actionData.intensity_type || (isClear ? "Clear Plan" : "Custom");
+    const focusStr = actionData.focus_area || actionData.intensity_type || (isClearTravelWeek ? "Restore Schedule" : (isClear ? "Clear Plan" : "Custom"));
 
     actionCard.innerHTML = `
       <div class="chat-action-header">
@@ -6924,7 +6928,7 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
     `;
 
     const applyBtn = actionCard.querySelector(".btn-chat-apply-action");
-    if (actionData.already_applied && isClear) {
+    if (actionData.already_applied && (isClear || isClearTravelWeek)) {
       applyBtn.classList.remove("btn-primary");
       applyBtn.classList.add("btn-applied");
       applyBtn.disabled = true;
@@ -7118,7 +7122,15 @@ async function sendCoachMessage(text) {
     clearTimeout(chatTimeoutId);
 
     if (!res.ok) {
-      throw new Error(`HTTP ${res.status}`);
+      let detail = `HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson && errJson.detail) detail = `HTTP ${res.status}: ${errJson.detail}`;
+      } catch (_) {}
+      const httpErr = new Error(detail);
+      httpErr.isHttpError = true;
+      httpErr.status = res.status;
+      throw httpErr;
     }
     const data = await res.json();
     removeCoachTypingIndicator();
@@ -7127,7 +7139,7 @@ async function sendCoachMessage(text) {
       appendCoachChatMessage("coach", data.reply, data.proposed_action, data.executed_tools);
       coachChatHistory.push({ role: "model", text: data.reply });
 
-      if (data.cleared_plan || (data.proposed_action && data.proposed_action.action_type === "clear_upcoming_plan")) {
+      if (data.cleared_plan || data.cleared_travel_week || (data.proposed_action && (data.proposed_action.action_type === "clear_upcoming_plan" || data.proposed_action.action_type === "clear_travel_recovery_week"))) {
         if (data.active_workout || data.workout) {
           const activeW = data.active_workout || data.workout;
           state.currentWorkout = activeW;
@@ -7183,9 +7195,16 @@ async function sendCoachMessage(text) {
     if (chatTimeoutId) clearTimeout(chatTimeoutId);
     removeCoachTypingIndicator();
     console.error("Coach chat error:", err);
-    const msg = err && err.name === "AbortError"
-      ? "⏱️ The AI Coach request timed out after 60s (Gemini may be busy or rate-limited). Please try again."
-      : "⚠️ Connection error contacting coach engine. Please verify the PowerSync server is running.";
+    let msg;
+    if (err && err.name === "AbortError") {
+      msg = "⏱️ The AI Coach request timed out after 65s (Gemini may be busy or rate-limited). Please try again.";
+    } else if (err && err.isHttpError) {
+      msg = (err.status === 502 || err.status === 504)
+        ? "⏱️ The coach engine timed out waiting on the AI provider. Please try again."
+        : `⚠️ Coach engine error (${err.message}). Please try again.`;
+    } else {
+      msg = "⚠️ Connection error contacting coach engine. Please verify the PowerSync server is running.";
+    }
     appendCoachChatMessage("coach", msg);
   } finally {
     isCoachChatLoading = false;

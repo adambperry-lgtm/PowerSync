@@ -291,6 +291,7 @@ def build_system_prompt(snapshot: Dict[str, Any], memory: Optional[Dict[str, Any
         "- `search_workout_archive_and_library(query, zone, source, duration_min)`: Searches Adam's saved/prior Workout Archive and the 19-workout structured Coach Library.\n"
         "- `customize_and_save_workout(workout_id, archetype_id, query, new_title, duration_min, intensity_adjust_pct, notes)`: Clones or edits a workout from the Archive or Library, adjusts duration or intensity %, recalculates NP/IF/TSS/XSS, and saves it to the Workout Archive.\n"
         "- `send_workout_to_zwift(workout_id, archetype_id, query, target_date, duration_min, intensity_adjust_pct)`: Sends a specific workout from the Archive or Library directly to Zwift via Intervals.icu (with optional duration/intensity adjustment).\n"
+        "- `clear_travel_recovery_week()`: Deactivates the Travel & Recovery Week tag and restores normal daily workouts and 3-day forecast whenever the athlete says it was set in error or asks to clear/remove that tag.\n"
         "Always use these tools to inspect real numbers and provide high-fidelity coaching advice based on actual data rather than speculating."
         + _format_memory_prompt_block(memory)
     )
@@ -495,6 +496,22 @@ def extract_action_from_response(text: str) -> Tuple[str, Optional[Dict[str, Any
 
     return text.strip(), action_data
 
+def _is_clear_travel_tag_intent(msg: str) -> bool:
+    """Detects when the athlete is asking to clear/remove a mistaken Travel & Recovery Week tag."""
+    m = (msg or "").lower().strip()
+    if any(p in m for p in [
+        "clear that tag", "clear the tag", "remove that tag", "remove the tag",
+        "clear travel", "clear the travel", "remove travel", "exit travel",
+        "turn off travel", "disable travel", "stop travel", "end travel", "cancel travel",
+        "clear rest week", "remove rest week", "not a travel", "not a rest week",
+        "never marked", "not traveling", "not on a rest week"
+    ]):
+        return True
+    if "was an error" in m and any(k in m for k in ["tag", "travel", "rest week", "rest day"]):
+        return True
+    return False
+
+
 def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """
     Constructs a structured action payload from user intent for fallback or supplemental matching.
@@ -503,11 +520,27 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
     ftp = int(snapshot.get("athlete", {}).get("ftp_watts", 250))
     today = datetime.date.today()
 
+    # -1. Check for clearing a mistaken Travel & Recovery Week tag FIRST
+    if _is_clear_travel_tag_intent(msg):
+        return {
+            "action_type": "clear_travel_recovery_week",
+            "is_recovery_week": False,
+            "title": "Clear Travel & Recovery Week Tag",
+            "description": "Deactivate Travel & Recovery Week and restore normal daily training and 3-day forecast."
+        }
+
+    # -0.5. Do not auto-prescribe workouts or clear plans when reporting a glitch or denying a schedule
+    if any(p in msg for p in [
+        "didn't schedule", "did not schedule", "never scheduled",
+        "glitch", "by mistake"
+    ]):
+        return None
+
     # 0. Check for plan cancellation / clear intent or travel / recovery week intent
     has_cancel_verb = any(v in msg for v in ["cancel", "clear", "remove", "delete", "drop", "reset", "stop"])
-    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule", "week", "training", "workout"])
+    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "schedule", "week", "training"])
     is_recovery_travel = any(k in msg for k in [
-        "travel", "recovery", "recoveyr", "rest week", "rest and recovery", "rest and recoveyr",
+        "travel", "recovery week", "recoveyr", "rest week", "rest and recovery", "rest and recoveyr",
         "cross-train", "cross train", "cross-trainig", "crosstraining", "deload", "vacation",
         "taking this week off", "take this week off", "start something new next week",
         "new plan next week", "reset my week"
@@ -528,16 +561,16 @@ def build_sports_science_action(user_message: str, snapshot: Dict[str, Any]) -> 
         }
 
     # 1. Check for daily workout / interval session intent (today OR scheduled for tomorrow/future date)
-    is_pure_review = any(k in msg for k in ["review", "history", "why did", "what happened", "explain my"]) and not any(k in msg for k in [
+    is_pure_review = any(k in msg for k in ["review", "history", "why did", "what happened", "explain my", "why does"]) and not any(k in msg for k in [
         "give me a", "schedule", "create", "make a", "prescribe", "swap", "change", "what workout", "suggest a workout"
     ])
     wants_workout = (not is_pure_review) and any(k in msg for k in [
         "intervals", "spin", "ride today", "sweet spot", "sst", "tempo",
-        "vo2", "recovery", "flush", "threshold", "over-under", "over under", "overunder",
+        "vo2", "flush", "threshold", "over-under", "over under", "overunder",
         "trainer", "zwift", "shorter", "20 min", "25 min", "30 min", "45 min", "60 min",
         "75 min", "90 min", "give me a", "make a", "create a", "suggest a", "change to",
         "swap to", "switch to", "can i do", "put together", "schedule", "new workout", "prescribe",
-        "doing", "riding", "plan to ride", "plans", "tomorrow", "sunday", "saturday", "weekend"
+        "plan to ride"
     ])
     
     # Check if this is an explicit major target event or large outdoor ride (NOT a daily workout)
@@ -772,13 +805,13 @@ def call_gemini_api(
 
     headers = {"Content-Type": "application/json"}
     tools_config = [{"functionDeclarations": COACH_TOOL_DECLARATIONS}]
-    deadline = time.monotonic() + 55.0
+    deadline = time.monotonic() + 40.0
     model_errors: List[str] = []
 
     for api_ver, model in models_to_try:
         remaining = deadline - time.monotonic()
         if remaining <= 4.0:
-            model_errors.append("deadline exceeded (55s)")
+            model_errors.append("deadline exceeded (40s)")
             print("Gemini API deadline reached; returning to fallback.")
             break
 
@@ -812,7 +845,7 @@ def call_gemini_api(
                 if not is_final_turn:
                     payload["tools"] = tools_config
 
-                req_timeout = min(35.0, max(5.0, remaining))
+                req_timeout = min(20.0, max(4.0, remaining))
                 res = requests.post(url, headers=headers, json=payload, timeout=req_timeout)
                 if res.status_code != 200:
                     err_snippet = res.text[:140].replace("\n", " ")
@@ -914,11 +947,18 @@ def generate_sports_science_fallback_response(user_message: str, snapshot: Dict[
     recent = snapshot["training_load_strava"]["recent_rides"]
     last_ride = recent[0] if recent else None
 
+    # -1. Clear mistaken Travel & Recovery Week tag
+    if _is_clear_travel_tag_intent(msg):
+        return (
+            "Got it! I have cleared the **Travel & Rest/Recovery Week** tag and restored your normal training schedule. "
+            "Today's prescribed workout, 3-day forward forecast, and training phase are now back to your standard progression."
+        )
+
     # 0a. Clear / Cancel upcoming target event or activate travel/recovery week
     has_cancel_verb = any(v in msg for v in ["cancel", "clear", "remove", "delete", "drop", "reset", "stop"])
-    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "ride", "schedule", "week", "training", "workout"])
+    has_plan_noun = any(n in msg for n in ["plan", "upcoming", "event", "target", "schedule", "week", "training"])
     is_recovery_travel = any(k in msg for k in [
-        "travel", "recovery", "recoveyr", "rest week", "rest and recovery", "rest and recoveyr",
+        "travel", "recovery week", "recoveyr", "rest week", "rest and recovery", "rest and recoveyr",
         "cross-train", "cross train", "cross-trainig", "crosstraining", "deload", "vacation",
         "taking this week off", "take this week off", "start something new next week",
         "new plan next week", "reset my week"
@@ -1249,8 +1289,10 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 has_action_request = any(k in user_message.lower() for k in [
                     "give me a", "schedule", "create a", "make a", "prescribe", "suggest a workout",
                     "change to", "swap to", "switch to", "put together", "plan a ride", "upcoming ride",
-                    "cancel plan", "clear plan", "what workout should i do", "what should i do today",
-                    "doing", "riding", "plan", "plans", "tomorrow", "sunday", "saturday", "weekend"
+                    "cancel plan", "clear plan", "cancel my plan", "clear my plan", "cancel the plan", "clear the plan",
+                    "what workout should i do", "what should i do today",
+                    "clear that tag", "clear the tag", "remove that tag", "clear travel", "remove travel",
+                    "not a travel", "never marked"
                 ])
                 if has_action_request:
                     proposed_action = build_sports_science_action(user_message, snapshot)
@@ -1278,18 +1320,27 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                     ftp=snapshot["athlete"]["ftp_watts"]
                 )
 
-            # Auto-persist planned upcoming sessions or auto-apply plan cancellation
+            # Auto-persist planned upcoming sessions or auto-apply plan/travel cancellation
             applied_clear = None
+            tool_cleared_travel = any(t.get("name") == "clear_travel_recovery_week" for t in (executed_tools or []))
             if proposed_action:
                 act_type = proposed_action.get("action_type")
                 t_date = proposed_action.get("target_date")
-                from app.services.forecast_service import save_athlete_planned_session, clear_athlete_planned_session
+                from app.services.forecast_service import save_athlete_planned_session
                 if act_type in ("schedule_workout", "schedule_upcoming_plan") and t_date:
                     save_athlete_planned_session(t_date, proposed_action, user_id=uid)
                 elif act_type == "clear_upcoming_plan":
                     from app.services.plan_service import execute_clear_plan
-                    applied_clear = execute_clear_plan(user_id=uid, is_recovery_week=True, notes=user_message)
+                    is_rec_wk = bool(proposed_action.get("is_recovery_week", True))
+                    applied_clear = execute_clear_plan(user_id=uid, is_recovery_week=is_rec_wk, notes=user_message)
                     proposed_action["already_applied"] = True
+                elif act_type == "clear_travel_recovery_week":
+                    from app.services.plan_service import execute_clear_travel_recovery_week
+                    applied_clear = execute_clear_travel_recovery_week(user_id=uid)
+                    proposed_action["already_applied"] = True
+            elif tool_cleared_travel:
+                from app.services.plan_service import execute_clear_travel_recovery_week
+                applied_clear = execute_clear_travel_recovery_week(user_id=uid)
 
             # Prepend learned notice if Gemini didn't mention saving it
             reply_text = clean_reply
@@ -1328,6 +1379,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
                 "gemini_configured": True,
                 "proposed_action": proposed_action,
                 "cleared_plan": bool(applied_clear),
+                "cleared_travel_week": bool(tool_cleared_travel or (applied_clear and applied_clear.get("travel_week_cleared"))),
                 "active_workout": applied_clear.get("active_workout") if applied_clear else None,
                 "options": applied_clear.get("options") if applied_clear else None,
                 "forecast": applied_clear.get("forecast") if applied_clear else None,
@@ -1376,17 +1428,22 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             ftp=snapshot["athlete"]["ftp_watts"]
         )
 
-    # Auto-persist planned upcoming sessions or auto-apply plan cancellation
+    # Auto-persist planned upcoming sessions or auto-apply plan/travel cancellation
     applied_clear = None
     if proposed_action:
         act_type = proposed_action.get("action_type")
         t_date = proposed_action.get("target_date")
-        from app.services.forecast_service import save_athlete_planned_session, clear_athlete_planned_session
+        from app.services.forecast_service import save_athlete_planned_session
         if act_type in ("schedule_workout", "schedule_upcoming_plan") and t_date:
             save_athlete_planned_session(t_date, proposed_action, user_id=uid)
         elif act_type == "clear_upcoming_plan":
             from app.services.plan_service import execute_clear_plan
-            applied_clear = execute_clear_plan(user_id=uid, is_recovery_week=True, notes=user_message)
+            is_rec_wk = bool(proposed_action.get("is_recovery_week", True))
+            applied_clear = execute_clear_plan(user_id=uid, is_recovery_week=is_rec_wk, notes=user_message)
+            proposed_action["already_applied"] = True
+        elif act_type == "clear_travel_recovery_week":
+            from app.services.plan_service import execute_clear_travel_recovery_week
+            applied_clear = execute_clear_travel_recovery_week(user_id=uid)
             proposed_action["already_applied"] = True
 
     reply_out = key_saved_notice + fallback_reply
@@ -1412,7 +1469,12 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             model="powersync-coach-v1",
             user_id=uid
         )
-        maybe_update_conversation_memory(uid, api_key=api_key)
+        threading.Thread(
+            target=maybe_update_conversation_memory,
+            args=(uid,),
+            kwargs={"api_key": api_key},
+            daemon=True,
+        ).start()
     except Exception as e:
         print(f"Error persisting fallback chat reply/memory: {e}")
 
@@ -1424,6 +1486,7 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
         "gemini_configured": bool(api_key),
         "proposed_action": proposed_action,
         "cleared_plan": bool(applied_clear),
+        "cleared_travel_week": bool(applied_clear and applied_clear.get("travel_week_cleared")),
         "active_workout": applied_clear.get("active_workout") if applied_clear else None,
         "options": applied_clear.get("options") if applied_clear else None,
         "forecast": applied_clear.get("forecast") if applied_clear else None,

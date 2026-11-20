@@ -149,6 +149,16 @@ def parse_chat_schedule_directives(message: str, today: Optional[datetime.date] 
 
     lower = message.strip().lower()
 
+    # Do not auto-schedule workouts or rest days when the athlete is reporting a glitch/error,
+    # denying a schedule, or asking to clear a travel/rest tag.
+    if any(p in lower for p in [
+        "didn't schedule", "did not schedule", "never marked", "never scheduled",
+        "was an error", "by mistake", "glitch", "clear that tag", "clear the tag",
+        "remove that tag", "remove the tag", "not a travel", "not a rest week",
+        "clear travel", "remove travel", "exit travel", "turn off travel"
+    ]):
+        return []
+
     # Strip complaint / bug report tails like 'but it still has rest tomorrow...'
     complaint_match = re.search(r'\b(?:but\s+(?:it\s+still|it\s+shows|it\s+has)|why\s+does\s+it|it\s+still\s+shows|it\s+still\s+has)\b.*$', lower, re.IGNORECASE)
     working_text = lower[:complaint_match.start()].strip() if complaint_match else lower

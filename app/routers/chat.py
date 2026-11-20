@@ -470,7 +470,13 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
 
         elif action_type == "clear_upcoming_plan":
             from app.services.plan_service import execute_clear_plan
-            res = execute_clear_plan(user_id=uid, is_recovery_week=True, notes=str(data.get("description", "")))
+            is_rec_wk = bool(data.get("is_recovery_week", True))
+            res = execute_clear_plan(user_id=uid, is_recovery_week=is_rec_wk, notes=str(data.get("description", "")))
+            return res
+
+        elif action_type == "clear_travel_recovery_week":
+            from app.services.plan_service import execute_clear_travel_recovery_week
+            res = execute_clear_travel_recovery_week(user_id=uid)
             return res
 
         else:

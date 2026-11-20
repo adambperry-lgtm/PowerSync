@@ -147,9 +147,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.7",
-        "release_name": "Gemini 3.8 Flash Paid-Tier Upgrade",
-        "build_date": "2026-11-19",
+        "version": "2.17.8",
+        "release_name": "Chat Intent Guard, Travel Tag Clear & Timeout Resilience",
+        "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.8",
+                "date": "2026-11-20",
+                "title": "Chat Intent Guard, Travel Tag Clear & Timeout Resilience",
+                "items": [
+                    "Intent & Auto-Schedule Guard: Tightened Coach Chat and forecast directive parsing so casual questions, negations, and error reports never auto-schedule a 45-min workout or activate Travel & Recovery Week.",
+                    "Clear Travel & Recovery Week Tag: Added clear_travel_recovery_week tool and chat action so athletes can immediately clear a mistaken Travel & Recovery Week tag and restore normal workouts and 3-day forecasts.",
+                    "Timeout & Error Resilience: Lowered Gemini deadline to 40s, moved fallback memory distillation to a background thread to avoid 60s proxy timeouts, and surfaced exact HTTP error details in the chat UI (app.js?v=147)."
+                ]
+            },
             {
                 "version": "v2.17.7",
                 "date": "2026-11-19",

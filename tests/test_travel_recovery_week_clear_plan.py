@@ -133,5 +133,38 @@ class TestTravelRecoveryWeekClearPlan(unittest.TestCase):
         self.assertTrue(get_setting("travel_recovery_week_active", False, user_id=self.user_id))
         self.assertEqual(res.get("active_workout", {}).get("duration_minutes"), 0)
 
+    def test_clear_mistaken_travel_tag_via_chat(self):
+        from app.services.coach_chat_service import handle_coach_chat
+        from app.services.forecast_service import get_athlete_planned_sessions
+        set_setting("travel_recovery_week_active", True, user_id=self.user_id)
+
+        res = handle_coach_chat("clear that tag and that it was an error, i never marked this week as a travel and rest week", [])
+        self.assertTrue(res.get("success"))
+        self.assertTrue(res.get("cleared_travel_week"))
+        self.assertFalse(get_setting("travel_recovery_week_active", False, user_id=self.user_id))
+        self.assertEqual(get_athlete_planned_sessions(user_id=self.user_id), {})
+        self.assertNotIn("Travel Week", res.get("active_workout", {}).get("title", ""))
+
+    def test_casual_question_and_error_report_do_not_auto_schedule_or_activate_travel(self):
+        from app.services.coach_chat_service import handle_coach_chat
+        from app.services.forecast_service import get_athlete_planned_sessions
+
+        for msg in [
+            "first it showed me a chat prescribed 45 minute workout that i didn't schedule",
+            "how am i doing for my plans this weekend?",
+            "my recovery is low today, should i take it easy?"
+        ]:
+            res = handle_coach_chat(msg, [])
+            self.assertTrue(res.get("success"))
+            self.assertFalse(get_setting("travel_recovery_week_active", False, user_id=self.user_id), f"Travel week falsely activated for: {msg}")
+            self.assertEqual(get_athlete_planned_sessions(user_id=self.user_id), {}, f"Workout falsely scheduled for: {msg}")
+
+    def test_execute_clear_plan_respects_is_recovery_week_false(self):
+        from app.services.plan_service import execute_clear_plan
+        res = execute_clear_plan(user_id=self.user_id, is_recovery_week=False)
+        self.assertTrue(res.get("success"))
+        self.assertFalse(res.get("is_recovery_week"))
+        self.assertFalse(get_setting("travel_recovery_week_active", False, user_id=self.user_id))
+
 if __name__ == "__main__":
     unittest.main()

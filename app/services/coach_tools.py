@@ -258,6 +258,19 @@ COACH_TOOL_DECLARATIONS = [
             "type": "OBJECT",
             "properties": {}
         }
+    },
+    {
+        "name": "clear_travel_recovery_week",
+        "description": (
+            "Clears/deactivates the Travel & Recovery Week tag (travel_recovery_week_active = False) "
+            "and restores normal daily workout prescriptions, 3-day forecast, and training phase. "
+            "Call this immediately whenever the athlete says the Travel & Rest/Recovery Week tag was set in error, "
+            "asks to clear/remove that tag, or says they are back to normal training."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {}
+        }
     }
 ]
 
@@ -929,6 +942,11 @@ def execute_coach_tool(name: str, args: Dict[str, Any], user_id: Optional[str] =
         from app.services.ftp_test_service import evaluate_ftp_test_readiness
         res = evaluate_ftp_test_readiness(user_id=uid)
         res["tool_summary"] = f"FTP Test Readiness: {res['status_label']} ({res['readiness_score']}/100) — {res['headline']}"
+        return res
+    elif name == "clear_travel_recovery_week":
+        from app.services.plan_service import execute_clear_travel_recovery_week
+        res = execute_clear_travel_recovery_week(user_id=uid)
+        res["tool_summary"] = "Cleared Travel & Recovery Week tag and restored normal training schedule"
         return res
     else:
         return {"error": f"Unknown tool '{name}'", "tool_summary": f"Unknown tool '{name}'"}
