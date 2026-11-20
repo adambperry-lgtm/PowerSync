@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.18.0",
-        "release_name": "Outdoor Route Archive, Time/Distance Search & Garmin Course Sync",
+        "version": "2.18.1",
+        "release_name": "Outdoor Recommendation Duration Inheritance",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -161,6 +161,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.18.1",
+                "date": "2026-11-20",
+                "title": "Outdoor Recommendation Duration Inheritance",
+                "items": [
+                    "Active Workout Duration Sync: Switching to the Outdoor Ride tab now inherits today's Coach-scheduled or active workout duration (e.g. 90m) instead of defaulting to 60m."
+                ]
+            },
             {
                 "version": "v2.18.0",
                 "date": "2026-11-20",

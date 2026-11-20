@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.18.1] - 2026-11-20
+### Fixed
+- **Outdoor Recommendation Inherits Today's Scheduled / Active Workout Duration**:
+  - Updated [`generate_outdoor_recommendation()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/workouts.py) (`OutdoorRecommendRequest.duration_min: Optional[int] = None`), [`build_outdoor_ride_recommendation()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/outdoor_coach.py), and [`switchTrainingMode()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) so switching to **Outdoor Ride** inherits today's Coach-scheduled or active workout duration (e.g. `90 min`) instead of defaulting to `60 min`.
+
 ## [2.18.0] - 2026-11-20
 ### Added
 - **Outdoor Routes in Workout Archive & Time/Distance Preset Search**:

@@ -1519,7 +1519,13 @@ function setTrainingMode(mode) {
     }
 
     if (!state.currentOutdoorRide) {
-      loadOutdoorRecommendation(state.outdoorDuration);
+      const inheritedDur = (state.currentWorkout && Number(state.currentWorkout.duration_minutes) >= 20)
+        ? Number(state.currentWorkout.duration_minutes)
+        : null;
+      if (inheritedDur && !state.outdoorDurationExplicit) {
+        state.outdoorDuration = inheritedDur;
+      }
+      loadOutdoorRecommendation(state.outdoorDurationExplicit ? state.outdoorDuration : inheritedDur);
     } else {
       setTimeout(() => {
         if (state.currentOutdoorRide) {
@@ -1550,18 +1556,19 @@ function setTrainingMode(mode) {
 }
 
 // Fetch Outdoor Route Recommendation
-async function loadOutdoorRecommendation(duration = 60, userNote = "") {
+async function loadOutdoorRecommendation(duration = null, userNote = "") {
   try {
     if (outdoorRationale) {
       outdoorRationale.innerHTML = "<em>Analyzing your Strava outdoor ride history and matching today's recovery...</em>";
     }
+    const payload = { user_note: userNote || "" };
+    if (duration !== null && duration !== undefined && Number(duration) >= 20) {
+      payload.duration_min = Number(duration);
+    }
     const res = await fetch("/api/workouts/outdoor-recommendation", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        duration_min: duration,
-        user_note: userNote
-      })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (data.success && data.active_ride) {

@@ -1045,6 +1045,31 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
         strain_profile = whoop.get("strain_profile", "Recent Surge (Yesterday Heavy)")
         trailing_7d_high_strain_count = int(whoop.get("trailing_7d_high_strain_days", 2))
 
+    # Resolve target duration: explicit req.duration_min > active/scheduled today workout > forecast/day pref > 60
+    effective_dur = req.duration_min
+    inherited_from_workout = False
+    if effective_dur is None:
+        active_w = get_current_workout_cache()
+        if active_w and int(active_w.get("duration_minutes") or 0) >= 20:
+            effective_dur = int(active_w["duration_minutes"])
+            inherited_from_workout = True
+        else:
+            from app.database import get_scheduled_workout_for_date
+            sched_w = get_scheduled_workout_for_date(today_iso)
+            if sched_w and int(sched_w.get("duration_minutes") or 0) >= 20:
+                effective_dur = int(sched_w["duration_minutes"])
+                inherited_from_workout = True
+            else:
+                from app.services.forecast_service import get_forecast_for_date
+                from app.services.preferences_service import get_day_target_config
+                f_entry = get_forecast_for_date(today_iso, user_id=uid)
+                if f_entry and int(f_entry.get("duration_min") or 0) >= 20:
+                    effective_dur = int(f_entry["duration_min"])
+                else:
+                    d_cfg = get_day_target_config()
+                    pref_d = int(d_cfg.get("preferred_duration_min") or 60)
+                    effective_dur = pref_d if pref_d >= 20 else 60
+
     from app.services.outdoor_coach import build_outdoor_ride_recommendation
     outdoor_bundle = build_outdoor_ride_recommendation(
         recovery_score=rec_score,
@@ -1062,10 +1087,11 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
         yesterday_tss=yesterday_tss,
         load_profile=load_profile,
         strain_profile=strain_profile,
-        target_duration_min=req.duration_min,
+        target_duration_min=int(effective_dur or 60),
         ftp=ftp,
         user_note=req.user_note or "",
-        today_activities=today_activities
+        today_activities=today_activities,
+        explicit_duration=bool(req.duration_min is not None or inherited_from_workout),
     )
 
     outdoor_options = get_current_outdoor_options()

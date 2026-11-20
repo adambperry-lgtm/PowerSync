@@ -184,7 +184,8 @@ def build_outdoor_ride_recommendation(
     target_duration_min: int = 60,
     ftp: int = 250,
     user_note: str = "",
-    today_activities: Optional[List[Dict[str, Any]]] = None
+    today_activities: Optional[List[Dict[str, Any]]] = None,
+    explicit_duration: bool = False,
 ) -> Dict[str, Any]:
     """
     Analyzes athlete's Strava outdoor ride history and selects the best matching
@@ -194,9 +195,9 @@ def build_outdoor_ride_recommendation(
 
     import re
     note_clean = (user_note or "").strip().lower()
-    target_min_low: Optional[int] = None
-    target_min_high: Optional[int] = None
-    has_explicit_dur_req = False
+    target_min_low: Optional[int] = max(20, target_duration_min - 10) if explicit_duration else None
+    target_min_high: Optional[int] = min(360, target_duration_min + 10) if explicit_duration else None
+    has_explicit_dur_req = bool(explicit_duration)
 
     if note_clean:
         range_min_match = re.search(

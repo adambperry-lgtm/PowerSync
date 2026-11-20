@@ -192,6 +192,26 @@ class TestOutdoorArchiveAndGarmin(unittest.TestCase):
         self.assertIn("connect.garmin.com/modern/course/12345678", push_res["course_url"])
         self.assertEqual(mock_client.client.post.call_count, 2)
 
+    def test_outdoor_recommendation_inherits_active_90m_workout(self):
+        tok = set_current_user_context(self.user_a)
+        try:
+            with patch("app.services.outdoor_coach.get_setting", return_value={"access_token": "tok"}):
+                bundle = build_outdoor_ride_recommendation(
+                    recovery_score=80,
+                    hrv_rmssd=55.0,
+                    sleep_score=88,
+                    recent_volume_hours=4.5,
+                    recent_high_intensity=False,
+                    target_duration_min=90,
+                    ftp=250,
+                    user_note="",
+                    explicit_duration=True,
+                )
+            self.assertEqual(bundle["primary"]["id"], "900002")
+            self.assertEqual(bundle["primary"]["moving_time_min"], 90)
+        finally:
+            reset_current_user_context(tok)
+
 
 if __name__ == "__main__":
     unittest.main()
