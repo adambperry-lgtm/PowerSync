@@ -327,6 +327,7 @@ class GarminConnectPayload(BaseModel):
     email: Optional[str] = None
     password: Optional[str] = None
     mfa_code: Optional[str] = None
+    token_data: Optional[str] = None
 
 
 @router.post("/garmin/connect")
@@ -339,6 +340,7 @@ def connect_garmin_endpoint(
         email=payload.email,
         password=payload.password,
         mfa_code=payload.mfa_code,
+        token_data=payload.token_data,
         user_id=uid,
     )
 

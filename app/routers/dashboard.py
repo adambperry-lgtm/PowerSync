@@ -337,7 +337,8 @@ def get_dashboard_data(request: Request = None):
             "wyze": {"connected": wyze_connected, "auth_expired": wyze_auth_expired, "enabled": enabled_conns["wyze"]},
             "apple_health": {"connected": apple_health_connected, "has_records": bool(apple_health_summary.get("has_records")), "enabled": enabled_conns["apple_health"]},
             "gemini": {"configured": bool(enabled_conns["gemini"] and gemini_key and "•" not in gemini_key), "enabled": enabled_conns["gemini"]},
-            "intervals_icu": {"configured": bool(enabled_conns["zwift"] and intervals_icu_key and "•" not in intervals_icu_key and intervals_athlete_id), "enabled": enabled_conns["zwift"]}
+            "intervals_icu": {"configured": bool(enabled_conns["zwift"] and intervals_icu_key and "•" not in intervals_icu_key and intervals_athlete_id), "enabled": enabled_conns["zwift"]},
+            "garmin": {"connected": bool(get_setting("garmin_tokens", "", user_id=uid)), "enabled": True}
         },
         "wyze_scale": wyze_summary,
         "apple_health": apple_health_summary,

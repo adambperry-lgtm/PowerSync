@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.18.3] - 2026-11-20
+### Added
+- **Garmin Connect in Connections Dropdown & Session Token Import**:
+  - Added **Garmin** (`#badgeGarmin`) to the navbar **Connections Indicator Dropdown** ([`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`dashboard.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/dashboard.py), [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js)) so its live connection state appears alongside Whoop, Strava, Wyze, Apple Health, Zwift, and Gemini.
+  - Added **Paste Garmin Session Token** (`token_data`) support to [`connect_garmin()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/garmin_service.py) and `#settingsGarminCard` with clear cloud-IP block diagnostics when Garmin SSO rejects logins from Railway's cloud IP.
+
 ## [2.18.2] - 2026-11-20
 ### Fixed
 - **Outdoor Routes Archive `map: null` Crash & Auto-Sync Fallback**:

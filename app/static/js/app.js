@@ -1212,6 +1212,8 @@ function renderIntegrations(integrations) {
     totalServices++;
     if (Boolean(integrations.intervals_icu?.configured)) connectedCount++;
   }
+  totalServices++;
+  if (Boolean(integrations.garmin?.connected)) connectedCount++;
   if (geminiEnabled) {
     totalServices++;
     if (Boolean(integrations.gemini?.configured) || (!isDemo && state.dashboard?.has_gemini)) connectedCount++;
@@ -11015,8 +11017,10 @@ document.getElementById("btnConnectGarmin")?.addEventListener("click", async () 
   const email = document.getElementById("settingGarminEmail")?.value.trim() || "";
   const password = document.getElementById("settingGarminPassword")?.value || "";
   const mfaCode = document.getElementById("settingGarminMfaCode")?.value.trim() || "";
+  const tokenData = document.getElementById("settingGarminTokenData")?.value.trim() || "";
   const fbEl = document.getElementById("garminConnectFeedback");
   const mfaGroup = document.getElementById("garminMfaGroup");
+  const tokenDetails = document.getElementById("garminTokenDetails");
   const btn = document.getElementById("btnConnectGarmin");
   if (!btn) return;
 
@@ -11029,10 +11033,17 @@ document.getElementById("btnConnectGarmin")?.addEventListener("click", async () 
     const res = await fetch("/api/settings/garmin/connect", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password, mfa_code: mfaCode || null })
+      body: JSON.stringify({
+        email,
+        password,
+        mfa_code: mfaCode || null,
+        token_data: tokenData || null
+      })
     });
     const data = await res.json();
     if (data.success) {
+      const tokInput = document.getElementById("settingGarminTokenData");
+      if (tokInput) tokInput.value = "";
       renderGarminSettingsSummary({ garmin_connected: true, garmin_has_tokens: true, garmin_email: data.email || email, garmin_password_set: true });
       if (fbEl) {
         fbEl.textContent = `✅ ${data.message || "Connected to Garmin Connect!"}`;
@@ -11041,6 +11052,7 @@ document.getElementById("btnConnectGarmin")?.addEventListener("click", async () 
         fbEl.style.display = "block";
       }
       showToast("✅ Garmin Connect linked!");
+      if (typeof loadDashboard === "function") await loadDashboard();
     } else if (data.mfa_required) {
       if (mfaGroup) mfaGroup.style.display = "block";
       if (fbEl) {
@@ -11051,6 +11063,9 @@ document.getElementById("btnConnectGarmin")?.addEventListener("click", async () 
       }
       btn.textContent = "🔐 Verify 2FA Code";
     } else {
+      if (data.cloud_blocked && tokenDetails) {
+        tokenDetails.open = true;
+      }
       if (fbEl) {
         fbEl.textContent = `⚠️ ${data.error || "Could not connect to Garmin."}`;
         fbEl.style.color = "#DC2626";
@@ -11077,6 +11092,7 @@ document.getElementById("btnDisconnectGarmin")?.addEventListener("click", async 
     if (data.success) {
       renderGarminSettingsSummary({ garmin_connected: false, garmin_has_tokens: false, garmin_email: document.getElementById("settingGarminEmail")?.value || "", garmin_password_set: false });
       showToast("Garmin Connect disconnected.");
+      if (typeof loadDashboard === "function") await loadDashboard();
     }
   } catch (e) {
     console.warn("Could not disconnect Garmin:", e);

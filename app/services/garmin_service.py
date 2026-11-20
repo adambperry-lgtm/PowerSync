@@ -96,15 +96,37 @@ def connect_garmin(
     email: Optional[str] = None,
     password: Optional[str] = None,
     mfa_code: Optional[str] = None,
+    token_data: Optional[str] = None,
     user_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Authenticates with Garmin Connect and stores session tokens scoped by `user_id`.
-    Supports 2-step MFA completion when `mfa_code` is provided.
+    Supports 2-step MFA completion when `mfa_code` is provided, or direct session token
+    import (`token_data`) when Garmin SSO blocks cloud server IPs.
     """
     from garminconnect import Garmin
 
     uid = user_id or get_current_user_id()
+
+    if token_data and token_data.strip():
+        raw_tok = token_data.strip()
+        try:
+            client = Garmin()
+            client.login(tokenstore=raw_tok)
+            dumped = client.client.dumps() or raw_tok
+            set_setting("garmin_tokens", dumped, user_id=uid)
+            if email and email.strip():
+                set_setting("garmin_email", email.strip(), user_id=uid)
+            _GARMIN_MFA_STATES.pop(uid, None)
+            display = getattr(client, "display_name", "") or email or "Garmin Connect"
+            return {
+                "success": True,
+                "connected": True,
+                "email": str(get_setting("garmin_email", "", user_id=uid) or display),
+                "message": f"Garmin Connect session token verified ({display})!",
+            }
+        except Exception as e:
+            return {"success": False, "error": f"Invalid or expired Garmin session token: {str(e)}"}
 
     if mfa_code and mfa_code.strip():
         pending = _GARMIN_MFA_STATES.get(uid)
@@ -130,7 +152,7 @@ def connect_garmin(
     clean_pw = password if (password and "•" not in password and "\u2022" not in password) else str(get_setting("garmin_password", "", user_id=uid) or "")
 
     if not clean_email or not clean_pw:
-        return {"success": False, "error": "Garmin Connect email and password are required."}
+        return {"success": False, "error": "Garmin Connect email and password (or a session token) are required."}
 
     set_setting("garmin_email", clean_email, user_id=uid)
     set_setting("garmin_password", clean_pw, user_id=uid)
@@ -157,7 +179,18 @@ def connect_garmin(
             "message": f"Connected to Garmin Connect as {clean_email}!",
         }
     except Exception as e:
-        return {"success": False, "error": f"Garmin Connect login failed: {str(e)}"}
+        err_str = str(e)
+        if any(k in err_str.lower() for k in ("401", "429", "cloudflare", "exhausted", "unauthorized")):
+            return {
+                "success": False,
+                "cloud_blocked": True,
+                "error": (
+                    f"Garmin SSO rejected login from this cloud server IP ({err_str}). "
+                    "Garmin frequently blocks automated logins from Railway/cloud IPs even with the right password. "
+                    "Use 'Paste Session Token' below to link your Garmin session from your computer, or use ⬇️ .GPX download."
+                ),
+            }
+        return {"success": False, "error": f"Garmin Connect login failed: {err_str}"}
 
 
 def generate_gpx_from_points(

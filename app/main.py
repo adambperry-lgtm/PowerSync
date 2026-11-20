@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.18.2",
-        "release_name": "Outdoor Routes Archive Null-Map Fix",
+        "version": "2.18.3",
+        "release_name": "Garmin Connections Dropdown & Session Token Import",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -161,6 +161,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.18.3",
+                "date": "2026-11-20",
+                "title": "Garmin Connections Dropdown & Session Token Import",
+                "items": [
+                    "Garmin in Connections Dropdown: Added live Garmin Connect status to the top navbar Connections menu.",
+                    "Session Token Workaround: Added 1-step Garmin session token paste in Settings for cases where Garmin SSO blocks cloud server IPs from password login."
+                ]
+            },
             {
                 "version": "v2.18.2",
                 "date": "2026-11-20",

@@ -2828,6 +2828,17 @@
             </div>
           </div>
 
+          <details id="garminTokenDetails" style="margin-top:0.65rem;background:#FFFFFF;border:1px solid rgba(0,124,195,0.22);border-radius:8px;padding:0.55rem 0.75rem;font-size:0.76rem;color:var(--text-secondary);">
+            <summary style="cursor:pointer;font-weight:700;color:#007CC3;outline:none;">
+              🛡️ Blocked on cloud login? Paste Garmin Session Token (1-step workaround)
+            </summary>
+            <p style="margin:0.45rem 0 0.35rem;line-height:1.45;">
+              Garmin SSO often blocks automated logins from cloud servers like Railway even with the right password. Run this once on your own Mac/PC terminal, then paste the output below:
+            </p>
+            <pre style="margin:0 0 0.45rem;padding:0.45rem;background:#F1F5F9;border-radius:6px;overflow-x:auto;font-size:0.71rem;color:#0f172a;">pip install garminconnect &amp;&amp; python3 -c "import garminconnect; g=garminconnect.Garmin('EMAIL','PASSWORD'); g.login(); print(g.client.dumps())"</pre>
+            <textarea id="settingGarminTokenData" rows="2" placeholder="Paste Garmin session token string here, then click Connect Garmin..." style="width:100%;font-size:0.75rem;padding:0.4rem;border:1px solid var(--border-color);border-radius:6px;"></textarea>
+          </details>
+
           <div id="garminConnectFeedback" style="display:none;margin-top:0.6rem;font-size:0.76rem;padding:0.45rem 0.65rem;border-radius:6px;background:#FFFFFF;border:1px solid var(--border-color);"></div>
 
           <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;">
