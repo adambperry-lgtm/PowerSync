@@ -136,6 +136,14 @@ class TestTravelRecoveryWeekClearPlan(unittest.TestCase):
     def test_clear_mistaken_travel_tag_via_chat(self):
         from app.services.coach_chat_service import handle_coach_chat
         from app.services.forecast_service import get_athlete_planned_sessions
+        from app.database import get_db_connection
+        conn = get_db_connection()
+        conn.execute(
+            "INSERT OR REPLACE INTO whoop_metrics (user_id, date, recovery_score, hrv_rmssd, sleep_performance) VALUES (?, ?, ?, ?, ?)",
+            (self.user_id, datetime.date.today().isoformat(), 78, 62.5, 88)
+        )
+        conn.commit()
+        conn.close()
         set_setting("travel_recovery_week_active", True, user_id=self.user_id)
 
         res = handle_coach_chat("clear that tag and that it was an error, i never marked this week as a travel and rest week", [])

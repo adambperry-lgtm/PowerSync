@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.17.8",
-        "release_name": "Chat Intent Guard, Travel Tag Clear & Timeout Resilience",
+        "version": "2.17.9",
+        "release_name": "Whoop Metrics Column Key Hotfix",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.17.9",
+                "date": "2026-11-20",
+                "title": "Whoop Metrics Column Key Hotfix",
+                "items": [
+                    "Fixed SQLite Row Key Error: Updated execute_clear_plan() and execute_clear_travel_recovery_week() in plan_service.py to read hrv_rmssd and sleep_performance instead of hrv and sleep_score."
+                ]
+            },
             {
                 "version": "v2.17.8",
                 "date": "2026-11-20",

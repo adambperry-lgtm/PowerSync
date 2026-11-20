@@ -555,9 +555,10 @@ def execute_clear_plan(user_id: Optional[str] = None, is_recovery_week: bool = T
     whoop_row = c.fetchone()
     conn.close()
 
-    rec_score = int(whoop_row["recovery_score"]) if whoop_row and whoop_row["recovery_score"] else 65
-    hrv_val = float(whoop_row["hrv"]) if whoop_row and whoop_row["hrv"] else 45.0
-    sleep_sc = int(whoop_row["sleep_score"]) if whoop_row and whoop_row["sleep_score"] else 75
+    whoop_dict = dict(whoop_row) if whoop_row else {}
+    rec_score = int(whoop_dict.get("recovery_score") or 65)
+    hrv_val = float(whoop_dict.get("hrv_rmssd") or 45.0)
+    sleep_sc = int(whoop_dict.get("sleep_performance") or 75)
     try:
         athlete_ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
     except Exception:
@@ -660,9 +661,10 @@ def execute_clear_travel_recovery_week(user_id: Optional[str] = None) -> Dict[st
     whoop_row = c.fetchone()
     conn.close()
 
-    rec_score = int(whoop_row["recovery_score"]) if whoop_row and whoop_row["recovery_score"] else 65
-    hrv_val = float(whoop_row["hrv"]) if whoop_row and whoop_row["hrv"] else 45.0
-    sleep_sc = int(whoop_row["sleep_score"]) if whoop_row and whoop_row["sleep_score"] else 75
+    whoop_dict = dict(whoop_row) if whoop_row else {}
+    rec_score = int(whoop_dict.get("recovery_score") or 65)
+    hrv_val = float(whoop_dict.get("hrv_rmssd") or 45.0)
+    sleep_sc = int(whoop_dict.get("sleep_performance") or 75)
     try:
         athlete_ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
     except Exception:

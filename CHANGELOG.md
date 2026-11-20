@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.17.9] - 2026-11-20
+### Fixed
+- **`whoop_metrics` Column Name Fix in Plan Clear & Travel-Week Clear**:
+  - Fixed `IndexError: No item with that key` in [`execute_clear_plan()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/plan_service.py) and [`execute_clear_travel_recovery_week()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/plan_service.py) by reading `hrv_rmssd` and `sleep_performance` (the actual `whoop_metrics` columns) instead of `hrv` and `sleep_score`.
+
 ## [2.17.8] - 2026-11-20
 ### Fixed
 - **Prevent False Auto-Scheduled Workouts & Mistaken Travel/Recovery Week Activation**:
