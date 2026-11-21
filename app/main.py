@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.19.2",
-        "release_name": "Outdoor Routes Strava Link Cleanup",
+        "version": "2.19.3",
+        "release_name": "Outdoor Route Terrain Filter, Inspect Scroll & Leaflet Map",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.19.3",
+                "date": "2026-11-20",
+                "title": "Outdoor Route Terrain Filter, Inspect Scroll & Leaflet Map",
+                "items": [
+                    "Terrain Filter Fix: Restored Flat / Rolling / Hilly filtering in renderArchiveGrid().",
+                    "Inspect & Map Background: Tapping Inspect or a route card now scrolls to the Route Inspector and renders an interactive Leaflet street/terrain map behind the route."
+                ]
+            },
             {
                 "version": "v2.19.2",
                 "date": "2026-11-20",

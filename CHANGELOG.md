@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.19.3] - 2026-11-20
+### Fixed
+- **Outdoor Route Terrain Filter, Inspect Scroll & Leaflet Map Background**:
+  - Restored `archiveState.outdoorTerrain` filtering in [`renderArchiveGrid()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`app.js?v=154`) with on-the-fly `ft/mi` fallback so **Flat / Rolling / Hilly** pills filter immediately.
+  - Updated [`openOutdoorRouteInspector()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) to render an interactive **Leaflet** map (`#archiveOutdoorLeafletMap` in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html)) with CartoDB Voyager street/terrain tiles and route polyline (falling back to SVG if no GPS points), and to expand & scroll the Route Inspector into view on mobile when tapping **🗺️ Inspect** or a route card.
+
 ## [2.19.2] - 2026-11-20
 ### Fixed
 - **Outdoor Route Card Button & Settings Cleanup**:

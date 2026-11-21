@@ -10409,11 +10409,15 @@ function setArchiveMode(mode) {
   renderArchiveGrid();
 }
 
-function openOutdoorRouteInspector(route) {
+let archiveOutdoorLeafletMap = null;
+let archiveOutdoorRouteLayer = null;
+
+function openOutdoorRouteInspector(route, scrollToInspector = false) {
   if (!route) return;
   archiveState.selectedOutdoorRoute = route;
   const titleEl = document.getElementById("archiveOutdoorTitle");
   const svgEl = document.getElementById("archiveOutdoorMapSvg");
+  const leafletEl = document.getElementById("archiveOutdoorLeafletMap");
   const durEl = document.getElementById("archiveOutdoorDur");
   const distEl = document.getElementById("archiveOutdoorDist");
   const elevEl = document.getElementById("archiveOutdoorElev");
@@ -10448,17 +10452,69 @@ function openOutdoorRouteInspector(route) {
     openStravaBtn.href = hasStrava ? route.strava_url : "https://www.strava.com/athlete/training";
   }
 
-  if (svgEl) {
-    if (route.svg_path) {
-      const startCircle = route.start_xy ? `<circle cx="${route.start_xy[0]}" cy="${route.start_xy[1]}" r="5" fill="#10B981" stroke="#fff" stroke-width="1.5"/>` : "";
-      const endCircle = route.end_xy && !route.is_loop ? `<circle cx="${route.end_xy[0]}" cy="${route.end_xy[1]}" r="5" fill="#EF4444" stroke="#fff" stroke-width="1.5"/>` : "";
-      svgEl.innerHTML = `<path d="${route.svg_path}" fill="none" stroke="#007CC3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${startCircle}${endCircle}`;
-    } else {
-      svgEl.innerHTML = `<text x="190" y="85" text-anchor="middle" fill="#94a3b8" font-size="13">No GPS polyline stored for this ride</text>`;
+  const pts = Array.isArray(route.map_points) ? route.map_points : [];
+  if (typeof L !== "undefined" && leafletEl && pts.length >= 2) {
+    if (svgEl) svgEl.style.display = "none";
+    leafletEl.style.display = "block";
+    if (!archiveOutdoorLeafletMap) {
+      archiveOutdoorLeafletMap = L.map(leafletEl, { zoomControl: true, attributionControl: false });
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+        maxZoom: 19,
+        subdomains: "abcd"
+      }).addTo(archiveOutdoorLeafletMap);
+    }
+    if (archiveOutdoorRouteLayer) {
+      archiveOutdoorLeafletMap.removeLayer(archiveOutdoorRouteLayer);
+      archiveOutdoorRouteLayer = null;
+    }
+    const poly = L.polyline(pts, { color: "#FC4C02", weight: 4, opacity: 0.92 });
+    const startPt = pts[0];
+    const endPt = pts[pts.length - 1];
+    const startMarker = L.circleMarker(startPt, { radius: 6, fillColor: "#10B981", color: "#fff", weight: 2, fillOpacity: 1 });
+    const layers = [poly, startMarker];
+    if (!route.is_loop) {
+      layers.push(L.circleMarker(endPt, { radius: 6, fillColor: "#EF4444", color: "#fff", weight: 2, fillOpacity: 1 }));
+    }
+    archiveOutdoorRouteLayer = L.featureGroup(layers).addTo(archiveOutdoorLeafletMap);
+    setTimeout(() => {
+      if (archiveOutdoorLeafletMap && archiveOutdoorRouteLayer) {
+        archiveOutdoorLeafletMap.invalidateSize(true);
+        archiveOutdoorLeafletMap.fitBounds(archiveOutdoorRouteLayer.getBounds(), { padding: [20, 20], maxZoom: 15 });
+      }
+    }, 80);
+  } else {
+    if (leafletEl) leafletEl.style.display = "none";
+    if (svgEl) {
+      svgEl.style.display = "block";
+      if (route.svg_path) {
+        const startCircle = route.start_xy ? `<circle cx="${route.start_xy[0]}" cy="${route.start_xy[1]}" r="5" fill="#10B981" stroke="#fff" stroke-width="1.5"/>` : "";
+        const endCircle = route.end_xy && !route.is_loop ? `<circle cx="${route.end_xy[0]}" cy="${route.end_xy[1]}" r="5" fill="#EF4444" stroke="#fff" stroke-width="1.5"/>` : "";
+        svgEl.innerHTML = `<path d="${route.svg_path}" fill="none" stroke="#007CC3" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>${startCircle}${endCircle}`;
+      } else {
+        svgEl.innerHTML = `<text x="190" y="85" text-anchor="middle" fill="#94a3b8" font-size="13">No GPS polyline stored for this ride</text>`;
+      }
     }
   }
 
   renderArchiveGrid();
+
+  if (scrollToInspector) {
+    const panel = document.getElementById("archiveEditorPanel");
+    if (panel) {
+      panel.classList.remove("collapsed");
+      const toggleIcon = document.getElementById("archiveEditorToggleIcon");
+      const toggleText = document.getElementById("archiveEditorToggleText");
+      if (toggleIcon) toggleIcon.textContent = "▲";
+      if (toggleText) toggleText.textContent = "Collapse";
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      setTimeout(() => {
+        if (archiveOutdoorLeafletMap && archiveOutdoorRouteLayer) {
+          archiveOutdoorLeafletMap.invalidateSize(true);
+          archiveOutdoorLeafletMap.fitBounds(archiveOutdoorRouteLayer.getBounds(), { padding: [20, 20], maxZoom: 15 });
+        }
+      }, 320);
+    }
+  }
 }
 
 function downloadOutdoorRouteGpx(rideId) {
@@ -10489,6 +10545,18 @@ function renderArchiveGrid() {
     }
     if (archiveState.outdoorMaxDist !== null) {
       routes = routes.filter(r => (Number(r.distance_miles) || 0) <= archiveState.outdoorMaxDist);
+    }
+    if (archiveState.outdoorTerrain && archiveState.outdoorTerrain !== "all") {
+      routes = routes.filter(r => {
+        let t = r.terrain_type;
+        if (!t) {
+          const distMi = Number(r.distance_miles) || 0;
+          const elevFt = Number(r.elevation_gain_ft) || 0;
+          const ftPerMi = distMi > 0 ? elevFt / Math.max(0.5, distMi) : 0;
+          t = ftPerMi < 30 ? "flat" : (ftPerMi <= 65 ? "rolling" : "hilly");
+        }
+        return t === archiveState.outdoorTerrain;
+      });
     }
 
     const sortBy = archiveState.outdoorSort || "recent";
@@ -10564,7 +10632,11 @@ function renderArchiveGrid() {
 
       cardEl.addEventListener("click", (e) => {
         if (e.target.closest(".archive-btn-strava")) return;
-        openOutdoorRouteInspector(routeObj);
+        openOutdoorRouteInspector(routeObj, true);
+      });
+      cardEl.querySelector(".archive-btn-inspect")?.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openOutdoorRouteInspector(routeObj, true);
       });
     });
     return;
