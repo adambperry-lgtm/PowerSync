@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.19.0",
-        "release_name": "Outdoor Routes Strava Link & GPX Export",
+        "version": "2.19.1",
+        "release_name": "Outdoor Routes Terrain Filter (Flat / Rolling / Hilly)",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.19.1",
+                "date": "2026-11-20",
+                "title": "Outdoor Routes Terrain Filter (Flat / Rolling / Hilly)",
+                "items": [
+                    "Terrain Preset Pills: Added All / Flat (<30 ft/mi) / Rolling (30–65 ft/mi) / Hilly (>65 ft/mi) filter pills to Outdoor Routes in the Workout Archive."
+                ]
+            },
             {
                 "version": "v2.19.0",
                 "date": "2026-11-20",

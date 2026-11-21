@@ -9975,6 +9975,7 @@ const archiveState = {
   outdoorMaxDur: null,
   outdoorMinDist: null,
   outdoorMaxDist: null,
+  outdoorTerrain: "all",
   outdoorSort: "recent",
   editingWorkout: null,
   selectedOutdoorRoute: null,
@@ -10982,6 +10983,16 @@ function initWorkoutArchive() {
       pill.classList.add("active");
       archiveState.outdoorMinDist = pill.dataset.minDist !== "" ? Number(pill.dataset.minDist) : null;
       archiveState.outdoorMaxDist = pill.dataset.maxDist !== "" ? Number(pill.dataset.maxDist) : null;
+      renderArchiveGrid();
+    });
+  });
+
+  // Outdoor Terrain preset pills (Flat / Rolling / Hilly)
+  document.querySelectorAll("#archiveOutdoorTerrainPills .archive-pill").forEach(pill => {
+    pill.addEventListener("click", () => {
+      document.querySelectorAll("#archiveOutdoorTerrainPills .archive-pill").forEach(p => p.classList.remove("active"));
+      pill.classList.add("active");
+      archiveState.outdoorTerrain = pill.dataset.terrain || "all";
       renderArchiveGrid();
     });
   });

@@ -1258,6 +1258,7 @@ def get_workout_archive_and_library(
     max_dur: Optional[int] = None,
     min_dist: Optional[float] = None,
     max_dist: Optional[float] = None,
+    terrain: Optional[str] = None,
     sort: str = "recent",
 ):
     """Returns the user's prior/saved workouts, outdoor routes, and the structured Coach Library."""
@@ -1280,6 +1281,7 @@ def get_workout_archive_and_library(
         max_duration_min=max_dur,
         min_distance_mi=min_dist,
         max_distance_mi=max_dist,
+        terrain=terrain,
         sort_by=sort,
     )
 

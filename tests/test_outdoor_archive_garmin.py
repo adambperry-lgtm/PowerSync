@@ -252,6 +252,16 @@ class TestOutdoorArchiveAndGarmin(unittest.TestCase):
         ids = {r["id"] for r in data["outdoor_routes"]}
         self.assertEqual(ids, {"900001", "900002"})
 
+    def test_outdoor_terrain_filter(self):
+        # 900001: 350m (~1148ft) over 18.6mi -> ~61.7 ft/mi (rolling)
+        # 900002: 600m (~1968ft) over 30.0mi -> ~65.6 ft/mi (hilly)
+        hilly = get_archived_outdoor_routes(user_id=self.user_a, ftp=250, terrain="hilly")
+        self.assertEqual([r["id"] for r in hilly], ["900002"])
+        rolling = get_archived_outdoor_routes(user_id=self.user_a, ftp=250, terrain="rolling")
+        self.assertEqual([r["id"] for r in rolling], ["900001"])
+        flat = get_archived_outdoor_routes(user_id=self.user_a, ftp=250, terrain="flat")
+        self.assertEqual(flat, [])
+
 
 if __name__ == "__main__":
     unittest.main()

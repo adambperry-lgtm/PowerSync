@@ -1941,6 +1941,13 @@
               <button type="button" class="archive-pill" data-min-dist="40" data-max-dist="59.9">40–60 mi</button>
               <button type="button" class="archive-pill" data-min-dist="60" data-max-dist="">60+ mi</button>
             </div>
+            <div class="archive-outdoor-filter-row" id="archiveOutdoorTerrainPills">
+              <span class="archive-outdoor-filter-lbl">⛰️ Terrain</span>
+              <button type="button" class="archive-pill active" data-terrain="all">All</button>
+              <button type="button" class="archive-pill" data-terrain="flat" title="< 30 ft climbing per mile">Flat</button>
+              <button type="button" class="archive-pill" data-terrain="rolling" title="30–65 ft climbing per mile">Rolling</button>
+              <button type="button" class="archive-pill" data-terrain="hilly" title="> 65 ft climbing per mile">Hilly</button>
+            </div>
           </div>
 
           <div id="archiveWorkoutsGrid" class="archive-cards-grid" style="margin-top:0.85rem;">
@@ -3604,6 +3611,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=151"></script>
+  <script src="/static/js/app.js?v=152"></script>
 </body>
 </html>

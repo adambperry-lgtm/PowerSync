@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.19.1] - 2026-11-20
+### Added
+- **Flat / Rolling / Hilly Terrain Filter Pills**:
+  - Added **⛰️ Terrain** preset pills (`All`, `Flat`, `Rolling`, `Hilly`) to the Outdoor Routes archive ([`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) `v=152`).
+  - Added `climbing_ft_per_mile`, `terrain_type` (`flat` `<30 ft/mi`, `rolling` `30–65 ft/mi`, `hilly` `>65 ft/mi`), and `terrain` filtering in [`get_archived_outdoor_routes()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/workout_archive_service.py) and [`GET /api/workouts/archive`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/workouts.py).
+
 ## [2.19.0] - 2026-11-20
 ### Changed
 - **Open in Strava Workflow for Outdoor Routes (Replaces Shaky Garmin Login)**:

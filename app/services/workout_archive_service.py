@@ -419,6 +419,7 @@ def get_archived_outdoor_routes(
     max_duration_min: Optional[int] = None,
     min_distance_mi: Optional[float] = None,
     max_distance_mi: Optional[float] = None,
+    terrain: Optional[str] = None,
     sort_by: str = "recent",
 ) -> List[Dict[str, Any]]:
     """
@@ -556,6 +557,18 @@ def get_archived_outdoor_routes(
             if_val = 0.0
             est_tss = round(float(d.get("suffer_score") or 0))
 
+        climbing_ft_per_mi = round(elev_ft / max(0.5, dist_mi), 1) if dist_mi > 0 else 0.0
+        if climbing_ft_per_mi < 30.0:
+            terrain_type = "flat"
+        elif climbing_ft_per_mi <= 65.0:
+            terrain_type = "rolling"
+        else:
+            terrain_type = "hilly"
+
+        terrain_filter = (terrain or "").strip().lower()
+        if terrain_filter and terrain_filter != "all" and terrain_type != terrain_filter:
+            continue
+
         ride_id = str(d.get("id") or "")
         results.append({
             "id": ride_id,
@@ -570,6 +583,8 @@ def get_archived_outdoor_routes(
             "distance_km": dist_km,
             "elevation_gain_ft": elev_ft,
             "elevation_gain_m": elev_m,
+            "climbing_ft_per_mile": climbing_ft_per_mi,
+            "terrain_type": terrain_type,
             "average_watts": avg_w,
             "normalized_power_watts": np_w,
             "intensity_factor": if_val,
