@@ -1254,24 +1254,41 @@ def get_workout_archive_and_library(
     duration_min: int = 60,
     zone: Optional[str] = None,
     q: Optional[str] = None,
+    min_dur: Optional[int] = None,
+    max_dur: Optional[int] = None,
+    min_dist: Optional[float] = None,
+    max_dist: Optional[float] = None,
+    sort: str = "recent",
 ):
-    """Returns the user's prior/saved workouts alongside the structured Coach Library."""
+    """Returns the user's prior/saved workouts, outdoor routes, and the structured Coach Library."""
     uid = get_current_user_id()
     ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
 
     from app.services.workout_archive_service import (
+        get_archived_outdoor_routes,
         get_archived_workouts,
         get_workout_library,
     )
 
     prior_workouts = [] if uid == "usr_guest" else get_archived_workouts(user_id=uid, ftp=ftp, query=q)
     library_workouts = get_workout_library(ftp=ftp, duration_min=duration_min, zone_filter=zone, query=q)
+    outdoor_routes = [] if uid == "usr_guest" else get_archived_outdoor_routes(
+        user_id=uid,
+        ftp=ftp,
+        query=q,
+        min_duration_min=min_dur,
+        max_duration_min=max_dur,
+        min_distance_mi=min_dist,
+        max_distance_mi=max_dist,
+        sort_by=sort,
+    )
 
     return {
         "success": True,
         "ftp": ftp,
         "prior_workouts": prior_workouts,
         "library_workouts": library_workouts,
+        "outdoor_routes": outdoor_routes,
     }
 
 

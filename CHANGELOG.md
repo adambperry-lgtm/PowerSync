@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.18.6] - 2026-11-20
+### Fixed
+- **Restore `outdoor_routes` in `GET /api/workouts/archive`**:
+  - Restored [`get_archived_outdoor_routes()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/workout_archive_service.py) call and `outdoor_routes` response field in [`get_workout_archive_and_library()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/workouts.py) (`GET /api/workouts/archive`), which was inadvertently dropped and caused the **Outdoor Routes** tab to always receive `outdoor_routes: undefined`.
+  - Added HTTP endpoint regression test [`test_archive_http_endpoint_returns_outdoor_routes()`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_outdoor_archive_garmin.py).
+
 ## [2.18.5] - 2026-11-20
 ### Fixed
 - **Outdoor Routes Strava Backfill Fallback & Cache-Busting**:

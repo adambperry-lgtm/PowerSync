@@ -242,6 +242,16 @@ class TestOutdoorArchiveAndGarmin(unittest.TestCase):
         self.assertIn("900004", ids)
         self.assertNotIn("900005", ids)
 
+    def test_archive_http_endpoint_returns_outdoor_routes(self):
+        with patch("app.routers.workouts.get_current_user_id", return_value=self.user_a):
+            res = self.client.get("/api/workouts/archive?duration_min=60")
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data["success"])
+        self.assertIn("outdoor_routes", data)
+        ids = {r["id"] for r in data["outdoor_routes"]}
+        self.assertEqual(ids, {"900001", "900002"})
+
 
 if __name__ == "__main__":
     unittest.main()

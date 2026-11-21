@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.18.5",
-        "release_name": "Outdoor Routes Strava Backfill & Cache-Bust",
+        "version": "2.18.6",
+        "release_name": "Outdoor Routes Archive Endpoint Fix",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -161,6 +161,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.18.6",
+                "date": "2026-11-20",
+                "title": "Outdoor Routes Archive Endpoint Fix",
+                "items": [
+                    "Outdoor Routes API Fix: Restored outdoor_routes in GET /api/workouts/archive so synced Strava outdoor rides populate in the Workout Archive."
+                ]
+            },
             {
                 "version": "v2.18.5",
                 "date": "2026-11-20",
