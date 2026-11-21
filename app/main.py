@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.18.6",
-        "release_name": "Outdoor Routes Archive Endpoint Fix",
+        "version": "2.19.0",
+        "release_name": "Outdoor Routes Strava Link & GPX Export",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -156,11 +156,19 @@ def version_info():
             "wyze": "Wyze Scale Cloud API (Pluto & Classic Scale)",
             "apple_health": "Auto-Export Webhook (Health Auto Export / Shortcuts) & Manual Entry",
             "zwift": "Intervals.icu Cloud Bridge",
-            "garmin": "Garmin Connect Courses Bridge (1-Click GPX Route Sync)",
             "ai_coach":"Google Gemini 2.5 Flash (Zero-Thinking Fast Mode • Tool Calling)",
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.19.0",
+                "date": "2026-11-20",
+                "title": "Outdoor Routes Strava Link & GPX Export",
+                "items": [
+                    "Open in Strava: Replaced the Garmin Connect login flow with direct 'Open in Strava ↗' links on every outdoor route card and in the Route Inspector (alongside ⬇️ .GPX export) so you can create/star a Strava route for automatic Garmin sync.",
+                    "Cleaner Connections UI: Removed the Garmin Connect login card from Settings and the navbar Connections dropdown."
+                ]
+            },
             {
                 "version": "v2.18.6",
                 "date": "2026-11-20",

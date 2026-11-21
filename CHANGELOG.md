@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.19.0] - 2026-11-20
+### Changed
+- **Open in Strava Workflow for Outdoor Routes (Replaces Shaky Garmin Login)**:
+  - Replaced **📡 Send to Garmin** on outdoor route cards and in the Route Inspector ([`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) `v=151`) with **🟠 Open in Strava ↗**, linking directly to `https://www.strava.com/activities/{id}` so you can create/star a Strava route (which syncs to Garmin automatically) while keeping **⬇️ .GPX** export in the Route Inspector.
+  - Removed the Garmin Connect login card from Settings and the Garmin entry from the navbar Connections dropdown ([`dashboard.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/dashboard.py)).
+
 ## [2.18.6] - 2026-11-20
 ### Fixed
 - **Restore `outdoor_routes` in `GET /api/workouts/archive`**:

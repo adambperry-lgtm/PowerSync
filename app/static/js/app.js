@@ -1212,8 +1212,6 @@ function renderIntegrations(integrations) {
     totalServices++;
     if (Boolean(integrations.intervals_icu?.configured)) connectedCount++;
   }
-  totalServices++;
-  if (Boolean(integrations.garmin?.connected)) connectedCount++;
   if (geminiEnabled) {
     totalServices++;
     if (Boolean(integrations.gemini?.configured) || (!isDemo && state.dashboard?.has_gemini)) connectedCount++;
@@ -3338,7 +3336,6 @@ function openSettingsModal() {
 
       // Wyze Smart Scale Connection & Fields
       renderWyzeSettingsSummary(s);
-      if (typeof renderGarminSettingsSummary === "function") renderGarminSettingsSummary(s);
 
       // Intervals.icu / Zwift Connection Status
       const intervalsStat = document.getElementById("intervalsConnStatus");
@@ -10394,7 +10391,7 @@ function setArchiveMode(mode) {
     } else if (archiveState.outdoorRoutes.length > 0) {
       openOutdoorRouteInspector(archiveState.outdoorRoutes[0]);
     } else if (editorSub) {
-      editorSub.textContent = "Select any prior outdoor route to inspect or send to Garmin";
+      editorSub.textContent = "Select any prior outdoor route to inspect or open in Strava";
     }
   } else {
     if (editorIcon) editorIcon.textContent = "🛠️";
@@ -10423,6 +10420,7 @@ function openOutdoorRouteInspector(route) {
   const tssEl = document.getElementById("archiveOutdoorTSS");
   const orientEl = document.getElementById("archiveOutdoorOrientation");
   const stravaEl = document.getElementById("archiveOutdoorStravaLink");
+  const openStravaBtn = document.getElementById("btnArchiveOpenStrava");
   const subEl = document.getElementById("archiveEditorSourceLabel");
   const fbEl = document.getElementById("archiveGarminFeedback");
 
@@ -10436,13 +10434,17 @@ function openOutdoorRouteInspector(route) {
   if (tssEl) tssEl.textContent = route.estimated_tss != null ? `${route.estimated_tss}` : "--";
   if (orientEl) orientEl.textContent = `${route.orientation_label || "Outdoor Route"} • ${route.distance_km || 0} km`;
 
+  const hasStrava = Boolean(route.strava_url && /^\d+$/.test(String(route.id || "")));
   if (stravaEl) {
-    if (route.strava_url && /^\d+$/.test(String(route.id || ""))) {
+    if (hasStrava) {
       stravaEl.href = route.strava_url;
       stravaEl.style.display = "inline";
     } else {
       stravaEl.style.display = "none";
     }
+  }
+  if (openStravaBtn) {
+    openStravaBtn.href = hasStrava ? route.strava_url : "https://www.strava.com/athlete/training";
   }
 
   if (svgEl) {
@@ -10990,138 +10992,12 @@ function initWorkoutArchive() {
     renderArchiveGrid();
   });
 
-  // Outdoor Inspector: Download .GPX & 1-Click Send to Garmin
+  // Outdoor Inspector: Download .GPX
   document.getElementById("btnArchiveDownloadGpx")?.addEventListener("click", () => {
     if (!archiveState.selectedOutdoorRoute) return;
     downloadOutdoorRouteGpx(archiveState.selectedOutdoorRoute.id);
   });
-
-  document.getElementById("btnArchivePushGarmin")?.addEventListener("click", async () => {
-    if (!archiveState.selectedOutdoorRoute) return;
-    const btn = document.getElementById("btnArchivePushGarmin");
-    const titleEl = document.getElementById("archiveOutdoorTitle");
-    const courseName = titleEl?.value?.trim() || archiveState.selectedOutdoorRoute.title;
-    await pushOutdoorRouteToGarmin(archiveState.selectedOutdoorRoute.id, courseName, btn);
-  });
 }
-
-function renderGarminSettingsSummary(s) {
-  const emailEl = document.getElementById("settingGarminEmail");
-  const passEl = document.getElementById("settingGarminPassword");
-  const mfaGroup = document.getElementById("garminMfaGroup");
-  const mfaInput = document.getElementById("settingGarminMfaCode");
-  const statEl = document.getElementById("garminConnStatus");
-  const btnConn = document.getElementById("btnConnectGarmin");
-  const btnDisc = document.getElementById("btnDisconnectGarmin");
-  const fbEl = document.getElementById("garminConnectFeedback");
-
-  if (fbEl) fbEl.style.display = "none";
-  if (emailEl && s.garmin_email !== undefined) emailEl.value = s.garmin_email || "";
-  if (passEl) {
-    passEl.value = "";
-    passEl.placeholder = s.garmin_password_set ? "•••••••••••• (Saved on server — leave blank to keep)" : "Garmin password";
-  }
-  if (mfaGroup) mfaGroup.style.display = "none";
-  if (mfaInput) mfaInput.value = "";
-
-  const isConnected = Boolean(s.garmin_connected || s.garmin_has_tokens);
-  if (statEl) {
-    statEl.textContent = isConnected ? "Connected ✅" : "Not connected";
-    statEl.style.color = isConnected ? "#10b981" : "#94a3b8";
-  }
-  if (btnConn) {
-    btnConn.textContent = isConnected ? "🔑 Re-Authenticate Garmin" : "🔗 Connect Garmin";
-  }
-  if (btnDisc) {
-    btnDisc.style.display = isConnected ? "inline-flex" : "none";
-  }
-}
-
-document.getElementById("btnConnectGarmin")?.addEventListener("click", async () => {
-  const email = document.getElementById("settingGarminEmail")?.value.trim() || "";
-  const password = document.getElementById("settingGarminPassword")?.value || "";
-  const mfaCode = document.getElementById("settingGarminMfaCode")?.value.trim() || "";
-  const tokenData = document.getElementById("settingGarminTokenData")?.value.trim() || "";
-  const fbEl = document.getElementById("garminConnectFeedback");
-  const mfaGroup = document.getElementById("garminMfaGroup");
-  const tokenDetails = document.getElementById("garminTokenDetails");
-  const btn = document.getElementById("btnConnectGarmin");
-  if (!btn) return;
-
-  const origText = btn.textContent;
-  btn.textContent = "⏳ Connecting to Garmin...";
-  btn.disabled = true;
-  if (fbEl) fbEl.style.display = "none";
-
-  try {
-    const res = await fetch("/api/settings/garmin/connect", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        email,
-        password,
-        mfa_code: mfaCode || null,
-        token_data: tokenData || null
-      })
-    });
-    const data = await res.json();
-    if (data.success) {
-      const tokInput = document.getElementById("settingGarminTokenData");
-      if (tokInput) tokInput.value = "";
-      renderGarminSettingsSummary({ garmin_connected: true, garmin_has_tokens: true, garmin_email: data.email || email, garmin_password_set: true });
-      if (fbEl) {
-        fbEl.textContent = `✅ ${data.message || "Connected to Garmin Connect!"}`;
-        fbEl.style.color = "#059669";
-        fbEl.style.borderColor = "rgba(16, 185, 129, 0.35)";
-        fbEl.style.display = "block";
-      }
-      showToast("✅ Garmin Connect linked!");
-      if (typeof loadDashboard === "function") await loadDashboard();
-    } else if (data.mfa_required) {
-      if (mfaGroup) mfaGroup.style.display = "block";
-      if (fbEl) {
-        fbEl.textContent = `🔐 ${data.error}`;
-        fbEl.style.color = "#D97706";
-        fbEl.style.borderColor = "rgba(245, 158, 11, 0.4)";
-        fbEl.style.display = "block";
-      }
-      btn.textContent = "🔐 Verify 2FA Code";
-    } else {
-      if (data.cloud_blocked && tokenDetails) {
-        tokenDetails.open = true;
-      }
-      if (fbEl) {
-        fbEl.textContent = `⚠️ ${data.error || "Could not connect to Garmin."}`;
-        fbEl.style.color = "#DC2626";
-        fbEl.style.borderColor = "rgba(239, 68, 68, 0.35)";
-        fbEl.style.display = "block";
-      }
-    }
-  } catch (e) {
-    if (fbEl) {
-      fbEl.textContent = "⚠️ Network error connecting to Garmin.";
-      fbEl.style.color = "#DC2626";
-      fbEl.style.display = "block";
-    }
-  } finally {
-    if (btn.textContent.startsWith("⏳")) btn.textContent = origText;
-    btn.disabled = false;
-  }
-});
-
-document.getElementById("btnDisconnectGarmin")?.addEventListener("click", async () => {
-  try {
-    const res = await fetch("/api/settings/garmin/disconnect", { method: "POST" });
-    const data = await res.json();
-    if (data.success) {
-      renderGarminSettingsSummary({ garmin_connected: false, garmin_has_tokens: false, garmin_email: document.getElementById("settingGarminEmail")?.value || "", garmin_password_set: false });
-      showToast("Garmin Connect disconnected.");
-      if (typeof loadDashboard === "function") await loadDashboard();
-    }
-  } catch (e) {
-    console.warn("Could not disconnect Garmin:", e);
-  }
-});
 
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initWorkoutArchive);
