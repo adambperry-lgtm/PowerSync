@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.19.4",
-        "release_name": "Outdoor Route Inspector Leaflet Map Fix",
+        "version": "2.19.5",
+        "release_name": "Outdoor Route Inspector Modal Pop-up",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.19.5",
+                "date": "2026-11-20",
+                "title": "Outdoor Route Inspector Modal Pop-up",
+                "items": [
+                    "Route Inspector Pop-up: Moved Route Inspector into a modal pop-up with an × close button (plus backdrop & Escape close) so inspecting a route keeps your scroll position in the list."
+                ]
+            },
             {
                 "version": "v2.19.4",
                 "date": "2026-11-20",

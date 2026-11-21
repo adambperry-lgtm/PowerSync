@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.19.5] - 2026-11-20
+### Changed
+- **Route Inspector Modal Pop-up (Preserves Scroll Position)**:
+  - Converted the Outdoor **Route Inspector** into a modal pop-up (`#modalOutdoorRouteInspector` in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) `v=156`) with an `×` close button (`#btnCloseOutdoorRouteModal`), backdrop click, and `Escape` key support so inspecting any route keeps your exact scroll position in the list.
+  - Hid the right-hand indoor editor panel in **Outdoor Routes** mode so route cards span the full grid width.
+
 ## [2.19.4] - 2026-11-20
 ### Fixed
 - **Outdoor Route Inspector Leaflet Map Container & Tile Layer**:

@@ -10412,10 +10412,20 @@ function setArchiveMode(mode) {
 let archiveOutdoorLeafletMap = null;
 let archiveOutdoorRouteLayer = null;
 
-function openOutdoorRouteInspector(route, scrollToInspector = false) {
+function closeOutdoorRouteModal() {
+  const modal = document.getElementById("modalOutdoorRouteInspector");
+  if (modal) {
+    modal.classList.remove("open");
+    modal.style.display = "none";
+  }
+}
+
+function openOutdoorRouteInspector(route) {
   if (!route) return;
   archiveState.selectedOutdoorRoute = route;
-  const titleEl = document.getElementById("archiveOutdoorTitle");
+  const modal = document.getElementById("modalOutdoorRouteInspector");
+  const titleEl = document.getElementById("archiveOutdoorModalTitle");
+  const subEl = document.getElementById("archiveOutdoorModalSubtitle");
   const svgEl = document.getElementById("archiveOutdoorMapSvg");
   const leafletEl = document.getElementById("archiveOutdoorLeafletMap");
   const durEl = document.getElementById("archiveOutdoorDur");
@@ -10426,11 +10436,8 @@ function openOutdoorRouteInspector(route, scrollToInspector = false) {
   const orientEl = document.getElementById("archiveOutdoorOrientation");
   const stravaEl = document.getElementById("archiveOutdoorStravaLink");
   const openStravaBtn = document.getElementById("btnArchiveOpenStrava");
-  const subEl = document.getElementById("archiveEditorSourceLabel");
-  const fbEl = document.getElementById("archiveGarminFeedback");
 
-  if (fbEl) fbEl.style.display = "none";
-  if (titleEl) titleEl.value = route.title || "Outdoor Route";
+  if (titleEl) titleEl.textContent = route.title || "Outdoor Route";
   if (subEl) subEl.textContent = `${route.sport_type || "Ride"} • ${route.date_relative || route.date || ""}`;
   if (durEl) durEl.textContent = route.moving_time_formatted || `${route.duration_minutes || 0}m`;
   if (distEl) distEl.textContent = `${route.distance_miles || 0} mi`;
@@ -10450,6 +10457,11 @@ function openOutdoorRouteInspector(route, scrollToInspector = false) {
   }
   if (openStravaBtn) {
     openStravaBtn.href = hasStrava ? route.strava_url : "https://www.strava.com/athlete/training";
+  }
+
+  if (modal) {
+    modal.classList.add("open");
+    modal.style.display = "flex";
   }
 
   const pts = Array.isArray(route.map_points) ? route.map_points : [];
@@ -10504,26 +10516,6 @@ function openOutdoorRouteInspector(route, scrollToInspector = false) {
       } else {
         svgEl.innerHTML = `<text x="190" y="85" text-anchor="middle" fill="#94a3b8" font-size="13">No GPS polyline stored for this ride</text>`;
       }
-    }
-  }
-
-  renderArchiveGrid();
-
-  if (scrollToInspector) {
-    const panel = document.getElementById("archiveEditorPanel");
-    if (panel) {
-      panel.classList.remove("collapsed");
-      const toggleIcon = document.getElementById("archiveEditorToggleIcon");
-      const toggleText = document.getElementById("archiveEditorToggleText");
-      if (toggleIcon) toggleIcon.textContent = "▲";
-      if (toggleText) toggleText.textContent = "Collapse";
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
-      setTimeout(() => {
-        if (archiveOutdoorLeafletMap && archiveOutdoorRouteLayer) {
-          archiveOutdoorLeafletMap.invalidateSize(true);
-          archiveOutdoorLeafletMap.fitBounds(archiveOutdoorRouteLayer.getBounds(), { padding: [20, 20], maxZoom: 15 });
-        }
-      }, 320);
     }
   }
 }
@@ -11035,10 +11027,20 @@ function initWorkoutArchive() {
     renderArchiveGrid();
   });
 
-  // Outdoor Inspector: Download .GPX
+  // Outdoor Inspector Modal: Download .GPX & Close handlers
   document.getElementById("btnArchiveDownloadGpx")?.addEventListener("click", () => {
     if (!archiveState.selectedOutdoorRoute) return;
     downloadOutdoorRouteGpx(archiveState.selectedOutdoorRoute.id);
+  });
+  document.getElementById("btnCloseOutdoorRouteModal")?.addEventListener("click", closeOutdoorRouteModal);
+  document.getElementById("modalOutdoorRouteInspector")?.addEventListener("click", (e) => {
+    if (e.target && e.target.id === "modalOutdoorRouteInspector") closeOutdoorRouteModal();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const m = document.getElementById("modalOutdoorRouteInspector");
+      if (m && m.classList.contains("open")) closeOutdoorRouteModal();
+    }
   });
 }
 

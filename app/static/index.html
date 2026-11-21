@@ -2062,58 +2062,6 @@
             </button>
           </div>
         </div>
-
-        <!-- Outdoor Route Inspector & Garmin Sender -->
-        <div class="collapsible-tile-body archive-editor-body" id="archiveOutdoorInspectorBody" style="display:none;padding-top:0.85rem;flex-direction:column;gap:0.85rem;">
-          <div>
-            <label for="archiveOutdoorTitle" style="display:block;font-size:0.72rem;font-weight:700;color:var(--text-secondary);margin-bottom:0.25rem;">Route / Course Name (sent to Garmin)</label>
-            <input type="text" id="archiveOutdoorTitle" class="archive-input" placeholder="e.g. Sunday Gravel Loop" />
-          </div>
-
-          <div class="archive-route-map-wrap" id="archiveOutdoorMapWrap" style="display:block;padding:0;overflow:hidden;">
-            <div id="archiveOutdoorLeafletMap" style="width:100%;height:230px;border-radius:8px;display:none;"></div>
-            <svg id="archiveOutdoorMapSvg" viewBox="0 0 380 160" style="width:100%;height:150px;display:block;"></svg>
-          </div>
-
-          <div class="archive-metrics-strip">
-            <div class="archive-metric-box">
-              <span class="archive-metric-lbl">Time</span>
-              <span class="archive-metric-val" id="archiveOutdoorDur">--</span>
-            </div>
-            <div class="archive-metric-box">
-              <span class="archive-metric-lbl">Distance</span>
-              <span class="archive-metric-val" id="archiveOutdoorDist">-- mi</span>
-            </div>
-            <div class="archive-metric-box">
-              <span class="archive-metric-lbl">Elevation</span>
-              <span class="archive-metric-val" id="archiveOutdoorElev">-- ft</span>
-            </div>
-            <div class="archive-metric-box">
-              <span class="archive-metric-lbl">NP / Avg</span>
-              <span class="archive-metric-val" id="archiveOutdoorNP">-- W</span>
-            </div>
-            <div class="archive-metric-box">
-              <span class="archive-metric-lbl">Est. TSS</span>
-              <span class="archive-metric-val" id="archiveOutdoorTSS">--</span>
-            </div>
-          </div>
-
-          <div id="archiveOutdoorMetaLine" style="font-size:0.76rem;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem;">
-            <span id="archiveOutdoorOrientation">Outdoor Route</span>
-            <a id="archiveOutdoorStravaLink" href="#" target="_blank" rel="noopener" style="color:var(--accent-cyan);font-weight:600;text-decoration:none;display:none;">View on Strava ↗</a>
-          </div>
-
-          <div id="archiveGarminFeedback" style="display:none;font-size:0.77rem;padding:0.5rem 0.65rem;border-radius:8px;border:1px solid var(--border-color);"></div>
-
-          <div class="archive-editor-actions">
-            <button type="button" class="btn btn-secondary" id="btnArchiveDownloadGpx" title="Download .gpx route file">
-              ⬇️ .GPX
-            </button>
-            <a id="btnArchiveOpenStrava" href="#" target="_blank" rel="noopener" class="btn btn-primary" style="flex:1.5;background:linear-gradient(135deg,#FC4C02,#E34402);border:none;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">
-              🟠 Open in Strava ↗
-            </a>
-          </div>
-        </div>
       </aside>
     </div>
   </div> <!-- end viewArchiveContainer (Workout Archive & Library) -->
@@ -3561,6 +3509,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=155"></script>
+  <script src="/static/js/app.js?v=156"></script>
 </body>
 </html>
