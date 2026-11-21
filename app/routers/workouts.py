@@ -1528,4 +1528,21 @@ def download_archive_outdoor_gpx(ride_id: str):
     )
 
 
+@router.get("/archive/outdoor/{ride_id}")
+def get_archive_outdoor_route_detail(ride_id: str):
+    """Returns full GPS map_points and SVG path on demand for a single outdoor route."""
+    uid = get_current_user_id()
+    if uid == "usr_guest":
+        raise HTTPException(status_code=401, detail="Sign in required.")
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid))
+
+    from app.services.workout_archive_service import get_single_outdoor_route_detail
+
+    route = get_single_outdoor_route_detail(ride_id=ride_id, user_id=uid, ftp=ftp)
+    if not route:
+        raise HTTPException(status_code=404, detail="Outdoor route not found.")
+    return {"success": True, "route": route}
+
+
+
 

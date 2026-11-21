@@ -411,6 +411,251 @@ def resolve_workout_by_identifier(
     return None
 
 
+def _build_outdoor_route_cache_row(d: Dict[str, Any], ftp: int) -> Optional[Dict[str, Any]]:
+    import ast
+    from app.services.outdoor_coach import decode_polyline, generate_svg_path
+    from app.services.ride_history_service import _is_indoor_ride
+    from app.services.strain_model_service import is_cycling_sport
+
+    sport = str(d.get("sport_type") or "Ride")
+    if not is_cycling_sport(sport):
+        return None
+
+    title = d.get("name") or "Outdoor Ride"
+    raw = d.get("raw_json")
+    raw_d: Dict[str, Any] = {}
+    if raw:
+        parsed = None
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            try:
+                parsed = ast.literal_eval(raw)
+            except Exception:
+                parsed = None
+        if isinstance(parsed, dict):
+            raw_d = parsed
+
+    if _is_indoor_ride(sport, raw_d, title):
+        return None
+
+    dur_sec = int(d.get("moving_time_sec") or d.get("elapsed_time_sec") or 0)
+    if dur_sec < 600:
+        return None
+    dur_min = max(1, round(dur_sec / 60.0))
+    dist_m = float(d.get("distance_meters") or 0.0)
+    dist_km = round(dist_m / 1000.0, 1)
+    dist_mi = round(dist_m * 0.000621371, 1)
+    elev_m = round(float(d.get("total_elevation_gain") or 0.0))
+    elev_ft = round(elev_m * 3.28084)
+
+    poly = ((raw_d.get("map") or {}).get("summary_polyline") or "").strip()
+    pts = decode_polyline(poly)
+    thumb_svg, _, _ = generate_svg_path(pts, 140, 64, padding=6) if pts else ("", None, None)
+
+    is_loop = False
+    orientation_label = "Outdoor Route"
+    if pts and len(pts) >= 2:
+        d_se = math.sqrt(((pts[0][0] - pts[-1][0]) * 111.0) ** 2 + ((pts[0][1] - pts[-1][1]) * 85.0) ** 2)
+        if d_se < 0.8:
+            is_loop = True
+            orientation_label = "Loop Route"
+        elif d_se < 2.0:
+            orientation_label = "Out-and-Back"
+        else:
+            orientation_label = "Point-to-Point"
+
+    avg_w = round(float(d.get("average_watts") or 0))
+    np_w = round(float(d.get("weighted_average_watts") or avg_w or 0))
+    if np_w > 0 and dur_sec > 0:
+        if_val = round(np_w / float(ftp), 2)
+        est_tss = max(1, round(((dur_sec * np_w * if_val) / (float(ftp) * 3600.0)) * 100.0))
+    else:
+        if_val = 0.0
+        est_tss = round(float(d.get("suffer_score") or 0))
+
+    climbing_ft_per_mi = round(elev_ft / max(0.5, dist_mi), 1) if dist_mi > 0 else 0.0
+    if climbing_ft_per_mi < 30.0:
+        terrain_type = "flat"
+    elif climbing_ft_per_mi <= 65.0:
+        terrain_type = "rolling"
+    else:
+        terrain_type = "hilly"
+
+    ride_id = str(d.get("id") or "")
+    start_date = str(d.get("start_date") or "")
+    date_str = start_date[:10]
+    return {
+        "id": ride_id,
+        "title": title,
+        "sport_type": sport,
+        "start_date": start_date,
+        "date_str": date_str,
+        "duration_minutes": dur_min,
+        "moving_time_formatted": f"{dur_min // 60}h {dur_min % 60}m" if dur_min >= 60 else f"{dur_min}m",
+        "distance_miles": dist_mi,
+        "distance_km": dist_km,
+        "elevation_gain_ft": elev_ft,
+        "elevation_gain_m": elev_m,
+        "climbing_ft_per_mile": climbing_ft_per_mi,
+        "terrain_type": terrain_type,
+        "average_watts": avg_w,
+        "normalized_power_watts": np_w,
+        "intensity_factor": if_val,
+        "estimated_tss": est_tss,
+        "has_gps": 1 if len(pts) >= 2 else 0,
+        "thumbnail_svg": thumb_svg,
+        "is_loop": 1 if is_loop else 0,
+        "orientation_label": orientation_label,
+        "strava_url": f"https://www.strava.com/activities/{ride_id}",
+    }
+
+
+def sync_outdoor_routes_cache(
+    user_id: Optional[str] = None,
+    ftp: int = 250,
+    fetch_remote_if_needed: bool = True,
+) -> int:
+    """
+    Incrementally syncs new outdoor rides from `strava_activities` into the
+    persistent `outdoor_routes_cache` table in SQLite. Only parses/computes
+    SVGs for newly added rides, making archive loads near-instant.
+    Returns count of newly cached routes.
+    """
+    from app.database import get_setting
+
+    uid = user_id or get_current_user_id()
+    if uid == "usr_guest":
+        return 0
+    ftp = max(50, int(ftp or 250))
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM outdoor_routes_cache WHERE user_id = ?", (uid,))
+    cached_ids = {str(r[0]) for r in cursor.fetchall()}
+
+    cursor.execute(
+        """
+        SELECT id FROM strava_activities
+        WHERE user_id = ? AND COALESCE(moving_time_sec, elapsed_time_sec, 0) >= 600
+        """,
+        (uid,),
+    )
+    strava_ids = {str(r[0]) for r in cursor.fetchall()}
+
+    # If strava_activities is empty or has no outdoor routes yet and Strava is connected, fetch once
+    if fetch_remote_if_needed and not cached_ids and not strava_ids and get_setting("strava_tokens", None, user_id=uid):
+        conn.close()
+        try:
+            from app.services.strava_service import fetch_recent_strava_activities, trigger_strava_full_backfill_async
+            fetch_recent_strava_activities(limit=200, user_id=uid)
+            trigger_strava_full_backfill_async(user_id=uid)
+        except Exception:
+            pass
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT id FROM strava_activities
+            WHERE user_id = ? AND COALESCE(moving_time_sec, elapsed_time_sec, 0) >= 600
+            """,
+            (uid,),
+        )
+        strava_ids = {str(r[0]) for r in cursor.fetchall()}
+
+    # Remove deleted rides from cache if any
+    stale_ids = cached_ids - strava_ids
+    if stale_ids:
+        placeholders = ",".join("?" for _ in stale_ids)
+        cursor.execute(
+            f"DELETE FROM outdoor_routes_cache WHERE user_id = ? AND id IN ({placeholders})",
+            (uid, *stale_ids),
+        )
+
+    missing_ids = strava_ids - cached_ids
+    inserted = 0
+    if missing_ids:
+        placeholders = ",".join("?" for _ in missing_ids)
+        cursor.execute(
+            f"""
+            SELECT id, name, sport_type, start_date, moving_time_sec, elapsed_time_sec, distance_meters,
+                   total_elevation_gain, average_watts, weighted_average_watts,
+                   average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
+            FROM strava_activities
+            WHERE user_id = ? AND id IN ({placeholders})
+            """,
+            (uid, *missing_ids),
+        )
+        new_rows = cursor.fetchall()
+        for r in new_rows:
+            item = _build_outdoor_route_cache_row(dict(r), ftp=ftp)
+            if not item:
+                continue
+            cursor.execute(
+                """
+                INSERT INTO outdoor_routes_cache (
+                    user_id, id, title, sport_type, start_date, date_str, duration_minutes,
+                    moving_time_formatted, distance_miles, distance_km, elevation_gain_ft,
+                    elevation_gain_m, climbing_ft_per_mile, terrain_type, average_watts,
+                    normalized_power_watts, intensity_factor, estimated_tss, has_gps,
+                    thumbnail_svg, is_loop, orientation_label, strava_url
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id, id) DO UPDATE SET
+                    title = excluded.title,
+                    sport_type = excluded.sport_type,
+                    start_date = excluded.start_date,
+                    date_str = excluded.date_str,
+                    duration_minutes = excluded.duration_minutes,
+                    moving_time_formatted = excluded.moving_time_formatted,
+                    distance_miles = excluded.distance_miles,
+                    distance_km = excluded.distance_km,
+                    elevation_gain_ft = excluded.elevation_gain_ft,
+                    elevation_gain_m = excluded.elevation_gain_m,
+                    climbing_ft_per_mile = excluded.climbing_ft_per_mile,
+                    terrain_type = excluded.terrain_type,
+                    average_watts = excluded.average_watts,
+                    normalized_power_watts = excluded.normalized_power_watts,
+                    intensity_factor = excluded.intensity_factor,
+                    estimated_tss = excluded.estimated_tss,
+                    has_gps = excluded.has_gps,
+                    thumbnail_svg = excluded.thumbnail_svg,
+                    is_loop = excluded.is_loop,
+                    orientation_label = excluded.orientation_label,
+                    strava_url = excluded.strava_url
+                """,
+                (
+                    uid,
+                    item["id"],
+                    item["title"],
+                    item["sport_type"],
+                    item["start_date"],
+                    item["date_str"],
+                    item["duration_minutes"],
+                    item["moving_time_formatted"],
+                    item["distance_miles"],
+                    item["distance_km"],
+                    item["elevation_gain_ft"],
+                    item["elevation_gain_m"],
+                    item["climbing_ft_per_mile"],
+                    item["terrain_type"],
+                    item["average_watts"],
+                    item["normalized_power_watts"],
+                    item["intensity_factor"],
+                    item["estimated_tss"],
+                    item["has_gps"],
+                    item["thumbnail_svg"],
+                    item["is_loop"],
+                    item["orientation_label"],
+                    item["strava_url"],
+                ),
+            )
+            inserted += 1
+
+    conn.commit()
+    conn.close()
+    return inserted
+
+
 def get_archived_outdoor_routes(
     user_id: Optional[str] = None,
     ftp: int = 250,
@@ -423,221 +668,181 @@ def get_archived_outdoor_routes(
     sort_by: str = "recent",
 ) -> List[Dict[str, Any]]:
     """
-    Retrieves all prior outdoor rides from `strava_activities` for `user_id`,
-    decodes their route polylines into SVG previews, and supports filtering by
-    text query, duration range, and distance range.
+    Retrieves precomputed outdoor routes from `outdoor_routes_cache` in SQLite
+    (incrementally syncing any new `strava_activities` first). Omits heavy GPS
+    `map_points` so the full route list loads instantaneously.
     """
-    import ast
-    from app.database import get_setting
-    from app.services.outdoor_coach import decode_polyline, format_relative_date, generate_svg_path, sample_coordinates
-    from app.services.ride_history_service import _is_indoor_ride
-    from app.services.strain_model_service import is_cycling_sport
+    from app.services.outdoor_coach import format_relative_date
 
     uid = user_id or get_current_user_id()
     if uid == "usr_guest":
         return []
 
-    q = (query or "").strip().lower()
     ftp = max(50, int(ftp or 250))
+    sync_outdoor_routes_cache(user_id=uid, ftp=ftp)
+
+    sql = ["SELECT * FROM outdoor_routes_cache WHERE user_id = ?"]
+    params: List[Any] = [uid]
+
+    if min_duration_min is not None:
+        sql.append("AND duration_minutes >= ?")
+        params.append(int(min_duration_min))
+    if max_duration_min is not None:
+        sql.append("AND duration_minutes <= ?")
+        params.append(int(max_duration_min))
+    if min_distance_mi is not None:
+        sql.append("AND distance_miles >= ?")
+        params.append(float(min_distance_mi))
+    if max_distance_mi is not None:
+        sql.append("AND distance_miles <= ?")
+        params.append(float(max_distance_mi))
+
+    terrain_filter = (terrain or "").strip().lower()
+    if terrain_filter and terrain_filter != "all":
+        sql.append("AND terrain_type = ?")
+        params.append(terrain_filter)
+
+    q = (query or "").strip().lower()
+    if q:
+        sql.append("AND (LOWER(title) LIKE ? OR LOWER(sport_type) LIKE ? OR date_str LIKE ?)")
+        like_q = f"%{q}%"
+        params.extend([like_q, like_q, like_q])
+
+    order_map = {
+        "duration_desc": "duration_minutes DESC, start_date DESC",
+        "duration_asc": "duration_minutes ASC, start_date DESC",
+        "distance_desc": "distance_miles DESC, start_date DESC",
+        "distance_asc": "distance_miles ASC, start_date DESC",
+        "elevation_desc": "elevation_gain_ft DESC, start_date DESC",
+    }
+    sql.append(f"ORDER BY {order_map.get(sort_by, 'start_date DESC')}")
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        """
-        SELECT id, name, sport_type, start_date, moving_time_sec, elapsed_time_sec, distance_meters,
-               total_elevation_gain, average_watts, weighted_average_watts,
-               average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
-        FROM strava_activities
-        WHERE user_id = ?
-          AND COALESCE(moving_time_sec, elapsed_time_sec, 0) >= 600
-        ORDER BY start_date DESC
-        """,
-        (uid,),
-    )
+    cursor.execute(" ".join(sql), tuple(params))
     rows = cursor.fetchall()
     conn.close()
-
-    if not rows and get_setting("strava_tokens", None, user_id=uid):
-        try:
-            from app.services.strava_service import fetch_recent_strava_activities, trigger_strava_full_backfill_async
-            fetch_recent_strava_activities(limit=200, user_id=uid)
-            trigger_strava_full_backfill_async(user_id=uid)
-            conn = get_db_connection()
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT id, name, sport_type, start_date, moving_time_sec, elapsed_time_sec, distance_meters,
-                       total_elevation_gain, average_watts, weighted_average_watts,
-                       average_heartrate, max_heartrate, suffer_score, kilojoules, raw_json
-                FROM strava_activities
-                WHERE user_id = ?
-                  AND COALESCE(moving_time_sec, elapsed_time_sec, 0) >= 600
-                ORDER BY start_date DESC
-                """,
-                (uid,),
-            )
-            rows = cursor.fetchall()
-            conn.close()
-        except Exception:
-            pass
 
     results: List[Dict[str, Any]] = []
     for r in rows:
         d = dict(r)
-        sport = str(d.get("sport_type") or "Ride")
-        if not is_cycling_sport(sport):
-            continue
-
-        title = d.get("name") or "Outdoor Ride"
-        raw = d.get("raw_json")
-        raw_d: Dict[str, Any] = {}
-        if raw:
-            parsed = None
-            try:
-                parsed = json.loads(raw)
-            except Exception:
-                try:
-                    parsed = ast.literal_eval(raw)
-                except Exception:
-                    parsed = None
-            if isinstance(parsed, dict):
-                raw_d = parsed
-
-        if _is_indoor_ride(sport, raw_d, title):
-            continue
-
-        dur_sec = int(d.get("moving_time_sec") or d.get("elapsed_time_sec") or 0)
-        dur_min = max(1, round(dur_sec / 60.0))
-        dist_m = float(d.get("distance_meters") or 0.0)
-        dist_km = round(dist_m / 1000.0, 1)
-        dist_mi = round(dist_m * 0.000621371, 1)
-        elev_m = round(float(d.get("total_elevation_gain") or 0.0))
-        elev_ft = round(elev_m * 3.28084)
-
-        if min_duration_min is not None and dur_min < min_duration_min:
-            continue
-        if max_duration_min is not None and dur_min > max_duration_min:
-            continue
-        if min_distance_mi is not None and dist_mi < min_distance_mi:
-            continue
-        if max_distance_mi is not None and dist_mi > max_distance_mi:
-            continue
-
-        date_str = str(d.get("start_date") or "")[:10]
-
-        if q:
-            haystack = f"{title} {sport} {date_str}".lower()
-            if q not in haystack:
-                continue
-
-        poly = ((raw_d.get("map") or {}).get("summary_polyline") or "").strip()
-
-        pts = decode_polyline(poly)
-        svg_path, start_xy, end_xy = generate_svg_path(pts, 380, 160, padding=14) if pts else ("", None, None)
-        thumb_svg, _, _ = generate_svg_path(pts, 140, 64, padding=6) if pts else ("", None, None)
-
-        is_loop = False
-        orientation_label = "Outdoor Route"
-        if pts and len(pts) >= 2:
-            d_se = math.sqrt(((pts[0][0] - pts[-1][0]) * 111.0) ** 2 + ((pts[0][1] - pts[-1][1]) * 85.0) ** 2)
-            if d_se < 0.8:
-                is_loop = True
-                orientation_label = "Loop Route"
-            elif d_se < 2.0:
-                orientation_label = "Out-and-Back"
-            else:
-                orientation_label = "Point-to-Point"
-
-        avg_w = round(float(d.get("average_watts") or 0))
-        np_w = round(float(d.get("weighted_average_watts") or avg_w or 0))
-        if np_w > 0 and dur_sec > 0:
-            if_val = round(np_w / float(ftp), 2)
-            est_tss = max(1, round(((dur_sec * np_w * if_val) / (float(ftp) * 3600.0)) * 100.0))
-        else:
-            if_val = 0.0
-            est_tss = round(float(d.get("suffer_score") or 0))
-
-        climbing_ft_per_mi = round(elev_ft / max(0.5, dist_mi), 1) if dist_mi > 0 else 0.0
-        if climbing_ft_per_mi < 30.0:
-            terrain_type = "flat"
-        elif climbing_ft_per_mi <= 65.0:
-            terrain_type = "rolling"
-        else:
-            terrain_type = "hilly"
-
-        terrain_filter = (terrain or "").strip().lower()
-        if terrain_filter and terrain_filter != "all" and terrain_type != terrain_filter:
-            continue
-
-        ride_id = str(d.get("id") or "")
         results.append({
-            "id": ride_id,
+            "id": d["id"],
             "source": "outdoor",
-            "title": title,
-            "sport_type": sport,
-            "date": date_str,
-            "date_relative": format_relative_date(d.get("start_date") or ""),
-            "duration_minutes": dur_min,
-            "moving_time_formatted": f"{dur_min // 60}h {dur_min % 60}m" if dur_min >= 60 else f"{dur_min}m",
-            "distance_miles": dist_mi,
-            "distance_km": dist_km,
-            "elevation_gain_ft": elev_ft,
-            "elevation_gain_m": elev_m,
-            "climbing_ft_per_mile": climbing_ft_per_mi,
-            "terrain_type": terrain_type,
-            "average_watts": avg_w,
-            "normalized_power_watts": np_w,
-            "intensity_factor": if_val,
-            "estimated_tss": est_tss,
+            "title": d["title"],
+            "sport_type": d["sport_type"],
+            "date": d["date_str"],
+            "date_relative": format_relative_date(d["start_date"]),
+            "duration_minutes": d["duration_minutes"],
+            "moving_time_formatted": d["moving_time_formatted"],
+            "distance_miles": d["distance_miles"],
+            "distance_km": d["distance_km"],
+            "elevation_gain_ft": d["elevation_gain_ft"],
+            "elevation_gain_m": d["elevation_gain_m"],
+            "climbing_ft_per_mile": d["climbing_ft_per_mile"],
+            "terrain_type": d["terrain_type"],
+            "average_watts": d["average_watts"],
+            "normalized_power_watts": d["normalized_power_watts"],
+            "intensity_factor": d["intensity_factor"],
+            "estimated_tss": d["estimated_tss"],
+            "has_gps": bool(d["has_gps"]),
+            "thumbnail_svg": d["thumbnail_svg"] or "",
+            "is_loop": bool(d["is_loop"]),
+            "orientation_label": d["orientation_label"] or "Outdoor Route",
+            "strava_url": d["strava_url"] or f"https://www.strava.com/activities/{d['id']}",
+        })
+    return results
+
+
+def get_single_outdoor_route_detail(
+    ride_id: str,
+    user_id: Optional[str] = None,
+    ftp: int = 250,
+) -> Optional[Dict[str, Any]]:
+    """
+    Loads full GPS `map_points` and large SVG fallback for a single outdoor route
+    on demand when the user opens the Route Inspector modal.
+    """
+    import ast
+    from app.services.outdoor_coach import decode_polyline, format_relative_date, generate_svg_path, sample_coordinates
+
+    uid = user_id or get_current_user_id()
+    if uid == "usr_guest":
+        return None
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM outdoor_routes_cache WHERE user_id = ? AND id = ?",
+        (uid, str(ride_id)),
+    )
+    cached_row = cursor.fetchone()
+    cursor.execute(
+        "SELECT raw_json FROM strava_activities WHERE user_id = ? AND id = ?",
+        (uid, str(ride_id)),
+    )
+    act_row = cursor.fetchone()
+    conn.close()
+
+    if not cached_row and not act_row:
+        return None
+
+    poly = ""
+    if act_row and act_row["raw_json"]:
+        raw = act_row["raw_json"]
+        raw_d = None
+        try:
+            raw_d = json.loads(raw)
+        except Exception:
+            try:
+                raw_d = ast.literal_eval(raw)
+            except Exception:
+                raw_d = None
+        if isinstance(raw_d, dict):
+            poly = ((raw_d.get("map") or {}).get("summary_polyline") or "").strip()
+
+    pts = decode_polyline(poly)
+    svg_path, start_xy, end_xy = generate_svg_path(pts, 380, 160, padding=14) if pts else ("", None, None)
+
+    if cached_row:
+        d = dict(cached_row)
+        out = {
+            "id": d["id"],
+            "source": "outdoor",
+            "title": d["title"],
+            "sport_type": d["sport_type"],
+            "date": d["date_str"],
+            "date_relative": format_relative_date(d["start_date"]),
+            "duration_minutes": d["duration_minutes"],
+            "moving_time_formatted": d["moving_time_formatted"],
+            "distance_miles": d["distance_miles"],
+            "distance_km": d["distance_km"],
+            "elevation_gain_ft": d["elevation_gain_ft"],
+            "elevation_gain_m": d["elevation_gain_m"],
+            "climbing_ft_per_mile": d["climbing_ft_per_mile"],
+            "terrain_type": d["terrain_type"],
+            "average_watts": d["average_watts"],
+            "normalized_power_watts": d["normalized_power_watts"],
+            "intensity_factor": d["intensity_factor"],
+            "estimated_tss": d["estimated_tss"],
             "has_gps": len(pts) >= 2,
+            "thumbnail_svg": d["thumbnail_svg"] or "",
             "svg_path": svg_path,
-            "thumbnail_svg": thumb_svg,
             "start_xy": start_xy,
             "end_xy": end_xy,
-            "is_loop": is_loop,
-            "orientation_label": orientation_label,
-            "map_points": sample_coordinates(pts, 100) if pts else [],
-            "strava_url": f"https://www.strava.com/activities/{ride_id}",
-        })
+            "is_loop": bool(d["is_loop"]),
+            "orientation_label": d["orientation_label"] or "Outdoor Route",
+            "map_points": sample_coordinates(pts, 250) if pts else [],
+            "strava_url": d["strava_url"] or f"https://www.strava.com/activities/{d['id']}",
+        }
+        return out
 
-    if (
-        not results
-        and not q
-        and min_duration_min is None
-        and max_duration_min is None
-        and min_distance_mi is None
-        and max_distance_mi is None
-        and get_setting("strava_tokens", None, user_id=uid)
-        and not get_setting("strava_backfill_complete", False, user_id=uid)
-    ):
-        try:
-            from app.services.strava_service import fetch_recent_strava_activities, trigger_strava_full_backfill_async
-            fetched = fetch_recent_strava_activities(limit=200, user_id=uid)
-            trigger_strava_full_backfill_async(user_id=uid)
-            if fetched:
-                return get_archived_outdoor_routes(
-                    user_id=uid,
-                    ftp=ftp,
-                    query=query,
-                    min_duration_min=min_duration_min,
-                    max_duration_min=max_duration_min,
-                    min_distance_mi=min_distance_mi,
-                    max_distance_mi=max_distance_mi,
-                    sort_by=sort_by,
-                )
-        except Exception:
-            pass
+    return {
+        "id": str(ride_id),
+        "map_points": sample_coordinates(pts, 250) if pts else [],
+        "svg_path": svg_path,
+        "start_xy": start_xy,
+        "end_xy": end_xy,
+    }
 
-    if sort_by == "duration_desc":
-        results.sort(key=lambda x: x["duration_minutes"], reverse=True)
-    elif sort_by == "duration_asc":
-        results.sort(key=lambda x: x["duration_minutes"])
-    elif sort_by == "distance_desc":
-        results.sort(key=lambda x: x["distance_miles"], reverse=True)
-    elif sort_by == "distance_asc":
-        results.sort(key=lambda x: x["distance_miles"])
-    elif sort_by == "elevation_desc":
-        results.sort(key=lambda x: x["elevation_gain_ft"], reverse=True)
-
-    return results
 

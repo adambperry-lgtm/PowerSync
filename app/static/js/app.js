@@ -9142,8 +9142,8 @@ function switchMainDashboardView(targetView, updateHistory = true) {
     });
   } else if (currentActiveMainView === "archive") {
     if (toolbarTitle) toolbarTitle.textContent = "📚 Workout Archive & Customizer";
-    if (typeof loadWorkoutArchive === "function") {
-      loadWorkoutArchive();
+    if (typeof loadWorkoutArchive === "function" && !archiveState.loaded) {
+      loadWorkoutArchive({ sync: true });
     }
     requestAnimationFrame(() => {
       if (typeof drawArchiveEditorCanvas === "function") {
@@ -9977,8 +9977,10 @@ const archiveState = {
   outdoorMaxDist: null,
   outdoorTerrain: "all",
   outdoorSort: "recent",
+  outdoorVisibleLimit: 36,
   editingWorkout: null,
   selectedOutdoorRoute: null,
+  loaded: false,
   initialized: false
 };
 
@@ -10460,8 +10462,32 @@ function openOutdoorRouteInspector(route) {
   }
 
   if (modal) {
+    modal.style.zIndex = "9999";
     modal.classList.add("open");
     modal.style.display = "flex";
+  }
+
+  if (!Array.isArray(route.map_points) && route.has_gps !== false) {
+    if (leafletEl) leafletEl.style.display = "none";
+    if (svgEl) {
+      svgEl.style.display = "block";
+      svgEl.innerHTML = `<text x="190" y="85" text-anchor="middle" fill="#94a3b8" font-size="13">Loading route map...</text>`;
+    }
+    fetch(`/api/workouts/archive/outdoor/${encodeURIComponent(route.id)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.route) {
+          route.map_points = data.route.map_points || [];
+          route.svg_path = data.route.svg_path || "";
+          route.start_xy = data.route.start_xy || null;
+          route.end_xy = data.route.end_xy || null;
+          if (archiveState.selectedOutdoorRoute && archiveState.selectedOutdoorRoute.id === route.id) {
+            openOutdoorRouteInspector(route);
+          }
+        }
+      })
+      .catch(err => console.warn("Could not load route GPS detail:", err));
+    return;
   }
 
   const pts = Array.isArray(route.map_points) ? route.map_points : [];
@@ -10599,8 +10625,13 @@ function renderArchiveGrid() {
       return;
     }
 
+    const totalMatched = routes.length;
+    const visibleLimit = archiveState.outdoorVisibleLimit || 36;
+    const visibleRoutes = routes.slice(0, visibleLimit);
+    const remaining = Math.max(0, totalMatched - visibleRoutes.length);
+
     const selId = archiveState.selectedOutdoorRoute ? archiveState.selectedOutdoorRoute.id : null;
-    grid.innerHTML = routes.map(r => {
+    const cardsHtml = visibleRoutes.map(r => {
       const isSelected = selId && r.id === selId;
       const safeTitle = (r.title || "Outdoor Ride").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       const miniMap = r.thumbnail_svg
@@ -10621,26 +10652,26 @@ function renderArchiveGrid() {
             <span>🔥 ${r.estimated_tss || 0} TSS</span>
           </div>
           <div class="archive-card-actions">
-            <button type="button" class="btn btn-secondary btn-xs archive-btn-inspect" style="flex:1;" onclick="event.stopPropagation(); window.openOutdoorRouteInspectorById('${r.id}');">🗺️ Inspect</button>
+            <button type="button" class="btn btn-secondary btn-xs archive-btn-inspect" style="flex:1;">🗺️ Inspect</button>
             <a href="${r.strava_url || 'https://www.strava.com/athlete/training'}" target="_blank" rel="noopener" class="btn btn-primary btn-xs archive-btn-strava" style="flex:1.2;background:linear-gradient(135deg,#FC4C02,#E34402);border:none;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🟠 Open in Strava ↗</a>
           </div>
         </div>
       `;
     }).join("");
 
-    grid.querySelectorAll(".archive-workout-card[data-outdoor-id]").forEach(cardEl => {
-      const rid = cardEl.dataset.outdoorId;
-      const routeObj = archiveState.outdoorRoutes.find(x => String(x.id) === String(rid));
-      if (!routeObj) return;
+    const showMoreHtml = remaining > 0
+      ? `<div style="grid-column:1/-1;text-align:center;padding:0.75rem 0;">
+           <button type="button" class="btn btn-secondary" id="btnArchiveOutdoorShowMore" style="padding:0.5rem 1.25rem;font-weight:700;">
+             Show More (${remaining} remaining)
+           </button>
+         </div>`
+      : "";
 
-      cardEl.addEventListener("click", (e) => {
-        if (e.target.closest(".archive-btn-strava")) return;
-        openOutdoorRouteInspector(routeObj, true);
-      });
-      cardEl.querySelector(".archive-btn-inspect")?.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openOutdoorRouteInspector(routeObj, true);
-      });
+    grid.innerHTML = cardsHtml + showMoreHtml;
+
+    document.getElementById("btnArchiveOutdoorShowMore")?.addEventListener("click", () => {
+      archiveState.outdoorVisibleLimit = (archiveState.outdoorVisibleLimit || 36) + 36;
+      renderArchiveGrid();
     });
     return;
   }
@@ -10746,22 +10777,20 @@ function renderArchiveGrid() {
   });
 }
 
-async function loadWorkoutArchive() {
+async function loadWorkoutArchive(opts = {}) {
   try {
-    const url = `/api/workouts/archive?duration_min=${encodeURIComponent(archiveState.libraryDuration || 60)}`;
+    const syncParam = opts.sync ? "&sync=true" : "";
+    const url = `/api/workouts/archive?duration_min=${encodeURIComponent(archiveState.libraryDuration || 60)}${syncParam}`;
     const res = await fetch(url);
     const data = await res.json();
     if (data.success) {
+      archiveState.loaded = true;
       archiveState.ftp = data.ftp || 250;
       archiveState.priorWorkouts = data.prior_workouts || [];
       archiveState.libraryWorkouts = data.library_workouts || [];
       archiveState.outdoorRoutes = data.outdoor_routes || [];
       renderArchiveGrid();
-      if (archiveState.mode === "outdoor") {
-        if (!archiveState.selectedOutdoorRoute && archiveState.outdoorRoutes.length > 0) {
-          openOutdoorRouteInspector(archiveState.outdoorRoutes[0]);
-        }
-      } else if (!archiveState.editingWorkout && (archiveState.priorWorkouts.length > 0 || archiveState.libraryWorkouts.length > 0)) {
+      if (archiveState.mode !== "outdoor" && !archiveState.editingWorkout && (archiveState.priorWorkouts.length > 0 || archiveState.libraryWorkouts.length > 0)) {
         openArchiveEditor(archiveState.priorWorkouts[0] || archiveState.libraryWorkouts[0]);
       }
     }
@@ -11025,6 +11054,31 @@ function initWorkoutArchive() {
   document.getElementById("archiveOutdoorSort")?.addEventListener("change", (e) => {
     archiveState.outdoorSort = e.target.value || "recent";
     renderArchiveGrid();
+  });
+
+  // Delegated click handler for outdoor route cards & Inspect button (avoids 600+ per-card listeners)
+  document.getElementById("archiveWorkoutsGrid")?.addEventListener("click", (e) => {
+    const cardEl = e.target.closest(".archive-workout-card[data-outdoor-id]");
+    if (!cardEl) return;
+    if (e.target.closest(".archive-btn-strava")) return;
+    const rid = cardEl.dataset.outdoorId;
+    const routeObj = (archiveState.outdoorRoutes || []).find(x => String(x.id) === String(rid));
+    if (routeObj) {
+      openOutdoorRouteInspector(routeObj);
+    }
+  });
+
+  // Incremental Sync New button
+  document.getElementById("btnArchiveSyncIncremental")?.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    const btn = e.currentTarget;
+    const orig = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "⏳ Syncing...";
+    await loadWorkoutArchive({ sync: true });
+    btn.disabled = false;
+    btn.textContent = orig;
+    showToast("✅ Checked for new rides & workouts!");
   });
 
   // Outdoor Inspector Modal: Download .GPX & Close handlers

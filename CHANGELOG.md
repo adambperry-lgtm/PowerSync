@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.20.0] - 2026-11-21
+### Changed
+- **Persistent Outdoor Route Cache, Incremental Sync & Fast Paginated Grid**:
+  - Added persistent `outdoor_routes_cache` table in [`database.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) and [`sync_outdoor_routes_cache()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/workout_archive_service.py) so precomputed route summaries and SVG thumbnails are saved in `fitness.db` and only new Strava rides are processed incrementally.
+  - Stripped heavy `map_points` arrays from `GET /api/workouts/archive` (~90% smaller payload) and added on-demand `GET /api/workouts/archive/outdoor/{ride_id}` ([`workouts.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/workouts.py)) to load GPS coordinates only when inspecting a route.
+  - Added session caching across tab switches, a **🔄 Sync New** incremental check button (`?sync=true`), single delegated grid click handling, and **36-card pagination with Show More** in [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=158`).
+
 ## [2.19.6] - 2026-11-21
 ### Fixed
 - **Outdoor Route Inspect Button & Modal Stacking Context**:

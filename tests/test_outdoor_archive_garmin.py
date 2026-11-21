@@ -37,6 +37,7 @@ class TestOutdoorArchiveAndGarmin(unittest.TestCase):
         c = conn.cursor()
         for uid in (self.user_a, self.user_b):
             c.execute("DELETE FROM strava_activities WHERE user_id = ?", (uid,))
+            c.execute("DELETE FROM outdoor_routes_cache WHERE user_id = ?", (uid,))
             c.execute("DELETE FROM settings WHERE user_id = ?", (uid,))
         # Insert 63m ride and 90m ride for user_a
         c.execute(
@@ -114,6 +115,7 @@ class TestOutdoorArchiveAndGarmin(unittest.TestCase):
         c = conn.cursor()
         for uid in (self.user_a, self.user_b):
             c.execute("DELETE FROM strava_activities WHERE user_id = ?", (uid,))
+            c.execute("DELETE FROM outdoor_routes_cache WHERE user_id = ?", (uid,))
             c.execute("DELETE FROM settings WHERE user_id = ?", (uid,))
         conn.commit()
         conn.close()
@@ -261,6 +263,33 @@ class TestOutdoorArchiveAndGarmin(unittest.TestCase):
         self.assertEqual([r["id"] for r in rolling], ["900001"])
         flat = get_archived_outdoor_routes(user_id=self.user_a, ftp=250, terrain="flat")
         self.assertEqual(flat, [])
+
+    def test_incremental_outdoor_routes_cache_and_detail_endpoint(self):
+        from app.services.workout_archive_service import sync_outdoor_routes_cache
+
+        # First sync inserts both outdoor rides into outdoor_routes_cache
+        inserted_1 = sync_outdoor_routes_cache(user_id=self.user_a, ftp=250, fetch_remote_if_needed=False)
+        self.assertEqual(inserted_1, 2)
+
+        # Second sync is a 0-insert incremental no-op
+        inserted_2 = sync_outdoor_routes_cache(user_id=self.user_a, ftp=250, fetch_remote_if_needed=False)
+        self.assertEqual(inserted_2, 0)
+
+        # List endpoint omits heavy map_points
+        with patch("app.routers.workouts.get_current_user_id", return_value=self.user_a):
+            res_list = self.client.get("/api/workouts/archive?duration_min=60")
+        self.assertEqual(res_list.status_code, 200)
+        routes = res_list.json()["outdoor_routes"]
+        self.assertEqual(len(routes), 2)
+        self.assertNotIn("map_points", routes[0])
+
+        # On-demand detail endpoint returns full map_points for Route Inspector
+        with patch("app.routers.workouts.get_current_user_id", return_value=self.user_a):
+            res_detail = self.client.get("/api/workouts/archive/outdoor/900002")
+        self.assertEqual(res_detail.status_code, 200)
+        detail = res_detail.json()["route"]
+        self.assertIn("map_points", detail)
+        self.assertGreaterEqual(len(detail["map_points"]), 2)
 
 
 if __name__ == "__main__":

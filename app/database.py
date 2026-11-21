@@ -453,6 +453,36 @@ def init_db():
     );
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS outdoor_routes_cache (
+        user_id TEXT NOT NULL DEFAULT 'usr_default',
+        id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        sport_type TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        date_str TEXT NOT NULL,
+        duration_minutes INTEGER NOT NULL,
+        moving_time_formatted TEXT NOT NULL,
+        distance_miles REAL NOT NULL,
+        distance_km REAL NOT NULL,
+        elevation_gain_ft INTEGER NOT NULL,
+        elevation_gain_m INTEGER NOT NULL,
+        climbing_ft_per_mile REAL NOT NULL,
+        terrain_type TEXT NOT NULL,
+        average_watts INTEGER NOT NULL DEFAULT 0,
+        normalized_power_watts INTEGER NOT NULL DEFAULT 0,
+        intensity_factor REAL NOT NULL DEFAULT 0.0,
+        estimated_tss INTEGER NOT NULL DEFAULT 0,
+        has_gps INTEGER NOT NULL DEFAULT 0,
+        thumbnail_svg TEXT,
+        is_loop INTEGER NOT NULL DEFAULT 0,
+        orientation_label TEXT,
+        strava_url TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, id)
+    );
+    """)
+
     # Check and migrate target_plans
     _migrate_table_to_multiuser(
         cursor,

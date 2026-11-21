@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.19.6",
-        "release_name": "Outdoor Route Inspect Modal Reliability",
+        "version": "2.20.0",
+        "release_name": "Persistent Outdoor Route Cache & Incremental Sync",
         "build_date": "2026-11-21",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.20.0",
+                "date": "2026-11-21",
+                "title": "Persistent Outdoor Route Cache & Incremental Sync",
+                "items": [
+                    "Persistent Cloud Cache: Precomputed outdoor routes are now saved in outdoor_routes_cache in fitness.db with incremental sync for new rides only.",
+                    "On-Demand GPS & Paginated Grid: Route GPS points load only when inspecting a route, tab switches use session cache, and cards render 36 at a time with Show More."
+                ]
+            },
             {
                 "version": "v2.19.6",
                 "date": "2026-11-21",
