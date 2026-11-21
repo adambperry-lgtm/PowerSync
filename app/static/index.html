@@ -2297,6 +2297,62 @@
 
   </main>
 
+  <!-- Outdoor Route Inspector Modal Pop-up -->
+  <div id="modalOutdoorRouteInspector" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="archiveOutdoorModalTitle" style="z-index:9999;">
+    <div class="modal-dialog" style="max-width:640px;">
+      <div class="modal-header">
+        <div>
+          <h3 id="archiveOutdoorModalTitle" style="margin:0;font-size:1.1rem;">🗺️ Route Inspector</h3>
+          <div id="archiveOutdoorModalSubtitle" style="font-size:0.78rem;color:var(--text-muted);margin-top:0.15rem;">--</div>
+        </div>
+        <button type="button" class="modal-close" id="btnCloseOutdoorRouteModal" aria-label="Close" title="Close">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex;flex-direction:column;gap:0.85rem;">
+        <div class="archive-route-map-wrap" id="archiveOutdoorMapWrap" style="display:block;padding:0;overflow:hidden;">
+          <div id="archiveOutdoorLeafletMap" style="width:100%;height:260px;border-radius:8px;display:none;"></div>
+          <svg id="archiveOutdoorMapSvg" viewBox="0 0 380 160" style="width:100%;height:150px;display:block;"></svg>
+        </div>
+
+        <div class="archive-metrics-strip">
+          <div class="archive-metric-box">
+            <span class="archive-metric-lbl">Time</span>
+            <span class="archive-metric-val" id="archiveOutdoorDur">--</span>
+          </div>
+          <div class="archive-metric-box">
+            <span class="archive-metric-lbl">Distance</span>
+            <span class="archive-metric-val" id="archiveOutdoorDist">-- mi</span>
+          </div>
+          <div class="archive-metric-box">
+            <span class="archive-metric-lbl">Elevation</span>
+            <span class="archive-metric-val" id="archiveOutdoorElev">-- ft</span>
+          </div>
+          <div class="archive-metric-box">
+            <span class="archive-metric-lbl">NP / Avg</span>
+            <span class="archive-metric-val" id="archiveOutdoorNP">-- W</span>
+          </div>
+          <div class="archive-metric-box">
+            <span class="archive-metric-lbl">Est. TSS</span>
+            <span class="archive-metric-val" id="archiveOutdoorTSS">--</span>
+          </div>
+        </div>
+
+        <div id="archiveOutdoorMetaLine" style="font-size:0.76rem;color:var(--text-muted);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem;">
+          <span id="archiveOutdoorOrientation">Outdoor Route</span>
+          <a id="archiveOutdoorStravaLink" href="#" target="_blank" rel="noopener" style="color:var(--accent-cyan);font-weight:600;text-decoration:none;display:none;">View on Strava ↗</a>
+        </div>
+
+        <div class="archive-editor-actions">
+          <button type="button" class="btn btn-secondary" id="btnArchiveDownloadGpx" title="Download .gpx route file">
+            ⬇️ .GPX
+          </button>
+          <a id="btnArchiveOpenStrava" href="#" target="_blank" rel="noopener" class="btn btn-primary" style="flex:1.5;background:linear-gradient(135deg,#FC4C02,#E34402);border:none;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">
+            🟠 Open in Strava ↗
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Version Tracker Footer -->
   <footer class="version-footer">
     <div class="version-footer-content">
@@ -3509,6 +3565,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=156"></script>
+  <script src="/static/js/app.js?v=157"></script>
 </body>
 </html>

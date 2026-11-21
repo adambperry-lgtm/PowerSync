@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.19.6] - 2026-11-21
+### Fixed
+- **Outdoor Route Inspect Button & Modal Stacking Context**:
+  - Moved `#modalOutdoorRouteInspector` to the root level after `</main>` with `z-index: 9999` in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) (`app.js?v=157`).
+  - Added [`openOutdoorRouteInspectorById()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) with a direct `onclick` handler on every **🗺️ Inspect** button and wrapped Leaflet map initialization in `try/catch` so the modal always opens reliably.
+
 ## [2.19.5] - 2026-11-20
 ### Changed
 - **Route Inspector Modal Pop-up (Preserves Scroll Position)**:

@@ -10621,7 +10621,7 @@ function renderArchiveGrid() {
             <span>🔥 ${r.estimated_tss || 0} TSS</span>
           </div>
           <div class="archive-card-actions">
-            <button type="button" class="btn btn-secondary btn-xs archive-btn-inspect" style="flex:1;">🗺️ Inspect</button>
+            <button type="button" class="btn btn-secondary btn-xs archive-btn-inspect" style="flex:1;" onclick="event.stopPropagation(); window.openOutdoorRouteInspectorById('${r.id}');">🗺️ Inspect</button>
             <a href="${r.strava_url || 'https://www.strava.com/athlete/training'}" target="_blank" rel="noopener" class="btn btn-primary btn-xs archive-btn-strava" style="flex:1.2;background:linear-gradient(135deg,#FC4C02,#E34402);border:none;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🟠 Open in Strava ↗</a>
           </div>
         </div>

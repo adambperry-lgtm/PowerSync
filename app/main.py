@@ -147,9 +147,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.19.5",
-        "release_name": "Outdoor Route Inspector Modal Pop-up",
-        "build_date": "2026-11-20",
+        "version": "2.19.6",
+        "release_name": "Outdoor Route Inspect Modal Reliability",
+        "build_date": "2026-11-21",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.19.6",
+                "date": "2026-11-21",
+                "title": "Outdoor Route Inspect Modal Reliability",
+                "items": [
+                    "Inspect Button Fix: Moved #modalOutdoorRouteInspector outside <main> with z-index 9999 and added direct openOutdoorRouteInspectorById() click handling."
+                ]
+            },
             {
                 "version": "v2.19.5",
                 "date": "2026-11-20",
