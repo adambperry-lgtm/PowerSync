@@ -10544,7 +10544,30 @@ function renderArchiveGrid() {
     }
 
     if (routes.length === 0) {
-      grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">No matching outdoor routes found. Try adjusting your Time or Distance pills.</div>`;
+      if (archiveState.outdoorRoutes.length === 0) {
+        grid.innerHTML = `
+          <div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;gap:0.75rem;">
+            <div>No outdoor routes found in your synced history yet.</div>
+            <button type="button" class="btn btn-primary btn-xs" id="btnArchiveSyncStrava" style="padding:0.45rem 0.9rem;">🔄 Sync Strava Routes</button>
+          </div>
+        `;
+        document.getElementById("btnArchiveSyncStrava")?.addEventListener("click", async (e) => {
+          const btn = e.currentTarget;
+          btn.disabled = true;
+          btn.textContent = "⏳ Syncing Strava...";
+          try {
+            await fetch("/api/auth/sync/strava?full=true", { method: "POST" });
+            await loadWorkoutArchive();
+          } catch (err) {
+            showToast("⚠️ Could not sync Strava routes.");
+          } finally {
+            btn.disabled = false;
+            btn.textContent = "🔄 Sync Strava Routes";
+          }
+        });
+      } else {
+        grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--text-muted);">No matching outdoor routes found. Try adjusting your Time or Distance pills.</div>`;
+      }
       return;
     }
 

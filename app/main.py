@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.18.4",
-        "release_name": "Ride Debrief Normalized Power Labels",
+        "version": "2.18.5",
+        "release_name": "Outdoor Routes Strava Backfill & Cache-Bust",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -161,6 +161,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.18.5",
+                "date": "2026-11-20",
+                "title": "Outdoor Routes Strava Backfill & Cache-Bust",
+                "items": [
+                    "Outdoor Routes Backfill: Automatically fetches up to 200 Strava activities and triggers full backfill when recent cached rides are all indoor/Zwift.",
+                    "Cache-Bust & Manual Sync: Bumped static asset versions (app.js?v=150, style.css?v=72) and added a Sync Strava Routes button."
+                ]
+            },
             {
                 "version": "v2.18.4",
                 "date": "2026-11-20",

@@ -458,8 +458,9 @@ def get_archived_outdoor_routes(
 
     if not rows and get_setting("strava_tokens", None, user_id=uid):
         try:
-            from app.services.strava_service import fetch_recent_strava_activities
-            fetch_recent_strava_activities(limit=50, user_id=uid)
+            from app.services.strava_service import fetch_recent_strava_activities, trigger_strava_full_backfill_async
+            fetch_recent_strava_activities(limit=200, user_id=uid)
+            trigger_strava_full_backfill_async(user_id=uid)
             conn = get_db_connection()
             cursor = conn.cursor()
             cursor.execute(
@@ -583,6 +584,34 @@ def get_archived_outdoor_routes(
             "map_points": sample_coordinates(pts, 100) if pts else [],
             "strava_url": f"https://www.strava.com/activities/{ride_id}",
         })
+
+    if (
+        not results
+        and not q
+        and min_duration_min is None
+        and max_duration_min is None
+        and min_distance_mi is None
+        and max_distance_mi is None
+        and get_setting("strava_tokens", None, user_id=uid)
+        and not get_setting("strava_backfill_complete", False, user_id=uid)
+    ):
+        try:
+            from app.services.strava_service import fetch_recent_strava_activities, trigger_strava_full_backfill_async
+            fetched = fetch_recent_strava_activities(limit=200, user_id=uid)
+            trigger_strava_full_backfill_async(user_id=uid)
+            if fetched:
+                return get_archived_outdoor_routes(
+                    user_id=uid,
+                    ftp=ftp,
+                    query=query,
+                    min_duration_min=min_duration_min,
+                    max_duration_min=max_duration_min,
+                    min_distance_mi=min_distance_mi,
+                    max_distance_mi=max_distance_mi,
+                    sort_by=sort_by,
+                )
+        except Exception:
+            pass
 
     if sort_by == "duration_desc":
         results.sort(key=lambda x: x["duration_minutes"], reverse=True)

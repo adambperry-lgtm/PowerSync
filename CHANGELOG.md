@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.18.5] - 2026-11-20
+### Fixed
+- **Outdoor Routes Strava Backfill Fallback & Cache-Busting**:
+  - Updated [`get_archived_outdoor_routes()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/workout_archive_service.py) to fetch up to `200` Strava activities and trigger [`trigger_strava_full_backfill_async()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strava_service.py) even when recent `strava_activities` rows are all indoor/Zwift rides.
+  - Bumped `style.css?v=72` and `app.js?v=150` in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) so mobile browsers immediately receive all `v2.18.x` updates, and added a **🔄 Sync Strava Routes** button in the Outdoor Routes empty state.
+
 ## [2.18.4] - 2026-11-20
 ### Fixed
 - **Ride Debrief Normalized Power (NP) Labels & Coach Copy**:
