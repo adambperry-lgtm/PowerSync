@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.19.2] - 2026-11-20
+### Fixed
+- **Outdoor Route Card Button & Settings Cleanup**:
+  - Replaced the remaining **📡 Send to Garmin** button on outdoor route cards in [`renderArchiveGrid()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`app.js?v=153`) with **🟠 Open in Strava ↗** and removed `#settingsGarminCard` from [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html).
+
 ## [2.19.1] - 2026-11-20
 ### Added
 - **Flat / Rolling / Hilly Terrain Filter Pills**:

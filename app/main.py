@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.19.1",
-        "release_name": "Outdoor Routes Terrain Filter (Flat / Rolling / Hilly)",
+        "version": "2.19.2",
+        "release_name": "Outdoor Routes Strava Link Cleanup",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.19.2",
+                "date": "2026-11-20",
+                "title": "Outdoor Routes Strava Link Cleanup",
+                "items": [
+                    "Card Button Cleanup: Replaced the remaining Send to Garmin button on outdoor route cards with Open in Strava ↗ and removed the Garmin Connect card from Settings."
+                ]
+            },
             {
                 "version": "v2.19.1",
                 "date": "2026-11-20",

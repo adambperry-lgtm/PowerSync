@@ -2807,57 +2807,6 @@
           </div>
         </div>
 
-        <!-- Garmin Connect Integration Card (1-Click Route Push) -->
-        <div class="form-group" id="settingsGarminCard" style="background:#F4F7FA;border:1px solid rgba(0, 124, 195, 0.30);padding:1rem;border-radius:8px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-              <span style="font-size:1.25rem;">📡</span>
-              <label style="color:#007CC3;font-weight:700;margin:0;">Garmin Connect (1-Click Route Sync)</label>
-            </div>
-            <span id="garminConnStatus" style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Not connected</span>
-          </div>
-          <p class="setting-hint" style="margin-top:0.35rem;font-size:0.78rem;color:var(--text-secondary);">
-            Sign in once to push outdoor routes from your Workout Archive directly to <b>Garmin Connect Courses</b> (syncs to your Garmin Edge/Forerunner).
-          </p>
-
-          <div class="settings-form-grid" style="margin-top:0.65rem;">
-            <div>
-              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Garmin Connect Email</label>
-              <input type="email" id="settingGarminEmail" placeholder="you@example.com" autocomplete="off" />
-            </div>
-            <div>
-              <label style="font-size:0.82rem;font-weight:600;color:var(--text-primary);margin-bottom:0.35rem;display:block;">Garmin Connect Password</label>
-              <input type="password" id="settingGarminPassword" placeholder="Garmin password" autocomplete="new-password" />
-            </div>
-            <div class="grid-col-span-2" id="garminMfaGroup" style="display:none;">
-              <label style="font-size:0.78rem;font-weight:600;color:var(--text-secondary);margin-bottom:0.3rem;display:block;">2FA Verification Code (sent by Garmin)</label>
-              <input type="text" id="settingGarminMfaCode" placeholder="Enter 6-digit code" autocomplete="off" />
-            </div>
-          </div>
-
-          <details id="garminTokenDetails" style="margin-top:0.65rem;background:#FFFFFF;border:1px solid rgba(0,124,195,0.22);border-radius:8px;padding:0.55rem 0.75rem;font-size:0.76rem;color:var(--text-secondary);">
-            <summary style="cursor:pointer;font-weight:700;color:#007CC3;outline:none;">
-              🛡️ Blocked on cloud login? Paste Garmin Session Token (1-step workaround)
-            </summary>
-            <p style="margin:0.45rem 0 0.35rem;line-height:1.45;">
-              Garmin SSO often blocks automated logins from cloud servers like Railway even with the right password. Run this once on your own Mac/PC terminal, then paste the output below:
-            </p>
-            <pre style="margin:0 0 0.45rem;padding:0.45rem;background:#F1F5F9;border-radius:6px;overflow-x:auto;font-size:0.71rem;color:#0f172a;">pip install garminconnect &amp;&amp; python3 -c "import garminconnect; g=garminconnect.Garmin('EMAIL','PASSWORD'); g.login(); print(g.client.dumps())"</pre>
-            <textarea id="settingGarminTokenData" rows="2" placeholder="Paste Garmin session token string here, then click Connect Garmin..." style="width:100%;font-size:0.75rem;padding:0.4rem;border:1px solid var(--border-color);border-radius:6px;"></textarea>
-          </details>
-
-          <div id="garminConnectFeedback" style="display:none;margin-top:0.6rem;font-size:0.76rem;padding:0.45rem 0.65rem;border-radius:6px;background:#FFFFFF;border:1px solid var(--border-color);"></div>
-
-          <div style="margin-top:0.75rem;display:flex;align-items:center;gap:0.65rem;flex-wrap:wrap;">
-            <button type="button" id="btnConnectGarmin" class="btn btn-secondary" style="font-size:0.8rem;padding:0.45rem 0.9rem;border-color:#007CC3;color:#007CC3;font-weight:600;">
-              🔗 Connect Garmin
-            </button>
-            <button type="button" id="btnDisconnectGarmin" class="btn btn-secondary" style="font-size:0.75rem;padding:0.35rem 0.7rem;color:#ef4444;border-color:rgba(239,68,68,0.3);display:none;">
-              Disconnect
-            </button>
-          </div>
-        </div>
-
         <!-- Apple Health Integration Card -->
         <div class="form-group" id="settingsAppleHealthCard" style="background:#F4F7FA;border:1px solid rgba(255, 45, 85, 0.28);padding:1rem;border-radius:8px;">
           <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem;">
@@ -3611,6 +3560,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=152"></script>
+  <script src="/static/js/app.js?v=153"></script>
 </body>
 </html>

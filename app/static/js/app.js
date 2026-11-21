@@ -10461,52 +10461,6 @@ function openOutdoorRouteInspector(route) {
   renderArchiveGrid();
 }
 
-async function pushOutdoorRouteToGarmin(rideId, courseName, btnEl) {
-  if (!rideId) return;
-  const fbEl = document.getElementById("archiveGarminFeedback");
-  const origText = btnEl ? btnEl.textContent : "📡 Send to Garmin";
-  if (btnEl) {
-    btnEl.disabled = true;
-    btnEl.textContent = "⏳ Sending...";
-  }
-  if (fbEl) fbEl.style.display = "none";
-
-  try {
-    const res = await fetch("/api/workouts/archive/push-garmin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ride_id: String(rideId), course_name: courseName || null })
-    });
-    const data = await res.json();
-    if (data.success) {
-      showToast(`📡 ${data.message || "Sent route to Garmin Connect!"}`);
-      if (fbEl) {
-        const linkHtml = data.course_url ? ` <a href="${data.course_url}" target="_blank" rel="noopener" style="color:#007CC3;font-weight:700;text-decoration:underline;">Open in Garmin Connect ↗</a>` : "";
-        fbEl.innerHTML = `✅ ${data.message}${linkHtml}`;
-        fbEl.style.color = "#059669";
-        fbEl.style.borderColor = "rgba(16, 185, 129, 0.35)";
-        fbEl.style.display = "block";
-      }
-    } else {
-      const errMsg = data.error || "Failed to send route to Garmin.";
-      showToast(`⚠️ ${errMsg}`);
-      if (fbEl) {
-        fbEl.textContent = `⚠️ ${errMsg}`;
-        fbEl.style.color = "#DC2626";
-        fbEl.style.borderColor = "rgba(239, 68, 68, 0.35)";
-        fbEl.style.display = "block";
-      }
-    }
-  } catch (e) {
-    showToast("⚠️ Network error sending route to Garmin.");
-  } finally {
-    if (btnEl) {
-      btnEl.disabled = false;
-      btnEl.textContent = origText;
-    }
-  }
-}
-
 function downloadOutdoorRouteGpx(rideId) {
   if (!rideId) return;
   window.location.href = `/api/workouts/archive/outdoor/${encodeURIComponent(rideId)}/download-gpx`;
@@ -10597,7 +10551,7 @@ function renderArchiveGrid() {
           </div>
           <div class="archive-card-actions">
             <button type="button" class="btn btn-secondary btn-xs archive-btn-inspect" style="flex:1;">🗺️ Inspect</button>
-            <button type="button" class="btn btn-primary btn-xs archive-btn-garmin" style="flex:1.2;background:linear-gradient(135deg,#007CC3,#0052FF);border:none;">📡 Send to Garmin</button>
+            <a href="${r.strava_url || 'https://www.strava.com/athlete/training'}" target="_blank" rel="noopener" class="btn btn-primary btn-xs archive-btn-strava" style="flex:1.2;background:linear-gradient(135deg,#FC4C02,#E34402);border:none;text-align:center;text-decoration:none;display:inline-flex;align-items:center;justify-content:center;">🟠 Open in Strava ↗</a>
           </div>
         </div>
       `;
@@ -10609,13 +10563,8 @@ function renderArchiveGrid() {
       if (!routeObj) return;
 
       cardEl.addEventListener("click", (e) => {
-        if (e.target.closest(".archive-btn-garmin")) return;
+        if (e.target.closest(".archive-btn-strava")) return;
         openOutdoorRouteInspector(routeObj);
-      });
-
-      cardEl.querySelector(".archive-btn-garmin")?.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        await pushOutdoorRouteToGarmin(routeObj.id, routeObj.title, e.currentTarget);
       });
     });
     return;
