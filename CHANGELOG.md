@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.19.4] - 2026-11-20
+### Fixed
+- **Outdoor Route Inspector Leaflet Map Container & Tile Layer**:
+  - Added `#archiveOutdoorLeafletMap` inside `#archiveOutdoorMapWrap` (`display:block`) in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) (`app.js?v=155`) and initialized `L.map` with `center`, `zoom`, and [`getTileLayerConfig()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (matching Daily Training's Google Maps / terrain tiles) in [`openOutdoorRouteInspector()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js).
+
 ## [2.19.3] - 2026-11-20
 ### Fixed
 - **Outdoor Route Terrain Filter, Inspect Scroll & Leaflet Map Background**:

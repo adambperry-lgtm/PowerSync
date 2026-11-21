@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.19.3",
-        "release_name": "Outdoor Route Terrain Filter, Inspect Scroll & Leaflet Map",
+        "version": "2.19.4",
+        "release_name": "Outdoor Route Inspector Leaflet Map Fix",
         "build_date": "2026-11-20",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.19.4",
+                "date": "2026-11-20",
+                "title": "Outdoor Route Inspector Leaflet Map Fix",
+                "items": [
+                    "Leaflet Map Background: Added #archiveOutdoorLeafletMap container in index.html and initialized L.map with center/zoom and Google/Carto tile layers matching Daily Training."
+                ]
+            },
             {
                 "version": "v2.19.3",
                 "date": "2026-11-20",

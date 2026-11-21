@@ -10457,11 +10457,20 @@ function openOutdoorRouteInspector(route, scrollToInspector = false) {
     if (svgEl) svgEl.style.display = "none";
     leafletEl.style.display = "block";
     if (!archiveOutdoorLeafletMap) {
-      archiveOutdoorLeafletMap = L.map(leafletEl, { zoomControl: true, attributionControl: false });
-      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-        maxZoom: 19,
-        subdomains: "abcd"
-      }).addTo(archiveOutdoorLeafletMap);
+      archiveOutdoorLeafletMap = L.map(leafletEl, {
+        center: pts[0],
+        zoom: 13,
+        zoomControl: true,
+        attributionControl: false
+      });
+      const googleKey = (state && state.googleMapsApiKey) || "";
+      const cfg = typeof getTileLayerConfig === "function"
+        ? getTileLayerConfig(outdoorBaseLayerName || "google_roads", googleKey)
+        : {
+            url: "https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png",
+            options: { maxZoom: 19, subdomains: "abcd" }
+          };
+      L.tileLayer(cfg.url, cfg.options).addTo(archiveOutdoorLeafletMap);
     }
     if (archiveOutdoorRouteLayer) {
       archiveOutdoorLeafletMap.removeLayer(archiveOutdoorRouteLayer);
@@ -10476,12 +10485,14 @@ function openOutdoorRouteInspector(route, scrollToInspector = false) {
       layers.push(L.circleMarker(endPt, { radius: 6, fillColor: "#EF4444", color: "#fff", weight: 2, fillOpacity: 1 }));
     }
     archiveOutdoorRouteLayer = L.featureGroup(layers).addTo(archiveOutdoorLeafletMap);
-    setTimeout(() => {
+    const fitArchiveMap = () => {
       if (archiveOutdoorLeafletMap && archiveOutdoorRouteLayer) {
         archiveOutdoorLeafletMap.invalidateSize(true);
         archiveOutdoorLeafletMap.fitBounds(archiveOutdoorRouteLayer.getBounds(), { padding: [20, 20], maxZoom: 15 });
       }
-    }, 80);
+    };
+    fitArchiveMap();
+    setTimeout(fitArchiveMap, 120);
   } else {
     if (leafletEl) leafletEl.style.display = "none";
     if (svgEl) {
