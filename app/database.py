@@ -617,6 +617,16 @@ def init_db():
         ON apple_health_records(user_id, date DESC);
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS strava_activity_streams (
+        user_id TEXT NOT NULL DEFAULT 'usr_default',
+        activity_id TEXT NOT NULL,
+        streams_json TEXT NOT NULL,
+        fetched_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, activity_id)
+    );
+    """)
+
     # Ensure default user exists so legacy single-user data is preserved
     cursor.execute("""
         INSERT OR IGNORE INTO users (id, email, name, picture)

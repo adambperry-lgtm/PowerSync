@@ -7737,3 +7737,141 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   transition: opacity 0.2s ease;
 }
 
+/* ============================================================
+   4-PILLAR DEEP PHYSIOLOGICAL & STRATEGIC RIDE DEBRIEF
+   ============================================================ */
+.debrief-pillars-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 0.9rem 0 1rem;
+}
+
+.debrief-pillar-card {
+  background: #FFFFFF;
+  border: 1px solid #DCE4EE;
+  border-radius: 12px;
+  padding: 0.85rem 0.95rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.debrief-pillar-card:hover {
+  border-color: #B8C7DB;
+  box-shadow: 0 3px 10px rgba(15, 23, 42, 0.06);
+}
+
+.debrief-pillar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.debrief-pillar-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #111625;
+}
+
+.debrief-pillar-pill {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.debrief-pillar-pill.pill-emerald {
+  background: rgba(16, 185, 129, 0.12);
+  color: #047857;
+  border-color: rgba(16, 185, 129, 0.35);
+}
+
+.debrief-pillar-pill.pill-cyan {
+  background: rgba(0, 82, 255, 0.10);
+  color: #0052FF;
+  border-color: rgba(0, 82, 255, 0.28);
+}
+
+.debrief-pillar-pill.pill-amber {
+  background: rgba(245, 158, 11, 0.14);
+  color: #B45309;
+  border-color: rgba(245, 158, 11, 0.38);
+}
+
+.debrief-pillar-pill.pill-rose {
+  background: rgba(244, 63, 94, 0.12);
+  color: #BE123C;
+  border-color: rgba(244, 63, 94, 0.35);
+}
+
+.debrief-pillar-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.debrief-pillar-chip {
+  font-size: 0.71rem;
+  font-weight: 600;
+  color: #334155;
+  background: #F4F7FA;
+  border: 1px solid #E2E8F0;
+  border-radius: 6px;
+  padding: 0.18rem 0.48rem;
+  line-height: 1.25;
+}
+
+.debrief-pillar-summary {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.48;
+  color: #334155;
+}
+
+.debrief-goal-bar-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+}
+
+.debrief-goal-bar-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1E293B;
+}
+
+.debrief-goal-bar-track {
+  width: 100%;
+  height: 7px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.debrief-goal-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0052FF, #00C896);
+  transition: width 0.35s ease;
+}
+
+@media (max-width: 768px) {
+  .debrief-pillars-grid {
+    grid-template-columns: 1fr;
+    gap: 0.65rem;
+  }
+}
+
+

@@ -470,3 +470,152 @@ def get_strava_trailing_stats(activities: Optional[List[Dict[str, Any]]] = None,
         "form_description": form_description
     }
 
+
+def _normalize_stream_payload(raw_streams: Dict[str, Any]) -> Optional[Dict[str, List[float]]]:
+    """Extracts and optionally downsamples time/watts/heartrate/cadence streams."""
+    if not isinstance(raw_streams, dict) or raw_streams.get("unavailable"):
+        return None
+
+    out: Dict[str, List[float]] = {}
+    for key in ("time", "watts", "heartrate", "cadence"):
+        val = raw_streams.get(key)
+        if isinstance(val, dict) and isinstance(val.get("data"), list):
+            arr = val["data"]
+        elif isinstance(val, list):
+            arr = val
+        else:
+            continue
+        if arr:
+            out[key] = arr
+
+    if not out:
+        return None
+
+    max_len = max(len(v) for v in out.values())
+    if max_len > 7200:
+        stride = max(2, max_len // 3600)
+        out = {k: v[::stride] for k, v in out.items()}
+
+    return out
+
+
+def get_or_fetch_activity_streams(
+    activity: Optional[Dict[str, Any]],
+    user_id: Optional[str] = None,
+    allow_network: bool = True,
+) -> Optional[Dict[str, List[float]]]:
+    """
+    Returns per-second (or compact) telemetry streams (time, watts, heartrate, cadence)
+    for a Strava activity, checking inline payloads and the user-isolated SQLite cache
+    before querying Strava's /activities/{id}/streams endpoint.
+    """
+    if not isinstance(activity, dict):
+        return None
+
+    # 1. Inline streams (e.g., pre-attached or injected in tests)
+    inline = _normalize_stream_payload(activity.get("streams"))
+    if inline:
+        return inline
+
+    raw_json = activity.get("raw_json")
+    if isinstance(raw_json, str) and raw_json.strip():
+        try:
+            parsed_raw = json.loads(raw_json)
+            if isinstance(parsed_raw, dict) and parsed_raw.get("streams"):
+                inline_raw = _normalize_stream_payload(parsed_raw.get("streams"))
+                if inline_raw:
+                    return inline_raw
+        except Exception:
+            pass
+
+    act_id = extract_strava_id(activity)
+    if not act_id:
+        return None
+
+    uid = user_id or get_current_user_id()
+
+    # 2. SQLite cache lookup (user-isolated)
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(
+            "SELECT streams_json FROM strava_activity_streams WHERE user_id = ? AND activity_id = ?",
+            (uid, act_id),
+        )
+        row = c.fetchone()
+        conn.close()
+        if row and row["streams_json"]:
+            cached = json.loads(row["streams_json"])
+            if isinstance(cached, dict) and cached.get("unavailable"):
+                return None
+            return _normalize_stream_payload(cached)
+    except Exception:
+        pass
+
+    if not allow_network:
+        return None
+
+    # Only query Strava API for real numeric Strava IDs and real-looking tokens
+    if not act_id.isdigit():
+        return None
+
+    tokens = get_setting("strava_tokens", {}, user_id=uid)
+    access_token = tokens.get("access_token") if isinstance(tokens, dict) else None
+    if not access_token or len(str(access_token).strip()) < 12:
+        return None
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    url = f"{STRAVA_API_BASE}/activities/{act_id}/streams?keys=time,watts,heartrate,cadence&key_by_type=true"
+    try:
+        res = requests.get(url, headers=headers, timeout=5)
+        if res.status_code == 401 and isinstance(tokens, dict) and tokens.get("refresh_token"):
+            refreshed = refresh_strava_token(user_id=uid)
+            if refreshed:
+                headers = {"Authorization": f"Bearer {refreshed}"}
+                res = requests.get(url, headers=headers, timeout=5)
+
+        if res.status_code == 200:
+            normalized = _normalize_stream_payload(res.json())
+            payload_to_cache = normalized if normalized else {"unavailable": True}
+            try:
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute(
+                    """
+                    INSERT INTO strava_activity_streams (user_id, activity_id, streams_json)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id, activity_id) DO UPDATE SET
+                        streams_json = excluded.streams_json,
+                        fetched_at = CURRENT_TIMESTAMP
+                    """,
+                    (uid, act_id, json.dumps(payload_to_cache)),
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+            return normalized
+        elif res.status_code == 404:
+            try:
+                conn = get_db_connection()
+                c = conn.cursor()
+                c.execute(
+                    """
+                    INSERT INTO strava_activity_streams (user_id, activity_id, streams_json)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(user_id, activity_id) DO UPDATE SET
+                        streams_json = excluded.streams_json,
+                        fetched_at = CURRENT_TIMESTAMP
+                    """,
+                    (uid, act_id, json.dumps({"unavailable": True})),
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Strava stream fetch error for activity {act_id}: {e}")
+
+    return None
+
+

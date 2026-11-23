@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.24.1",
-        "release_name": "Forecast Accuracy Backtest Moved to Settings",
+        "version": "2.25.0",
+        "release_name": "Non-Circular 4-Pillar Ride Debrief & Goal Progress",
         "build_date": "2026-11-23",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.25.0",
+                "date": "2026-11-23",
+                "title": "Non-Circular 4-Pillar Ride Debrief & Goal Progress",
+                "items": [
+                    "4-Pillar Ride Debrief Engine: Replaced circular ERG wattage confirmation with four independent pillars — Physiological Response (Efficiency Factor vs. 60-day baseline, stream-computed Pw:Hr aerobic decoupling, HR % max, WHOOP strain & next-day recovery reaction), Readiness & Strategic Fit (independent WHOOP recovery + 14-day HRV ceiling vs. actual session demand), Execution Nuances (VI, ERG detection, planned duration completion, cadence/power/interval fade), and Long-Term Goal Progress (macrocycle phase alignment, pace-adjusted weekly TSS progress bar, FTP gap, and 42-day power trends).",
+                    "Cached Strava Streams: Added user-isolated SQLite caching for Strava time/watts/heartrate/cadence streams to power real aerobic decoupling and work-interval fade detection without repeated API calls.",
+                    "Anti-Circular AI Coach Debrief: Upgraded Gemini debrief synthesis to analyze all four pillars and deliver per-pillar coaching notes while explicitly avoiding rubber-stamp ERG compliance praise."
+                ]
+            },
             {
                 "version": "v2.24.1",
                 "date": "2026-11-23",

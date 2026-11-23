@@ -3,6 +3,23 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.25.0] - 2026-11-23
+### Added
+- **Non-Circular 4-Pillar Ride Debrief & Long-Term Goal Tracking**:
+  - Added [`debrief_analytics.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/debrief_analytics.py) to evaluate every completed session across four orthogonal, physiology-first dimensions instead of circular ERG-mode NP compliance:
+    1. **Physiological Response**: Efficiency Factor (`NP / avg HR`) vs. your personal 60-day intensity-matched cycling baseline, stream-computed Aerobic Decoupling (`Pw:Hr` cardiac drift), HR % of max, WHOOP strain, and next-day recovery reaction.
+    2. **Readiness & Strategic Fit**: Compares actual session load against an independent physiological readiness ceiling (WHOOP recovery, 14-day personal HRV baseline, sleep performance, acute 7-day load, and weekly rest directives) regardless of workout edits or Zwift pushes.
+    3. **Execution Nuances**: Variability Index (`VI`), automatic ERG-locked indoor ride detection, planned duration completion %, 1st-vs-2nd half power/cadence/HR fade, discrete work-interval fade (`>=85% FTP` blocks), and 3-tier XSS / `W'bal` anaerobic signature.
+    4. **Long-Term Goal Progress**: Macrocycle phase & strain-mix alignment, weekday-pace-adjusted weekly TSS trajectory with this ride's share %, FTP gap (`current → target`), upcoming event countdown, and 42-day power profile trends.
+  - Added user-isolated `strava_activity_streams` SQLite cache table in [`database.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) and [`get_or_fetch_activity_streams()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strava_service.py) for cached `time`/`watts`/`heartrate`/`cadence` telemetry.
+  - Added the 2×2 `#debriefPillarsGrid` UI with semantic status pills, metric chips, and a weekly goal progress bar in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`style.css`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/css/style.css) (`v=72`), and [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=164`).
+  - Added unit and integration tests covering ERG anti-circularity, personal EF/HRV baseline isolation, stream decoupling, interval fade, long-term goal progress, and Gemini 4-pillar synthesis in [`test_four_pillar_debrief.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_four_pillar_debrief.py).
+
+### Changed
+- **Anti-Circular Gemini Coach Debrief & Cache Refresh**:
+  - Upgraded [`call_gemini_coach_review()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) to ingest all four pillars' telemetry, explicitly suppress rubber-stamp ERG praise, and return concise per-pillar coaching notes (`pillar_notes`) overlaid onto the 4-pillar cards.
+  - Bumped `DEBRIEF_CACHE_VERSION` from `2` to `3` so previously cached debriefs automatically refresh to the new 4-pillar format, and ensured sticky cache hits retain lightweight `strava.recent_activities`.
+
 ## [2.24.1] - 2026-11-23
 ### Changed
 - **Moved Forecast Accuracy Backtest Button to Settings**:

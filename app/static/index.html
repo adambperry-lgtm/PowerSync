@@ -15,7 +15,7 @@
     document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.setAttribute("data-theme-mode", "light");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=71">
+  <link rel="stylesheet" href="/static/css/style.css?v=72">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -1237,7 +1237,7 @@
         <!-- Telemetry & Compliance Strip -->
         <div class="debrief-metrics-grid">
           <div class="debrief-metric-box">
-            <span class="debrief-metric-lbl">Execution Score</span>
+            <span class="debrief-metric-lbl">Plan NP Fidelity</span>
             <span class="debrief-metric-val" id="debriefMetricScore" style="color:var(--accent-cyan);">--%</span>
             <span class="debrief-metric-sub" id="debriefMetricVerdict">Target Fidelity</span>
           </div>
@@ -1255,6 +1255,58 @@
             <span class="debrief-metric-lbl">Cardiovascular Load</span>
             <span class="debrief-metric-val" id="debriefMetricTss" style="color:var(--accent-orange);">-- TSS</span>
             <span class="debrief-metric-sub" id="debriefMetricHr">-- bpm avg</span>
+          </div>
+        </div>
+
+        <!-- 4-Pillar Deep Physiological & Strategic Debrief -->
+        <div class="debrief-pillars-grid" id="debriefPillarsGrid" style="display:none;">
+          <!-- Pillar 1: Physiological Response -->
+          <div class="debrief-pillar-card" id="debriefPillarPhys">
+            <div class="debrief-pillar-header">
+              <span class="debrief-pillar-title">❤️ Physiological Response</span>
+              <span class="debrief-pillar-pill pill-cyan" id="pillarPhysStatus">--</span>
+            </div>
+            <div class="debrief-pillar-chips" id="pillarPhysChips"></div>
+            <p class="debrief-pillar-summary" id="pillarPhysSummary">Analyzing internal cardiac cost vs. mechanical output...</p>
+          </div>
+
+          <!-- Pillar 2: Readiness & Strategic Fit -->
+          <div class="debrief-pillar-card" id="debriefPillarReadiness">
+            <div class="debrief-pillar-header">
+              <span class="debrief-pillar-title">🧭 Readiness &amp; Strategic Fit</span>
+              <span class="debrief-pillar-pill pill-emerald" id="pillarReadinessStatus">--</span>
+            </div>
+            <div class="debrief-pillar-chips" id="pillarReadinessChips"></div>
+            <p class="debrief-pillar-summary" id="pillarReadinessSummary">Evaluating session load against independent WHOOP recovery &amp; HRV...</p>
+          </div>
+
+          <!-- Pillar 3: Execution Nuances -->
+          <div class="debrief-pillar-card" id="debriefPillarExecution">
+            <div class="debrief-pillar-header">
+              <span class="debrief-pillar-title">⚙️ Execution Nuances</span>
+              <span class="debrief-pillar-pill pill-cyan" id="pillarExecutionStatus">--</span>
+            </div>
+            <div class="debrief-pillar-chips" id="pillarExecutionChips"></div>
+            <p class="debrief-pillar-summary" id="pillarExecutionSummary">Inspecting pacing variability, cadence stability, and interval durability...</p>
+          </div>
+
+          <!-- Pillar 4: Long-Term Goal Progress -->
+          <div class="debrief-pillar-card" id="debriefPillarGoal">
+            <div class="debrief-pillar-header">
+              <span class="debrief-pillar-title">🏆 Long-Term Goal Progress</span>
+              <span class="debrief-pillar-pill pill-emerald" id="pillarGoalStatus">--</span>
+            </div>
+            <div class="debrief-goal-bar-wrap" id="pillarGoalBarWrap" style="display:none;">
+              <div class="debrief-goal-bar-meta">
+                <span id="pillarGoalBarLabel">Weekly Target</span>
+                <span id="pillarGoalBarPct">0%</span>
+              </div>
+              <div class="debrief-goal-bar-track">
+                <div class="debrief-goal-bar-fill" id="pillarGoalBarFill" style="width:0%;"></div>
+              </div>
+            </div>
+            <div class="debrief-pillar-chips" id="pillarGoalChips"></div>
+            <p class="debrief-pillar-summary" id="pillarGoalSummary">Tracking macrocycle progress, weekly TSS pace, and FTP trajectory...</p>
           </div>
         </div>
 
@@ -3624,6 +3676,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=163"></script>
+  <script src="/static/js/app.js?v=164"></script>
 </body>
 </html>

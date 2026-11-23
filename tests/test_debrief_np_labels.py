@@ -204,7 +204,7 @@ class TestDebriefNormalizedPowerLabels(unittest.TestCase):
         refreshed = generate_ai_review_and_outlook()
         self.assertIn("180W NP", refreshed["today_assessment"]["assessment_text"])
         self.assertNotIn("180W avg", refreshed["today_assessment"]["assessment_text"])
-        self.assertEqual(DEBRIEF_CACHE_VERSION, 2)
+        self.assertEqual(DEBRIEF_CACHE_VERSION, 3)
 
     def test_frontend_debrief_labels_use_np(self):
         repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

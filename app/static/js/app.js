@@ -854,8 +854,11 @@ function renderAiCoachTodayCard(debriefData, workoutData) {
     }
 
     if (subtext) {
-      subtext.textContent = assessment.verdict ? `${assessment.verdict} 🎯` : "Execution Bullseye 🎯";
-      subtext.style.color = "#10b981";
+      const pillars = assessment.debrief_pillars || null;
+      const takeaway = pillars && pillars.takeaway_badge ? pillars.takeaway_badge : (assessment.verdict ? `${assessment.verdict} 🎯` : "Execution Bullseye 🎯");
+      const tColor = pillars && pillars.takeaway_color ? pillars.takeaway_color : (assessment.verdict_color || "emerald");
+      subtext.textContent = takeaway;
+      subtext.style.color = tColor === "rose" ? "#e11d48" : (tColor === "amber" ? "#d97706" : (tColor === "cyan" ? "#0052FF" : "#10b981"));
     }
 
     if (jumpLink) {
@@ -4622,22 +4625,33 @@ function renderDebrief(data) {
       debriefSessionsBreakdown.innerHTML = "";
     }
   }
+  const pillars = assessment.debrief_pillars || null;
+  const badgeText = (pillars && pillars.takeaway_badge) ? pillars.takeaway_badge : (assessment.verdict_badge || "🎯 Target Mastered");
+  const badgeColor = (pillars && pillars.takeaway_color) ? pillars.takeaway_color : (assessment.verdict_color || "emerald");
+
   if (debriefVerdictBadge) {
-    debriefVerdictBadge.textContent = assessment.verdict_badge || "🎯 Target Mastered";
-    if (assessment.verdict_color === "amber") {
-      debriefVerdictBadge.style.color = "#f59e0b";
-      debriefVerdictBadge.style.borderColor = "rgba(245, 158, 11, 0.3)";
-    } else if (assessment.verdict_color === "cyan") {
-      debriefVerdictBadge.style.color = "#06b6d4";
-      debriefVerdictBadge.style.borderColor = "rgba(6, 182, 212, 0.3)";
+    debriefVerdictBadge.textContent = badgeText;
+    if (badgeColor === "rose") {
+      debriefVerdictBadge.style.color = "#e11d48";
+      debriefVerdictBadge.style.borderColor = "rgba(244, 63, 94, 0.35)";
+    } else if (badgeColor === "amber") {
+      debriefVerdictBadge.style.color = "#d97706";
+      debriefVerdictBadge.style.borderColor = "rgba(245, 158, 11, 0.35)";
+    } else if (badgeColor === "cyan") {
+      debriefVerdictBadge.style.color = "#0052FF";
+      debriefVerdictBadge.style.borderColor = "rgba(0, 82, 255, 0.3)";
     } else {
       debriefVerdictBadge.style.color = "#10b981";
-      debriefVerdictBadge.style.borderColor = "rgba(16, 185, 129, 0.3)";
+      debriefVerdictBadge.style.borderColor = "rgba(16, 185, 129, 0.35)";
     }
   }
 
   if (debriefMetricScore) debriefMetricScore.textContent = `${assessment.compliance_score || 95}%`;
-  if (debriefMetricVerdict) debriefMetricVerdict.textContent = assessment.verdict || "Target Fidelity";
+  if (debriefMetricVerdict) {
+    debriefMetricVerdict.textContent = (pillars && pillars.is_erg_like)
+      ? "ERG-Locked NP"
+      : (assessment.verdict || "Target Fidelity");
+  }
   
   if (debriefMetricWatts) {
     debriefMetricWatts.textContent = assessment.weighted_watts ? `${assessment.weighted_watts}W NP` : "0W NP";
@@ -4654,11 +4668,78 @@ function renderDebrief(data) {
     debriefMetricHr.textContent = (assessment.avg_hr && assessment.avg_hr > 0) ? `${assessment.avg_hr} bpm avg` : "-- bpm avg";
   }
 
+  // Render 4-Pillar Deep Physiological & Strategic Debrief Grid
+  const debriefPillarsGrid = document.getElementById("debriefPillarsGrid");
+  if (debriefPillarsGrid) {
+    if (pillars && typeof pillars === "object") {
+      debriefPillarsGrid.style.display = "grid";
+
+      const _renderPillar = (pillarData, statusId, chipsId, summaryId) => {
+        if (!pillarData) return;
+        const statusEl = document.getElementById(statusId);
+        const chipsEl = document.getElementById(chipsId);
+        const sumEl = document.getElementById(summaryId);
+
+        if (statusEl) {
+          statusEl.textContent = pillarData.status || "--";
+          statusEl.className = `debrief-pillar-pill pill-${pillarData.color || "cyan"}`;
+        }
+        if (chipsEl) {
+          chipsEl.innerHTML = "";
+          const chips = Array.isArray(pillarData.chips) ? pillarData.chips : [];
+          chips.forEach((chipText) => {
+            const span = document.createElement("span");
+            span.className = "debrief-pillar-chip";
+            span.textContent = String(chipText);
+            chipsEl.appendChild(span);
+          });
+        }
+        if (sumEl) {
+          sumEl.textContent = pillarData.ai_note || pillarData.summary || "";
+        }
+      };
+
+      _renderPillar(pillars.physiological_response, "pillarPhysStatus", "pillarPhysChips", "pillarPhysSummary");
+      _renderPillar(pillars.readiness_fit, "pillarReadinessStatus", "pillarReadinessChips", "pillarReadinessSummary");
+      _renderPillar(pillars.execution_nuances, "pillarExecutionStatus", "pillarExecutionChips", "pillarExecutionSummary");
+      _renderPillar(pillars.goal_progress, "pillarGoalStatus", "pillarGoalChips", "pillarGoalSummary");
+
+      // Goal progress bar (Weekly TSS pace toward macrocycle goal)
+      const gData = pillars.goal_progress || {};
+      const goalBarWrap = document.getElementById("pillarGoalBarWrap");
+      const goalBarLabel = document.getElementById("pillarGoalBarLabel");
+      const goalBarPct = document.getElementById("pillarGoalBarPct");
+      const goalBarFill = document.getElementById("pillarGoalBarFill");
+      if (goalBarWrap && gData.weekly_tss_target > 0) {
+        goalBarWrap.style.display = "flex";
+        const pctClamped = Math.max(0, Math.min(100, gData.weekly_tss_pct || 0));
+        if (goalBarLabel) {
+          goalBarLabel.textContent = `${gData.goal_title || "Weekly Target"} • ${gData.weekly_tss_actual || 0}/${gData.weekly_tss_target} TSS`;
+        }
+        if (goalBarPct) {
+          goalBarPct.textContent = `${gData.weekly_tss_pct || 0}%`;
+        }
+        if (goalBarFill) {
+          goalBarFill.style.width = `${pctClamped}%`;
+          if (gData.color === "amber") {
+            goalBarFill.style.background = "linear-gradient(90deg, #f59e0b, #FF5E00)";
+          } else {
+            goalBarFill.style.background = "linear-gradient(90deg, #0052FF, #00C896)";
+          }
+        }
+      } else if (goalBarWrap) {
+        goalBarWrap.style.display = "none";
+      }
+    } else {
+      debriefPillarsGrid.style.display = "none";
+    }
+  }
+
   // Update collapsed summary for debrief card
   const collapsedDebriefVerdict = document.getElementById("collapsedDebriefVerdict");
-  if (collapsedDebriefVerdict) collapsedDebriefVerdict.textContent = assessment.verdict_badge || "🎯 Compliant";
+  if (collapsedDebriefVerdict) collapsedDebriefVerdict.textContent = badgeText;
   const collapsedDebriefScore = document.getElementById("collapsedDebriefScore");
-  if (collapsedDebriefScore) collapsedDebriefScore.textContent = `Score: ${assessment.compliance_score || 95}%`;
+  if (collapsedDebriefScore) collapsedDebriefScore.textContent = `Plan NP: ${assessment.compliance_score || 95}%`;
   const collapsedDebriefTss = document.getElementById("collapsedDebriefTss");
   if (collapsedDebriefTss) collapsedDebriefTss.textContent = `${cardLoadTss} TSS`;
 

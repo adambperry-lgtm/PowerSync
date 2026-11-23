@@ -1151,6 +1151,24 @@ def resolve_day_prescribed_target(
         pass
 
     target_obj = scheduled_w or planned_session or active_prescribed
+    planned_dur_min = None
+    if target_obj and isinstance(target_obj, dict):
+        raw_dur = target_obj.get("duration_minutes") or target_obj.get("duration_min")
+        if raw_dur is not None:
+            try:
+                planned_dur_min = int(raw_dur)
+            except Exception:
+                planned_dur_min = None
+
+    def _pack(target_pct_ftp: int, target_zone: str, target_title: str, source: str) -> Dict[str, Any]:
+        return {
+            "target_pct_ftp": target_pct_ftp,
+            "target_zone": target_zone,
+            "target_title": target_title,
+            "source": source,
+            "planned_duration_min": planned_dur_min,
+            "day_cfg": day_cfg,
+        }
 
     if target_obj and isinstance(target_obj, dict):
         title = target_obj.get("title", "")
@@ -1177,77 +1195,32 @@ def resolve_day_prescribed_target(
                 zone = "Threshold"
             else:
                 zone = "VO2 Max"
-            return {
-                "target_pct_ftp": pct,
-                "target_zone": zone,
-                "target_title": title or zone,
-                "source": "prescribed_intervals"
-            }
+            return _pack(pct, zone, title or zone, "prescribed_intervals")
 
         if is_rest:
-            return {
-                "target_pct_ftp": 50,
-                "target_zone": "Rest & Recovery",
-                "target_title": title or "Rest & Recovery",
-                "source": "scheduled_rest"
-            }
+            return _pack(50, "Rest & Recovery", title or "Rest & Recovery", "scheduled_rest")
 
         if any(k in focus for k in ["recovery", "flush", "active recovery", "gentle spin"]):
-            return {
-                "target_pct_ftp": 50,
-                "target_zone": "Zone 1 Active Recovery",
-                "target_title": title or "Active Recovery Flush",
-                "source": "prescribed_recovery"
-            }
+            return _pack(50, "Zone 1 Active Recovery", title or "Active Recovery Flush", "prescribed_recovery")
 
         if any(k in focus for k in ["zone 2", "endurance", "aerobic base", "base flush", "easy base", "cruise"]):
-            return {
-                "target_pct_ftp": 70,
-                "target_zone": "Zone 2 Aerobic Base",
-                "target_title": title or "Zone 2 Aerobic Base",
-                "source": "prescribed_endurance"
-            }
+            return _pack(70, "Zone 2 Aerobic Base", title or "Zone 2 Aerobic Base", "prescribed_endurance")
 
         if any(k in focus for k in ["tempo", "zone 3"]):
-            return {
-                "target_pct_ftp": 80,
-                "target_zone": "Zone 3 Tempo",
-                "target_title": title or "Tempo Cruise",
-                "source": "prescribed_tempo"
-            }
+            return _pack(80, "Zone 3 Tempo", title or "Tempo Cruise", "prescribed_tempo")
 
         if "sweet spot" in focus:
-            return {
-                "target_pct_ftp": 88,
-                "target_zone": "Sweet Spot",
-                "target_title": title or "Sweet Spot Sustained",
-                "source": "prescribed_sweet_spot"
-            }
+            return _pack(88, "Sweet Spot", title or "Sweet Spot Sustained", "prescribed_sweet_spot")
 
         if any(k in focus for k in ["threshold", "over-under", "over under", "ladder"]):
-            return {
-                "target_pct_ftp": 98,
-                "target_zone": "Threshold",
-                "target_title": title or "Threshold Intervals",
-                "source": "prescribed_threshold"
-            }
+            return _pack(98, "Threshold", title or "Threshold Intervals", "prescribed_threshold")
 
         if any(k in focus for k in ["vo2", "anaerobic", "microburst", "climb"]):
-            return {
-                "target_pct_ftp": 110,
-                "target_zone": "VO2 Max",
-                "target_title": title or "VO2 Max Climbing",
-                "source": "prescribed_vo2"
-            }
+            return _pack(110, "VO2 Max", title or "VO2 Max Climbing", "prescribed_vo2")
 
     # 5. Check Day Config (e.g. dedicated rest day or directive rest)
     if day_cfg and (day_cfg.get("is_default_rest") or day_cfg.get("is_directive_rest")):
-        return {
-            "target_pct_ftp": 50,
-            "target_zone": "Rest & Recovery",
-            "target_title": day_cfg.get("notes") or "Scheduled Rest Day",
-            "source": "weekly_rest_directive"
-        }
+        return _pack(50, "Rest & Recovery", day_cfg.get("notes") or "Scheduled Rest Day", "weekly_rest_directive")
 
     # 6. Fallback: Whoop recovery baseline (when no scheduled or updated workout was prescribed)
     if workout_recovery < 34:
@@ -1260,12 +1233,7 @@ def resolve_day_prescribed_target(
         pct = 90
         zone = "Sweet Spot / VO2 Max"
 
-    return {
-        "target_pct_ftp": pct,
-        "target_zone": zone,
-        "target_title": zone,
-        "source": "recovery_baseline"
-    }
+    return _pack(pct, zone, zone, "recovery_baseline")
 
 def build_daily_review_and_outlook_local(
     whoop_data: Dict[str, Any],
@@ -1683,6 +1651,75 @@ def build_daily_review_and_outlook_local(
                         f"{workout_strain:.1f} strain on {workout_recovery}% recovery). Today's recovery sits at {today_recovery}%."
                     )
 
+        active_plan = get_active_target_plan()
+        uid = get_current_user_id()
+        act_max_hr = round(max((float(a.get("max_heartrate") or 0.0) for a in evaluated_acts), default=0.0))
+
+        primary_streams = None
+        if has_cycling and primary_act:
+            try:
+                from app.services.strava_service import get_or_fetch_activity_streams
+                primary_streams = get_or_fetch_activity_streams(primary_act, user_id=uid)
+            except Exception:
+                primary_streams = None
+
+        from app.services.debrief_analytics import build_four_pillar_debrief
+        four_pillars = build_four_pillar_debrief(
+            has_cycling=has_cycling,
+            primary_act=primary_act,
+            primary_watts=primary_watts,
+            primary_pct_ftp=primary_pct_ftp,
+            act_min=act_min,
+            act_hr=act_hr,
+            act_max_hr=act_max_hr,
+            max_hr=max_hr,
+            calculated_tss=calculated_tss,
+            low_xss=act_strain.get("low_xss", 0.0),
+            high_xss=act_strain.get("high_xss", 0.0),
+            peak_xss=act_strain.get("peak_xss", 0.0),
+            total_xss=act_strain.get("total_xss", 0.0),
+            battery_depleted_pct=act_strain.get("battery_depleted_pct", 0.0),
+            workout_strain=workout_strain,
+            workout_recovery=workout_recovery,
+            workout_hrv=workout_hrv,
+            today_recovery=today_recovery,
+            today_hrv=today_hrv,
+            sleep_score=sleep_score,
+            acute_tss=acute_tss,
+            program=program,
+            active_plan=active_plan,
+            day_cfg=prescribed_info.get("day_cfg"),
+            prescribed_info=prescribed_info,
+            is_today=is_today,
+            is_yesterday=is_yesterday,
+            act_date_str=act_date_str,
+            today=today,
+            ftp=ftp,
+            user_id=uid,
+            streams=primary_streams,
+        )
+
+        # Enrich local fallback assessment_text with non-circular physiological & goal highlights
+        phys_p = four_pillars["physiological_response"]
+        read_p = four_pillars["readiness_fit"]
+        goal_p = four_pillars["goal_progress"]
+        extra_bits = []
+        if has_cycling and phys_p.get("ef") is not None:
+            if phys_p.get("ef_delta_pct") is not None:
+                extra_bits.append(f"Efficiency Factor was {phys_p['ef']:.2f} ({phys_p['ef_delta_pct']:+.1f}% vs. baseline).")
+            else:
+                extra_bits.append(f"Efficiency Factor registered {phys_p['ef']:.2f}.")
+        if phys_p.get("decoupling_pct") is not None:
+            extra_bits.append(f"Aerobic decoupling (Pw:Hr) was {phys_p['decoupling_pct']:.1f}%.")
+        if read_p.get("status"):
+            extra_bits.append(f"Readiness Fit: {read_p['status']} ({read_p['recommended_tier']}).")
+        if goal_p.get("weekly_tss_target"):
+            extra_bits.append(
+                f"Long-Term Goal ('{goal_p['goal_title']}'): {goal_p['weekly_tss_actual']}/{goal_p['weekly_tss_target']} weekly TSS ({goal_p['status']})."
+            )
+        if extra_bits:
+            assessment_text = f"{assessment_text} {' '.join(extra_bits)}"
+
         session_summary = {
             "title": act_name,
             "is_today": is_today,
@@ -1725,14 +1762,59 @@ def build_daily_review_and_outlook_local(
             "battery_depleted_pct": act_strain.get("battery_depleted_pct", 0.0),
             "focus_duration": act_strain.get("focus_duration", "Endurance / Century (>1h Focus)"),
             "strain_data": act_strain,
+            "debrief_pillars": four_pillars,
             "sessions": sessions_list,
             "sessions_count": len(evaluated_acts)
         }
     else:
+        active_plan = get_active_target_plan()
+        uid = get_current_user_id()
         is_today = True
         is_yesterday = False
         workout_strain = 0.0
         workout_recovery = today_recovery
+
+        from app.services.debrief_analytics import analyze_long_term_goal_progress
+        rest_goal_pillar = analyze_long_term_goal_progress(
+            program=program,
+            active_plan=active_plan,
+            ftp=ftp,
+            calculated_tss=0,
+            low_xss=0.0,
+            high_xss=0.0,
+            peak_xss=0.0,
+            total_xss=0.0,
+            acute_tss=acute_tss,
+            today=today,
+            user_id=uid,
+        )
+        rest_pillars = {
+            "physiological_response": {
+                "status": "Passive Absorption",
+                "color": "emerald",
+                "chips": [f"Recovery {today_recovery}%", f"Day Strain {today_strain:.1f}"],
+                "summary": f"No cycling load logged today. Keeping daytime strain light ({today_strain:.1f}) lets your nervous system and glycogen stores rebound.",
+            },
+            "readiness_fit": {
+                "status": "Rest Day",
+                "color": "emerald",
+                "chips": [f"Recovery {today_recovery}%", f"HRV {today_hrv:.0f}ms"],
+                "summary": f"With {today_recovery}% recovery today, taking a passive recovery day clears residual fatigue ahead of your next quality block.",
+            },
+            "execution_nuances": {
+                "status": "Off-Bike Day",
+                "color": "cyan",
+                "is_erg_like": False,
+                "chips": ["0m Moving Time", "0 XSS"],
+                "summary": "Zero on-bike work logged. Focus on sleep, hydration, and light mobility.",
+            },
+            "goal_progress": rest_goal_pillar,
+            "has_stream_telemetry": False,
+            "is_erg_like": False,
+            "takeaway_badge": "🛋️ Passive Recovery",
+            "takeaway_color": "emerald",
+        }
+
         session_summary = {
             "title": "Rest / Off-Bike Day",
             "is_today": True,
@@ -1772,7 +1854,8 @@ def build_daily_review_and_outlook_local(
                 "min_w_bal_pct": 100.0,
                 "battery_depleted_pct": 0.0,
                 "focus_duration": "Rest / Recovery"
-            }
+            },
+            "debrief_pillars": rest_pillars,
         }
 
     # 2. MULTI-DAY OUTLOOK (Next 3 Days)
@@ -1791,8 +1874,6 @@ def build_daily_review_and_outlook_local(
         custom_prompt=custom_prompt
     )
 
-    # Check if athlete has an active upcoming target plan
-    active_plan = get_active_target_plan()
     days_until_event = active_plan.get("days_until") if active_plan else None
 
     # Dynamically inject target event into outlook if within horizon
@@ -1986,7 +2067,7 @@ def build_daily_review_and_outlook_local(
         }
     }
 
-DEBRIEF_CACHE_VERSION = 2
+DEBRIEF_CACHE_VERSION = 3
 
 
 def _build_debrief_activity_signature(today_iso: str, day_acts: List[Dict[str, Any]], latest_act: Optional[Dict[str, Any]]) -> str:
@@ -2024,7 +2105,10 @@ def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool 
             and cached.get("signature") == activity_signature
             and isinstance(cached.get("review"), dict)
         ):
-            return dict(cached["review"])
+            cached_out = dict(cached["review"])
+            if "strava" not in cached_out:
+                cached_out["strava"] = {"recent_activities": act_info.get("all_recent", [])}
+            return cached_out
 
     from app.routers.dashboard import get_dashboard_data
     dash = get_dashboard_data()
@@ -2105,6 +2189,20 @@ def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool 
                     base_review["today_assessment"]["ai_coach_insights"] = clean_insights
                 if custom_prompt and "Athlete Note:" not in base_review["today_assessment"]["assessment_text"]:
                     base_review["today_assessment"]["assessment_text"] += f"\n\nAthlete Note: '{custom_prompt}' — accounted for in fatigue decay and forward outlook modeling."
+            if enhanced_assessment and isinstance(enhanced_assessment.get("pillar_notes"), dict):
+                pillars = base_review.get("today_assessment", {}).get("debrief_pillars")
+                if isinstance(pillars, dict):
+                    p_notes = enhanced_assessment["pillar_notes"]
+                    key_map = {
+                        "physiological": "physiological_response",
+                        "readiness": "readiness_fit",
+                        "execution": "execution_nuances",
+                        "goal": "goal_progress",
+                    }
+                    for short_k, full_k in key_map.items():
+                        note_val = str(p_notes.get(short_k) or "").strip()
+                        if len(note_val) > 15 and not note_val.startswith("{") and isinstance(pillars.get(full_k), dict):
+                            pillars[full_k]["ai_note"] = note_val
             if enhanced_assessment and enhanced_assessment.get("tomorrow_guidance"):
                 clean_guidance = str(enhanced_assessment["tomorrow_guidance"]).strip()
                 if len(clean_guidance) > 10 and not clean_guidance.startswith("{"):
@@ -2136,8 +2234,8 @@ def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool 
 
     return base_review
 
-def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_data: Dict[str, Any], custom_prompt: str = "") -> Optional[Dict[str, str]]:
-    """Invokes Google Gemini to generate natural-sounding qualitative coach feedback."""
+def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_data: Dict[str, Any], custom_prompt: str = "") -> Optional[Dict[str, Any]]:
+    """Invokes Google Gemini to generate a non-circular, 4-pillar qualitative sports-science debrief."""
     models_to_try = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-pro-preview", "gemini-3-flash-preview"]
     sess = review_data["today_assessment"]
     is_today = bool(sess.get("is_today"))
@@ -2207,19 +2305,43 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
         np_str = f"{sess.get('weighted_watts')}W NP ({sess.get('pct_ftp')}% FTP), " if sess.get('weighted_watts') else ""
         sessions_breakdown = f"Session Metrics: {sess.get('moving_time_formatted')}, {np_str}{eff_tss} TSS."
 
+    pillars = sess.get("debrief_pillars") or {}
+    p_phys = pillars.get("physiological_response") or {}
+    p_read = pillars.get("readiness_fit") or {}
+    p_exec = pillars.get("execution_nuances") or {}
+    p_goal = pillars.get("goal_progress") or {}
+    macro = review_data.get("macrocycle_context") or {}
+
+    pillar_block = (
+        f"4-PILLAR TELEMETRY (USE THESE FOR DEEP NON-CIRCULAR ANALYSIS):\n"
+        f"1. Physiological Response [{p_phys.get('status', 'N/A')}]: {p_phys.get('summary', 'Standard HR/power telemetry.')} "
+        f"(Chips: {', '.join(p_phys.get('chips') or [])})\n"
+        f"2. Independent Readiness & Strategic Fit [{p_read.get('status', 'N/A')}]: {p_read.get('summary', 'Evaluated against WHOOP recovery.')} "
+        f"(Chips: {', '.join(p_read.get('chips') or [])})\n"
+        f"3. Execution Nuances [{p_exec.get('status', 'N/A')}]: {p_exec.get('summary', 'Standard pacing profile.')} "
+        f"(ERG-locked={bool(p_exec.get('is_erg_like'))}; Chips: {', '.join(p_exec.get('chips') or [])})\n"
+        f"4. Long-Term Goal Progress [{p_goal.get('status', 'N/A')}]: {p_goal.get('summary', '')} "
+        f"(Goal: '{p_goal.get('goal_title', macro.get('goal_title', 'FTP Build'))}', Phase: {p_goal.get('phase', macro.get('phase', 'Build'))}, "
+        f"FTP {macro.get('current_ftp', 250)}W -> {macro.get('target_ftp', 265)}W, Weekly TSS {p_goal.get('weekly_tss_actual', macro.get('weekly_tss_actual', 0))}/{p_goal.get('weekly_tss_target', macro.get('weekly_tss_target', 360))})\n"
+    )
+
     prompt = (
-        f"You are PowerSync's elite cycling sports-science coach. Provide a concise, qualitative debrief for the athlete.\n"
-        f"Athlete FTP: {review_data['macrocycle_context']['current_ftp']}W.\n"
+        f"You are PowerSync's elite cycling sports-science coach. Provide a concise, deeply analytical, NON-CIRCULAR debrief for the athlete.\n"
+        f"Athlete FTP: {macro.get('current_ftp', 250)}W.\n"
         f"Athlete Permanent Schedule & Workout Preferences: {directives_summary}\n"
         f"Timeline & Data: {temporal_context}\n"
         f"{sessions_breakdown}\n"
         f"Physiological Strain Breakdown: {sess.get('total_xss', 0)} Total XSS ({sess.get('low_strain_xss', 0)} Low / {sess.get('high_strain_xss', 0)} High / {sess.get('peak_strain_xss', 0)} Peak), W' Anaerobic Battery Depleted: {sess.get('battery_depleted_pct', 0)}%, Focus Duration: {sess.get('focus_duration', 'Endurance')}.\n"
-        f"Target Zone was: {sess.get('target_zone')} ({sess.get('target_watts', 0)}W NP, {sess.get('target_pct_ftp', 0)}% FTP). Prescribed session: '{sess.get('prescribed_workout_title', sess.get('target_zone'))}'. Compliance verdict: {sess.get('verdict')} ({sess.get('compliance_score', 95)}% score).\n"
+        f"Scheduled / Prescribed Reference: {sess.get('target_zone')} ({sess.get('target_watts', 0)}W NP, {sess.get('target_pct_ftp', 0)}% FTP). Prescribed session: '{sess.get('prescribed_workout_title', sess.get('target_zone'))}'. Plan Compliance: {sess.get('verdict')} ({sess.get('compliance_score', 95)}% score).\n"
+        f"{pillar_block}"
         f"Tomorrow outlook: {review_data['outlook_days'][0]['title']} (est. {review_data['outlook_days'][0].get('estimated_xss', 50)} XSS, Focus: {review_data['outlook_days'][0].get('focus_duration', 'Sweet Spot')}, {review_data['outlook_days'][0]['focus']}).\n"
+        f"CRITICAL ANTI-CIRCULARITY RULE: Do NOT waste words congratulating the athlete for matching ERG-mode power to a workout file they themselves selected or edited. "
+        f"Instead, deliver real coaching value across all four pillars: (1) internal physiological cost (EF vs personal baseline, cardiac drift/decoupling, HR & WHOOP strain/reaction), "
+        f"(2) whether the workout truly fit their independent physiological readiness & HRV, (3) execution nuances beyond average NP (VI, cadence/power/interval fade, duration, W' depletion), "
+        f"and (4) how this ride moves them toward their long-term goal, weekly TSS pace, and phase target.\n"
         f"Mandatory: All wattage figures above are Normalized Power (NP). Always refer to them as Normalized Power or NP (e.g. '195W NP'), NEVER as 'average power' or 'avg watts'.\n"
-        f"Mandatory: If the athlete was prescribed a lower-effort or endurance ride (such as Zone 2 Aerobic Base, Recovery, or endurance) per their updated schedule or preferences, evaluate fidelity against THAT prescribed lower-effort target. Do NOT treat a lower-effort ride as 'conservative' or complain that it was not Sweet Spot/VO2 Max when a lower-effort ride was prescribed.\n"
         f"Mandatory: All advice and tomorrow guidance MUST strictly respect the athlete's workout and schedule preferences.\n"
-        f"Format response as strict JSON: {{\"insights\": \"1-2 paragraphs assessing all sessions of the day collectively against the prescribed target and explaining fatigue state, under 150 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\"}}"
+        f"Format response as strict JSON: {{\"insights\": \"2 tight paragraphs synthesizing physiological response, readiness fit, execution nuances, and long-term goal progress, under 180 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\", \"pillar_notes\": {{\"physiological\": \"1 concise insight sentence (<28 words)\", \"readiness\": \"1 concise insight sentence (<28 words)\", \"execution\": \"1 concise insight sentence (<28 words)\", \"goal\": \"1 concise insight sentence (<28 words)\"}}}}"
     )
     if custom_prompt:
         prompt += f"\nAthlete note: '{custom_prompt}'"
@@ -2253,10 +2375,13 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
                 try:
                     parsed = json.loads(clean)
                     if isinstance(parsed, dict) and parsed.get("insights") and len(str(parsed["insights"]).strip()) > 20:
-                        return {
+                        out: Dict[str, Any] = {
                             "insights": str(parsed["insights"]).strip(),
                             "tomorrow_guidance": str(parsed.get("tomorrow_guidance", "")).strip()
                         }
+                        if isinstance(parsed.get("pillar_notes"), dict):
+                            out["pillar_notes"] = parsed["pillar_notes"]
+                        return out
                 except Exception:
                     pass
 
