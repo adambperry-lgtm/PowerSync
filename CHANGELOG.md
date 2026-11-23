@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.24.1] - 2026-11-23
+### Changed
+- **Moved Forecast Accuracy Backtest Button to Settings**:
+  - Removed `#btnOpenForecastAccuracy` from `#debriefTabOutlook` on the Daily Training page and placed it in a dedicated **3-Day Forecast Accuracy Backtest** card inside `#settingsModal` right below **Coaching Preferences & Weekly Schedule** ([`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html)).
+  - Updated [`openForecastAccuracyModal()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=163`) to cleanly close `#settingsModal` before opening `#modalForecastAccuracy`.
+
 ## [2.24.0] - 2026-11-23
 ### Changed
 - **Promoted Calibrated Hybrid 3-Branch + Personal Baseline Model to Live 3-Day Forecast**:

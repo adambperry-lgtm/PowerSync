@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.24.0",
-        "release_name": "Calibrated Hybrid 3-Branch + Personal Baseline Live Forecast",
+        "version": "2.24.1",
+        "release_name": "Forecast Accuracy Backtest Moved to Settings",
         "build_date": "2026-11-23",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.24.1",
+                "date": "2026-11-23",
+                "title": "Forecast Accuracy Backtest Moved to Settings",
+                "items": [
+                    "Cleaner Daily Training UI: Removed the '📊 Forecast Accuracy Backtest' button from the 3-Day Forecast tab and moved it into a dedicated card inside the Settings modal right below Coaching Preferences & Weekly Schedule."
+                ]
+            },
             {
                 "version": "v2.24.0",
                 "date": "2026-11-23",

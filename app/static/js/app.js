@@ -12008,6 +12008,9 @@ function closeRideInspectorModal() {
 let _lastBacktestTimeline = [];
 
 function openForecastAccuracyModal() {
+  if (typeof closeSettingsModal === "function") {
+    closeSettingsModal();
+  }
   const modal = document.getElementById("modalForecastAccuracy");
   if (!modal) return;
   modal.classList.add("open", "active");
