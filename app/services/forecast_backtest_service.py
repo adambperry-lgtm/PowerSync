@@ -57,20 +57,6 @@ BRANCH_META = {
     },
 }
 
-# Sports-science prior weights for the Candidate Personalized Strain + HRV Model
-# Features: [intercept, z_rec, z_strain, z_load, z_hrv, z_stack]
-CANDIDATE_PRIOR_WEIGHTS = [0.0, 2.5, -7.5, -3.0, 3.0, -3.5]
-CANDIDATE_WEIGHT_BOUNDS = [
-    (-8.0, 8.0),    # residual intercept around personal rolling mean
-    (0.0, 10.0),    # z_rec: mild positive autocorrelation (mean reversion)
-    (-18.0, -1.5),  # z_strain: WHOOP day strain reduces next-day recovery
-    (-12.0, 0.0),   # z_load: cycling duration/effort load penalty
-    (0.0, 10.0),    # z_hrv: HRV above 14d baseline lifts next-day recovery
-    (-10.0, 0.0),   # z_stack: 2-day stacked strain fatigue penalty
-]
-CANDIDATE_RIDGE_LAMBDA = 14.0
-
-
 def _recovery_zone(score: int) -> str:
     if score > 66:
         return "green"
@@ -81,73 +67,6 @@ def _recovery_zone(score: int) -> str:
 
 def _clamp(val: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, val))
-
-
-def _solve_linear_system(a_mat: List[List[float]], b_vec: List[float]) -> Optional[List[float]]:
-    """Pure-Python Gaussian elimination with partial pivoting for small SPD systems."""
-    n = len(b_vec)
-    aug = [list(a_mat[i]) + [b_vec[i]] for i in range(n)]
-    for col in range(n):
-        pivot_row = max(range(col, n), key=lambda r: abs(aug[r][col]))
-        if abs(aug[pivot_row][col]) < 1e-10:
-            return None
-        if pivot_row != col:
-            aug[col], aug[pivot_row] = aug[pivot_row], aug[col]
-        piv = aug[col][col]
-        for j in range(col, n + 1):
-            aug[col][j] /= piv
-        for r in range(n):
-            if r == col:
-                continue
-            factor = aug[r][col]
-            if abs(factor) < 1e-12:
-                continue
-            for j in range(col, n + 1):
-                aug[r][j] -= factor * aug[col][j]
-    return [aug[i][n] for i in range(n)]
-
-
-def _fit_prior_ridge(
-    x_rows: List[List[float]],
-    y_devs: List[float],
-    prior_w: List[float] = CANDIDATE_PRIOR_WEIGHTS,
-    ridge_lambda: float = CANDIDATE_RIDGE_LAMBDA,
-) -> List[float]:
-    """
-    Fits Bayesian-shrunk ridge regression toward physiological priors:
-        w = w0 + (X^T X + lambda * I)^-1 X^T (y - X w0)
-    Guarantees smooth fallback to sports-science priors with small sample sizes
-    and progressively personalizes weights as athlete history accumulates.
-    """
-    p = len(prior_w)
-    if len(x_rows) < 5:
-        return list(prior_w)
-
-    xtx = [[(ridge_lambda if i == j else 0.0) for j in range(p)] for i in range(p)]
-    xtr = [0.0 for _ in range(p)]
-
-    for x, y in zip(x_rows, y_devs):
-        prior_pred = sum(w0_j * x_j for w0_j, x_j in zip(prior_w, x))
-        resid = y - prior_pred
-        for i in range(p):
-            xi = x[i]
-            xtr[i] += xi * resid
-            for j in range(i, p):
-                xtx[i][j] += xi * x[j]
-
-    for i in range(p):
-        for j in range(i):
-            xtx[i][j] = xtx[j][i]
-
-    delta_w = _solve_linear_system(xtx, xtr)
-    if delta_w is None:
-        return list(prior_w)
-
-    learned = []
-    for i in range(p):
-        lo, hi = CANDIDATE_WEIGHT_BOUNDS[i]
-        learned.append(_clamp(prior_w[i] + delta_w[i], lo, hi))
-    return learned
 
 
 def _schedule_prior_load(target_date: datetime.date, weekly_schedule: Dict[str, Any]) -> Tuple[float, float]:
@@ -176,8 +95,11 @@ def _compute_origin_context(
     strava_by_date: Dict[str, Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
     """
-    Computes strictly leak-free (<= origin_dt) personal baselines and standardized
-    candidate model features for day `origin_dt`.
+    Computes strictly leak-free (<= origin_dt) personal baselines for day `origin_dt`:
+      - 21-day personal rolling recovery mean
+      - 7-day rolling recovery mean
+      - 21-day mean WHOOP day strain & cycling duration
+      - HRV % deviation vs. trailing 14-day HRV baseline
     """
     d_iso = origin_dt.isoformat()
     w_today = whoop_by_date.get(d_iso)
@@ -187,9 +109,7 @@ def _compute_origin_context(
     today_rec = float(w_today["recovery_score"])
     act_today = strava_by_date.get(d_iso)
     today_dur = float(act_today["moving_time_min"]) if act_today else 0.0
-    today_suffer = float(act_today["suffer_score"]) if act_today else 0.0
 
-    # Gather strictly past/present (<= origin_dt) trailing stats
     recs_21: List[float] = []
     recs_7: List[float] = []
     strains_21: List[float] = []
@@ -208,7 +128,7 @@ def _compute_origin_context(
                     recs_7.append(val)
             if pw.get("day_strain") is not None:
                 strains_21.append(float(pw["day_strain"]))
-            if lb > 0 and lb <= 14 and pw.get("hrv_rmssd") is not None:
+            if 0 < lb <= 14 and pw.get("hrv_rmssd") is not None:
                 hrvs_14.append(float(pw["hrv_rmssd"]))
         durs_21.append(float(pa["moving_time_min"]) if pa else 0.0)
 
@@ -220,12 +140,7 @@ def _compute_origin_context(
     if w_today.get("day_strain") is not None:
         today_strain = float(w_today["day_strain"])
     else:
-        # Fallback proxy if WHOOP strain missing
         today_strain = min(18.0, 5.5 + (today_dur / 8.0)) if today_dur > 0 else mean_strain
-
-    yest_iso = (origin_dt - datetime.timedelta(days=1)).isoformat()
-    w_yest = whoop_by_date.get(yest_iso)
-    yest_strain = float(w_yest["day_strain"]) if (w_yest and w_yest.get("day_strain") is not None) else mean_strain
 
     hrv_pct_diff = 0.0
     if w_today.get("hrv_rmssd") is not None and len(hrvs_14) >= 3:
@@ -233,86 +148,93 @@ def _compute_origin_context(
         if hrv_base > 0:
             hrv_pct_diff = ((float(w_today["hrv_rmssd"]) - hrv_base) / hrv_base) * 100.0
 
-    z_rec = _clamp((today_rec - personal_rec_mean) / 20.0, -2.5, 2.5)
-    z_strain = _clamp((today_strain - mean_strain) / 4.5, -2.5, 2.5)
-    # Use Strava duration above personal daily mean (or relative effort proxy if duration is 0)
-    eff_dur = today_dur if today_dur > 0 else (today_suffer * 0.7 if today_suffer > 0 else 0.0)
-    z_load = _clamp((eff_dur - mean_dur) / 45.0, -1.5, 2.5)
-    z_hrv = _clamp(hrv_pct_diff / 15.0, -2.5, 2.5)
-    two_day_strain = 0.5 * (today_strain + yest_strain)
-    z_stack = _clamp(max(0.0, (two_day_strain - mean_strain) / 4.0), 0.0, 2.5)
-
     return {
-        "features": [1.0, z_rec, z_strain, z_load, z_hrv, z_stack],
         "personal_rec_mean": personal_rec_mean,
         "rolling_7_mean": rolling_7_mean,
         "mean_strain": mean_strain,
         "mean_dur": mean_dur,
         "today_strain": today_strain,
-        "today_dur": eff_dur,
+        "today_dur": today_dur,
         "hrv_pct_diff": hrv_pct_diff,
         "hrv_sample_count": len(hrvs_14),
     }
 
 
-def _predict_candidate_3day(
+def predict_hybrid_candidate_3day(
     origin_dt: datetime.date,
+    today_recovery: int,
+    today_strain: float,
+    workout_strain: float,
+    is_today: bool,
+    is_yesterday: bool,
+    has_trained_today: bool,
+    suffer_score: float,
     ctx: Dict[str, Any],
-    weights: List[float],
     weekly_schedule: Dict[str, Any],
     weekday_strain_hist: Dict[int, List[float]],
-    weekday_dur_hist: Dict[int, List[float]],
 ) -> List[int]:
     """
-    Produces Day +1, Day +2, Day +3 recovery predictions from the Candidate
-    Personalized Strain + HRV Mean-Reverting Model.
-      - Day +1 uses observed Day t features.
-      - Day +2 / Day +3 propagate forward using blended personal weekday &
-        schedule expected load with smooth mean reversion toward personal baseline.
+    Calibrated Hybrid 3-Branch + Personal Baseline Candidate Model (Shadow Backtest):
+      - Day +1 preserves the nonlinear 3-branch threshold/rebound dynamics while fixing:
+          1) Heavy Load Today: strain-scaled drop (-12 to -19) + HRV nudge, floor lowered to 30%
+          2) Heavy Yesterday + Light Today: removes artificial 74% cap on full rest (up to 82%)
+             and prevents false-Red predictions after extreme single-digit lows via mean-rebound floor
+          3) Standard / Balanced: separates easy rest days (<8.5 strain) from moderate training
+             days (8.5-13.4 strain, eliminating +9pt bias) and catches unlogged >=13.5 strain days
+      - Days +2 & +3 replace hardcoded 74/76/88 targets with smooth mean reversion toward the
+        athlete's own 21-day rolling recovery baseline, adjusted by expected weekday load.
     """
     mu = ctx["personal_rec_mean"]
     mean_strain = ctx["mean_strain"]
-    mean_dur = ctx["mean_dur"]
+    hrv_nudge = _clamp(ctx["hrv_pct_diff"] * 0.15, -5.0, 4.0)
 
-    # Day +1 prediction from observed features
-    f1 = ctx["features"]
-    dev1 = sum(w * x for w, x in zip(weights, f1))
-    pred1 = int(round(_clamp(mu + dev1, 22.0, 92.0)))
+    trained_today_heavy = is_today and ((workout_strain >= 13.5) or (suffer_score >= 60))
+    trained_yesterday_heavy = is_yesterday and ((workout_strain >= 13.5) or (suffer_score >= 40))
+    today_passive_or_light = (not has_trained_today) and (today_strain < 13.5)
 
-    def _expected_day_load(dt: datetime.date) -> Tuple[float, float]:
-        p_strain, p_dur = _schedule_prior_load(dt, weekly_schedule)
-        wd = dt.weekday()
-        s_hist = weekday_strain_hist.get(wd) or []
-        d_hist = weekday_dur_hist.get(wd) or []
-        # Bayesian shrink observed weekday load toward schedule prior (k=3)
+    # --- DAY +1 ---
+    if trained_today_heavy:
+        extra_strain = max(0.0, today_strain - 13.5)
+        drop = 12.0 + 1.2 * min(6.0, extra_strain)
+        pred1 = int(round(_clamp(today_recovery - drop + hrv_nudge, 30.0, 62.0)))
+    elif trained_yesterday_heavy and today_passive_or_light:
+        is_full_rest = today_strain < 5.0
+        boost = 26.0 if is_full_rest else 22.0
+        cap = 82.0 if is_full_rest else 76.0
+        rebound_from_low = 0.45 * today_recovery + 0.55 * mu + 14.0
+        raw_d1 = max(today_recovery + boost, rebound_from_low) + 0.5 * hrv_nudge
+        pred1 = int(round(_clamp(raw_d1, 36.0, cap)))
+    else:
+        if today_strain >= 13.5:
+            # Unlogged high WHOOP cardiovascular strain (e.g. non-cycling activity or life load)
+            extra_strain = max(0.0, today_strain - 13.5)
+            pred1 = int(round(_clamp(today_recovery - (10.0 + 1.0 * min(5.0, extra_strain)) + hrv_nudge, 32.0, 62.0)))
+        elif today_strain < 8.5:
+            # Genuine easy / recovery day: mild rebound preserving Green precision
+            easy_target = 0.65 * (today_recovery + 8.0) + 0.35 * (mu + 8.0) + 0.5 * hrv_nudge
+            pred1 = int(round(_clamp(easy_target, 38.0, 84.0)))
+        else:
+            # Moderate active/training day (8.5 <= strain < 13.5): eliminate blind +12 boost
+            mod_target = (
+                0.55 * today_recovery
+                + 0.45 * mu
+                - 1.5 * max(0.0, today_strain - 10.0)
+                + 0.5 * hrv_nudge
+            )
+            pred1 = int(round(_clamp(mod_target, 36.0, 78.0)))
+
+    # --- DAYS +2 & +3 (Personal-baseline mean reversion + expected weekday load) ---
+    def _expected_day_strain(dt: datetime.date) -> float:
+        p_strain, _ = _schedule_prior_load(dt, weekly_schedule)
+        s_hist = weekday_strain_hist.get(dt.weekday()) or []
         k = 3.0
-        exp_s = (sum(s_hist) + k * p_strain) / (len(s_hist) + k)
-        exp_d = (sum(d_hist) + k * p_dur) / (len(d_hist) + k)
-        return exp_s, exp_d
+        return (sum(s_hist) + k * p_strain) / (len(s_hist) + k)
 
-    # Day +2 propagation (from Day +1 predicted recovery + expected Day +1 load)
-    d1_dt = origin_dt + datetime.timedelta(days=1)
-    exp_s1, exp_d1 = _expected_day_load(d1_dt)
-    z_rec2 = _clamp((pred1 - mu) / 20.0, -2.5, 2.5)
-    z_strain2 = _clamp((exp_s1 - mean_strain) / 4.5, -2.0, 2.0)
-    z_load2 = _clamp((exp_d1 - mean_dur) / 45.0, -1.5, 2.0)
-    z_hrv2 = 0.35 * f1[4]
-    z_stack2 = _clamp(max(0.0, (0.5 * (exp_s1 + ctx["today_strain"]) - mean_strain) / 4.0), 0.0, 2.0)
-    f2 = [1.0, z_rec2, z_strain2, z_load2, z_hrv2, z_stack2]
-    dev2 = 0.70 * sum(w * x for w, x in zip(weights, f2))
-    pred2 = int(round(_clamp(mu + dev2, 26.0, 90.0)))
+    exp_s1 = _expected_day_strain(origin_dt + datetime.timedelta(days=1))
+    exp_s2 = _expected_day_strain(origin_dt + datetime.timedelta(days=2))
 
-    # Day +3 propagation (from Day +2 predicted recovery + expected Day +2 load)
-    d2_dt = origin_dt + datetime.timedelta(days=2)
-    exp_s2, exp_d2 = _expected_day_load(d2_dt)
-    z_rec3 = _clamp((pred2 - mu) / 20.0, -2.5, 2.5)
-    z_strain3 = _clamp((exp_s2 - mean_strain) / 4.5, -2.0, 2.0)
-    z_load3 = _clamp((exp_d2 - mean_dur) / 45.0, -1.5, 2.0)
-    z_hrv3 = 0.15 * f1[4]
-    z_stack3 = _clamp(max(0.0, (0.5 * (exp_s2 + exp_s1) - mean_strain) / 4.0), 0.0, 2.0)
-    f3 = [1.0, z_rec3, z_strain3, z_load3, z_hrv3, z_stack3]
-    dev3 = 0.50 * sum(w * x for w, x in zip(weights, f3))
-    pred3 = int(round(_clamp(mu + dev3, 30.0, 88.0)))
+    pred2 = int(round(_clamp(mu + 0.30 * (pred1 - mu) - 1.2 * (exp_s1 - mean_strain), 30.0, 86.0)))
+    pred3 = int(round(_clamp(mu + 0.15 * (pred2 - mu) - 1.0 * (exp_s2 - mean_strain), 32.0, 84.0)))
 
     return [pred1, pred2, pred3]
 
@@ -469,7 +391,7 @@ def _build_baseline_comparison(
     all_records: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     models = [
-        ("candidate", "Personalized Strain + HRV (Candidate)", "candidate_recovery"),
+        ("candidate", "Calibrated Hybrid 3-Branch (Candidate)", "candidate_recovery"),
         ("heuristic", "3-Branch Heuristic (Current)", "predicted_recovery"),
         ("rolling_mean", "Rolling 7-Day Personal Mean", "baseline_rolling_mean"),
         ("mean_reversion", "50/50 Mean-Reversion", "baseline_mean_reversion"),
@@ -558,28 +480,37 @@ def _generate_diagnostic_insights(
     ):
         d1_delta = round(candidate_d1["mae"] - d1_stats["mae"], 1)
         all_delta = round(candidate_overall["mae"] - overall_stats["mae"], 1)
+        z_heur = d1_stats.get("zone_accuracy_pct") or 0.0
+        z_cand = candidate_d1.get("zone_accuracy_pct") or 0.0
+        z_delta = round(z_cand - z_heur, 1)
         fg_heur = d1_confusion.get("false_green_pct", 0.0)
         fg_cand = (candidate_d1_confusion or {}).get("false_green_pct", 0.0)
-        if d1_delta <= -0.5 or all_delta <= -1.0:
-            insights.append({
-                "severity": "good",
-                "title": f"Candidate Model Outperforms Current Heuristic (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)",
-                "detail": (
-                    f"Strictly walk-forward (out-of-sample), the Personalized Strain + HRV candidate achieves "
-                    f"{candidate_d1['mae']} pts Day +1 MAE (vs. {d1_stats['mae']}) and {candidate_overall['mae']} pts All-3d MAE "
-                    f"(vs. {overall_stats['mae']}), cutting Day +1 bias from {d1_stats['bias']:+.1f} to {candidate_d1['bias']:+.1f} "
-                    f"and False-Green rate from {fg_heur:.0f}% to {fg_cand:.0f}%."
-                ),
-            })
+        bias_verb = "reducing" if abs(candidate_d1["bias"]) < abs(d1_stats["bias"]) else "shifting"
+        fg_verb = (
+            "reducing" if fg_cand < fg_heur - 0.5
+            else ("increasing" if fg_cand > fg_heur + 0.5 else "keeping")
+        )
+        beats_both = (d1_delta <= 0.0 and all_delta <= -0.5) or (d1_delta <= -0.5 and all_delta <= 0.0)
+        if beats_both and z_delta >= -2.0:
+            severity = "good"
+            title = f"Hybrid Candidate Outperforms Current Heuristic (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
+        elif all_delta <= -0.5 or d1_delta <= -0.5:
+            severity = "neutral"
+            title = f"Hybrid Candidate Mixed vs. Current Heuristic (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
         else:
-            insights.append({
-                "severity": "neutral",
-                "title": f"Candidate Model vs. Current Heuristic (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)",
-                "detail": (
-                    f"Out-of-sample Day +1 MAE is {candidate_d1['mae']} pts (vs. {d1_stats['mae']}) and All-3d MAE is "
-                    f"{candidate_overall['mae']} pts (vs. {overall_stats['mae']}), with bias {candidate_d1['bias']:+.1f} pts."
-                ),
-            })
+            severity = "warning"
+            title = f"Hybrid Candidate Trails Current Heuristic (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
+
+        insights.append({
+            "severity": severity,
+            "title": title,
+            "detail": (
+                f"Walk-forward out-of-sample: Day +1 MAE {candidate_d1['mae']} vs. {d1_stats['mae']} "
+                f"(Zone Match {z_cand:.1f}% vs. {z_heur:.1f}%), All-3d MAE {candidate_overall['mae']} vs. {overall_stats['mae']}, "
+                f"{bias_verb} Day +1 bias from {d1_stats['bias']:+.1f} to {candidate_d1['bias']:+.1f} "
+                f"and {fg_verb} False-Green rate from {fg_heur:.0f}% to {fg_cand:.0f}%."
+            ),
+        })
 
     # 1. Heuristic vs Rolling Mean baseline
     mae = d1_stats["mae"]
@@ -767,25 +698,16 @@ def run_recovery_forecast_backtest(
         d for d, w in whoop_by_date.items() if w.get("recovery_score") is not None
     )
 
-    # Precompute strictly leak-free per-day candidate contexts across all fetched days
-    # and build chronological Day +1 training pairs keyed by target_date (so on day t,
-    # we only train on pairs whose outcome target_date <= t).
+    # Precompute strictly leak-free per-day candidate contexts (<= origin_dt)
     origin_ctx_by_date: Dict[str, Dict[str, Any]] = {}
-    all_training_pairs: List[Tuple[str, List[float], float]] = []  # (target_iso, features, y_dev)
     for d_iso in valid_whoop_dates:
         try:
             odt = datetime.date.fromisoformat(d_iso)
         except ValueError:
             continue
         ctx = _compute_origin_context(odt, whoop_by_date, strava_by_date)
-        if not ctx:
-            continue
-        origin_ctx_by_date[d_iso] = ctx
-        next_iso = (odt + datetime.timedelta(days=1)).isoformat()
-        w_next = whoop_by_date.get(next_iso)
-        if w_next and w_next.get("recovery_score") is not None:
-            y_dev = float(w_next["recovery_score"]) - ctx["personal_rec_mean"]
-            all_training_pairs.append((next_iso, ctx["features"], y_dev))
+        if ctx:
+            origin_ctx_by_date[d_iso] = ctx
 
     cutoff_iso = cutoff_dt.isoformat()
     window_whoop_dates = [d for d in valid_whoop_dates if d >= cutoff_iso]
@@ -809,9 +731,8 @@ def run_recovery_forecast_backtest(
         "strava_duration_min": [],
     }
 
-    # Maintain running weekday strain/duration histories strictly <= origin_dt for D+2/D+3 propagation
+    # Maintain running weekday strain histories strictly <= origin_dt for D+2/D+3 propagation
     weekday_strain_hist: Dict[int, List[float]] = {wd: [] for wd in range(7)}
-    weekday_dur_hist: Dict[int, List[float]] = {wd: [] for wd in range(7)}
     for pre_iso in valid_whoop_dates:
         if pre_iso >= cutoff_iso:
             break
@@ -820,16 +741,12 @@ def run_recovery_forecast_backtest(
         except ValueError:
             continue
         pw = whoop_by_date[pre_iso]
-        pa = strava_by_date.get(pre_iso)
         if pw.get("day_strain") is not None:
             weekday_strain_hist[pdt.weekday()].append(float(pw["day_strain"]))
-        weekday_dur_hist[pdt.weekday()].append(float(pa["moving_time_min"]) if pa else 0.0)
 
     timeline: List[Dict[str, Any]] = []
     origin_days_evaluated = 0
     strava_matched_days = 0
-    latest_weights = list(CANDIDATE_PRIOR_WEIGHTS)
-    latest_train_n = 0
     latest_ctx: Optional[Dict[str, Any]] = None
 
     for d_iso in window_whoop_dates:
@@ -849,10 +766,9 @@ def run_recovery_forecast_backtest(
         if has_trained_today:
             strava_matched_days += 1
 
-        # Update weekday load history with day `origin_dt` (observed today, <= origin_dt)
+        # Update weekday strain history with day `origin_dt` (observed today, <= origin_dt)
         if w_today.get("day_strain") is not None:
             weekday_strain_hist[origin_dt.weekday()].append(float(w_today["day_strain"]))
-        weekday_dur_hist[origin_dt.weekday()].append(float(act_today["moving_time_min"]) if act_today else 0.0)
 
         # Mirror `build_daily_review_and_outlook_local` activity-context resolution
         if has_trained_today:
@@ -885,22 +801,22 @@ def run_recovery_forecast_backtest(
         branch = pred_out["branch"]
         preds = pred_out["recoveries"]
 
-        # Fit Candidate Model strictly on past pairs whose outcome target_date <= d_iso (zero leakage)
-        past_x = [fx for t_iso, fx, _ in all_training_pairs if t_iso <= d_iso]
-        past_y = [yv for t_iso, _, yv in all_training_pairs if t_iso <= d_iso]
-        cand_weights = _fit_prior_ridge(past_x, past_y)
+        # Calibrated Hybrid 3-Branch + Personal Baseline Candidate (strictly <= origin_dt)
         ctx = origin_ctx_by_date.get(d_iso)
         if ctx:
-            cand_preds = _predict_candidate_3day(
+            cand_preds = predict_hybrid_candidate_3day(
                 origin_dt=origin_dt,
+                today_recovery=today_rec,
+                today_strain=today_strain,
+                workout_strain=workout_strain,
+                is_today=is_today,
+                is_yesterday=is_yesterday,
+                has_trained_today=has_trained_today,
+                suffer_score=suffer_score,
                 ctx=ctx,
-                weights=cand_weights,
                 weekly_schedule=weekly_schedule,
                 weekday_strain_hist=weekday_strain_hist,
-                weekday_dur_hist=weekday_dur_hist,
             )
-            latest_weights = cand_weights
-            latest_train_n = len(past_x)
             latest_ctx = ctx
         else:
             cand_preds = list(preds)
@@ -1025,13 +941,6 @@ def run_recovery_forecast_backtest(
             origin_days_evaluated += 1
             branch_trigger_counts[branch] += 1
 
-    # Also fit final candidate weights on all pairs up to the latest date for the learned profile card
-    if all_training_pairs:
-        final_x = [fx for _, fx, _ in all_training_pairs]
-        final_y = [yv for _, _, yv in all_training_pairs]
-        latest_weights = _fit_prior_ridge(final_x, final_y)
-        latest_train_n = len(final_x)
-
     all_records = by_horizon_records[1] + by_horizon_records[2] + by_horizon_records[3]
 
     by_horizon = {
@@ -1125,16 +1034,15 @@ def run_recovery_forecast_backtest(
     }
 
     learned_profile = {
-        "training_samples": latest_train_n,
+        "model_type": "hybrid_3branch_personal_baseline",
+        "training_samples": origin_days_evaluated,
         "personal_baseline_recovery": round(latest_ctx["personal_rec_mean"], 1) if latest_ctx else None,
         "personal_baseline_strain": round(latest_ctx["mean_strain"], 1) if latest_ctx else None,
         "personal_baseline_duration_min": round(latest_ctx["mean_dur"], 0) if latest_ctx else None,
-        "pts_per_plus_1_strain": round(latest_weights[2] / 4.5, 2),
-        "pts_per_plus_30m_ride": round(latest_weights[3] * (30.0 / 45.0), 2),
-        "pts_per_plus_10pct_hrv": round(latest_weights[4] * (10.0 / 15.0), 2),
-        "pts_per_plus_10_today_rec": round(latest_weights[1] * (10.0 / 20.0), 2),
-        "stacked_strain_penalty_per_4pts": round(latest_weights[5], 2),
-        "residual_intercept": round(latest_weights[0], 2),
+        "heavy_drop_range": "-12 to -19 pts (floor 30%)",
+        "full_rest_cap": "82% (<5 strain) / 76% light",
+        "standard_split": "<8.5 easy rebound • 8.5–13.4 neutral • ≥13.5 dip",
+        "horizon_decay": "D+2/D+3 revert to 21d mean + weekday load",
     }
 
     feature_labels = {
@@ -1208,8 +1116,8 @@ def run_recovery_forecast_backtest(
             "overall_confirmation_rate_pct": by_horizon["overall"]["confirmation_rate_pct"],
         },
         "candidate_model": {
-            "name": "Personalized Strain + HRV Mean-Reverting Model",
-            "description": "Walk-forward Bayesian-shrunk ridge model anchored to your personal 21d recovery baseline, continuous WHOOP strain, cycling load, HRV vs. 14d baseline, 2-day stacked strain, and weekday schedule propagation for Days +2/+3.",
+            "name": "Calibrated Hybrid 3-Branch + Personal Baseline",
+            "description": "Preserves the 3-branch Day +1 step dynamics while calibrating strain-scaled heavy drops, full-rest rebounds (up to 82%), strain-gated Standard days (fixing +9pt bias), and personal 21d baseline mean-reversion on Days +2/+3.",
             "by_horizon": candidate_by_horizon,
             "confusion_matrix": {
                 "day_1": candidate_confusion_d1,

@@ -12271,12 +12271,12 @@ function renderForecastAccuracyReport(data) {
           </div>
         </div>
         <div style="margin-top:0.6rem;padding-top:0.55rem;border-top:1px dashed rgba(0,200,150,0.35);display:flex;flex-wrap:wrap;gap:0.45rem 0.9rem;font-size:0.71rem;color:var(--text-secondary);">
-          <span><b>Learned Profile (n=${learned.training_samples || 0}):</b></span>
+          <span><b>Calibration (n=${learned.training_samples || 0}):</b></span>
           <span>21d Baseline: <b>${_btFmtNum(learned.personal_baseline_recovery, "%")}</b></span>
-          <span>Strain: <b>${_btFmtNum(learned.pts_per_plus_1_strain, " pts/+1", true)}</b></span>
-          <span>Ride Vol: <b>${_btFmtNum(learned.pts_per_plus_30m_ride, " pts/+30m", true)}</b></span>
-          <span>HRV: <b>${_btFmtNum(learned.pts_per_plus_10pct_hrv, " pts/+10%", true)}</b></span>
-          <span>2d Stack: <b>${_btFmtNum(learned.stacked_strain_penalty_per_4pts, " pts", true)}</b></span>
+          <span>Avg Strain: <b>${_btFmtNum(learned.personal_baseline_strain)}</b></span>
+          <span>Heavy Drop: <b>${_btEsc(learned.heavy_drop_range || "-12 to -19 pts")}</b></span>
+          <span>Rest Cap: <b>${_btEsc(learned.full_rest_cap || "82% / 76%")}</b></span>
+          <span>Standard: <b>${_btEsc(learned.standard_split || "strain-gated")}</b></span>
         </div>
       </div>`
     : "";

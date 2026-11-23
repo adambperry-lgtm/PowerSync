@@ -234,8 +234,8 @@ class TestForecastBacktest(unittest.TestCase):
         self.assertIsNotNone(cand["by_horizon"]["day_1"]["mae"])
         self.assertIsNotNone(cand["by_horizon"]["overall"]["mae"])
         self.assertIsNotNone(cand["vs_heuristic"]["day_1_mae_delta"])
-        self.assertGreater(cand["learned_profile"]["training_samples"], 0)
-        self.assertLess(cand["learned_profile"]["pts_per_plus_1_strain"], 0.0)
+        self.assertEqual(cand["learned_profile"]["model_type"], "hybrid_3branch_personal_baseline")
+        self.assertIsNotNone(cand["learned_profile"]["personal_baseline_recovery"])
         for b_key in ("trained_today_heavy", "trained_yesterday_heavy", "standard"):
             self.assertIsNotNone(report["by_branch"][b_key]["candidate_day_1"]["mae"])
 

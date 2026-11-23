@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.22.0",
-        "release_name": "Candidate Personalized Recovery Model (Shadow Backtest)",
+        "version": "2.23.0",
+        "release_name": "Calibrated Hybrid 3-Branch + Personal Baseline Candidate",
         "build_date": "2026-11-23",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.23.0",
+                "date": "2026-11-23",
+                "title": "Calibrated Hybrid 3-Branch + Personal Baseline Candidate",
+                "items": [
+                    "Hybrid Candidate Upgrade: Replaced the over-damped linear ridge shadow model with a Calibrated Hybrid 3-Branch + Personal Baseline model that preserves sharp Day +1 nonlinear step dynamics (strain-scaled heavy drop -12 to -19 with 30% floor, full-rest rebound cap raised to 82%, strain-gated Standard branch eliminating +9pt moderate-day bias, and unlogged >=13.5 strain handling) while reverting Days +2/+3 smoothly toward your 21-day personal mean + expected weekday load.",
+                    "Accurate Diagnostic Wording: Fixed the Candidate vs. Current diagnostic insight banner so it evaluates both Day +1 and All-3d MAE + Zone Match together and accurately states whether bias and False-Green rate decreased or increased."
+                ]
+            },
             {
                 "version": "v2.22.0",
                 "date": "2026-11-23",

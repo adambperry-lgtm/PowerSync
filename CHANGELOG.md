@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.23.0] - 2026-11-23
+### Changed
+- **Calibrated Hybrid 3-Branch + Personal Baseline Shadow Candidate**:
+  - Replaced the over-damped linear ridge candidate in [`forecast_backtest_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/forecast_backtest_service.py) with [`predict_hybrid_candidate_3day()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/forecast_backtest_service.py), keeping Day +1's nonlinear 3-branch step response while calibrating strain-scaled heavy drops (`-12` to `-19`, `30%` floor), full-rest rebounds (up to `82%` cap with mean-rebound floor from extreme lows), strain-gated `Standard` days (`<8.5` easy rebound, `8.5–13.4` neutral mean-pull, `>=13.5` unlogged strain dip), and personal 21-day baseline mean reversion + weekday load on Days +2 and +3.
+  - Fixed `_generate_diagnostic_insights()` banner logic so Candidate comparisons accurately reflect both Day +1 and All-3d outcomes and use truthful wording (`reducing` vs. `increasing`) for bias and False-Green rate; updated the calibration strip in [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=161`).
+
 ## [2.22.0] - 2026-11-23
 ### Added
 - **Candidate Personalized Strain + HRV Recovery Model (Shadow Backtest)**:
