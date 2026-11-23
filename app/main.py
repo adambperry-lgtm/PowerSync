@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.23.0",
-        "release_name": "Calibrated Hybrid 3-Branch + Personal Baseline Candidate",
+        "version": "2.24.0",
+        "release_name": "Calibrated Hybrid 3-Branch + Personal Baseline Live Forecast",
         "build_date": "2026-11-23",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.24.0",
+                "date": "2026-11-23",
+                "title": "Calibrated Hybrid 3-Branch + Personal Baseline Live Forecast",
+                "items": [
+                    "Promoted to Live 3-Day Forecast: Upgraded build_preference_aligned_outlook_days() to use PowerSync's backtest-validated Calibrated Hybrid 3-Branch + Personal Baseline WHOOP recovery model (predict_3day_recovery_hybrid) with your 21-day personal recovery baseline and 60-day weekday strain rhythm.",
+                    "Heavy-Day Yellow Floor Refinement: Calibrated Heavy Load Today to a -10 to -12 strain-scaled drop with a 36% Yellow floor (eliminating false-Red zone flips while keeping ~12.9 MAE), alongside the 82% full-rest rebound cap, strain-gated Standard branch, and personal-baseline Day +2/+3 reversion.",
+                    "Backtest Analyzer Promotion: Updated the Forecast Accuracy Backtest modal to display the Active Live Hybrid model as the primary scorecard compared against Legacy 3-Branch v1 and statistical baselines."
+                ]
+            },
             {
                 "version": "v2.23.0",
                 "date": "2026-11-23",

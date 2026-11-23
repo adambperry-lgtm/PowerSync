@@ -207,6 +207,110 @@ def parse_athlete_feedback_for_outlook(note: str, today: datetime.date, ftp: int
 
     return overrides
 
+def _clamp_val(val: float, lo: float, hi: float) -> float:
+    return max(lo, min(hi, val))
+
+
+def _schedule_prior_strain(target_date: datetime.date, weekly_schedule: Optional[Dict[str, Any]] = None) -> float:
+    """Returns prior expected WHOOP day strain for a calendar weekday from athlete schedule preferences."""
+    from app.services.preferences_service import DEFAULT_COACHING_PREFERENCES
+    weekday_keys = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    w_key = weekday_keys[target_date.weekday()]
+    sched_map = weekly_schedule if isinstance(weekly_schedule, dict) else DEFAULT_COACHING_PREFERENCES["weekly_schedule"]
+    sched = sched_map.get(w_key) or DEFAULT_COACHING_PREFERENCES["weekly_schedule"].get(w_key, {})
+    mode = sched.get("mode", "indoor_priority")
+    is_default_rest = bool(sched.get("is_default_rest", False)) or (w_key == "saturday")
+
+    if is_default_rest or mode == "rest_day":
+        return 5.5
+    if w_key == "sunday" or mode == "outdoor_or_long_indoor":
+        return 14.5
+    if w_key in ("wednesday", "friday") or mode == "outdoor_priority":
+        return 13.8
+    return 11.2
+
+
+def _load_athlete_recovery_baseline_context(
+    today: datetime.date,
+    today_recovery: int,
+    user_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Loads strictly past/present (<= today) personal WHOOP baselines for `user_id`:
+      - 21-day rolling recovery mean
+      - 21-day rolling WHOOP day strain mean
+      - Today's HRV % deviation vs. trailing 14-day HRV baseline
+      - Trailing 60-day weekday WHOOP strain history for Day +2/+3 load propagation
+    """
+    uid = user_id or get_current_user_id()
+    today_iso = today.isoformat()
+    start_60_iso = (today - datetime.timedelta(days=60)).isoformat()
+    start_21_iso = (today - datetime.timedelta(days=20)).isoformat()
+    start_14_iso = (today - datetime.timedelta(days=14)).isoformat()
+
+    recs_21: List[float] = []
+    strains_21: List[float] = []
+    hrvs_14: List[float] = []
+    today_hrv: Optional[float] = None
+    weekday_strain_hist: Dict[int, List[float]] = {wd: [] for wd in range(7)}
+
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT date, recovery_score, hrv_rmssd, day_strain
+            FROM whoop_metrics
+            WHERE user_id = ? AND date >= ? AND date <= ?
+            ORDER BY date ASC
+            """,
+            (uid, start_60_iso, today_iso),
+        )
+        rows = c.fetchall()
+        conn.close()
+    except Exception:
+        rows = []
+
+    for row in rows:
+        d_str = str(row["date"] or "")[:10]
+        if not d_str:
+            continue
+        try:
+            rdt = datetime.date.fromisoformat(d_str)
+        except ValueError:
+            continue
+
+        if row["day_strain"] is not None:
+            st = float(row["day_strain"])
+            weekday_strain_hist[rdt.weekday()].append(st)
+            if d_str >= start_21_iso:
+                strains_21.append(st)
+
+        if d_str >= start_21_iso and row["recovery_score"] is not None:
+            recs_21.append(float(row["recovery_score"]))
+
+        if row["hrv_rmssd"] is not None:
+            if d_str == today_iso:
+                today_hrv = float(row["hrv_rmssd"])
+            elif d_str >= start_14_iso and d_str < today_iso:
+                hrvs_14.append(float(row["hrv_rmssd"]))
+
+    personal_rec_mean = sum(recs_21) / len(recs_21) if recs_21 else float(today_recovery)
+    mean_strain = sum(strains_21) / len(strains_21) if strains_21 else 10.5
+    hrv_pct_diff = 0.0
+    if today_hrv is not None and len(hrvs_14) >= 3:
+        hrv_base = sum(hrvs_14) / len(hrvs_14)
+        if hrv_base > 0:
+            hrv_pct_diff = ((today_hrv - hrv_base) / hrv_base) * 100.0
+
+    return {
+        "personal_rec_mean": personal_rec_mean,
+        "mean_strain": mean_strain,
+        "hrv_pct_diff": hrv_pct_diff,
+        "weekday_strain_hist": weekday_strain_hist,
+    }
+
+
 def predict_3day_recovery_heuristic(
     today_recovery: int,
     today_strain: float,
@@ -218,11 +322,9 @@ def predict_3day_recovery_heuristic(
     verdict: str = "",
 ) -> Dict[str, Any]:
     """
-    Pure implementation of PowerSync's current rule-based 3-branch WHOOP recovery
-    forecast heuristic (Day +1, Day +2, Day +3).
-
-    Exposed as a standalone helper so both the live 3-day outlook builder and
-    the historical backtest/accuracy analyzer execute the exact same logic.
+    Legacy rule-based 3-branch WHOOP recovery forecast heuristic (v1).
+    Preserved as a standalone helper for historical backtest comparison against
+    PowerSync's active Calibrated Hybrid 3-Branch + Personal Baseline model.
     """
     trained_today_heavy = is_today and ((workout_strain >= 13.5) or (suffer_score >= 60))
     trained_yesterday_heavy = is_yesterday and (
@@ -261,6 +363,101 @@ def predict_3day_recovery_heuristic(
     }
 
 
+def predict_3day_recovery_hybrid(
+    origin_dt: datetime.date,
+    today_recovery: int,
+    today_strain: float,
+    workout_strain: float,
+    is_today: bool,
+    is_yesterday: bool,
+    has_trained_today: bool,
+    suffer_score: float = 0,
+    verdict: str = "",
+    personal_rec_mean: Optional[float] = None,
+    mean_strain: float = 10.5,
+    hrv_pct_diff: float = 0.0,
+    weekly_schedule: Optional[Dict[str, Any]] = None,
+    weekday_strain_hist: Optional[Dict[int, List[float]]] = None,
+) -> Dict[str, Any]:
+    """
+    Active PowerSync Calibrated Hybrid 3-Branch + Personal Baseline WHOOP recovery model:
+      - Day +1 preserves nonlinear 3-branch step/rebound dynamics while fixing:
+          1) Heavy Load Today: calibrated -10 to -12 strain-scaled drop + gentle HRV nudge
+             with a 36% Yellow floor (prevents false-Red zone flips while preserving ~12.9 MAE)
+          2) Heavy Yesterday + Light Today: lifts the 74% cap to 82% on true rest days (<5 strain)
+             and prevents false-Red predictions after extreme lows via a mean-rebound floor
+          3) Standard / Balanced: separates easy days (<8.5 strain) from moderate training days
+             (8.5-13.4 strain, eliminating +9pt bias) and handles unlogged >=13.5 strain days
+      - Days +2 & +3 replace hardcoded 74/76/88 targets with smooth mean reversion toward the
+        athlete's own 21-day personal recovery baseline, adjusted by expected weekday strain.
+    """
+    mu = float(personal_rec_mean) if personal_rec_mean is not None else float(today_recovery)
+    hrv_nudge = _clamp_val(hrv_pct_diff * 0.10, -3.0, 3.0)
+
+    trained_today_heavy = is_today and ((workout_strain >= 13.5) or (suffer_score >= 60))
+    trained_yesterday_heavy = is_yesterday and (
+        (workout_strain >= 13.5)
+        or (suffer_score >= 40)
+        or (verdict == "Intensity Overreach")
+    )
+    today_passive_or_light = (not has_trained_today) and (today_strain < 13.5)
+
+    # --- DAY +1 ---
+    if trained_today_heavy:
+        branch = "trained_today_heavy"
+        branch_label = "Heavy Load Today"
+        extra_strain = max(0.0, today_strain - 13.5)
+        drop = 10.0 + 0.5 * min(4.0, extra_strain)
+        pred1 = int(round(_clamp_val(today_recovery - drop + hrv_nudge, 36.0, 62.0)))
+    elif trained_yesterday_heavy and today_passive_or_light:
+        branch = "trained_yesterday_heavy"
+        branch_label = "Heavy Yesterday + Light Today"
+        is_full_rest = today_strain < 5.0
+        boost = 26.0 if is_full_rest else 22.0
+        cap = 82.0 if is_full_rest else 76.0
+        rebound_from_low = 0.45 * today_recovery + 0.55 * mu + 14.0
+        raw_d1 = max(today_recovery + boost, rebound_from_low) + 0.5 * hrv_nudge
+        pred1 = int(round(_clamp_val(raw_d1, 36.0, cap)))
+    else:
+        branch = "standard"
+        branch_label = "Standard / Balanced"
+        if today_strain >= 13.5:
+            extra_strain = max(0.0, today_strain - 13.5)
+            pred1 = int(round(_clamp_val(today_recovery - (10.0 + 0.5 * min(4.0, extra_strain)) + hrv_nudge, 36.0, 62.0)))
+        elif today_strain < 8.5:
+            easy_target = 0.65 * (today_recovery + 8.0) + 0.35 * (mu + 8.0) + 0.5 * hrv_nudge
+            pred1 = int(round(_clamp_val(easy_target, 38.0, 84.0)))
+        else:
+            mod_target = (
+                0.55 * today_recovery
+                + 0.45 * mu
+                - 1.5 * max(0.0, today_strain - 10.0)
+                + 0.5 * hrv_nudge
+            )
+            pred1 = int(round(_clamp_val(mod_target, 36.0, 78.0)))
+
+    # --- DAYS +2 & +3 (Personal-baseline mean reversion + expected weekday strain) ---
+    hist_map = weekday_strain_hist or {}
+
+    def _expected_day_strain(dt: datetime.date) -> float:
+        p_strain = _schedule_prior_strain(dt, weekly_schedule)
+        s_hist = hist_map.get(dt.weekday()) or []
+        k = 3.0
+        return (sum(s_hist) + k * p_strain) / (len(s_hist) + k)
+
+    exp_s1 = _expected_day_strain(origin_dt + datetime.timedelta(days=1))
+    exp_s2 = _expected_day_strain(origin_dt + datetime.timedelta(days=2))
+
+    pred2 = int(round(_clamp_val(mu + 0.30 * (pred1 - mu) - 1.2 * (exp_s1 - mean_strain), 34.0, 86.0)))
+    pred3 = int(round(_clamp_val(mu + 0.15 * (pred2 - mu) - 1.0 * (exp_s2 - mean_strain), 34.0, 84.0)))
+
+    return {
+        "branch": branch,
+        "branch_label": branch_label,
+        "recoveries": [pred1, pred2, pred3],
+    }
+
+
 def build_preference_aligned_outlook_days(
     today: datetime.date,
     today_recovery: int,
@@ -275,8 +472,9 @@ def build_preference_aligned_outlook_days(
     custom_prompt: str = ""
 ) -> List[Dict[str, Any]]:
     """
-    Constructs a 3-day forward forecast that models acute fatigue decay (tau ~ 3.0 days)
-    while strictly aligning with the athlete's persistent weekly schedule preferences:
+    Constructs a 3-day forward forecast using PowerSync's Calibrated Hybrid
+    3-Branch + Personal Baseline WHOOP recovery model while strictly aligning
+    with the athlete's persistent weekly schedule preferences:
       - Monday, Tuesday, Thursday: 35–45 minutes ONLY (indoor efficiency, secondary rest candidates)
       - Wednesday & Friday: 60+ minutes (an hour or more, outdoor priority if weather allows)
       - Saturday: Dedicated weekly rest day (0 min)
@@ -285,16 +483,33 @@ def build_preference_aligned_outlook_days(
       - Threshold / Sweet Spot: Diverse interval archetypes (sustained blocks, stepped ladders, criss-cross surges, pyramids, over-unders)
       - Dynamically adapts to subjective athlete notes (e.g. 'tomorrow will be zone 2 or a rest day')
     """
-    from app.services.preferences_service import get_day_target_config, get_weekday_rest_quota_and_status
+    from app.services.preferences_service import (
+        get_day_target_config,
+        get_weekday_rest_quota_and_status,
+        DEFAULT_COACHING_PREFERENCES,
+    )
 
+    uid = get_current_user_id()
     rest_quota_status = get_weekday_rest_quota_and_status(ref_date=today)
     must_rest_days = rest_quota_status.get("must_rest_days", [])
 
     # Parse athlete subjective notes for dynamic forecast adaptation
     feedback_overrides = parse_athlete_feedback_for_outlook(custom_prompt, today, ftp)
 
-    # 1. Base recovery progression over next 3 days
-    heuristic_pred = predict_3day_recovery_heuristic(
+    # 1. Base recovery progression over next 3 days (Calibrated Hybrid 3-Branch + Personal Baseline)
+    stored_prefs = get_setting("coaching_preferences", None, user_id=uid)
+    weekly_schedule = (
+        stored_prefs.get("weekly_schedule", DEFAULT_COACHING_PREFERENCES["weekly_schedule"])
+        if isinstance(stored_prefs, dict)
+        else DEFAULT_COACHING_PREFERENCES["weekly_schedule"]
+    )
+    baseline_ctx = _load_athlete_recovery_baseline_context(
+        today=today,
+        today_recovery=today_recovery,
+        user_id=uid,
+    )
+    hybrid_pred = predict_3day_recovery_hybrid(
+        origin_dt=today,
         today_recovery=today_recovery,
         today_strain=today_strain,
         workout_strain=workout_strain,
@@ -303,11 +518,15 @@ def build_preference_aligned_outlook_days(
         has_trained_today=has_trained_today,
         suffer_score=session_summary.get("suffer_score", 0) or 0,
         verdict=str(session_summary.get("verdict") or ""),
+        personal_rec_mean=baseline_ctx["personal_rec_mean"],
+        mean_strain=baseline_ctx["mean_strain"],
+        hrv_pct_diff=baseline_ctx["hrv_pct_diff"],
+        weekly_schedule=weekly_schedule,
+        weekday_strain_hist=baseline_ctx["weekday_strain_hist"],
     )
-    recoveries = list(heuristic_pred["recoveries"])
+    recoveries = list(hybrid_pred["recoveries"])
     outlook_days = []
     forecast_history: List[str] = []
-    uid = get_current_user_id()
     from app.services.workout_catalog import select_diverse_archetype
     from app.services.strain_model_service import calculate_intervals_strain
     from app.services.forecast_service import get_athlete_planned_sessions

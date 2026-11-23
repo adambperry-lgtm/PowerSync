@@ -11,6 +11,7 @@ from app.database import (
 from app.main import app
 from app.services.review_coach import (
     predict_3day_recovery_heuristic,
+    predict_3day_recovery_hybrid,
     build_preference_aligned_outlook_days,
 )
 from app.services.forecast_backtest_service import run_recovery_forecast_backtest
@@ -139,11 +140,12 @@ class TestForecastBacktest(unittest.TestCase):
         # day1 = min(88, 70+12) = 82, day2 = max(45, 82-14) = 68, day3 = 74
         self.assertEqual(b3["recoveries"], [82, 68, 74])
 
-    def test_heuristic_parity_with_outlook_builder(self):
-        """Ensure build_preference_aligned_outlook_days uses identical base projected recoveries."""
+    def test_hybrid_live_parity_with_outlook_builder(self):
+        """Ensure build_preference_aligned_outlook_days matches promoted predict_3day_recovery_hybrid."""
         # Tuesday Oct 20 -> Wed (training), Thu (training), Fri (training) with no rest overrides
         today = datetime.date(2026, 10, 20)
-        expected = predict_3day_recovery_heuristic(
+        expected = predict_3day_recovery_hybrid(
+            origin_dt=today,
             today_recovery=78,
             today_strain=16.0,
             workout_strain=16.0,
@@ -151,6 +153,8 @@ class TestForecastBacktest(unittest.TestCase):
             is_yesterday=False,
             has_trained_today=True,
             suffer_score=80,
+            personal_rec_mean=78.0,
+            mean_strain=10.5,
         )["recoveries"]
 
         outlook = build_preference_aligned_outlook_days(
@@ -167,6 +171,34 @@ class TestForecastBacktest(unittest.TestCase):
         )
         actual = [d["projected_recovery"] for d in outlook]
         self.assertEqual(actual, expected)
+
+        # Verify 36% Yellow floor on Heavy Load Today prevents false-Red zone flips
+        heavy_low = predict_3day_recovery_hybrid(
+            origin_dt=today,
+            today_recovery=38,
+            today_strain=17.5,
+            workout_strain=17.5,
+            is_today=True,
+            is_yesterday=False,
+            has_trained_today=True,
+            personal_rec_mean=58.0,
+            mean_strain=10.0,
+        )
+        self.assertEqual(heavy_low["recoveries"][0], 36)
+
+        # Verify full-rest cap rises to 82% on Heavy Yesterday + Light Today (<5 strain)
+        rest_rebound = predict_3day_recovery_hybrid(
+            origin_dt=today,
+            today_recovery=60,
+            today_strain=0.8,
+            workout_strain=15.5,
+            is_today=False,
+            is_yesterday=True,
+            has_trained_today=False,
+            personal_rec_mean=58.0,
+            mean_strain=10.0,
+        )
+        self.assertEqual(rest_rebound["recoveries"][0], 82)
 
     def test_backtest_walks_history_across_all_branches_and_baselines(self):
         """Verify walk-forward backtest computes metrics across all 3 branches, confusion matrix, and correlations."""

@@ -29,6 +29,7 @@ from app.services.forecast_service import is_forecast_valid_for_recovery
 from app.services.preferences_service import DEFAULT_COACHING_PREFERENCES
 from app.services.review_coach import (
     predict_3day_recovery_heuristic,
+    predict_3day_recovery_hybrid,
     get_activity_date_str,
 )
 
@@ -45,15 +46,15 @@ WEEKDAY_KEYS = [
 BRANCH_META = {
     "trained_today_heavy": {
         "label": "Heavy Load Today",
-        "rule": "Activity today & (strain ≥ 13.5 or suffer ≥ 60) → D+1: clamp(R₀−10, 38..62), D+2: +24, D+3: +6",
+        "rule": "Activity today & (strain ≥ 13.5 or suffer ≥ 60) → Live: −10..−12 drop (36–62%) + 21d baseline D+2/D+3",
     },
     "trained_yesterday_heavy": {
         "label": "Heavy Yesterday + Light Today",
-        "rule": "Activity yesterday (strain ≥ 13.5 or suffer ≥ 40) & light today → D+1: min(74, R₀+22), D+2: +14, D+3: 76",
+        "rule": "Activity yesterday (strain ≥ 13.5 or suffer ≥ 40) & light today → Live: +26 rest (cap 82%) / +22 light (cap 76%)",
     },
     "standard": {
         "label": "Standard / Balanced",
-        "rule": "All other days → D+1: min(88, R₀+12), D+2: max(45, D+1−14), D+3: 74",
+        "rule": "All other days → Live: <8.5 easy rebound, 8.5–13.4 neutral mean-pull, ≥13.5 unlogged strain dip",
     },
 }
 
@@ -63,30 +64,6 @@ def _recovery_zone(score: int) -> str:
     if score >= 34:
         return "yellow"
     return "red"
-
-
-def _clamp(val: float, lo: float, hi: float) -> float:
-    return max(lo, min(hi, val))
-
-
-def _schedule_prior_load(target_date: datetime.date, weekly_schedule: Dict[str, Any]) -> Tuple[float, float]:
-    """Returns prior expected (day_strain, cycling_duration_min) for a calendar weekday."""
-    w_key = WEEKDAY_KEYS[target_date.weekday()]
-    sched = weekly_schedule.get(w_key) or DEFAULT_COACHING_PREFERENCES["weekly_schedule"].get(w_key, {})
-    mode = sched.get("mode", "indoor_priority")
-    is_default_rest = bool(sched.get("is_default_rest", False)) or (w_key == "saturday")
-    pref_dur = float(sched.get("preferred_duration_min") or 0)
-
-    if is_default_rest or mode == "rest_day":
-        return 5.5, 0.0
-    if w_key == "sunday" or mode == "outdoor_or_long_indoor":
-        dur = max(60.0, pref_dur or 75.0)
-        return 14.5, dur
-    if w_key in ("wednesday", "friday") or mode == "outdoor_priority":
-        dur = max(60.0, pref_dur or 60.0)
-        return 13.8, dur
-    dur = min(45.0, max(35.0, pref_dur or 40.0))
-    return 11.2, dur
 
 
 def _compute_origin_context(
@@ -173,70 +150,24 @@ def predict_hybrid_candidate_3day(
     weekly_schedule: Dict[str, Any],
     weekday_strain_hist: Dict[int, List[float]],
 ) -> List[int]:
-    """
-    Calibrated Hybrid 3-Branch + Personal Baseline Candidate Model (Shadow Backtest):
-      - Day +1 preserves the nonlinear 3-branch threshold/rebound dynamics while fixing:
-          1) Heavy Load Today: strain-scaled drop (-12 to -19) + HRV nudge, floor lowered to 30%
-          2) Heavy Yesterday + Light Today: removes artificial 74% cap on full rest (up to 82%)
-             and prevents false-Red predictions after extreme single-digit lows via mean-rebound floor
-          3) Standard / Balanced: separates easy rest days (<8.5 strain) from moderate training
-             days (8.5-13.4 strain, eliminating +9pt bias) and catches unlogged >=13.5 strain days
-      - Days +2 & +3 replace hardcoded 74/76/88 targets with smooth mean reversion toward the
-        athlete's own 21-day rolling recovery baseline, adjusted by expected weekday load.
-    """
-    mu = ctx["personal_rec_mean"]
-    mean_strain = ctx["mean_strain"]
-    hrv_nudge = _clamp(ctx["hrv_pct_diff"] * 0.15, -5.0, 4.0)
-
-    trained_today_heavy = is_today and ((workout_strain >= 13.5) or (suffer_score >= 60))
-    trained_yesterday_heavy = is_yesterday and ((workout_strain >= 13.5) or (suffer_score >= 40))
-    today_passive_or_light = (not has_trained_today) and (today_strain < 13.5)
-
-    # --- DAY +1 ---
-    if trained_today_heavy:
-        extra_strain = max(0.0, today_strain - 13.5)
-        drop = 12.0 + 1.2 * min(6.0, extra_strain)
-        pred1 = int(round(_clamp(today_recovery - drop + hrv_nudge, 30.0, 62.0)))
-    elif trained_yesterday_heavy and today_passive_or_light:
-        is_full_rest = today_strain < 5.0
-        boost = 26.0 if is_full_rest else 22.0
-        cap = 82.0 if is_full_rest else 76.0
-        rebound_from_low = 0.45 * today_recovery + 0.55 * mu + 14.0
-        raw_d1 = max(today_recovery + boost, rebound_from_low) + 0.5 * hrv_nudge
-        pred1 = int(round(_clamp(raw_d1, 36.0, cap)))
-    else:
-        if today_strain >= 13.5:
-            # Unlogged high WHOOP cardiovascular strain (e.g. non-cycling activity or life load)
-            extra_strain = max(0.0, today_strain - 13.5)
-            pred1 = int(round(_clamp(today_recovery - (10.0 + 1.0 * min(5.0, extra_strain)) + hrv_nudge, 32.0, 62.0)))
-        elif today_strain < 8.5:
-            # Genuine easy / recovery day: mild rebound preserving Green precision
-            easy_target = 0.65 * (today_recovery + 8.0) + 0.35 * (mu + 8.0) + 0.5 * hrv_nudge
-            pred1 = int(round(_clamp(easy_target, 38.0, 84.0)))
-        else:
-            # Moderate active/training day (8.5 <= strain < 13.5): eliminate blind +12 boost
-            mod_target = (
-                0.55 * today_recovery
-                + 0.45 * mu
-                - 1.5 * max(0.0, today_strain - 10.0)
-                + 0.5 * hrv_nudge
-            )
-            pred1 = int(round(_clamp(mod_target, 36.0, 78.0)))
-
-    # --- DAYS +2 & +3 (Personal-baseline mean reversion + expected weekday load) ---
-    def _expected_day_strain(dt: datetime.date) -> float:
-        p_strain, _ = _schedule_prior_load(dt, weekly_schedule)
-        s_hist = weekday_strain_hist.get(dt.weekday()) or []
-        k = 3.0
-        return (sum(s_hist) + k * p_strain) / (len(s_hist) + k)
-
-    exp_s1 = _expected_day_strain(origin_dt + datetime.timedelta(days=1))
-    exp_s2 = _expected_day_strain(origin_dt + datetime.timedelta(days=2))
-
-    pred2 = int(round(_clamp(mu + 0.30 * (pred1 - mu) - 1.2 * (exp_s1 - mean_strain), 30.0, 86.0)))
-    pred3 = int(round(_clamp(mu + 0.15 * (pred2 - mu) - 1.0 * (exp_s2 - mean_strain), 32.0, 84.0)))
-
-    return [pred1, pred2, pred3]
+    """Delegates directly to production `predict_3day_recovery_hybrid` for zero-drift backtesting."""
+    out = predict_3day_recovery_hybrid(
+        origin_dt=origin_dt,
+        today_recovery=today_recovery,
+        today_strain=today_strain,
+        workout_strain=workout_strain,
+        is_today=is_today,
+        is_yesterday=is_yesterday,
+        has_trained_today=has_trained_today,
+        suffer_score=suffer_score,
+        verdict="",
+        personal_rec_mean=ctx["personal_rec_mean"],
+        mean_strain=ctx["mean_strain"],
+        hrv_pct_diff=ctx["hrv_pct_diff"],
+        weekly_schedule=weekly_schedule,
+        weekday_strain_hist=weekday_strain_hist,
+    )
+    return list(out["recoveries"])
 
 
 def _workout_tier_for_day(
@@ -391,8 +322,8 @@ def _build_baseline_comparison(
     all_records: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     models = [
-        ("candidate", "Calibrated Hybrid 3-Branch (Candidate)", "candidate_recovery"),
-        ("heuristic", "3-Branch Heuristic (Current)", "predicted_recovery"),
+        ("candidate", "Calibrated Hybrid 3-Branch (Active Live)", "candidate_recovery"),
+        ("heuristic", "Legacy 3-Branch Heuristic (v1)", "predicted_recovery"),
         ("rolling_mean", "Rolling 7-Day Personal Mean", "baseline_rolling_mean"),
         ("mean_reversion", "50/50 Mean-Reversion", "baseline_mean_reversion"),
         ("persistence", "Naive Persistence (Same as Today)", "baseline_persistence"),
@@ -465,11 +396,15 @@ def _generate_diagnostic_insights(
         insights.append({
             "severity": "info",
             "title": "Need More Historical WHOOP Days",
-            "detail": "At least 5–14 days of consecutive WHOOP recovery records are recommended to reliably evaluate the 3-branch heuristic. Click 'Sync WHOOP History' to backfill older records.",
+            "detail": "At least 5–14 days of consecutive WHOOP recovery records are recommended to reliably evaluate the 3-day forecast. Click 'Sync WHOOP History' to backfill older records.",
         })
         return insights
 
-    # 0. Candidate Model vs. Current Heuristic head-to-head
+    active_d1 = candidate_d1 if (candidate_d1 and candidate_d1.get("mae") is not None) else d1_stats
+    active_overall = candidate_overall if (candidate_overall and candidate_overall.get("mae") is not None) else overall_stats
+    active_conf = candidate_d1_confusion or d1_confusion
+
+    # 0. Active Live Hybrid vs. Legacy v1 Heuristic head-to-head
     if (
         candidate_d1
         and candidate_overall
@@ -493,13 +428,13 @@ def _generate_diagnostic_insights(
         beats_both = (d1_delta <= 0.0 and all_delta <= -0.5) or (d1_delta <= -0.5 and all_delta <= 0.0)
         if beats_both and z_delta >= -2.0:
             severity = "good"
-            title = f"Hybrid Candidate Outperforms Current Heuristic (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
+            title = f"Active Hybrid Model Outperforms Legacy v1 (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
         elif all_delta <= -0.5 or d1_delta <= -0.5:
             severity = "neutral"
-            title = f"Hybrid Candidate Mixed vs. Current Heuristic (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
+            title = f"Active Hybrid Model vs. Legacy v1 (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
         else:
             severity = "warning"
-            title = f"Hybrid Candidate Trails Current Heuristic (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
+            title = f"Active Hybrid Model Trails Legacy v1 (D+1 {d1_delta:+.1f} MAE, All 3d {all_delta:+.1f} MAE)"
 
         insights.append({
             "severity": severity,
@@ -512,89 +447,80 @@ def _generate_diagnostic_insights(
             ),
         })
 
-    # 1. Heuristic vs Rolling Mean baseline
-    mae = d1_stats["mae"]
-    roll_mae = d1_stats["rolling_mean_mae"]
+    # 1. Active Live Model vs Rolling Mean baseline
+    mae = active_d1["mae"]
+    roll_mae = active_d1["rolling_mean_mae"]
     if mae is not None and roll_mae is not None:
         diff = round(mae - roll_mae, 1)
         if diff > 1.5:
             insights.append({
                 "severity": "warning",
-                "title": f"Current Heuristic Trails Personal Baseline by +{diff} pts MAE",
+                "title": f"Active Model Trails Personal Baseline by +{diff} pts MAE",
                 "detail": (
-                    f"On Day +1 predictions (n={d1_stats['count']}), the 3-branch heuristic averages {mae} pts error vs. "
+                    f"On Day +1 predictions (n={active_d1['count']}), the active Hybrid model averages {mae} pts error vs. "
                     f"{roll_mae} pts for simply predicting your rolling 7-day average recovery."
                 ),
             })
         elif diff < -1.5:
             insights.append({
                 "severity": "good",
-                "title": f"Current Heuristic Beats Personal Baseline by {abs(diff)} pts MAE",
+                "title": f"Active Hybrid Model Beats Personal Baseline by {abs(diff)} pts MAE",
                 "detail": (
-                    f"On Day +1 predictions (n={d1_stats['count']}), the 3-branch heuristic averages {mae} pts error vs. "
-                    f"{roll_mae} pts for your rolling 7-day personal mean."
+                    f"On Day +1 predictions (n={active_d1['count']}), the active Hybrid model averages {mae} pts error vs. "
+                    f"{roll_mae} pts for your rolling 7-day personal mean (All-3d MAE {active_overall['mae']} vs. {active_overall['rolling_mean_mae']})."
                 ),
             })
         else:
             insights.append({
                 "severity": "neutral",
-                "title": "Current Heuristic Performs Roughly On Par with Rolling Mean",
+                "title": "Active Hybrid Model Performs Roughly On Par with Rolling Mean",
                 "detail": (
                     f"Day +1 MAE is {mae} pts compared to {roll_mae} pts for your rolling 7-day average "
-                    f"(difference {diff:+.1f} pts across {d1_stats['count']} days)."
+                    f"(difference {diff:+.1f} pts across {active_d1['count']} days)."
                 ),
             })
 
-    # 2. Systematic bias check
-    bias = d1_stats["bias"]
+    # 2. Systematic bias check (Active Live Model)
+    bias = active_d1["bias"]
     if bias is not None and abs(bias) >= 4.0:
         direction = "over-predicts (too optimistic)" if bias > 0 else "under-predicts (too conservative)"
         insights.append({
             "severity": "warning",
-            "title": f"Current Heuristic Systematic Bias: {bias:+.1f} pts on Day +1",
+            "title": f"Active Model Systematic Bias: {bias:+.1f} pts on Day +1",
             "detail": (
-                f"The 3-branch heuristic consistently {direction} your next-day WHOOP recovery "
-                f"(avg predicted {d1_stats['avg_predicted']}% vs. actual {d1_stats['avg_actual']}%)."
+                f"The active Hybrid model consistently {direction} your next-day WHOOP recovery "
+                f"(avg predicted {active_d1['avg_predicted']}% vs. actual {active_d1['avg_actual']}%)."
             ),
         })
 
-    # 3. False-Green overreach risk
-    fg_count = d1_confusion.get("false_green_count", 0)
-    fg_pct = d1_confusion.get("false_green_pct", 0.0)
-    pred_green = d1_confusion.get("predicted_green_total", 0)
+    # 3. False-Green overreach check (Active Live Model)
+    fg_count = active_conf.get("false_green_count", 0)
+    fg_pct = active_conf.get("false_green_pct", 0.0)
+    pred_green = active_conf.get("predicted_green_total", 0)
     if pred_green >= 3 and fg_pct >= 30.0:
         insights.append({
             "severity": "warning",
-            "title": f"Current Heuristic False-Green Rate: {fg_pct:.0f}% ({fg_count}/{pred_green} Green Calls)",
+            "title": f"Active Model False-Green Rate: {fg_pct:.0f}% ({fg_count}/{pred_green} Green Calls)",
             "detail": (
-                f"When the 3-branch heuristic projected Green (>66%) for tomorrow, actual WHOOP recovery landed in Yellow or Red "
-                f"{fg_count} times ({d1_confusion.get('false_green_to_red_count', 0)} Red). "
-                f"Heavy Load Today also floors Day +1 at 38%, preventing Red warnings after hard training days."
-            ),
-        })
-    elif d1_confusion.get("actual_red_total", 0) > 0 and d1_confusion.get("caught_red_count", 0) == 0:
-        insights.append({
-            "severity": "info",
-            "title": f"0/{d1_confusion['actual_red_total']} Actual Red Days Caught by Current Heuristic",
-            "detail": (
-                "Because the Heavy Load Today branch floors Day +1 at 38%, the current heuristic misses post-strain Red (<34%) drops."
+                f"When the forecast projected Green (>66%) for tomorrow, actual WHOOP recovery landed in Yellow or Red "
+                f"{fg_count} times ({active_conf.get('false_green_to_red_count', 0)} Red)."
             ),
         })
 
-    # 4. Worst-performing branch
+    # 4. Largest-error regime (Active Live Model)
     branch_candidates = [
         (b_key, b_data)
         for b_key, b_data in by_branch.items()
-        if b_data.get("day_1", {}).get("count", 0) >= 3 and b_data.get("day_1", {}).get("mae") is not None
+        if b_data.get("candidate_day_1", {}).get("count", 0) >= 3 and b_data.get("candidate_day_1", {}).get("mae") is not None
     ]
     if branch_candidates:
-        _, worst = max(branch_candidates, key=lambda kv: kv[1]["day_1"]["mae"])
-        wd1 = worst["day_1"]
+        _, worst = max(branch_candidates, key=lambda kv: kv[1]["candidate_day_1"]["mae"])
+        wd1 = worst["candidate_day_1"]
         insights.append({
             "severity": "info",
-            "title": f"Largest Error Branch: {worst['label']} ({wd1['mae']} MAE)",
+            "title": f"Largest Error Regime (Active Model): {worst['label']} ({wd1['mae']} MAE)",
             "detail": (
-                f"Triggered {wd1['count']} times: heuristic projected avg {wd1['avg_pred_delta']:+.1f} pts change next day, "
+                f"Triggered {wd1['count']} times: active Hybrid projected avg {wd1['avg_pred_delta']:+.1f} pts change next day, "
                 f"while your actual WHOOP recovery changed by {wd1['avg_actual_delta']:+.1f} pts (bias {wd1['bias']:+.1f})."
             ),
         })
@@ -1039,7 +965,7 @@ def run_recovery_forecast_backtest(
         "personal_baseline_recovery": round(latest_ctx["personal_rec_mean"], 1) if latest_ctx else None,
         "personal_baseline_strain": round(latest_ctx["mean_strain"], 1) if latest_ctx else None,
         "personal_baseline_duration_min": round(latest_ctx["mean_dur"], 0) if latest_ctx else None,
-        "heavy_drop_range": "-12 to -19 pts (floor 30%)",
+        "heavy_drop_range": "-10 to -12 pts (floor 36%)",
         "full_rest_cap": "82% (<5 strain) / 76% light",
         "standard_split": "<8.5 easy rebound • 8.5–13.4 neutral • ≥13.5 dip",
         "horizon_decay": "D+2/D+3 revert to 21d mean + weekday load",
@@ -1087,10 +1013,11 @@ def run_recovery_forecast_backtest(
         candidate_d1_confusion=candidate_confusion_d1,
     )
 
-    d1_count = by_horizon["day_1"]["count"]
+    d1_count = candidate_by_horizon["day_1"]["count"]
     return {
         "success": True,
         "lookback_days": days,
+        "active_model_name": "Calibrated Hybrid 3-Branch + Personal Baseline",
         "data_coverage": {
             "whoop_days_in_window": len(window_whoop_dates),
             "origin_days_evaluated": origin_days_evaluated,
@@ -1102,22 +1029,33 @@ def run_recovery_forecast_backtest(
             "sufficient_data": d1_count >= 5,
         },
         "summary": {
+            "day_1_mae": candidate_by_horizon["day_1"]["mae"],
+            "day_1_rmse": candidate_by_horizon["day_1"]["rmse"],
+            "day_1_bias": candidate_by_horizon["day_1"]["bias"],
+            "day_1_zone_accuracy_pct": candidate_by_horizon["day_1"]["zone_accuracy_pct"],
+            "day_1_confirmation_rate_pct": candidate_by_horizon["day_1"]["confirmation_rate_pct"],
+            "day_1_workout_tier_match_pct": candidate_by_horizon["day_1"]["workout_tier_match_pct"],
+            "day_1_rolling_mean_mae": candidate_by_horizon["day_1"]["rolling_mean_mae"],
+            "day_1_mae_vs_baseline": candidate_by_horizon["day_1"]["mae_vs_rolling_mean"],
+            "day_1_false_green_pct": candidate_confusion_d1["false_green_pct"],
+            "overall_mae": candidate_by_horizon["overall"]["mae"],
+            "overall_zone_accuracy_pct": candidate_by_horizon["overall"]["zone_accuracy_pct"],
+            "overall_confirmation_rate_pct": candidate_by_horizon["overall"]["confirmation_rate_pct"],
+        },
+        "legacy_summary": {
             "day_1_mae": by_horizon["day_1"]["mae"],
             "day_1_rmse": by_horizon["day_1"]["rmse"],
             "day_1_bias": by_horizon["day_1"]["bias"],
             "day_1_zone_accuracy_pct": by_horizon["day_1"]["zone_accuracy_pct"],
             "day_1_confirmation_rate_pct": by_horizon["day_1"]["confirmation_rate_pct"],
             "day_1_workout_tier_match_pct": by_horizon["day_1"]["workout_tier_match_pct"],
-            "day_1_rolling_mean_mae": by_horizon["day_1"]["rolling_mean_mae"],
-            "day_1_mae_vs_baseline": by_horizon["day_1"]["mae_vs_rolling_mean"],
             "day_1_false_green_pct": confusion_d1["false_green_pct"],
             "overall_mae": by_horizon["overall"]["mae"],
-            "overall_zone_accuracy_pct": by_horizon["overall"]["zone_accuracy_pct"],
-            "overall_confirmation_rate_pct": by_horizon["overall"]["confirmation_rate_pct"],
         },
         "candidate_model": {
+            "is_active": True,
             "name": "Calibrated Hybrid 3-Branch + Personal Baseline",
-            "description": "Preserves the 3-branch Day +1 step dynamics while calibrating strain-scaled heavy drops, full-rest rebounds (up to 82%), strain-gated Standard days (fixing +9pt bias), and personal 21d baseline mean-reversion on Days +2/+3.",
+            "description": "Active live forecast model: calibrated -10..-12 heavy drops (36% floor), full-rest rebounds (up to 82%), strain-gated Standard days, and personal 21d baseline mean-reversion on Days +2/+3.",
             "by_horizon": candidate_by_horizon,
             "confusion_matrix": {
                 "day_1": candidate_confusion_d1,

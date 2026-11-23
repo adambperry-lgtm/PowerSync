@@ -12189,16 +12189,19 @@ function renderForecastAccuracyReport(data) {
     return `<span style="display:inline-block;padding:0.08rem 0.38rem;border-radius:9px;font-size:0.68rem;font-weight:700;background:${bg};color:${col};">${sign}${val.toFixed(1)}${suffix}</span>`;
   };
 
-  // 1. Hero KPI Cards (Current Heuristic Baseline)
+  const leg = data.legacy_summary || sum;
+  const isHybridLive = !!(cand && cand.is_active);
+
+  // 1. Hero KPI Cards (Active Live Model)
   const kpiHtml = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(145px, 1fr));gap:0.6rem;">
       <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
-        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Current D+1 MAE</div>
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Active D+1 MAE</div>
         <div style="font-size:1.35rem;font-weight:800;color:#0052FF;font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(sum.day_1_mae, " pts")}</div>
         <div style="font-size:0.7rem;font-weight:600;color:${baseDeltaColor};margin-top:0.15rem;">${_btEsc(baseDeltaLabel)}</div>
       </div>
       <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
-        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Current Zone Match</div>
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">D+1 Zone Match</div>
         <div style="font-size:1.35rem;font-weight:800;color:#00C896;font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(sum.day_1_zone_accuracy_pct, "%")}</div>
         <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">Exact Green / Yellow / Red</div>
       </div>
@@ -12213,19 +12216,19 @@ function renderForecastAccuracyReport(data) {
         <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">Same prescription intensity</div>
       </div>
       <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
-        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Current D+1 Bias</div>
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">D+1 Mean Bias</div>
         <div style="font-size:1.35rem;font-weight:800;color:${Math.abs(biasVal || 0) >= 4 ? "#D97706" : "var(--text-primary)"};font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(biasVal, " pts", true)}</div>
         <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">${_btEsc(biasDesc)}</div>
       </div>
     </div>
   `;
 
-  // 1b. Candidate Model Head-to-Head Scorecard
+  // 1b. Active Live Hybrid vs. Legacy v1 Scorecard
   const candCardHtml = cand && candD1.count > 0
     ? `<div style="background:linear-gradient(135deg, rgba(0,200,150,0.08), rgba(0,82,255,0.05));border:1px solid rgba(0,200,150,0.38);border-radius:10px;padding:0.8rem 0.9rem;">
         <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.55rem;">
           <div>
-            <div style="font-size:0.82rem;font-weight:800;color:#047857;">🧪 Candidate Model: ${_btEsc(cand.name)} <span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:9px;background:rgba(0,200,150,0.18);color:#047857;margin-left:0.3rem;">Shadow Backtest Only</span></div>
+            <div style="font-size:0.82rem;font-weight:800;color:#047857;">⚡ ${_btEsc(cand.name)} <span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:9px;background:rgba(0,200,150,0.2);color:#047857;margin-left:0.3rem;">${isHybridLive ? "Active Live Model" : "Shadow Backtest"}</span></div>
             <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">${_btEsc(cand.description)}</div>
           </div>
         </div>
@@ -12236,7 +12239,7 @@ function renderForecastAccuracyReport(data) {
               <span style="font-size:1.15rem;font-weight:800;color:#047857;font-family:var(--font-display);">${_btFmtNum(candD1.mae)}</span>
               ${_deltaBadge(candVs.day_1_mae_delta, true)}
             </div>
-            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(sum.day_1_mae)} current</div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(leg.day_1_mae)} legacy v1</div>
           </div>
           <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem 0.65rem;">
             <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">All 3d MAE</div>
@@ -12244,7 +12247,7 @@ function renderForecastAccuracyReport(data) {
               <span style="font-size:1.15rem;font-weight:800;color:#047857;font-family:var(--font-display);">${_btFmtNum(candAll.mae)}</span>
               ${_deltaBadge(candVs.overall_mae_delta, true)}
             </div>
-            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(sum.overall_mae)} current</div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(leg.overall_mae)} legacy v1</div>
           </div>
           <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem 0.65rem;">
             <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">D+1 Zone / Conf</div>
@@ -12259,7 +12262,7 @@ function renderForecastAccuracyReport(data) {
             <div style="display:flex;align-items:baseline;gap:0.35rem;margin-top:0.15rem;">
               <span style="font-size:1.1rem;font-weight:800;color:var(--text-primary);font-family:var(--font-display);">${_btFmtNum(candD1.bias, " pts", true)}</span>
             </div>
-            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(sum.day_1_bias, " pts", true)} current</div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(leg.day_1_bias, " pts", true)} legacy v1</div>
           </div>
           <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem 0.65rem;">
             <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">False-Green Rate</div>
@@ -12267,14 +12270,14 @@ function renderForecastAccuracyReport(data) {
               <span style="font-size:1.1rem;font-weight:800;color:var(--text-primary);font-family:var(--font-display);">${_btFmtNum(candConfD1.false_green_pct, "%")}</span>
               ${_deltaBadge(candVs.day_1_false_green_delta, true, "%")}
             </div>
-            <div style="font-size:0.67rem;color:var(--text-muted);">${candConfD1.false_green_count || 0}/${candConfD1.predicted_green_total || 0} calls • Red caught: ${candConfD1.caught_red_count || 0}/${candConfD1.actual_red_total || 0}</div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">${candConfD1.false_green_count || 0}/${candConfD1.predicted_green_total || 0} calls • vs ${_btFmtNum(leg.day_1_false_green_pct, "%")} v1</div>
           </div>
         </div>
         <div style="margin-top:0.6rem;padding-top:0.55rem;border-top:1px dashed rgba(0,200,150,0.35);display:flex;flex-wrap:wrap;gap:0.45rem 0.9rem;font-size:0.71rem;color:var(--text-secondary);">
-          <span><b>Calibration (n=${learned.training_samples || 0}):</b></span>
+          <span><b>Live Calibration (n=${learned.training_samples || 0}):</b></span>
           <span>21d Baseline: <b>${_btFmtNum(learned.personal_baseline_recovery, "%")}</b></span>
           <span>Avg Strain: <b>${_btFmtNum(learned.personal_baseline_strain)}</b></span>
-          <span>Heavy Drop: <b>${_btEsc(learned.heavy_drop_range || "-12 to -19 pts")}</b></span>
+          <span>Heavy Drop: <b>${_btEsc(learned.heavy_drop_range || "-10 to -12 pts (floor 36%)")}</b></span>
           <span>Rest Cap: <b>${_btEsc(learned.full_rest_cap || "82% / 76%")}</b></span>
           <span>Standard: <b>${_btEsc(learned.standard_split || "strain-gated")}</b></span>
         </div>
@@ -12301,15 +12304,15 @@ function renderForecastAccuracyReport(data) {
       </div>`
     : "";
 
-  // 3. Predicted vs Actual Chart (Actual + Candidate + Current Heuristic)
+  // 3. Predicted vs Actual Chart (Actual + Active Hybrid + Legacy Heuristic)
   const chartHtml = `
     <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.8rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.45rem;">
         <div style="font-size:0.78rem;font-weight:700;color:var(--accent-cyan);letter-spacing:0.03em;">DAY +1 PREDICTED VS. ACTUAL WHOOP RECOVERY</div>
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.75rem;font-size:0.71rem;color:var(--text-secondary);">
           <span><span style="display:inline-block;width:12px;height:3px;background:#0F172A;vertical-align:middle;margin-right:4px;"></span>Actual WHOOP</span>
-          <span><span style="display:inline-block;width:12px;height:3px;background:#00C896;vertical-align:middle;margin-right:4px;"></span>Candidate Model</span>
-          <span><span style="display:inline-block;width:12px;height:0;border-top:2px dashed #0052FF;vertical-align:middle;margin-right:4px;"></span>Current Heuristic</span>
+          <span><span style="display:inline-block;width:12px;height:3px;background:#00C896;vertical-align:middle;margin-right:4px;"></span>Active Hybrid</span>
+          <span><span style="display:inline-block;width:12px;height:0;border-top:2px dashed #0052FF;vertical-align:middle;margin-right:4px;"></span>Legacy v1</span>
         </div>
       </div>
       <canvas id="backtestTimelineCanvas" style="width:100%;height:195px;display:block;border-radius:6px;background:#FFFFFF;border:1px solid var(--border-color);"></canvas>
@@ -12355,7 +12358,7 @@ function renderForecastAccuracyReport(data) {
     </div>
   `;
 
-  // 5. 3-Branch Audit Table (with Candidate MAE & Bias side-by-side)
+  // 5. 3-Branch Regime Breakdown (Legacy v1 vs Active Hybrid)
   const branchOrder = ["trained_today_heavy", "trained_yesterday_heavy", "standard"];
   const branchRows = branchOrder.map((bk) => {
     const b = byB[bk];
@@ -12368,7 +12371,7 @@ function renderForecastAccuracyReport(data) {
         <div style="font-size:0.66rem;color:var(--text-muted);margin-top:0.1rem;">${_btEsc(b.rule)}</div>
       </td>
       <td style="padding:0.5rem 0.35rem;text-align:right;white-space:nowrap;"><b>${b.trigger_count || 0}</b> <span style="color:var(--text-muted);">(${_btFmtNum(b.trigger_share_pct, "%")})</span></td>
-      <td style="padding:0.5rem 0.35rem;text-align:right;">${_btFmtNum(d1.avg_pred_delta, "", true)} / <b>${_btFmtNum(d1.avg_actual_delta, "", true)}</b></td>
+      <td style="padding:0.5rem 0.35rem;text-align:right;">${_btFmtNum(cd1.avg_pred_delta, "", true)} / <b>${_btFmtNum(cd1.avg_actual_delta, "", true)}</b></td>
       <td style="padding:0.5rem 0.35rem;text-align:right;font-weight:700;color:#0052FF;">${_btFmtNum(d1.mae)}</td>
       <td style="padding:0.5rem 0.35rem;text-align:right;color:var(--text-secondary);">${_btFmtNum(d1.bias, "", true)}</td>
       <td style="padding:0.5rem 0.35rem;text-align:right;font-weight:800;color:#047857;">${_btFmtNum(cd1.mae)}</td>
@@ -12378,17 +12381,17 @@ function renderForecastAccuracyReport(data) {
 
   const branchHtml = `
     <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;overflow-x:auto;">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">🌿 Regime Breakdown: Current 3-Branch vs. Candidate Model (Day +1)</div>
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">🌿 Regime Breakdown: Legacy v1 vs. Active Hybrid Model (Day +1)</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.74rem;">
         <thead>
           <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.65rem;">
-            <th style="text-align:left;padding:0.35rem 0.5rem;">Regime (Heuristic Branch)</th>
+            <th style="text-align:left;padding:0.35rem 0.5rem;">Regime (Branch)</th>
             <th style="text-align:right;padding:0.35rem 0.35rem;">Days</th>
-            <th style="text-align:right;padding:0.35rem 0.35rem;">Cur Pred / Act Δ</th>
-            <th style="text-align:right;padding:0.35rem 0.35rem;color:#0052FF;">Cur MAE</th>
-            <th style="text-align:right;padding:0.35rem 0.35rem;color:#0052FF;">Cur Bias</th>
-            <th style="text-align:right;padding:0.35rem 0.35rem;color:#047857;">Cand MAE</th>
-            <th style="text-align:right;padding:0.35rem 0.35rem;color:#047857;">Cand Bias</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;">Live Pred / Act Δ</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;color:#0052FF;">v1 MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;color:#0052FF;">v1 Bias</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;color:#047857;">Live MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;color:#047857;">Live Bias</th>
           </tr>
         </thead>
         <tbody>${branchRows}</tbody>
@@ -12396,7 +12399,7 @@ function renderForecastAccuracyReport(data) {
     </div>
   `;
 
-  // 6. Confusion Matrix (switchable between Candidate & Current Heuristic) + Feature Correlations
+  // 6. Confusion Matrix (switchable between Active Hybrid & Legacy v1) + Feature Correlations
   const showingCandCm = _activeConfusionModel === "candidate" && candConfD1 && candConfD1.matrix;
   const activeConf = showingCandCm ? candConfD1 : confD1;
   const cm = activeConf.matrix || { green: { green: 0, yellow: 0, red: 0 }, yellow: { green: 0, yellow: 0, red: 0 }, red: { green: 0, yellow: 0, red: 0 } };
@@ -12414,8 +12417,8 @@ function renderForecastAccuracyReport(data) {
       <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.45rem;">
         <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);">🎯 Day +1 Zone Confusion Matrix</div>
         <div style="display:flex;gap:0.25rem;">
-          <button type="button" onclick="switchBacktestConfusionModel('candidate')" style="font-size:0.67rem;font-weight:700;padding:0.16rem 0.45rem;border-radius:6px;cursor:pointer;${showingCandCm ? pillActive : pillInactive}">Candidate</button>
-          <button type="button" onclick="switchBacktestConfusionModel('heuristic')" style="font-size:0.67rem;font-weight:700;padding:0.16rem 0.45rem;border-radius:6px;cursor:pointer;${!showingCandCm ? pillActive : pillInactive}">Current</button>
+          <button type="button" onclick="switchBacktestConfusionModel('candidate')" style="font-size:0.67rem;font-weight:700;padding:0.16rem 0.45rem;border-radius:6px;cursor:pointer;${showingCandCm ? pillActive : pillInactive}">Active Live</button>
+          <button type="button" onclick="switchBacktestConfusionModel('heuristic')" style="font-size:0.67rem;font-weight:700;padding:0.16rem 0.45rem;border-radius:6px;cursor:pointer;${!showingCandCm ? pillActive : pillInactive}">Legacy v1</button>
         </div>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:0.74rem;">
@@ -12476,7 +12479,7 @@ function renderForecastAccuracyReport(data) {
     </div>
   `;
 
-  // 7. Recent Day +1 Log (side-by-side Current vs Candidate)
+  // 7. Recent Day +1 Log (side-by-side Legacy v1 vs Active Hybrid)
   const recentRows = [...timeline].reverse().slice(0, 30).map((t) => {
     const curErrCol = Math.abs(t.error) <= 8 ? "#047857" : (Math.abs(t.error) <= 15 ? "#b45309" : "#b91c1c");
     const cErr = t.candidate_error != null ? t.candidate_error : 0;
@@ -12503,11 +12506,11 @@ function renderForecastAccuracyReport(data) {
               <th style="text-align:left;padding:0.3rem 0.4rem;">Target Date</th>
               <th style="text-align:left;padding:0.3rem 0.4rem;">Regime</th>
               <th style="text-align:right;padding:0.3rem 0.35rem;">Strain</th>
-              <th style="text-align:center;padding:0.3rem 0.35rem;">Current</th>
-              <th style="text-align:center;padding:0.3rem 0.35rem;color:#047857;">Candidate</th>
+              <th style="text-align:center;padding:0.3rem 0.35rem;">Legacy v1</th>
+              <th style="text-align:center;padding:0.3rem 0.35rem;color:#047857;">Active Live</th>
               <th style="text-align:center;padding:0.3rem 0.35rem;">Actual</th>
-              <th style="text-align:right;padding:0.3rem 0.35rem;">Cur Err</th>
-              <th style="text-align:right;padding:0.3rem 0.35rem;color:#047857;">Cand Err</th>
+              <th style="text-align:right;padding:0.3rem 0.35rem;">v1 Err</th>
+              <th style="text-align:right;padding:0.3rem 0.35rem;color:#047857;">Live Err</th>
             </tr>
           </thead>
           <tbody>${recentRows}</tbody>

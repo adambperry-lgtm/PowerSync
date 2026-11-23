@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.24.0] - 2026-11-23
+### Changed
+- **Promoted Calibrated Hybrid 3-Branch + Personal Baseline Model to Live 3-Day Forecast**:
+  - Added [`predict_3day_recovery_hybrid()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) and `_load_athlete_recovery_baseline_context()` in [`review_coach.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) and promoted it as the active live recovery engine in [`build_preference_aligned_outlook_days()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py).
+  - Refined the `Heavy Load Today` and unlogged `>=13.5` strain branches to a calibrated `-10` to `-12` strain-scaled drop with a `36%` Yellow floor (eliminating false-Red zone flips while preserving full-rest `82%` rebounds, strain-gated `Standard` bias elimination, and personal 21-day baseline reversion on Days +2/+3).
+  - Wired [`forecast_backtest_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/forecast_backtest_service.py) directly to [`predict_3day_recovery_hybrid()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) as the single source of truth, promoting Active Live Hybrid metrics to the primary KPI strip while preserving Legacy 3-Branch v1 for side-by-side comparison in [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=162`) and [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html).
+
 ## [2.23.0] - 2026-11-23
 ### Changed
 - **Calibrated Hybrid 3-Branch + Personal Baseline Shadow Candidate**:

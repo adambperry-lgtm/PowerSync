@@ -1321,7 +1321,7 @@
       <div id="debriefTabOutlook" class="debrief-tab-panel" style="display:none;">
         <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.6rem;margin-bottom:0.75rem;">
           <div style="font-size:0.8rem;color:var(--text-secondary);">
-            Forecast modeled on acute fatigue decay (&tau; &approx; 3.0 days), athlete weekly schedule preferences, and macrocycle target of <b id="outlookWeeklyTargetTss" style="color:#FF5E00;">360 TSS</b>:
+            Forecast modeled on your 21-day personal recovery baseline, strain-calibrated 3-branch WHOOP model, weekly schedule preferences, and macrocycle target of <b id="outlookWeeklyTargetTss" style="color:#FF5E00;">360 TSS</b>:
           </div>
           <button type="button" class="btn btn-secondary" id="btnOpenForecastAccuracy" onclick="openForecastAccuracyModal()" style="font-size:0.76rem;padding:0.35rem 0.75rem;color:var(--accent-cyan);border-color:rgba(0,82,255,0.35);white-space:nowrap;">
             📊 Forecast Accuracy Backtest
@@ -3491,7 +3491,7 @@
           <span style="font-size:1.35rem;">📊</span>
           <div>
             <h3 style="margin:0;font-size:1.1rem;font-weight:700;">3-Day Forecast Accuracy Backtest</h3>
-            <span id="backtestModalSubtitle" style="font-size:0.75rem;color:var(--text-muted);font-weight:500;">Walk-forward audit of the 3-branch WHOOP recovery heuristic</span>
+            <span id="backtestModalSubtitle" style="font-size:0.75rem;color:var(--text-muted);font-weight:500;">Walk-forward audit of the Active Calibrated Hybrid 3-Branch model vs. Legacy v1 &amp; baselines</span>
           </div>
         </div>
         <button class="modal-close" id="btnCloseForecastAccuracy" type="button" aria-label="Close" title="Close" onclick="closeForecastAccuracyModal()">&times;</button>
@@ -3613,6 +3613,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=161"></script>
+  <script src="/static/js/app.js?v=162"></script>
 </body>
 </html>
