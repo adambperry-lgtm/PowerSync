@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.21.0",
-        "release_name": "3-Day WHOOP Forecast Backtest & Accuracy Analyzer",
+        "version": "2.22.0",
+        "release_name": "Candidate Personalized Recovery Model (Shadow Backtest)",
         "build_date": "2026-11-23",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.22.0",
+                "date": "2026-11-23",
+                "title": "Candidate Personalized Recovery Model (Shadow Backtest)",
+                "items": [
+                    "Walk-Forward Candidate Model: Added a strictly out-of-sample Personalized Strain + HRV Mean-Reverting Candidate Model (Bayesian-shrunk ridge regression anchored to your 21-day recovery mean, WHOOP strain, cycling volume, HRV vs. 14d baseline, 2-day stacked strain, and weekday schedule propagation for Days +2/+3) inside the Forecast Accuracy Backtest without altering live forecasts.",
+                    "Head-to-Head Scorecard & Learned Profile: Added a shadow comparison card showing Candidate vs. Current 3-Branch Heuristic deltas across Day +1 MAE, All-3d MAE, bias, False-Green rate, and your learned personal sensitivity weights.",
+                    "3-Line Timeline Chart & Switchable Confusion Matrix: Plotted Actual WHOOP, Candidate Model, and Current Heuristic together on the Day +1 chart, added Candidate MAE/Bias columns to the Regime Breakdown and Recent Predictions tables, and added a Candidate/Current toggle on the Confusion Matrix."
+                ]
+            },
             {
                 "version": "v2.21.0",
                 "date": "2026-11-23",

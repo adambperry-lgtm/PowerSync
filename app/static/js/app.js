@@ -12105,10 +12105,21 @@ async function loadForecastAccuracyBacktest(syncWhoop = false) {
   }
 }
 
+let _lastBacktestData = null;
+let _activeConfusionModel = "candidate";
+
+function switchBacktestConfusionModel(modelKey) {
+  _activeConfusionModel = modelKey === "heuristic" ? "heuristic" : "candidate";
+  if (_lastBacktestData) {
+    renderForecastAccuracyReport(_lastBacktestData);
+  }
+}
+
 function renderForecastAccuracyReport(data) {
   const bodyEl = document.getElementById("forecastAccuracyBody");
   const covEl = document.getElementById("backtestCoverageBadge");
   if (!bodyEl) return;
+  _lastBacktestData = data;
 
   if (data.requires_auth) {
     if (covEl) covEl.textContent = "Sign in required";
@@ -12118,10 +12129,15 @@ function renderForecastAccuracyReport(data) {
 
   const cov = data.data_coverage || {};
   const sum = data.summary || {};
-  const byH = data.by_horizon || {};
   const byB = data.by_branch || {};
   const baselines = data.baselines || [];
   const confD1 = (data.confusion_matrix && data.confusion_matrix.day_1) || {};
+  const cand = data.candidate_model || null;
+  const candD1 = (cand && cand.by_horizon && cand.by_horizon.day_1) || {};
+  const candAll = (cand && cand.by_horizon && cand.by_horizon.overall) || {};
+  const candVs = (cand && cand.vs_heuristic) || {};
+  const candConfD1 = (cand && cand.confusion_matrix && cand.confusion_matrix.day_1) || {};
+  const learned = (cand && cand.learned_profile) || {};
   const corrs = data.feature_correlations || [];
   const insights = data.insights || [];
   const timeline = data.timeline || [];
@@ -12163,16 +12179,26 @@ function renderForecastAccuracyReport(data) {
   const biasVal = sum.day_1_bias;
   const biasDesc = biasVal == null ? "" : (biasVal > 2 ? "Too optimistic" : (biasVal < -2 ? "Too conservative" : "Well centered"));
 
-  // 1. Hero KPI Cards
+  const _deltaBadge = (val, lowerIsBetter = true, suffix = "") => {
+    if (val === null || val === undefined || Number.isNaN(val)) return "";
+    const improved = lowerIsBetter ? val < -0.1 : val > 0.1;
+    const worse = lowerIsBetter ? val > 0.1 : val < -0.1;
+    const col = improved ? "#047857" : (worse ? "#B91C1C" : "#475569");
+    const bg = improved ? "rgba(0,200,150,0.14)" : (worse ? "rgba(239,68,68,0.12)" : "#E2E8F0");
+    const sign = val > 0 ? "+" : "";
+    return `<span style="display:inline-block;padding:0.08rem 0.38rem;border-radius:9px;font-size:0.68rem;font-weight:700;background:${bg};color:${col};">${sign}${val.toFixed(1)}${suffix}</span>`;
+  };
+
+  // 1. Hero KPI Cards (Current Heuristic Baseline)
   const kpiHtml = `
     <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(145px, 1fr));gap:0.6rem;">
       <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
-        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Day +1 MAE</div>
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Current D+1 MAE</div>
         <div style="font-size:1.35rem;font-weight:800;color:#0052FF;font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(sum.day_1_mae, " pts")}</div>
         <div style="font-size:0.7rem;font-weight:600;color:${baseDeltaColor};margin-top:0.15rem;">${_btEsc(baseDeltaLabel)}</div>
       </div>
       <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
-        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Day +1 Zone Match</div>
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Current Zone Match</div>
         <div style="font-size:1.35rem;font-weight:800;color:#00C896;font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(sum.day_1_zone_accuracy_pct, "%")}</div>
         <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">Exact Green / Yellow / Red</div>
       </div>
@@ -12187,12 +12213,73 @@ function renderForecastAccuracyReport(data) {
         <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">Same prescription intensity</div>
       </div>
       <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
-        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Day +1 Mean Bias</div>
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Current D+1 Bias</div>
         <div style="font-size:1.35rem;font-weight:800;color:${Math.abs(biasVal || 0) >= 4 ? "#D97706" : "var(--text-primary)"};font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(biasVal, " pts", true)}</div>
         <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">${_btEsc(biasDesc)}</div>
       </div>
     </div>
   `;
+
+  // 1b. Candidate Model Head-to-Head Scorecard
+  const candCardHtml = cand && candD1.count > 0
+    ? `<div style="background:linear-gradient(135deg, rgba(0,200,150,0.08), rgba(0,82,255,0.05));border:1px solid rgba(0,200,150,0.38);border-radius:10px;padding:0.8rem 0.9rem;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.55rem;">
+          <div>
+            <div style="font-size:0.82rem;font-weight:800;color:#047857;">🧪 Candidate Model: ${_btEsc(cand.name)} <span style="font-size:0.68rem;font-weight:700;padding:0.1rem 0.45rem;border-radius:9px;background:rgba(0,200,150,0.18);color:#047857;margin-left:0.3rem;">Shadow Backtest Only</span></div>
+            <div style="font-size:0.72rem;color:var(--text-secondary);margin-top:0.15rem;">${_btEsc(cand.description)}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(130px, 1fr));gap:0.5rem;">
+          <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem 0.65rem;">
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">D+1 MAE</div>
+            <div style="display:flex;align-items:baseline;gap:0.35rem;margin-top:0.15rem;">
+              <span style="font-size:1.15rem;font-weight:800;color:#047857;font-family:var(--font-display);">${_btFmtNum(candD1.mae)}</span>
+              ${_deltaBadge(candVs.day_1_mae_delta, true)}
+            </div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(sum.day_1_mae)} current</div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem 0.65rem;">
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">All 3d MAE</div>
+            <div style="display:flex;align-items:baseline;gap:0.35rem;margin-top:0.15rem;">
+              <span style="font-size:1.15rem;font-weight:800;color:#047857;font-family:var(--font-display);">${_btFmtNum(candAll.mae)}</span>
+              ${_deltaBadge(candVs.overall_mae_delta, true)}
+            </div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(sum.overall_mae)} current</div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem 0.65rem;">
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">D+1 Zone / Conf</div>
+            <div style="display:flex;align-items:baseline;gap:0.35rem;margin-top:0.15rem;">
+              <span style="font-size:1.05rem;font-weight:800;color:var(--text-primary);font-family:var(--font-display);">${_btFmtNum(candD1.zone_accuracy_pct, "%")}</span>
+              ${_deltaBadge(candVs.day_1_zone_acc_delta, false, "%")}
+            </div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">Conf: ${_btFmtNum(candD1.confirmation_rate_pct, "%")} • Tier: ${_btFmtNum(candD1.workout_tier_match_pct, "%")}</div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem 0.65rem;">
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">D+1 Bias</div>
+            <div style="display:flex;align-items:baseline;gap:0.35rem;margin-top:0.15rem;">
+              <span style="font-size:1.1rem;font-weight:800;color:var(--text-primary);font-family:var(--font-display);">${_btFmtNum(candD1.bias, " pts", true)}</span>
+            </div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">vs ${_btFmtNum(sum.day_1_bias, " pts", true)} current</div>
+          </div>
+          <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:8px;padding:0.5rem 0.65rem;">
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">False-Green Rate</div>
+            <div style="display:flex;align-items:baseline;gap:0.35rem;margin-top:0.15rem;">
+              <span style="font-size:1.1rem;font-weight:800;color:var(--text-primary);font-family:var(--font-display);">${_btFmtNum(candConfD1.false_green_pct, "%")}</span>
+              ${_deltaBadge(candVs.day_1_false_green_delta, true, "%")}
+            </div>
+            <div style="font-size:0.67rem;color:var(--text-muted);">${candConfD1.false_green_count || 0}/${candConfD1.predicted_green_total || 0} calls • Red caught: ${candConfD1.caught_red_count || 0}/${candConfD1.actual_red_total || 0}</div>
+          </div>
+        </div>
+        <div style="margin-top:0.6rem;padding-top:0.55rem;border-top:1px dashed rgba(0,200,150,0.35);display:flex;flex-wrap:wrap;gap:0.45rem 0.9rem;font-size:0.71rem;color:var(--text-secondary);">
+          <span><b>Learned Profile (n=${learned.training_samples || 0}):</b></span>
+          <span>21d Baseline: <b>${_btFmtNum(learned.personal_baseline_recovery, "%")}</b></span>
+          <span>Strain: <b>${_btFmtNum(learned.pts_per_plus_1_strain, " pts/+1", true)}</b></span>
+          <span>Ride Vol: <b>${_btFmtNum(learned.pts_per_plus_30m_ride, " pts/+30m", true)}</b></span>
+          <span>HRV: <b>${_btFmtNum(learned.pts_per_plus_10pct_hrv, " pts/+10%", true)}</b></span>
+          <span>2d Stack: <b>${_btFmtNum(learned.stacked_strain_penalty_per_4pts, " pts", true)}</b></span>
+        </div>
+      </div>`
+    : "";
 
   // 2. Diagnostic Insights
   const sevStyle = {
@@ -12214,46 +12301,53 @@ function renderForecastAccuracyReport(data) {
       </div>`
     : "";
 
-  // 3. Predicted vs Actual Chart
+  // 3. Predicted vs Actual Chart (Actual + Candidate + Current Heuristic)
   const chartHtml = `
     <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.8rem;">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.45rem;">
         <div style="font-size:0.78rem;font-weight:700;color:var(--accent-cyan);letter-spacing:0.03em;">DAY +1 PREDICTED VS. ACTUAL WHOOP RECOVERY</div>
-        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.71rem;color:var(--text-secondary);">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.75rem;font-size:0.71rem;color:var(--text-secondary);">
           <span><span style="display:inline-block;width:12px;height:3px;background:#0F172A;vertical-align:middle;margin-right:4px;"></span>Actual WHOOP</span>
-          <span><span style="display:inline-block;width:12px;height:0;border-top:2px dashed #0052FF;vertical-align:middle;margin-right:4px;"></span>Heuristic Forecast</span>
+          <span><span style="display:inline-block;width:12px;height:3px;background:#00C896;vertical-align:middle;margin-right:4px;"></span>Candidate Model</span>
+          <span><span style="display:inline-block;width:12px;height:0;border-top:2px dashed #0052FF;vertical-align:middle;margin-right:4px;"></span>Current Heuristic</span>
         </div>
       </div>
-      <canvas id="backtestTimelineCanvas" style="width:100%;height:185px;display:block;border-radius:6px;background:#FFFFFF;border:1px solid var(--border-color);"></canvas>
+      <canvas id="backtestTimelineCanvas" style="width:100%;height:195px;display:block;border-radius:6px;background:#FFFFFF;border:1px solid var(--border-color);"></canvas>
     </div>
   `;
 
   // 4. Baseline Comparison Table
   const baselineRows = baselines.map((row) => {
+    const isCand = row.key === "candidate";
     const isHeur = row.key === "heuristic";
-    const rowBg = isHeur ? "rgba(0,82,255,0.06)" : "transparent";
+    const rowBg = isCand
+      ? "rgba(0,200,150,0.09)"
+      : (isHeur ? "rgba(0,82,255,0.05)" : "transparent");
+    const labelColor = isCand ? "#047857" : "var(--text-primary)";
     return `<tr style="background:${rowBg};border-bottom:1px solid var(--border-color);">
-      <td style="padding:0.45rem 0.5rem;font-weight:${isHeur ? "700" : "500"};color:var(--text-primary);">${_btEsc(row.label)}</td>
-      <td style="padding:0.45rem 0.45rem;text-align:right;font-weight:700;">${_btFmtNum(row.day_1_mae)}</td>
-      <td style="padding:0.45rem 0.45rem;text-align:right;">${_btFmtNum(row.day_1_zone_acc, "%")}</td>
-      <td style="padding:0.45rem 0.45rem;text-align:right;">${_btFmtNum(row.day_2_mae)}</td>
-      <td style="padding:0.45rem 0.45rem;text-align:right;">${_btFmtNum(row.day_3_mae)}</td>
-      <td style="padding:0.45rem 0.45rem;text-align:right;font-weight:700;">${_btFmtNum(row.overall_mae)}</td>
+      <td style="padding:0.45rem 0.5rem;font-weight:${isCand || isHeur ? "700" : "500"};color:${labelColor};">${_btEsc(row.label)}</td>
+      <td style="padding:0.45rem 0.4rem;text-align:right;font-weight:700;">${_btFmtNum(row.day_1_mae)}</td>
+      <td style="padding:0.45rem 0.4rem;text-align:right;">${_btFmtNum(row.day_1_bias, "", true)}</td>
+      <td style="padding:0.45rem 0.4rem;text-align:right;">${_btFmtNum(row.day_1_zone_acc, "%")}</td>
+      <td style="padding:0.45rem 0.4rem;text-align:right;">${_btFmtNum(row.day_2_mae)}</td>
+      <td style="padding:0.45rem 0.4rem;text-align:right;">${_btFmtNum(row.day_3_mae)}</td>
+      <td style="padding:0.45rem 0.4rem;text-align:right;font-weight:700;">${_btFmtNum(row.overall_mae)}</td>
     </tr>`;
   }).join("");
 
   const baselineHtml = `
     <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;overflow-x:auto;">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">📏 Model vs. Baselines (Lower MAE is Better)</div>
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">📏 Models vs. Baselines (Walk-Forward Out-of-Sample • Lower MAE is Better)</div>
       <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
         <thead>
-          <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.67rem;">
+          <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.66rem;">
             <th style="text-align:left;padding:0.35rem 0.5rem;">Model</th>
-            <th style="text-align:right;padding:0.35rem 0.45rem;">D+1 MAE</th>
-            <th style="text-align:right;padding:0.35rem 0.45rem;">D+1 Zone %</th>
-            <th style="text-align:right;padding:0.35rem 0.45rem;">D+2 MAE</th>
-            <th style="text-align:right;padding:0.35rem 0.45rem;">D+3 MAE</th>
-            <th style="text-align:right;padding:0.35rem 0.45rem;">All 3d MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">D+1 MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">D+1 Bias</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">D+1 Zone %</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">D+2 MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">D+3 MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">All 3d MAE</th>
           </tr>
         </thead>
         <tbody>${baselineRows}</tbody>
@@ -12261,39 +12355,40 @@ function renderForecastAccuracyReport(data) {
     </div>
   `;
 
-  // 5. 3-Branch Heuristic Audit Table
+  // 5. 3-Branch Audit Table (with Candidate MAE & Bias side-by-side)
   const branchOrder = ["trained_today_heavy", "trained_yesterday_heavy", "standard"];
   const branchRows = branchOrder.map((bk) => {
     const b = byB[bk];
     if (!b) return "";
     const d1 = b.day_1 || {};
+    const cd1 = b.candidate_day_1 || {};
     return `<tr style="border-bottom:1px solid var(--border-color);">
       <td style="padding:0.5rem 0.5rem;">
         <div style="font-weight:700;color:var(--text-primary);">${_btEsc(b.label)}</div>
-        <div style="font-size:0.67rem;color:var(--text-muted);margin-top:0.1rem;">${_btEsc(b.rule)}</div>
+        <div style="font-size:0.66rem;color:var(--text-muted);margin-top:0.1rem;">${_btEsc(b.rule)}</div>
       </td>
-      <td style="padding:0.5rem 0.4rem;text-align:right;white-space:nowrap;"><b>${b.trigger_count || 0}</b> <span style="color:var(--text-muted);">(${_btFmtNum(b.trigger_share_pct, "%")})</span></td>
-      <td style="padding:0.5rem 0.4rem;text-align:right;">${_btFmtNum(d1.avg_pred_delta, "", true)}</td>
-      <td style="padding:0.5rem 0.4rem;text-align:right;font-weight:700;">${_btFmtNum(d1.avg_actual_delta, "", true)}</td>
-      <td style="padding:0.5rem 0.4rem;text-align:right;font-weight:700;">${_btFmtNum(d1.mae)}</td>
-      <td style="padding:0.5rem 0.4rem;text-align:right;">${_btFmtNum(d1.bias, "", true)}</td>
-      <td style="padding:0.5rem 0.4rem;text-align:right;">${_btFmtNum(d1.zone_accuracy_pct, "%")}</td>
+      <td style="padding:0.5rem 0.35rem;text-align:right;white-space:nowrap;"><b>${b.trigger_count || 0}</b> <span style="color:var(--text-muted);">(${_btFmtNum(b.trigger_share_pct, "%")})</span></td>
+      <td style="padding:0.5rem 0.35rem;text-align:right;">${_btFmtNum(d1.avg_pred_delta, "", true)} / <b>${_btFmtNum(d1.avg_actual_delta, "", true)}</b></td>
+      <td style="padding:0.5rem 0.35rem;text-align:right;font-weight:700;color:#0052FF;">${_btFmtNum(d1.mae)}</td>
+      <td style="padding:0.5rem 0.35rem;text-align:right;color:var(--text-secondary);">${_btFmtNum(d1.bias, "", true)}</td>
+      <td style="padding:0.5rem 0.35rem;text-align:right;font-weight:800;color:#047857;">${_btFmtNum(cd1.mae)}</td>
+      <td style="padding:0.5rem 0.35rem;text-align:right;color:#047857;">${_btFmtNum(cd1.bias, "", true)}</td>
     </tr>`;
   }).join("");
 
   const branchHtml = `
     <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;overflow-x:auto;">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">🌿 3-Branch Heuristic Audit (Day +1 Predicted Δ vs. Actual Δ)</div>
-      <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">🌿 Regime Breakdown: Current 3-Branch vs. Candidate Model (Day +1)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.74rem;">
         <thead>
-          <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.67rem;">
-            <th style="text-align:left;padding:0.35rem 0.5rem;">Heuristic Branch</th>
-            <th style="text-align:right;padding:0.35rem 0.4rem;">Days</th>
-            <th style="text-align:right;padding:0.35rem 0.4rem;">Pred Δ</th>
-            <th style="text-align:right;padding:0.35rem 0.4rem;">Actual Δ</th>
-            <th style="text-align:right;padding:0.35rem 0.4rem;">MAE</th>
-            <th style="text-align:right;padding:0.35rem 0.4rem;">Bias</th>
-            <th style="text-align:right;padding:0.35rem 0.4rem;">Zone %</th>
+          <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.65rem;">
+            <th style="text-align:left;padding:0.35rem 0.5rem;">Regime (Heuristic Branch)</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;">Days</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;">Cur Pred / Act Δ</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;color:#0052FF;">Cur MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;color:#0052FF;">Cur Bias</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;color:#047857;">Cand MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.35rem;color:#047857;">Cand Bias</th>
           </tr>
         </thead>
         <tbody>${branchRows}</tbody>
@@ -12301,8 +12396,10 @@ function renderForecastAccuracyReport(data) {
     </div>
   `;
 
-  // 6. Confusion Matrix + Feature Correlations (2-column responsive grid)
-  const cm = confD1.matrix || { green: { green: 0, yellow: 0, red: 0 }, yellow: { green: 0, yellow: 0, red: 0 }, red: { green: 0, yellow: 0, red: 0 } };
+  // 6. Confusion Matrix (switchable between Candidate & Current Heuristic) + Feature Correlations
+  const showingCandCm = _activeConfusionModel === "candidate" && candConfD1 && candConfD1.matrix;
+  const activeConf = showingCandCm ? candConfD1 : confD1;
+  const cm = activeConf.matrix || { green: { green: 0, yellow: 0, red: 0 }, yellow: { green: 0, yellow: 0, red: 0 }, red: { green: 0, yellow: 0, red: 0 } };
   const cmCell = (val, highlight = false, warn = false) => {
     const bg = highlight
       ? "rgba(0,200,150,0.14)"
@@ -12310,9 +12407,17 @@ function renderForecastAccuracyReport(data) {
     const col = warn && val > 0 ? "#B91C1C" : (highlight ? "#047857" : "var(--text-primary)");
     return `<td style="text-align:center;padding:0.45rem;font-weight:700;background:${bg};color:${col};border:1px solid var(--border-color);">${val}</td>`;
   };
+  const pillActive = "background:#0052FF;color:#FFFFFF;border:1px solid #0052FF;";
+  const pillInactive = "background:#F4F7FA;color:var(--text-secondary);border:1px solid var(--border-color);";
   const cmHtml = `
     <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;">
-      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">🎯 Day +1 Zone Confusion Matrix</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:0.4rem;flex-wrap:wrap;margin-bottom:0.45rem;">
+        <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);">🎯 Day +1 Zone Confusion Matrix</div>
+        <div style="display:flex;gap:0.25rem;">
+          <button type="button" onclick="switchBacktestConfusionModel('candidate')" style="font-size:0.67rem;font-weight:700;padding:0.16rem 0.45rem;border-radius:6px;cursor:pointer;${showingCandCm ? pillActive : pillInactive}">Candidate</button>
+          <button type="button" onclick="switchBacktestConfusionModel('heuristic')" style="font-size:0.67rem;font-weight:700;padding:0.16rem 0.45rem;border-radius:6px;cursor:pointer;${!showingCandCm ? pillActive : pillInactive}">Current</button>
+        </div>
+      </div>
       <table style="width:100%;border-collapse:collapse;font-size:0.74rem;">
         <thead>
           <tr style="color:var(--text-muted);font-size:0.67rem;text-transform:uppercase;">
@@ -12344,8 +12449,8 @@ function renderForecastAccuracyReport(data) {
         </tbody>
       </table>
       <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">
-        False-Green calls: <b>${confD1.false_green_count || 0}/${confD1.predicted_green_total || 0}</b> (${_btFmtNum(confD1.false_green_pct, "%")}) •
-        Actual Red days caught: <b>${confD1.caught_red_count || 0}/${confD1.actual_red_total || 0}</b>
+        False-Green calls: <b>${activeConf.false_green_count || 0}/${activeConf.predicted_green_total || 0}</b> (${_btFmtNum(activeConf.false_green_pct, "%")}) •
+        Actual Red days caught: <b>${activeConf.caught_red_count || 0}/${activeConf.actual_red_total || 0}</b>
       </div>
     </div>
   `;
@@ -12371,18 +12476,20 @@ function renderForecastAccuracyReport(data) {
     </div>
   `;
 
-  // 7. Recent Day +1 Log
+  // 7. Recent Day +1 Log (side-by-side Current vs Candidate)
   const recentRows = [...timeline].reverse().slice(0, 30).map((t) => {
-    const errCol = Math.abs(t.error) <= 8 ? "#047857" : (Math.abs(t.error) <= 15 ? "#b45309" : "#b91c1c");
+    const curErrCol = Math.abs(t.error) <= 8 ? "#047857" : (Math.abs(t.error) <= 15 ? "#b45309" : "#b91c1c");
+    const cErr = t.candidate_error != null ? t.candidate_error : 0;
+    const candErrCol = Math.abs(cErr) <= 8 ? "#047857" : (Math.abs(cErr) <= 15 ? "#b45309" : "#b91c1c");
     return `<tr style="border-bottom:1px solid var(--border-color);">
-      <td style="padding:0.35rem 0.45rem;white-space:nowrap;">${_btEsc(t.target_date)}</td>
-      <td style="padding:0.35rem 0.45rem;color:var(--text-secondary);">${_btEsc(t.branch_label)}</td>
-      <td style="padding:0.35rem 0.4rem;text-align:right;">${t.origin_strain}</td>
-      <td style="padding:0.35rem 0.4rem;text-align:center;">${_btZonePill(t.predicted_zone, t.predicted_recovery)}</td>
-      <td style="padding:0.35rem 0.4rem;text-align:center;">${_btZonePill(t.actual_zone, t.actual_recovery)}</td>
-      <td style="padding:0.35rem 0.4rem;text-align:right;font-weight:700;color:${errCol};">${t.error > 0 ? `+${t.error}` : t.error}</td>
-      <td style="padding:0.35rem 0.4rem;text-align:center;">${t.forecast_confirmed ? "✅" : "⚡"}</td>
-      <td style="padding:0.35rem 0.4rem;text-align:center;">${t.workout_tier_match ? "✅" : "✕"}</td>
+      <td style="padding:0.35rem 0.4rem;white-space:nowrap;">${_btEsc(t.target_date)}</td>
+      <td style="padding:0.35rem 0.4rem;color:var(--text-secondary);">${_btEsc(t.branch_label)}</td>
+      <td style="padding:0.35rem 0.35rem;text-align:right;">${t.origin_strain}</td>
+      <td style="padding:0.35rem 0.35rem;text-align:center;">${_btZonePill(t.predicted_zone, t.predicted_recovery)}</td>
+      <td style="padding:0.35rem 0.35rem;text-align:center;">${_btZonePill(t.candidate_zone, t.candidate_recovery)}</td>
+      <td style="padding:0.35rem 0.35rem;text-align:center;">${_btZonePill(t.actual_zone, t.actual_recovery)}</td>
+      <td style="padding:0.35rem 0.35rem;text-align:right;font-weight:700;color:${curErrCol};">${t.error > 0 ? `+${t.error}` : t.error}</td>
+      <td style="padding:0.35rem 0.35rem;text-align:right;font-weight:700;color:${candErrCol};">${cErr > 0 ? `+${cErr}` : cErr}</td>
     </tr>`;
   }).join("");
 
@@ -12390,17 +12497,17 @@ function renderForecastAccuracyReport(data) {
     <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;">
       <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">📋 Recent Day +1 Predictions (Last ${Math.min(30, timeline.length)} Days)</div>
       <div style="max-height:220px;overflow:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:0.73rem;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.72rem;">
           <thead>
-            <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.65rem;position:sticky;top:0;background:#FFFFFF;">
-              <th style="text-align:left;padding:0.3rem 0.45rem;">Target Date</th>
-              <th style="text-align:left;padding:0.3rem 0.45rem;">Branch</th>
-              <th style="text-align:right;padding:0.3rem 0.4rem;">Prior Strain</th>
-              <th style="text-align:center;padding:0.3rem 0.4rem;">Predicted</th>
-              <th style="text-align:center;padding:0.3rem 0.4rem;">Actual</th>
-              <th style="text-align:right;padding:0.3rem 0.4rem;">Err</th>
-              <th style="text-align:center;padding:0.3rem 0.4rem;" title="Passed is_forecast_valid_for_recovery">Conf</th>
-              <th style="text-align:center;padding:0.3rem 0.4rem;" title="Same workout intensity tier">Tier</th>
+            <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.64rem;position:sticky;top:0;background:#FFFFFF;">
+              <th style="text-align:left;padding:0.3rem 0.4rem;">Target Date</th>
+              <th style="text-align:left;padding:0.3rem 0.4rem;">Regime</th>
+              <th style="text-align:right;padding:0.3rem 0.35rem;">Strain</th>
+              <th style="text-align:center;padding:0.3rem 0.35rem;">Current</th>
+              <th style="text-align:center;padding:0.3rem 0.35rem;color:#047857;">Candidate</th>
+              <th style="text-align:center;padding:0.3rem 0.35rem;">Actual</th>
+              <th style="text-align:right;padding:0.3rem 0.35rem;">Cur Err</th>
+              <th style="text-align:right;padding:0.3rem 0.35rem;color:#047857;">Cand Err</th>
             </tr>
           </thead>
           <tbody>${recentRows}</tbody>
@@ -12412,6 +12519,7 @@ function renderForecastAccuracyReport(data) {
   bodyEl.innerHTML = `
     ${syncBanner}
     ${kpiHtml}
+    ${candCardHtml}
     ${insightsHtml}
     ${chartHtml}
     ${baselineHtml}
@@ -12433,7 +12541,7 @@ function drawBacktestTimelineCanvas(timeline) {
   const dpr = window.devicePixelRatio || 1;
   const rect = canvas.getBoundingClientRect();
   const width = Math.max(320, Math.round(rect.width || 720));
-  const height = 185;
+  const height = 195;
   canvas.width = width * dpr;
   canvas.height = height * dpr;
 
@@ -12480,7 +12588,38 @@ function drawBacktestTimelineCanvas(timeline) {
     ctx.fillText(`${v}%`, padL - 5, y);
   });
 
-  // Actual recovery line (solid dark)
+  // Current 3-Branch Heuristic line (dashed blue, lighter)
+  ctx.save();
+  ctx.strokeStyle = "rgba(0, 82, 255, 0.7)";
+  ctx.lineWidth = 1.6;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  timeline.forEach((pt, idx) => {
+    const x = xFor(idx);
+    const y = yFor(pt.predicted_recovery);
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.restore();
+
+  // Candidate Personalized Model line (solid emerald)
+  if (timeline[0] && timeline[0].candidate_recovery != null) {
+    ctx.save();
+    ctx.strokeStyle = "#00C896";
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    timeline.forEach((pt, idx) => {
+      const x = xFor(idx);
+      const y = yFor(pt.candidate_recovery);
+      if (idx === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Actual WHOOP recovery line (solid dark)
   ctx.save();
   ctx.strokeStyle = "#0F172A";
   ctx.lineWidth = 2;
@@ -12494,21 +12633,6 @@ function drawBacktestTimelineCanvas(timeline) {
   ctx.stroke();
   ctx.restore();
 
-  // Predicted recovery line (dashed blue)
-  ctx.save();
-  ctx.strokeStyle = "#0052FF";
-  ctx.lineWidth = 2;
-  ctx.setLineDash([5, 4]);
-  ctx.beginPath();
-  timeline.forEach((pt, idx) => {
-    const x = xFor(idx);
-    const y = yFor(pt.predicted_recovery);
-    if (idx === 0) ctx.moveTo(x, y);
-    else ctx.lineTo(x, y);
-  });
-  ctx.stroke();
-  ctx.restore();
-
   // Dots for actual points when sparse
   if (timeline.length <= 45) {
     timeline.forEach((pt, idx) => {
@@ -12516,7 +12640,7 @@ function drawBacktestTimelineCanvas(timeline) {
       const yAct = yFor(pt.actual_recovery);
       ctx.fillStyle = pt.actual_zone === "green" ? "#00C896" : (pt.actual_zone === "yellow" ? "#F59E0B" : "#EF4444");
       ctx.beginPath();
-      ctx.arc(x, yAct, 2.8, 0, Math.PI * 2);
+      ctx.arc(x, yAct, 2.5, 0, Math.PI * 2);
       ctx.fill();
     });
   }
@@ -12535,4 +12659,5 @@ function drawBacktestTimelineCanvas(timeline) {
     ctx.fillText(String(timeline[idx].target_date || "").slice(5), x, padT + plotH + 6);
   });
 }
+
 

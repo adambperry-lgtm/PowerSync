@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.22.0] - 2026-11-23
+### Added
+- **Candidate Personalized Strain + HRV Recovery Model (Shadow Backtest)**:
+  - Added a strictly leak-free walk-forward **Personalized Strain + HRV Mean-Reverting Candidate Model** inside [`forecast_backtest_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/forecast_backtest_service.py) using Bayesian-shrunk ridge regression toward sports-science priors (`_fit_prior_ridge`, `_predict_candidate_3day`), anchored to each athlete's rolling 21-day personal recovery mean, continuous WHOOP strain, cycling load duration, HRV vs. 14-day baseline, 2-day stacked strain, and weekday schedule propagation for Days +2 and +3 (leaving the live 3-day forecast untouched).
+  - Updated `#modalForecastAccuracy` in [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=160`) with a **Candidate vs. Current Head-to-Head Scorecard**, **Learned Personal Profile** strip, 3-line Day +1 chart (**Actual WHOOP** vs. **Candidate Model** vs. **Current Heuristic**), `D+1 Bias` column in the Models vs. Baselines table, Candidate MAE/Bias columns in the Regime Breakdown & Recent Predictions log, and a **Candidate / Current** Confusion Matrix toggle.
+  - Clarified Red-day diagnostic messaging (Branch 1's 38% floor vs. Branches 2 & 3) and added strict zero-future-leakage and candidate metric tests in [`test_forecast_backtest.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_forecast_backtest.py).
+
 ## [2.21.0] - 2026-11-23
 ### Added
 - **3-Day WHOOP Recovery Forecast Backtest & Accuracy Analyzer**:

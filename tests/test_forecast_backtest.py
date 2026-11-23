@@ -219,11 +219,25 @@ class TestForecastBacktest(unittest.TestCase):
         self.assertEqual(report["by_horizon"]["day_3"]["count"], 12)
         self.assertEqual(report["by_horizon"]["overall"]["count"], 39)
 
-        # Baselines list contains all 4 models with valid Day +1 MAE
+        # Baselines list contains all 5 models (Candidate + Heuristic + 3 baselines) with valid Day +1 MAE
         baseline_keys = [b["key"] for b in report["baselines"]]
-        self.assertEqual(baseline_keys, ["heuristic", "rolling_mean", "mean_reversion", "persistence"])
+        self.assertEqual(
+            baseline_keys,
+            ["candidate", "heuristic", "rolling_mean", "mean_reversion", "persistence"],
+        )
         for b in report["baselines"]:
             self.assertIsNotNone(b["day_1_mae"])
+            self.assertIsNotNone(b["day_1_bias"])
+
+        # Candidate model payload and per-branch candidate metrics populated
+        cand = report["candidate_model"]
+        self.assertIsNotNone(cand["by_horizon"]["day_1"]["mae"])
+        self.assertIsNotNone(cand["by_horizon"]["overall"]["mae"])
+        self.assertIsNotNone(cand["vs_heuristic"]["day_1_mae_delta"])
+        self.assertGreater(cand["learned_profile"]["training_samples"], 0)
+        self.assertLess(cand["learned_profile"]["pts_per_plus_1_strain"], 0.0)
+        for b_key in ("trained_today_heavy", "trained_yesterday_heavy", "standard"):
+            self.assertIsNotNone(report["by_branch"][b_key]["candidate_day_1"]["mae"])
 
         # Structural check: actual Red day (28%) occurred once and heuristic never predicts Red (<34)
         cm_d1 = report["confusion_matrix"]["day_1"]
@@ -238,6 +252,32 @@ class TestForecastBacktest(unittest.TestCase):
 
         # Insights populated
         self.assertTrue(len(report["insights"]) >= 1)
+
+    def test_candidate_model_zero_future_leakage(self):
+        """Mutating future WHOOP recovery after day t must not change day t's walk-forward candidate prediction."""
+        today = get_athlete_date(self.user_a)
+        start = today - datetime.timedelta(days=12)
+
+        base_recs = [70, 52, 74, 68, 48, 72, 65, 55, 76, 60, 50, 72]
+        strains = [15.5, 5.0, 10.0, 16.0, 4.5, 9.5, 14.8, 6.0, 11.0, 15.2, 5.5, 9.0]
+        for idx, (rec, st) in enumerate(zip(base_recs, strains)):
+            d_iso = (start + datetime.timedelta(days=idx)).isoformat()
+            self._insert_whoop(self.user_a, d_iso, rec, strain=st, hrv=55.0 + (idx % 3) * 4.0)
+
+        rep_before = run_recovery_forecast_backtest(user_id=self.user_a, days=30)
+        # Capture Day +1 prediction made on origin day idx=5 (targeting idx=6)
+        target_mid_iso = (start + datetime.timedelta(days=6)).isoformat()
+        pred_before = next(t["candidate_recovery"] for t in rep_before["timeline"] if t["target_date"] == target_mid_iso)
+
+        # Now drastically alter future recoveries on days idx=6..11 (strictly AFTER origin day idx=5)
+        for idx in range(6, 12):
+            d_iso = (start + datetime.timedelta(days=idx)).isoformat()
+            self._insert_whoop(self.user_a, d_iso, 20 if idx % 2 == 0 else 95, strain=strains[idx], hrv=40.0)
+
+        rep_after = run_recovery_forecast_backtest(user_id=self.user_a, days=30)
+        pred_after = next(t["candidate_recovery"] for t in rep_after["timeline"] if t["target_date"] == target_mid_iso)
+
+        self.assertEqual(pred_before, pred_after)
 
     def test_multi_user_isolation_and_empty_history(self):
         """User A's historical WHOOP metrics must never appear in User B's backtest."""
