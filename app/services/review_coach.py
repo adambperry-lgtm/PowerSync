@@ -207,6 +207,60 @@ def parse_athlete_feedback_for_outlook(note: str, today: datetime.date, ftp: int
 
     return overrides
 
+def predict_3day_recovery_heuristic(
+    today_recovery: int,
+    today_strain: float,
+    workout_strain: float,
+    is_today: bool,
+    is_yesterday: bool,
+    has_trained_today: bool,
+    suffer_score: float = 0,
+    verdict: str = "",
+) -> Dict[str, Any]:
+    """
+    Pure implementation of PowerSync's current rule-based 3-branch WHOOP recovery
+    forecast heuristic (Day +1, Day +2, Day +3).
+
+    Exposed as a standalone helper so both the live 3-day outlook builder and
+    the historical backtest/accuracy analyzer execute the exact same logic.
+    """
+    trained_today_heavy = is_today and ((workout_strain >= 13.5) or (suffer_score >= 60))
+    trained_yesterday_heavy = is_yesterday and (
+        (workout_strain >= 13.5)
+        or (suffer_score >= 40)
+        or (verdict == "Intensity Overreach")
+    )
+    today_passive_or_light = (not has_trained_today) and (today_strain < 13.5)
+
+    if trained_today_heavy:
+        # Acute fatigue spike peaks tomorrow morning (Day +1)
+        branch = "trained_today_heavy"
+        branch_label = "Heavy Load Today"
+        day1_recovery = max(38, min(62, today_recovery - 10))
+        day2_recovery = min(84, day1_recovery + 24)
+        day3_recovery = min(88, day2_recovery + 6)
+    elif trained_yesterday_heavy and today_passive_or_light:
+        # 48 hours post-workout: fatigue clears, recovery rebounds
+        branch = "trained_yesterday_heavy"
+        branch_label = "Heavy Yesterday + Light Today"
+        day1_recovery = min(74, today_recovery + 22)
+        day2_recovery = min(86, day1_recovery + 14)
+        day3_recovery = 76
+    else:
+        # Standard balanced progression
+        branch = "standard"
+        branch_label = "Standard / Balanced"
+        day1_recovery = min(88, today_recovery + 12)
+        day2_recovery = max(45, day1_recovery - 14)
+        day3_recovery = 74
+
+    return {
+        "branch": branch,
+        "branch_label": branch_label,
+        "recoveries": [day1_recovery, day2_recovery, day3_recovery],
+    }
+
+
 def build_preference_aligned_outlook_days(
     today: datetime.date,
     today_recovery: int,
@@ -236,31 +290,21 @@ def build_preference_aligned_outlook_days(
     rest_quota_status = get_weekday_rest_quota_and_status(ref_date=today)
     must_rest_days = rest_quota_status.get("must_rest_days", [])
 
-    trained_today_heavy = is_today and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 60))
-    trained_yesterday_heavy = is_yesterday and ((workout_strain >= 13.5) or (session_summary.get("suffer_score", 0) >= 40) or (session_summary.get("verdict") == "Intensity Overreach"))
-    today_passive_or_light = (not has_trained_today) and (today_strain < 13.5)
-
     # Parse athlete subjective notes for dynamic forecast adaptation
     feedback_overrides = parse_athlete_feedback_for_outlook(custom_prompt, today, ftp)
 
     # 1. Base recovery progression over next 3 days
-    if trained_today_heavy:
-        # Acute fatigue spike peaks tomorrow morning (Day +1)
-        day1_recovery = max(38, min(62, today_recovery - 10))
-        day2_recovery = min(84, day1_recovery + 24)
-        day3_recovery = min(88, day2_recovery + 6)
-    elif trained_yesterday_heavy and today_passive_or_light:
-        # 48 hours post-workout: fatigue clears, recovery rebounds
-        day1_recovery = min(74, today_recovery + 22)
-        day2_recovery = min(86, day1_recovery + 14)
-        day3_recovery = 76
-    else:
-        # Standard balanced progression
-        day1_recovery = min(88, today_recovery + 12)
-        day2_recovery = max(45, day1_recovery - 14)
-        day3_recovery = 74
-
-    recoveries = [day1_recovery, day2_recovery, day3_recovery]
+    heuristic_pred = predict_3day_recovery_heuristic(
+        today_recovery=today_recovery,
+        today_strain=today_strain,
+        workout_strain=workout_strain,
+        is_today=is_today,
+        is_yesterday=is_yesterday,
+        has_trained_today=has_trained_today,
+        suffer_score=session_summary.get("suffer_score", 0) or 0,
+        verdict=str(session_summary.get("verdict") or ""),
+    )
+    recoveries = list(heuristic_pred["recoveries"])
     outlook_days = []
     forecast_history: List[str] = []
     uid = get_current_user_id()

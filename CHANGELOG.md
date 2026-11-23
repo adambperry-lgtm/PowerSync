@@ -3,6 +3,15 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.21.0] - 2026-11-23
+### Added
+- **3-Day WHOOP Recovery Forecast Backtest & Accuracy Analyzer**:
+  - Extracted pure [`predict_3day_recovery_heuristic()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) with identical 3-branch logic so live forecasts and backtests share a single source of truth with zero behavioral change.
+  - Added [`run_recovery_forecast_backtest()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/forecast_backtest_service.py) to replay historical `whoop_metrics` and `strava_activities` walk-forward across Day +1, +2, and +3, computing MAE, RMSE, bias, WHOOP zone accuracy, Forecast Confirmation rate, workout intensity tier match, 3-branch delta audit, 3×3 zone confusion matrix, honest benchmark baselines (Rolling 7d Personal Mean, 50/50 Mean-Reversion, Persistence), and Pearson feature correlations.
+  - Added paginated [`backfill_whoop_history()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/whoop_service.py) (up to 180 days) and `GET /api/review/forecast-accuracy` ([`review.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/review.py)) with strict multi-user isolation and guest privacy guard.
+  - Added the **📊 Forecast Accuracy Backtest** button and interactive `#modalForecastAccuracy` report modal (KPI cards, diagnostic insights, Day +1 Predicted vs. Actual canvas chart, baseline & branch tables, confusion matrix, feature correlation bars, and recent prediction log) in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) and [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=159`).
+  - Added unit and API integration test coverage across all 3 heuristic branches, multi-user isolation, and backtest metrics in [`test_forecast_backtest.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_forecast_backtest.py).
+
 ## [2.20.0] - 2026-11-21
 ### Changed
 - **Persistent Outdoor Route Cache, Incremental Sync & Fast Paginated Grid**:

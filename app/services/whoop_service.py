@@ -452,3 +452,205 @@ def fetch_latest_whoop_metrics(user_id: Optional[str] = None) -> Dict[str, Any]:
         "trailing_7d_high_strain_count": trailing_stats.get("trailing_7d_high_strain_count", 0),
         "trailing_strains": trailing_stats.get("trailing_strains", [])
     }
+
+
+def backfill_whoop_history(days: int = 90, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Paginates WHOOP v2 recovery, sleep, and cycle endpoints for up to `days` days
+    and upserts all daily biometric rows into `whoop_metrics` scoped strictly to `user_id`.
+    Used by the Forecast Accuracy Backtest Analyzer to ensure sufficient historical coverage.
+    """
+    uid = user_id or get_current_user_id()
+    days = max(14, min(180, int(days or 90)))
+    tokens = get_setting("whoop_tokens", {}, user_id=uid)
+    if not tokens and uid == GUEST_USER_ID:
+        tokens = get_setting("whoop_tokens", {}, user_id=DEFAULT_USER_ID)
+    access_token = tokens.get("access_token") if isinstance(tokens, dict) else None
+    if not access_token:
+        return {"success": False, "error": "Whoop not connected", "days_synced": 0}
+
+    headers = {"Authorization": f"Bearer {access_token}"}
+    tz = get_athlete_timezone(user_id=uid)
+    today_dt = get_athlete_date(user_id=uid)
+    start_dt = today_dt - datetime.timedelta(days=days + 2)
+    start_iso = f"{start_dt.isoformat()}T00:00:00.000Z"
+
+    max_pages = max(1, min(10, (days // 25) + 2))
+
+    def _fetch_paginated(path: str):
+        nonlocal access_token, headers
+        records = []
+        next_token = None
+        for _ in range(max_pages):
+            params = {"limit": 25, "start": start_iso}
+            if next_token:
+                params["nextToken"] = next_token
+            try:
+                res = requests.get(f"{WHOOP_API_BASE}/{path}", headers=headers, params=params, timeout=12)
+                if res.status_code == 401:
+                    refreshed = refresh_whoop_token(user_id=uid)
+                    if not refreshed:
+                        return None, "Whoop session expired. Please re-authenticate Whoop in Settings."
+                    access_token = refreshed
+                    headers = {"Authorization": f"Bearer {access_token}"}
+                    res = requests.get(f"{WHOOP_API_BASE}/{path}", headers=headers, params=params, timeout=12)
+                if res.status_code != 200:
+                    return records, f"Whoop API error {res.status_code} on /{path}"
+                payload = res.json() or {}
+                batch = payload.get("records") or []
+                records.extend(batch)
+                next_token = payload.get("next_token")
+                if not next_token or not batch:
+                    break
+            except Exception as e:
+                return records, f"Network error fetching Whoop /{path}: {str(e)}"
+        return records, None
+
+    rec_records, rec_err = _fetch_paginated("recovery")
+    if rec_records is None:
+        return {"success": False, "error": rec_err or "Whoop auth failed", "days_synced": 0}
+    if not rec_records:
+        return {"success": False, "error": rec_err or "No historical recovery records returned from Whoop.", "days_synced": 0}
+
+    sleep_records, _ = _fetch_paginated("activity/sleep")
+    sleep_records = sleep_records or []
+    cycle_records, _ = _fetch_paginated("cycle")
+    cycle_records = cycle_records or []
+
+    rec_by_cycle = {r.get("cycle_id"): r for r in rec_records if r.get("cycle_id")}
+    sleep_by_id = {s.get("id"): s for s in sleep_records if s.get("id")}
+    sleep_by_cycle = {s.get("cycle_id"): s for s in sleep_records if s.get("cycle_id") and not s.get("nap")}
+
+    daily_records: Dict[str, Dict[str, Any]] = {}
+
+    def get_or_create_day(d: str) -> Dict[str, Any]:
+        if d not in daily_records:
+            daily_records[d] = {
+                "recovery_score": None,
+                "hrv_rmssd": None,
+                "resting_heart_rate": None,
+                "sleep_performance": None,
+                "sleep_duration_hours": None,
+                "day_strain": None,
+            }
+        return daily_records[d]
+
+    # Map recoveries first using sleep wake date (or recovery created_at)
+    cycle_to_date: Dict[Any, str] = {}
+    for rec in rec_records:
+        score = rec.get("score") or {}
+        rec_score = score.get("recovery_score")
+        hrv_val = score.get("hrv_rmssd_milli")
+        rhr_val = score.get("resting_heart_rate")
+
+        cid = rec.get("cycle_id")
+        sid = rec.get("sleep_id")
+        slp = sleep_by_id.get(sid) or sleep_by_cycle.get(cid)
+
+        rec_date = None
+        if slp and slp.get("end"):
+            rec_date = parse_whoop_iso_date(slp.get("end"), tz)
+        if not rec_date and rec.get("created_at"):
+            rec_date = parse_whoop_iso_date(rec.get("created_at"), tz)
+        if not rec_date:
+            continue
+
+        if cid is not None:
+            cycle_to_date[cid] = rec_date
+
+        day_entry = get_or_create_day(rec_date)
+        if day_entry["recovery_score"] is None and rec_score is not None:
+            day_entry["recovery_score"] = int(round(float(rec_score)))
+        if day_entry["hrv_rmssd"] is None and hrv_val is not None:
+            day_entry["hrv_rmssd"] = round(float(hrv_val), 1)
+        if day_entry["resting_heart_rate"] is None and rhr_val is not None:
+            day_entry["resting_heart_rate"] = int(round(float(rhr_val)))
+        if slp:
+            slp_score = slp.get("score") or {}
+            s_perf = slp_score.get("sleep_performance_percentage")
+            s_milli = (slp_score.get("stage_summary") or {}).get("total_in_bed_time_milli", 0) or 0
+            if day_entry["sleep_performance"] is None and s_perf is not None:
+                day_entry["sleep_performance"] = int(round(float(s_perf)))
+            if day_entry["sleep_duration_hours"] is None and s_milli > 0:
+                day_entry["sleep_duration_hours"] = round(s_milli / (1000.0 * 3600.0), 1)
+
+    # Map cycles (day_strain)
+    for cycle in cycle_records:
+        cid = cycle.get("id")
+        strain_raw = (cycle.get("score") or {}).get("strain")
+        if strain_raw is None:
+            continue
+        strain = round(float(strain_raw), 1)
+        cycle_date = cycle_to_date.get(cid)
+        if not cycle_date:
+            rec = rec_by_cycle.get(cid)
+            if rec and rec.get("created_at"):
+                cycle_date = parse_whoop_iso_date(rec.get("created_at"), tz)
+        if not cycle_date and cycle.get("start"):
+            cycle_date = parse_whoop_iso_date(cycle.get("start"), tz)
+        if cycle_date:
+            day_entry = get_or_create_day(cycle_date)
+            if day_entry["day_strain"] is None:
+                day_entry["day_strain"] = strain
+
+    # Map any remaining non-nap sleeps
+    for slp in sleep_records:
+        if slp.get("nap"):
+            continue
+        wake_date = parse_whoop_iso_date(slp.get("end") or slp.get("start"), tz)
+        if not wake_date:
+            continue
+        slp_score = slp.get("score") or {}
+        perf = slp_score.get("sleep_performance_percentage")
+        milli = (slp_score.get("stage_summary") or {}).get("total_in_bed_time_milli", 0) or 0
+        hrs = round(milli / (1000.0 * 3600.0), 1) if milli > 0 else None
+        day_entry = get_or_create_day(wake_date)
+        if day_entry["sleep_performance"] is None and perf is not None:
+            day_entry["sleep_performance"] = int(round(float(perf)))
+        if day_entry["sleep_duration_hours"] is None and hrs is not None:
+            day_entry["sleep_duration_hours"] = hrs
+
+    target_users = {DEFAULT_USER_ID, GUEST_USER_ID} if uid in (DEFAULT_USER_ID, GUEST_USER_ID) else {uid}
+    conn = get_db_connection()
+    c = conn.cursor()
+    days_synced = 0
+    for d_str, d_val in daily_records.items():
+        if not d_str:
+            continue
+        days_synced += 1
+        for u in target_users:
+            c.execute("""
+                INSERT INTO whoop_metrics (
+                    user_id, date, recovery_score, hrv_rmssd, resting_heart_rate,
+                    sleep_performance, sleep_duration_hours, day_strain, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(user_id, date) DO UPDATE SET
+                    recovery_score = COALESCE(excluded.recovery_score, whoop_metrics.recovery_score),
+                    hrv_rmssd = COALESCE(excluded.hrv_rmssd, whoop_metrics.hrv_rmssd),
+                    resting_heart_rate = COALESCE(excluded.resting_heart_rate, whoop_metrics.resting_heart_rate),
+                    sleep_performance = COALESCE(excluded.sleep_performance, whoop_metrics.sleep_performance),
+                    sleep_duration_hours = COALESCE(excluded.sleep_duration_hours, whoop_metrics.sleep_duration_hours),
+                    day_strain = COALESCE(excluded.day_strain, whoop_metrics.day_strain),
+                    updated_at = CURRENT_TIMESTAMP
+            """, (
+                u,
+                d_str,
+                d_val["recovery_score"],
+                d_val["hrv_rmssd"],
+                d_val["resting_heart_rate"],
+                d_val["sleep_performance"],
+                d_val["sleep_duration_hours"],
+                d_val["day_strain"],
+            ))
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "days_synced": days_synced,
+        "recovery_records": len(rec_records),
+        "cycle_records": len(cycle_records),
+        "sleep_records": len(sleep_records),
+    }
+

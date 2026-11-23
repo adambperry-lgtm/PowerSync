@@ -12001,3 +12001,538 @@ function closeRideInspectorModal() {
     historyState.inspectorMap = null;
   }
 }
+
+// ============================================================================
+// 3-DAY FORECAST ACCURACY BACKTEST ANALYZER MODAL
+// ============================================================================
+let _lastBacktestTimeline = [];
+
+function openForecastAccuracyModal() {
+  const modal = document.getElementById("modalForecastAccuracy");
+  if (!modal) return;
+  modal.classList.add("open", "active");
+  modal.style.display = "flex";
+  loadForecastAccuracyBacktest(false);
+}
+
+function closeForecastAccuracyModal() {
+  const modal = document.getElementById("modalForecastAccuracy");
+  if (!modal) return;
+  modal.classList.remove("open", "active");
+  modal.style.display = "none";
+}
+
+(function initForecastAccuracyModalListeners() {
+  const modal = document.getElementById("modalForecastAccuracy");
+  if (modal) {
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeForecastAccuracyModal();
+    });
+  }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      const m = document.getElementById("modalForecastAccuracy");
+      if (m && (m.classList.contains("open") || m.style.display === "flex")) {
+        closeForecastAccuracyModal();
+      }
+    }
+  });
+})();
+
+function _btEsc(str) {
+  return String(str == null ? "" : str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function _btFmtNum(val, suffix = "", signed = false) {
+  if (val === null || val === undefined || Number.isNaN(val)) return "—";
+  const num = Number(val);
+  const sign = signed && num > 0 ? "+" : "";
+  return `${sign}${num.toFixed(1)}${suffix}`;
+}
+
+function _btZonePill(zone, score) {
+  const z = String(zone || "").toLowerCase();
+  const map = {
+    green: { bg: "rgba(0,200,150,0.14)", color: "#008f6b", border: "rgba(0,200,150,0.35)" },
+    yellow: { bg: "rgba(245,158,11,0.14)", color: "#b45309", border: "rgba(245,158,11,0.35)" },
+    red: { bg: "rgba(239,68,68,0.14)", color: "#b91c1c", border: "rgba(239,68,68,0.35)" },
+  };
+  const st = map[z] || { bg: "#F4F7FA", color: "#475569", border: "#CBD5E1" };
+  const label = score != null ? `${score}%` : z.toUpperCase();
+  return `<span style="display:inline-block;padding:0.1rem 0.42rem;border-radius:10px;font-weight:700;font-size:0.72rem;background:${st.bg};color:${st.color};border:1px solid ${st.border};">${label}</span>`;
+}
+
+async function loadForecastAccuracyBacktest(syncWhoop = false) {
+  const bodyEl = document.getElementById("forecastAccuracyBody");
+  const covEl = document.getElementById("backtestCoverageBadge");
+  const selectEl = document.getElementById("backtestDaysSelect");
+  const syncBtn = document.getElementById("btnSyncWhoopBacktest");
+  const days = selectEl ? parseInt(selectEl.value, 10) || 90 : 90;
+
+  if (syncBtn) {
+    syncBtn.disabled = true;
+    syncBtn.textContent = syncWhoop ? "⏳ Syncing WHOOP..." : "🔄 Sync WHOOP History";
+  }
+  if (bodyEl) {
+    bodyEl.innerHTML = `<div style="text-align:center;padding:2rem 1rem;color:var(--text-muted);font-size:0.85rem;">${
+      syncWhoop
+        ? `Backfilling up to ${days} days of WHOOP history &amp; running walk-forward backtest...`
+        : `Running walk-forward backtest over the last ${days} days...`
+    }</div>`;
+  }
+
+  try {
+    const url = `/api/review/forecast-accuracy?days=${encodeURIComponent(days)}&sync_whoop=${syncWhoop ? "true" : "false"}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    renderForecastAccuracyReport(data);
+  } catch (err) {
+    console.error("Forecast accuracy backtest failed:", err);
+    if (covEl) covEl.textContent = "Error loading backtest";
+    if (bodyEl) {
+      bodyEl.innerHTML = `<div style="padding:1.25rem;background:#FEF2F2;border:1px solid #FECACA;border-radius:8px;color:#B91C1C;font-size:0.82rem;">Failed to run forecast backtest: ${_btEsc(err.message)}</div>`;
+    }
+  } finally {
+    if (syncBtn) {
+      syncBtn.disabled = false;
+      syncBtn.textContent = "🔄 Sync WHOOP History";
+    }
+  }
+}
+
+function renderForecastAccuracyReport(data) {
+  const bodyEl = document.getElementById("forecastAccuracyBody");
+  const covEl = document.getElementById("backtestCoverageBadge");
+  if (!bodyEl) return;
+
+  if (data.requires_auth) {
+    if (covEl) covEl.textContent = "Sign in required";
+    bodyEl.innerHTML = `<div style="padding:1.5rem;text-align:center;background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;color:var(--text-secondary);font-size:0.85rem;">${_btEsc(data.message || "Sign in to view your personal forecast accuracy backtest.")}</div>`;
+    return;
+  }
+
+  const cov = data.data_coverage || {};
+  const sum = data.summary || {};
+  const byH = data.by_horizon || {};
+  const byB = data.by_branch || {};
+  const baselines = data.baselines || [];
+  const confD1 = (data.confusion_matrix && data.confusion_matrix.day_1) || {};
+  const corrs = data.feature_correlations || [];
+  const insights = data.insights || [];
+  const timeline = data.timeline || [];
+  _lastBacktestTimeline = timeline;
+
+  if (covEl) {
+    const rangeTxt = cov.start_date && cov.end_date ? ` (${cov.start_date} → ${cov.end_date})` : "";
+    covEl.textContent = `${cov.whoop_days_in_window || 0} WHOOP days • ${cov.day_1_pairs || 0} Day +1 pairs${rangeTxt}`;
+  }
+
+  let syncBanner = "";
+  if (data.whoop_sync) {
+    if (data.whoop_sync.success) {
+      syncBanner = `<div style="padding:0.55rem 0.8rem;border-radius:8px;background:rgba(0,200,150,0.1);border:1px solid rgba(0,200,150,0.3);font-size:0.77rem;color:#047857;">
+        ✅ Synced <b>${data.whoop_sync.days_synced || 0}</b> historical WHOOP days (${data.whoop_sync.recovery_records || 0} recovery / ${data.whoop_sync.cycle_records || 0} strain records).
+      </div>`;
+    } else {
+      syncBanner = `<div style="padding:0.55rem 0.8rem;border-radius:8px;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);font-size:0.77rem;color:#92400e;">
+        ⚠️ WHOOP sync note: ${_btEsc(data.whoop_sync.error || "Unable to fetch additional history.")} Showing locally cached history.
+      </div>`;
+    }
+  }
+
+  if (!cov.day_1_pairs) {
+    bodyEl.innerHTML = `${syncBanner}<div style="padding:1.75rem;text-align:center;background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;color:var(--text-secondary);font-size:0.84rem;">
+      <div style="font-size:1.5rem;margin-bottom:0.4rem;">🧬</div>
+      <b>No paired consecutive WHOOP recovery days found in this window.</b><br/>
+      <span style="font-size:0.78rem;color:var(--text-muted);">Click <b>🔄 Sync WHOOP History</b> above to pull up to 90–180 days of WHOOP recovery &amp; strain records for backtesting.</span>
+    </div>`;
+    return;
+  }
+
+  const deltaVsBase = sum.day_1_mae_vs_baseline;
+  const baseDeltaColor = deltaVsBase == null ? "#475569" : (deltaVsBase > 1.0 ? "#DC2626" : (deltaVsBase < -1.0 ? "#008f6b" : "#475569"));
+  const baseDeltaLabel = deltaVsBase == null
+    ? ""
+    : (deltaVsBase > 0 ? `+${deltaVsBase.toFixed(1)} worse than 7d avg` : `${deltaVsBase.toFixed(1)} vs 7d avg`);
+
+  const biasVal = sum.day_1_bias;
+  const biasDesc = biasVal == null ? "" : (biasVal > 2 ? "Too optimistic" : (biasVal < -2 ? "Too conservative" : "Well centered"));
+
+  // 1. Hero KPI Cards
+  const kpiHtml = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(145px, 1fr));gap:0.6rem;">
+      <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Day +1 MAE</div>
+        <div style="font-size:1.35rem;font-weight:800;color:#0052FF;font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(sum.day_1_mae, " pts")}</div>
+        <div style="font-size:0.7rem;font-weight:600;color:${baseDeltaColor};margin-top:0.15rem;">${_btEsc(baseDeltaLabel)}</div>
+      </div>
+      <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Day +1 Zone Match</div>
+        <div style="font-size:1.35rem;font-weight:800;color:#00C896;font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(sum.day_1_zone_accuracy_pct, "%")}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">Exact Green / Yellow / Red</div>
+      </div>
+      <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Forecast Confirmed</div>
+        <div style="font-size:1.35rem;font-weight:800;color:#FF5E00;font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(sum.day_1_confirmation_rate_pct, "%")}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">Same zone or within ±8 pts</div>
+      </div>
+      <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Workout Tier Match</div>
+        <div style="font-size:1.35rem;font-weight:800;color:var(--text-primary);font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(sum.day_1_workout_tier_match_pct, "%")}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">Same prescription intensity</div>
+      </div>
+      <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.7rem 0.8rem;">
+        <div style="font-size:0.67rem;color:var(--text-muted);text-transform:uppercase;font-weight:700;">Day +1 Mean Bias</div>
+        <div style="font-size:1.35rem;font-weight:800;color:${Math.abs(biasVal || 0) >= 4 ? "#D97706" : "var(--text-primary)"};font-family:var(--font-display);margin-top:0.15rem;">${_btFmtNum(biasVal, " pts", true)}</div>
+        <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.15rem;">${_btEsc(biasDesc)}</div>
+      </div>
+    </div>
+  `;
+
+  // 2. Diagnostic Insights
+  const sevStyle = {
+    warning: { bg: "rgba(245,158,11,0.09)", border: "rgba(245,158,11,0.35)", icon: "⚠️" },
+    good: { bg: "rgba(0,200,150,0.09)", border: "rgba(0,200,150,0.35)", icon: "✅" },
+    info: { bg: "rgba(0,82,255,0.06)", border: "rgba(0,82,255,0.22)", icon: "🔬" },
+    neutral: { bg: "#F4F7FA", border: "var(--border-color)", icon: "📊" },
+  };
+  const insightsHtml = insights.length
+    ? `<div style="display:flex;flex-direction:column;gap:0.45rem;">
+        <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);letter-spacing:0.02em;">🧠 Diagnostic Findings</div>
+        ${insights.map((ins) => {
+          const st = sevStyle[ins.severity] || sevStyle.info;
+          return `<div style="background:${st.bg};border:1px solid ${st.border};border-radius:8px;padding:0.55rem 0.75rem;font-size:0.77rem;line-height:1.4;">
+            <div style="font-weight:700;color:var(--text-primary);margin-bottom:0.15rem;">${st.icon} ${_btEsc(ins.title)}</div>
+            <div style="color:var(--text-secondary);">${_btEsc(ins.detail)}</div>
+          </div>`;
+        }).join("")}
+      </div>`
+    : "";
+
+  // 3. Predicted vs Actual Chart
+  const chartHtml = `
+    <div style="background:#F4F7FA;border:1px solid var(--border-color);border-radius:10px;padding:0.8rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.4rem;margin-bottom:0.45rem;">
+        <div style="font-size:0.78rem;font-weight:700;color:var(--accent-cyan);letter-spacing:0.03em;">DAY +1 PREDICTED VS. ACTUAL WHOOP RECOVERY</div>
+        <div style="display:flex;align-items:center;gap:0.75rem;font-size:0.71rem;color:var(--text-secondary);">
+          <span><span style="display:inline-block;width:12px;height:3px;background:#0F172A;vertical-align:middle;margin-right:4px;"></span>Actual WHOOP</span>
+          <span><span style="display:inline-block;width:12px;height:0;border-top:2px dashed #0052FF;vertical-align:middle;margin-right:4px;"></span>Heuristic Forecast</span>
+        </div>
+      </div>
+      <canvas id="backtestTimelineCanvas" style="width:100%;height:185px;display:block;border-radius:6px;background:#FFFFFF;border:1px solid var(--border-color);"></canvas>
+    </div>
+  `;
+
+  // 4. Baseline Comparison Table
+  const baselineRows = baselines.map((row) => {
+    const isHeur = row.key === "heuristic";
+    const rowBg = isHeur ? "rgba(0,82,255,0.06)" : "transparent";
+    return `<tr style="background:${rowBg};border-bottom:1px solid var(--border-color);">
+      <td style="padding:0.45rem 0.5rem;font-weight:${isHeur ? "700" : "500"};color:var(--text-primary);">${_btEsc(row.label)}</td>
+      <td style="padding:0.45rem 0.45rem;text-align:right;font-weight:700;">${_btFmtNum(row.day_1_mae)}</td>
+      <td style="padding:0.45rem 0.45rem;text-align:right;">${_btFmtNum(row.day_1_zone_acc, "%")}</td>
+      <td style="padding:0.45rem 0.45rem;text-align:right;">${_btFmtNum(row.day_2_mae)}</td>
+      <td style="padding:0.45rem 0.45rem;text-align:right;">${_btFmtNum(row.day_3_mae)}</td>
+      <td style="padding:0.45rem 0.45rem;text-align:right;font-weight:700;">${_btFmtNum(row.overall_mae)}</td>
+    </tr>`;
+  }).join("");
+
+  const baselineHtml = `
+    <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;overflow-x:auto;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">📏 Model vs. Baselines (Lower MAE is Better)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.67rem;">
+            <th style="text-align:left;padding:0.35rem 0.5rem;">Model</th>
+            <th style="text-align:right;padding:0.35rem 0.45rem;">D+1 MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.45rem;">D+1 Zone %</th>
+            <th style="text-align:right;padding:0.35rem 0.45rem;">D+2 MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.45rem;">D+3 MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.45rem;">All 3d MAE</th>
+          </tr>
+        </thead>
+        <tbody>${baselineRows}</tbody>
+      </table>
+    </div>
+  `;
+
+  // 5. 3-Branch Heuristic Audit Table
+  const branchOrder = ["trained_today_heavy", "trained_yesterday_heavy", "standard"];
+  const branchRows = branchOrder.map((bk) => {
+    const b = byB[bk];
+    if (!b) return "";
+    const d1 = b.day_1 || {};
+    return `<tr style="border-bottom:1px solid var(--border-color);">
+      <td style="padding:0.5rem 0.5rem;">
+        <div style="font-weight:700;color:var(--text-primary);">${_btEsc(b.label)}</div>
+        <div style="font-size:0.67rem;color:var(--text-muted);margin-top:0.1rem;">${_btEsc(b.rule)}</div>
+      </td>
+      <td style="padding:0.5rem 0.4rem;text-align:right;white-space:nowrap;"><b>${b.trigger_count || 0}</b> <span style="color:var(--text-muted);">(${_btFmtNum(b.trigger_share_pct, "%")})</span></td>
+      <td style="padding:0.5rem 0.4rem;text-align:right;">${_btFmtNum(d1.avg_pred_delta, "", true)}</td>
+      <td style="padding:0.5rem 0.4rem;text-align:right;font-weight:700;">${_btFmtNum(d1.avg_actual_delta, "", true)}</td>
+      <td style="padding:0.5rem 0.4rem;text-align:right;font-weight:700;">${_btFmtNum(d1.mae)}</td>
+      <td style="padding:0.5rem 0.4rem;text-align:right;">${_btFmtNum(d1.bias, "", true)}</td>
+      <td style="padding:0.5rem 0.4rem;text-align:right;">${_btFmtNum(d1.zone_accuracy_pct, "%")}</td>
+    </tr>`;
+  }).join("");
+
+  const branchHtml = `
+    <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;overflow-x:auto;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">🌿 3-Branch Heuristic Audit (Day +1 Predicted Δ vs. Actual Δ)</div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.75rem;">
+        <thead>
+          <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.67rem;">
+            <th style="text-align:left;padding:0.35rem 0.5rem;">Heuristic Branch</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">Days</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">Pred Δ</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">Actual Δ</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">MAE</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">Bias</th>
+            <th style="text-align:right;padding:0.35rem 0.4rem;">Zone %</th>
+          </tr>
+        </thead>
+        <tbody>${branchRows}</tbody>
+      </table>
+    </div>
+  `;
+
+  // 6. Confusion Matrix + Feature Correlations (2-column responsive grid)
+  const cm = confD1.matrix || { green: { green: 0, yellow: 0, red: 0 }, yellow: { green: 0, yellow: 0, red: 0 }, red: { green: 0, yellow: 0, red: 0 } };
+  const cmCell = (val, highlight = false, warn = false) => {
+    const bg = highlight
+      ? "rgba(0,200,150,0.14)"
+      : (warn && val > 0 ? "rgba(239,68,68,0.12)" : "#F8FAFC");
+    const col = warn && val > 0 ? "#B91C1C" : (highlight ? "#047857" : "var(--text-primary)");
+    return `<td style="text-align:center;padding:0.45rem;font-weight:700;background:${bg};color:${col};border:1px solid var(--border-color);">${val}</td>`;
+  };
+  const cmHtml = `
+    <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">🎯 Day +1 Zone Confusion Matrix</div>
+      <table style="width:100%;border-collapse:collapse;font-size:0.74rem;">
+        <thead>
+          <tr style="color:var(--text-muted);font-size:0.67rem;text-transform:uppercase;">
+            <th style="text-align:left;padding:0.3rem;">Pred \\ Actual</th>
+            <th style="text-align:center;padding:0.3rem;color:#008f6b;">Green</th>
+            <th style="text-align:center;padding:0.3rem;color:#b45309;">Yellow</th>
+            <th style="text-align:center;padding:0.3rem;color:#b91c1c;">Red</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:0.4rem 0.3rem;font-weight:700;color:#008f6b;">Pred Green</td>
+            ${cmCell(cm.green.green, true, false)}
+            ${cmCell(cm.green.yellow, false, true)}
+            ${cmCell(cm.green.red, false, true)}
+          </tr>
+          <tr>
+            <td style="padding:0.4rem 0.3rem;font-weight:700;color:#b45309;">Pred Yellow</td>
+            ${cmCell(cm.yellow.green, false, false)}
+            ${cmCell(cm.yellow.yellow, true, false)}
+            ${cmCell(cm.yellow.red, false, true)}
+          </tr>
+          <tr>
+            <td style="padding:0.4rem 0.3rem;font-weight:700;color:#b91c1c;">Pred Red</td>
+            ${cmCell(cm.red.green, false, false)}
+            ${cmCell(cm.red.yellow, false, false)}
+            ${cmCell(cm.red.red, true, false)}
+          </tr>
+        </tbody>
+      </table>
+      <div style="font-size:0.7rem;color:var(--text-muted);margin-top:0.5rem;">
+        False-Green calls: <b>${confD1.false_green_count || 0}/${confD1.predicted_green_total || 0}</b> (${_btFmtNum(confD1.false_green_pct, "%")}) •
+        Actual Red days caught: <b>${confD1.caught_red_count || 0}/${confD1.actual_red_total || 0}</b>
+      </div>
+    </div>
+  `;
+
+  const corrRows = corrs.slice(0, 7).map((c) => {
+    const r = c.r_next_day_recovery;
+    const widthPct = r == null ? 0 : Math.min(100, Math.round(Math.abs(r) * 100));
+    const barCol = r == null ? "#CBD5E1" : (r >= 0 ? "#00C896" : "#FF5E00");
+    return `<div style="display:flex;align-items:center;gap:0.5rem;font-size:0.73rem;">
+      <div style="flex:1;min-width:120px;color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${_btEsc(c.label)}">${_btEsc(c.label)}</div>
+      <div style="width:76px;height:7px;background:#EEF2F6;border-radius:4px;overflow:hidden;">
+        <div style="width:${widthPct}%;height:100%;background:${barCol};border-radius:4px;"></div>
+      </div>
+      <div style="width:42px;text-align:right;font-weight:700;color:var(--text-primary);font-variant-numeric:tabular-nums;">${r == null ? "—" : (r > 0 ? `+${r.toFixed(2)}` : r.toFixed(2))}</div>
+    </div>`;
+  }).join("");
+
+  const corrHtml = `
+    <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">🔎 Feature Signal vs. Next-Day Recovery (Pearson r)</div>
+      <div style="display:flex;flex-direction:column;gap:0.42rem;">${corrRows}</div>
+      <div style="font-size:0.68rem;color:var(--text-muted);margin-top:0.5rem;">Shows which today metrics actually correlate with tomorrow's WHOOP recovery.</div>
+    </div>
+  `;
+
+  // 7. Recent Day +1 Log
+  const recentRows = [...timeline].reverse().slice(0, 30).map((t) => {
+    const errCol = Math.abs(t.error) <= 8 ? "#047857" : (Math.abs(t.error) <= 15 ? "#b45309" : "#b91c1c");
+    return `<tr style="border-bottom:1px solid var(--border-color);">
+      <td style="padding:0.35rem 0.45rem;white-space:nowrap;">${_btEsc(t.target_date)}</td>
+      <td style="padding:0.35rem 0.45rem;color:var(--text-secondary);">${_btEsc(t.branch_label)}</td>
+      <td style="padding:0.35rem 0.4rem;text-align:right;">${t.origin_strain}</td>
+      <td style="padding:0.35rem 0.4rem;text-align:center;">${_btZonePill(t.predicted_zone, t.predicted_recovery)}</td>
+      <td style="padding:0.35rem 0.4rem;text-align:center;">${_btZonePill(t.actual_zone, t.actual_recovery)}</td>
+      <td style="padding:0.35rem 0.4rem;text-align:right;font-weight:700;color:${errCol};">${t.error > 0 ? `+${t.error}` : t.error}</td>
+      <td style="padding:0.35rem 0.4rem;text-align:center;">${t.forecast_confirmed ? "✅" : "⚡"}</td>
+      <td style="padding:0.35rem 0.4rem;text-align:center;">${t.workout_tier_match ? "✅" : "✕"}</td>
+    </tr>`;
+  }).join("");
+
+  const logHtml = `
+    <div style="background:#FFFFFF;border:1px solid var(--border-color);border-radius:10px;padding:0.75rem;">
+      <div style="font-size:0.78rem;font-weight:700;color:var(--text-primary);margin-bottom:0.45rem;">📋 Recent Day +1 Predictions (Last ${Math.min(30, timeline.length)} Days)</div>
+      <div style="max-height:220px;overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.73rem;">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border-color);color:var(--text-muted);text-transform:uppercase;font-size:0.65rem;position:sticky;top:0;background:#FFFFFF;">
+              <th style="text-align:left;padding:0.3rem 0.45rem;">Target Date</th>
+              <th style="text-align:left;padding:0.3rem 0.45rem;">Branch</th>
+              <th style="text-align:right;padding:0.3rem 0.4rem;">Prior Strain</th>
+              <th style="text-align:center;padding:0.3rem 0.4rem;">Predicted</th>
+              <th style="text-align:center;padding:0.3rem 0.4rem;">Actual</th>
+              <th style="text-align:right;padding:0.3rem 0.4rem;">Err</th>
+              <th style="text-align:center;padding:0.3rem 0.4rem;" title="Passed is_forecast_valid_for_recovery">Conf</th>
+              <th style="text-align:center;padding:0.3rem 0.4rem;" title="Same workout intensity tier">Tier</th>
+            </tr>
+          </thead>
+          <tbody>${recentRows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  bodyEl.innerHTML = `
+    ${syncBanner}
+    ${kpiHtml}
+    ${insightsHtml}
+    ${chartHtml}
+    ${baselineHtml}
+    ${branchHtml}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(290px, 1fr));gap:0.75rem;">
+      ${cmHtml}
+      ${corrHtml}
+    </div>
+    ${logHtml}
+  `;
+
+  requestAnimationFrame(() => drawBacktestTimelineCanvas(_lastBacktestTimeline));
+}
+
+function drawBacktestTimelineCanvas(timeline) {
+  const canvas = document.getElementById("backtestTimelineCanvas");
+  if (!canvas || !Array.isArray(timeline) || timeline.length === 0) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  const width = Math.max(320, Math.round(rect.width || 720));
+  const height = 185;
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.scale(dpr, dpr);
+
+  const padL = 36;
+  const padR = 14;
+  const padT = 12;
+  const padB = 24;
+  const plotW = width - padL - padR;
+  const plotH = height - padT - padB;
+
+  const yFor = (val) => padT + plotH * (1 - Math.max(0, Math.min(100, val)) / 100);
+  const xFor = (i) =>
+    timeline.length === 1
+      ? padL + plotW / 2
+      : padL + (i / (timeline.length - 1)) * plotW;
+
+  ctx.clearRect(0, 0, width, height);
+
+  // WHOOP zone bands (Green >66, Yellow 34-66, Red <34)
+  ctx.fillStyle = "rgba(0, 200, 150, 0.08)";
+  ctx.fillRect(padL, yFor(100), plotW, yFor(66) - yFor(100));
+  ctx.fillStyle = "rgba(245, 158, 11, 0.07)";
+  ctx.fillRect(padL, yFor(66), plotW, yFor(34) - yFor(66));
+  ctx.fillStyle = "rgba(239, 68, 68, 0.07)";
+  ctx.fillRect(padL, yFor(34), plotW, yFor(0) - yFor(34));
+
+  // Threshold grid lines
+  ctx.strokeStyle = "#E2E8F0";
+  ctx.lineWidth = 1;
+  ctx.fillStyle = "#64748B";
+  ctx.font = "10px system-ui, -apple-system, sans-serif";
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  [0, 34, 66, 100].forEach((v) => {
+    const y = yFor(v);
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+    ctx.fillText(`${v}%`, padL - 5, y);
+  });
+
+  // Actual recovery line (solid dark)
+  ctx.save();
+  ctx.strokeStyle = "#0F172A";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  timeline.forEach((pt, idx) => {
+    const x = xFor(idx);
+    const y = yFor(pt.actual_recovery);
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.restore();
+
+  // Predicted recovery line (dashed blue)
+  ctx.save();
+  ctx.strokeStyle = "#0052FF";
+  ctx.lineWidth = 2;
+  ctx.setLineDash([5, 4]);
+  ctx.beginPath();
+  timeline.forEach((pt, idx) => {
+    const x = xFor(idx);
+    const y = yFor(pt.predicted_recovery);
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.restore();
+
+  // Dots for actual points when sparse
+  if (timeline.length <= 45) {
+    timeline.forEach((pt, idx) => {
+      const x = xFor(idx);
+      const yAct = yFor(pt.actual_recovery);
+      ctx.fillStyle = pt.actual_zone === "green" ? "#00C896" : (pt.actual_zone === "yellow" ? "#F59E0B" : "#EF4444");
+      ctx.beginPath();
+      ctx.arc(x, yAct, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }
+
+  // X-axis date ticks (first, middle, last)
+  ctx.fillStyle = "#64748B";
+  ctx.font = "10px system-ui, -apple-system, sans-serif";
+  ctx.textBaseline = "top";
+  const tickIdxs = timeline.length <= 2 ? [0, timeline.length - 1] : [0, Math.floor(timeline.length / 2), timeline.length - 1];
+  const seen = new Set();
+  tickIdxs.forEach((idx) => {
+    if (seen.has(idx) || !timeline[idx]) return;
+    seen.add(idx);
+    const x = xFor(idx);
+    ctx.textAlign = idx === 0 ? "left" : (idx === timeline.length - 1 ? "right" : "center");
+    ctx.fillText(String(timeline[idx].target_date || "").slice(5), x, padT + plotH + 6);
+  });
+}
+

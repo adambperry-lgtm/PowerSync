@@ -147,9 +147,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.20.0",
-        "release_name": "Persistent Outdoor Route Cache & Incremental Sync",
-        "build_date": "2026-11-21",
+        "version": "2.21.0",
+        "release_name": "3-Day WHOOP Forecast Backtest & Accuracy Analyzer",
+        "build_date": "2026-11-23",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.21.0",
+                "date": "2026-11-23",
+                "title": "3-Day WHOOP Forecast Backtest & Accuracy Analyzer",
+                "items": [
+                    "Walk-Forward Backtest Engine: Replays the exact 3-branch WHOOP recovery heuristic against your historical WHOOP & Strava records across Day +1, +2, and +3 to compute MAE, RMSE, signed bias, WHOOP zone accuracy, Forecast Confirmation rate, and workout intensity tier match rate.",
+                    "Baseline & Per-Branch Audit: Compares the 3-branch heuristic head-to-head against Rolling 7-Day Personal Mean, 50/50 Mean-Reversion, and Persistence baselines, breaks down Predicted vs. Actual recovery deltas for each heuristic branch, and builds a 3×3 zone confusion matrix + Pearson feature correlations.",
+                    "Interactive Backtest Modal & WHOOP History Backfill: Added the '📊 Forecast Accuracy Backtest' modal in the 3-Day Forecast tab (GET /api/review/forecast-accuracy) with a Day +1 Predicted vs. Actual chart and on-demand paginated WHOOP history backfill (up to 180 days)."
+                ]
+            },
             {
                 "version": "v2.20.0",
                 "date": "2026-11-21",
