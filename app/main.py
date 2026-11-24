@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.25.2",
-        "release_name": "Structured ERG-Mode Detection for Indoor Interval Workouts",
+        "version": "2.26.0",
+        "release_name": "Exact 1-Hz Strava Power Stream Spiderweb & Live Sync Progress",
         "build_date": "2026-11-24",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.26.0",
+                "date": "2026-11-24",
+                "title": "Exact 1-Hz Strava Power Stream Spiderweb & Live Sync Progress",
+                "items": [
+                    "Exact 1-Hz MMP Peak Calculation: Added strava_activity_mmp_peaks cache and sliding-window Mean Maximal Power (5s, 30s, 1m, 5m, 20m, 60m) computation from per-second Strava watts streams with pause zero-padding.",
+                    "Rate-Limit-Safe Background Stream Worker: Automatically backfills missing per-second Strava power streams in the background (newest rides first), reusing already-cached streams locally and pausing safely when approaching Strava X-ReadRateLimit-Usage caps or HTTP 429.",
+                    "Live Spiderweb Progress Indicator: Added a live progress pill, progress bar, rate-limit cooldown status, and automatic Spiderweb chart refresh to the Power Spiderweb & Fitness Profile card."
+                ]
+            },
             {
                 "version": "v2.25.2",
                 "date": "2026-11-24",

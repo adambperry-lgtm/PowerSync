@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Query, Body, HTTPException
+from fastapi import APIRouter, Query, Body, HTTPException, Request
 from typing import Optional, Dict, Any
 from app.services.power_profile_service import (
     get_power_spiderweb_profile,
@@ -29,6 +29,36 @@ def get_spiderweb_endpoint(timeframe: Optional[str] = Query("30d")):
             "active_goal": None
         }
     return get_power_spiderweb_profile(user_id=uid, timeframe=timeframe or "30d")
+
+
+@router.get("/spiderweb/streams/status")
+def get_spiderweb_streams_status_endpoint(request: Request):
+    """Returns per-user progress for 1-Hz Strava power stream fetching and MMP peak caching."""
+    uid = get_current_user_id(request)
+    if uid == "usr_guest":
+        return {
+            "total_eligible": 0,
+            "synced_count": 0,
+            "stream_backed_count": 0,
+            "remaining_count": 0,
+            "pct_complete": 100.0,
+            "in_progress": False,
+            "rate_limited": False,
+            "cooldown_remaining_sec": 0,
+            "strava_connected": False,
+        }
+    from app.services.strava_service import get_strava_stream_backfill_status
+    return get_strava_stream_backfill_status(user_id=uid)
+
+
+@router.post("/spiderweb/streams/sync")
+def trigger_spiderweb_streams_sync_endpoint(request: Request):
+    """Manually triggers rate-limit-safe background 1-Hz Strava power stream fetching."""
+    uid = get_current_user_id(request)
+    if uid == "usr_guest":
+        return {"started": False, "reason": "Guest session"}
+    from app.services.strava_service import trigger_power_stream_backfill_async
+    return trigger_power_stream_backfill_async(user_id=uid)
 
 @router.get("/spiderweb/target-analysis")
 def get_spiderweb_target_analysis_endpoint(timeframe: Optional[str] = Query("30d")):

@@ -575,7 +575,13 @@ def get_or_fetch_activity_streams(
                 res = requests.get(url, headers=headers, timeout=5)
 
         if res.status_code == 200:
-            normalized = _normalize_stream_payload(res.json())
+            raw_json_payload = res.json()
+            try:
+                mmp_peaks = compute_mmp_peaks_from_streams(raw_json_payload)
+                save_activity_mmp_peaks(uid, act_id, mmp_peaks)
+            except Exception:
+                pass
+            normalized = _normalize_stream_payload(raw_json_payload)
             payload_to_cache = normalized if normalized else {"unavailable": True}
             try:
                 conn = get_db_connection()
@@ -597,6 +603,10 @@ def get_or_fetch_activity_streams(
             return normalized
         elif res.status_code == 404:
             try:
+                save_activity_mmp_peaks(uid, act_id, None)
+            except Exception:
+                pass
+            try:
                 conn = get_db_connection()
                 c = conn.cursor()
                 c.execute(
@@ -617,5 +627,472 @@ def get_or_fetch_activity_streams(
         print(f"Strava stream fetch error for activity {act_id}: {e}")
 
     return None
+
+
+MMP_WINDOWS = (
+    ("5s", 5),
+    ("30s", 30),
+    ("1m", 60),
+    ("5m", 300),
+    ("20m", 1200),
+    ("60m", 3600),
+)
+
+
+def compute_mmp_peaks_from_streams(raw_streams: Any) -> Optional[Dict[str, int]]:
+    """
+    Computes exact Mean Maximal Power (MMP) peaks (5s, 30s, 1m, 5m, 20m, 60m)
+    from a Strava activity stream payload on a 1-Hz timeline (zero-padding pauses).
+    Returns None if no valid watts stream is present.
+    """
+    if not isinstance(raw_streams, dict) or raw_streams.get("unavailable"):
+        return None
+
+    watts_raw = raw_streams.get("watts")
+    if isinstance(watts_raw, dict) and isinstance(watts_raw.get("data"), list):
+        watts = watts_raw["data"]
+    elif isinstance(watts_raw, list):
+        watts = watts_raw
+    else:
+        return None
+
+    if not watts:
+        return None
+
+    time_raw = raw_streams.get("time")
+    if isinstance(time_raw, dict) and isinstance(time_raw.get("data"), list):
+        time_arr = time_raw["data"]
+    elif isinstance(time_raw, list):
+        time_arr = time_raw
+    else:
+        time_arr = None
+
+    # Reconstruct 1-Hz timeline so pauses/stops are zero-padded rather than compressed
+    if time_arr and len(time_arr) == len(watts) and len(time_arr) > 1:
+        try:
+            t0 = int(time_arr[0])
+            t_end = int(time_arr[-1])
+            span = t_end - t0 + 1
+            if 1 <= span <= 43200:  # up to 12 hours
+                series = [0.0] * span
+                for t_val, w_val in zip(time_arr, watts):
+                    idx = int(t_val) - t0
+                    if 0 <= idx < span and w_val is not None:
+                        w_f = float(w_val)
+                        if w_f > 0:
+                            series[idx] = w_f
+            else:
+                series = [max(0.0, float(w or 0.0)) for w in watts]
+        except Exception:
+            series = [max(0.0, float(w or 0.0)) for w in watts]
+    else:
+        series = [max(0.0, float(w or 0.0)) for w in watts]
+
+    n = len(series)
+    if n < 5 or max(series, default=0.0) <= 0.0:
+        return None
+
+    # Prefix sums for O(N) exact sliding-window averages
+    pref = [0.0] * (n + 1)
+    acc = 0.0
+    for i, val in enumerate(series):
+        acc += val
+        pref[i + 1] = acc
+
+    peaks: Dict[str, int] = {"sample_count": n}
+    for key, win in MMP_WINDOWS:
+        if n < win:
+            peaks[key] = 0
+            continue
+        best = 0.0
+        for i in range(win, n + 1):
+            avg = (pref[i] - pref[i - win]) / win
+            if avg > best:
+                best = avg
+        peaks[key] = int(round(best))
+
+    # Monotonicity guarantee across durations
+    if peaks["20m"] > 0 and peaks["60m"] > peaks["20m"]:
+        peaks["20m"] = peaks["60m"]
+    if peaks["5m"] > 0 and peaks["20m"] > peaks["5m"]:
+        peaks["5m"] = peaks["20m"]
+    if peaks["1m"] > 0 and peaks["5m"] > peaks["1m"]:
+        peaks["1m"] = peaks["5m"]
+    if peaks["30s"] > 0 and peaks["1m"] > peaks["30s"]:
+        peaks["30s"] = peaks["1m"]
+    if peaks["5s"] > 0 and peaks["30s"] > peaks["5s"]:
+        peaks["5s"] = peaks["30s"]
+
+    return peaks
+
+
+def save_activity_mmp_peaks(user_id: str, activity_id: str, peaks: Optional[Dict[str, int]]) -> None:
+    """Persists computed 1-Hz MMP peaks (or a has_power_stream=0 sentinel) per user and activity."""
+    if not activity_id:
+        return
+    has_stream = 1 if (peaks and any(peaks.get(k, 0) > 0 for k, _ in MMP_WINDOWS)) else 0
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        """
+        INSERT INTO strava_activity_mmp_peaks (
+            user_id, activity_id, has_power_stream,
+            peak_5s, peak_30s, peak_1m, peak_5m, peak_20m, peak_60m,
+            sample_count, computed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(user_id, activity_id) DO UPDATE SET
+            has_power_stream = excluded.has_power_stream,
+            peak_5s = excluded.peak_5s,
+            peak_30s = excluded.peak_30s,
+            peak_1m = excluded.peak_1m,
+            peak_5m = excluded.peak_5m,
+            peak_20m = excluded.peak_20m,
+            peak_60m = excluded.peak_60m,
+            sample_count = excluded.sample_count,
+            computed_at = CURRENT_TIMESTAMP
+        """,
+        (
+            user_id,
+            str(activity_id),
+            has_stream,
+            int((peaks or {}).get("5s", 0)),
+            int((peaks or {}).get("30s", 0)),
+            int((peaks or {}).get("1m", 0)),
+            int((peaks or {}).get("5m", 0)),
+            int((peaks or {}).get("20m", 0)),
+            int((peaks or {}).get("60m", 0)),
+            int((peaks or {}).get("sample_count", 0)),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_cached_mmp_peaks_map(user_id: Optional[str] = None) -> Dict[str, Dict[str, int]]:
+    """Returns a dict mapping activity_id -> cached MMP peaks for the given user."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT activity_id, has_power_stream, peak_5s, peak_30s, peak_1m, peak_5m, peak_20m, peak_60m, sample_count
+        FROM strava_activity_mmp_peaks
+        WHERE user_id = ?
+        """,
+        (uid,),
+    )
+    rows = c.fetchall()
+    conn.close()
+    out: Dict[str, Dict[str, int]] = {}
+    for r in rows or []:
+        out[str(r["activity_id"])] = {
+            "has_power_stream": bool(r["has_power_stream"]),
+            "5s": int(r["peak_5s"] or 0),
+            "30s": int(r["peak_30s"] or 0),
+            "1m": int(r["peak_1m"] or 0),
+            "5m": int(r["peak_5m"] or 0),
+            "20m": int(r["peak_20m"] or 0),
+            "60m": int(r["peak_60m"] or 0),
+            "sample_count": int(r["sample_count"] or 0),
+        }
+    return out
+
+
+def _parse_strava_rate_limits(headers: Any) -> Dict[str, int]:
+    """Parses Strava X-ReadRateLimit-* or X-RateLimit-* headers into short/daily usage & limits."""
+    out: Dict[str, int] = {}
+    if not headers:
+        return out
+    usage_str = headers.get("X-ReadRateLimit-Usage") or headers.get("X-RateLimit-Usage") or ""
+    limit_str = headers.get("X-ReadRateLimit-Limit") or headers.get("X-RateLimit-Limit") or ""
+    try:
+        if "," in usage_str:
+            u_short, u_daily = usage_str.split(",", 1)
+            out["short_usage"] = int(u_short.strip())
+            out["daily_usage"] = int(u_daily.strip())
+        if "," in limit_str:
+            l_short, l_daily = limit_str.split(",", 1)
+            out["short_limit"] = int(l_short.strip())
+            out["daily_limit"] = int(l_daily.strip())
+    except Exception:
+        pass
+    return out
+
+
+def _count_eligible_power_rides_and_synced(uid: str) -> Dict[str, int]:
+    """Counts user's cycling rides with power telemetry and how many have cached MMP peaks."""
+    from app.services.strain_model_service import is_cycling_sport
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT a.id, a.name, a.sport_type, a.average_watts, a.weighted_average_watts, a.kilojoules,
+               m.has_power_stream
+        FROM strava_activities a
+        LEFT JOIN strava_activity_mmp_peaks m
+               ON m.user_id = a.user_id AND m.activity_id = a.id
+        WHERE a.user_id = ?
+        """,
+        (uid,),
+    )
+    rows = c.fetchall()
+    conn.close()
+
+    total_eligible = 0
+    synced_count = 0
+    stream_backed_count = 0
+
+    for r in rows or []:
+        avg_w = float(r["average_watts"] or 0.0)
+        np_w = float(r["weighted_average_watts"] or 0.0)
+        kj = float(r["kilojoules"] or 0.0)
+        if avg_w <= 0 and np_w <= 0 and kj <= 0:
+            continue
+        act_dict = {
+            "id": r["id"],
+            "name": r["name"],
+            "sport_type": r["sport_type"],
+            "average_watts": avg_w,
+            "weighted_average_watts": np_w,
+            "kilojoules": kj,
+        }
+        if not is_cycling_sport(r["sport_type"] or "", r["name"] or "", activity=act_dict):
+            continue
+        total_eligible += 1
+        if r["has_power_stream"] is not None:
+            synced_count += 1
+            if int(r["has_power_stream"]) == 1:
+                stream_backed_count += 1
+
+    remaining = max(0, total_eligible - synced_count)
+    pct = round((synced_count / total_eligible) * 100.0, 1) if total_eligible > 0 else 100.0
+    return {
+        "total_eligible": total_eligible,
+        "synced_count": synced_count,
+        "stream_backed_count": stream_backed_count,
+        "remaining_count": remaining,
+        "pct_complete": pct,
+    }
+
+
+def get_strava_stream_backfill_status(user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Returns per-user progress for background 1-Hz power stream fetching and MMP caching."""
+    uid = user_id or get_current_user_id()
+    status = get_setting("strava_stream_backfill_status", {}, user_id=uid) or {}
+
+    if status.get("in_progress") and status.get("started_at_ts"):
+        if time.time() - float(status.get("started_at_ts", 0)) > 600:
+            status["in_progress"] = False
+            set_setting("strava_stream_backfill_status", status, user_id=uid)
+
+    counts = _count_eligible_power_rides_and_synced(uid)
+    now_ts = time.time()
+    cooldown_until_ts = float(status.get("cooldown_until_ts") or 0.0)
+    in_cooldown = cooldown_until_ts > now_ts
+    cooldown_remaining_sec = max(0, int(cooldown_until_ts - now_ts)) if in_cooldown else 0
+
+    tokens = get_setting("strava_tokens", {}, user_id=uid)
+    access_token = tokens.get("access_token") if isinstance(tokens, dict) else None
+    has_token = bool(access_token and len(str(access_token).strip()) >= 12)
+
+    return {
+        **counts,
+        "in_progress": bool(status.get("in_progress", False)),
+        "rate_limited": bool(in_cooldown or status.get("rate_limited", False)) and counts["remaining_count"] > 0,
+        "cooldown_until_ts": cooldown_until_ts if in_cooldown else None,
+        "cooldown_remaining_sec": cooldown_remaining_sec,
+        "last_batch_fetched": int(status.get("last_batch_fetched", 0)),
+        "last_error": status.get("last_error"),
+        "last_run_at": status.get("last_run_at"),
+        "strava_connected": has_token,
+    }
+
+
+def sync_missing_power_streams(user_id: Optional[str] = None, max_per_run: int = 40) -> Dict[str, Any]:
+    """
+    Rate-limit-safe worker that computes 1-Hz MMP peaks for cycling rides with power:
+    1) Reuses any already-cached strava_activity_streams rows locally (zero API calls).
+    2) Fetches missing /activities/{id}/streams from Strava (newest rides first),
+       respecting X-ReadRateLimit-Usage headers and HTTP 429 cooldowns.
+    """
+    from app.services.strain_model_service import is_cycling_sport
+
+    uid = user_id or get_current_user_id()
+    tokens = get_setting("strava_tokens", {}, user_id=uid)
+    access_token = tokens.get("access_token") if isinstance(tokens, dict) else None
+
+    status = get_setting("strava_stream_backfill_status", {}, user_id=uid) or {}
+    if status.get("in_progress") and status.get("started_at_ts"):
+        if time.time() - float(status.get("started_at_ts", 0)) <= 600:
+            return {"success": True, "already_running": True, **get_strava_stream_backfill_status(uid)}
+
+    status_obj = {
+        "in_progress": True,
+        "started_at_ts": time.time(),
+        "rate_limited": False,
+        "cooldown_until_ts": 0.0,
+        "last_batch_fetched": 0,
+        "last_error": None,
+        "last_run_at": datetime.datetime.utcnow().isoformat() + "Z",
+    }
+    set_setting("strava_stream_backfill_status", status_obj, user_id=uid)
+
+    batch_fetched = 0
+    rate_limited = False
+    cooldown_until_ts = 0.0
+    err_msg = None
+
+    try:
+        conn = get_db_connection()
+        c = conn.cursor()
+        c.execute(
+            """
+            SELECT a.id, a.name, a.sport_type, a.start_date, a.average_watts, a.weighted_average_watts, a.kilojoules,
+                   s.streams_json
+            FROM strava_activities a
+            LEFT JOIN strava_activity_mmp_peaks m
+                   ON m.user_id = a.user_id AND m.activity_id = a.id
+            LEFT JOIN strava_activity_streams s
+                   ON s.user_id = a.user_id AND s.activity_id = a.id
+            WHERE a.user_id = ?
+              AND m.activity_id IS NULL
+            ORDER BY a.start_date DESC
+            """,
+            (uid,),
+        )
+        candidates = c.fetchall()
+        conn.close()
+
+        to_fetch_network: List[str] = []
+        for row in candidates or []:
+            avg_w = float(row["average_watts"] or 0.0)
+            np_w = float(row["weighted_average_watts"] or 0.0)
+            kj = float(row["kilojoules"] or 0.0)
+            if avg_w <= 0 and np_w <= 0 and kj <= 0:
+                continue
+            act_dict = {
+                "id": row["id"],
+                "name": row["name"],
+                "sport_type": row["sport_type"],
+                "average_watts": avg_w,
+                "weighted_average_watts": np_w,
+                "kilojoules": kj,
+            }
+            if not is_cycling_sport(row["sport_type"] or "", row["name"] or "", activity=act_dict):
+                continue
+
+            act_id = str(row["id"])
+            # Local cache hit in strava_activity_streams -> compute MMP with 0 network calls
+            if row["streams_json"]:
+                try:
+                    cached = json.loads(row["streams_json"])
+                    peaks = compute_mmp_peaks_from_streams(cached)
+                    save_activity_mmp_peaks(uid, act_id, peaks)
+                    batch_fetched += 1
+                    continue
+                except Exception:
+                    pass
+
+            if act_id.isdigit():
+                to_fetch_network.append(act_id)
+
+        if to_fetch_network and access_token and len(str(access_token).strip()) >= 12:
+            headers = {"Authorization": f"Bearer {access_token}"}
+            for act_id in to_fetch_network[:max_per_run]:
+                url = f"{STRAVA_API_BASE}/activities/{act_id}/streams?keys=time,watts,heartrate,cadence&key_by_type=true"
+                try:
+                    res = requests.get(url, headers=headers, timeout=8)
+                    if res.status_code == 401 and isinstance(tokens, dict) and tokens.get("refresh_token"):
+                        refreshed = refresh_strava_token(user_id=uid)
+                        if refreshed:
+                            access_token = refreshed
+                            headers = {"Authorization": f"Bearer {refreshed}"}
+                            res = requests.get(url, headers=headers, timeout=8)
+
+                    if res.status_code == 429:
+                        rate_limited = True
+                        cooldown_until_ts = time.time() + 900
+                        err_msg = "Strava API rate limit reached; paused for 15 minutes."
+                        break
+
+                    if res.status_code == 200:
+                        raw_payload = res.json()
+                        peaks = compute_mmp_peaks_from_streams(raw_payload)
+                        save_activity_mmp_peaks(uid, act_id, peaks)
+                        normalized = _normalize_stream_payload(raw_payload)
+                        payload_to_cache = normalized if normalized else {"unavailable": True}
+                        conn = get_db_connection()
+                        c = conn.cursor()
+                        c.execute(
+                            """
+                            INSERT INTO strava_activity_streams (user_id, activity_id, streams_json)
+                            VALUES (?, ?, ?)
+                            ON CONFLICT(user_id, activity_id) DO UPDATE SET
+                                streams_json = excluded.streams_json,
+                                fetched_at = CURRENT_TIMESTAMP
+                            """,
+                            (uid, act_id, json.dumps(payload_to_cache)),
+                        )
+                        conn.commit()
+                        conn.close()
+                        batch_fetched += 1
+                    elif res.status_code == 404:
+                        save_activity_mmp_peaks(uid, act_id, None)
+                        batch_fetched += 1
+                    elif res.status_code >= 500:
+                        err_msg = f"Strava temporary error HTTP {res.status_code}"
+                        break
+
+                    rl = _parse_strava_rate_limits(res.headers)
+                    s_use = rl.get("short_usage", 0)
+                    s_lim = rl.get("short_limit", 0)
+                    d_use = rl.get("daily_usage", 0)
+                    d_lim = rl.get("daily_limit", 0)
+                    if (s_lim > 0 and s_use >= int(s_lim * 0.85)) or (d_lim > 0 and d_use >= int(d_lim * 0.90)):
+                        rate_limited = True
+                        cooldown_until_ts = time.time() + 900
+                        err_msg = "Approaching Strava API rate limit; pausing safely for 15 minutes."
+                        break
+
+                    time.sleep(0.25)
+                except Exception as exc:
+                    err_msg = str(exc)
+                    break
+    except Exception as e:
+        err_msg = str(e)
+    finally:
+        status_obj["in_progress"] = False
+        status_obj["rate_limited"] = rate_limited
+        status_obj["cooldown_until_ts"] = cooldown_until_ts
+        status_obj["last_batch_fetched"] = batch_fetched
+        status_obj["last_error"] = err_msg
+        status_obj["last_run_at"] = datetime.datetime.utcnow().isoformat() + "Z"
+        set_setting("strava_stream_backfill_status", status_obj, user_id=uid)
+
+    return {"success": err_msg is None, **get_strava_stream_backfill_status(uid)}
+
+
+def trigger_power_stream_backfill_async(user_id: Optional[str] = None, max_per_run: int = 40) -> Dict[str, Any]:
+    """Starts rate-limit-safe background 1-Hz power stream backfill if eligible rides remain."""
+    uid = user_id or get_current_user_id()
+    cur = get_strava_stream_backfill_status(uid)
+    if cur.get("in_progress"):
+        return {"started": False, "already_running": True, **cur}
+    if cur.get("remaining_count", 0) <= 0:
+        return {"started": False, "already_complete": True, **cur}
+    if not cur.get("strava_connected"):
+        return {"started": False, "reason": "Strava not connected", **cur}
+    if cur.get("cooldown_remaining_sec", 0) > 0:
+        return {"started": False, "reason": "Rate-limit cooldown active", **cur}
+
+    t = threading.Thread(
+        target=sync_missing_power_streams,
+        kwargs={"user_id": uid, "max_per_run": max_per_run},
+        daemon=True,
+    )
+    t.start()
+    return {"started": True, "already_running": False, **cur, "in_progress": True}
+
 
 

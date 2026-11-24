@@ -7900,6 +7900,108 @@ function escapeSpiderwebHtml(str) {
 
 let currentSpiderwebTimeframe = "30d";
 let currentSpiderwebData = null;
+let spiderwebStreamPollTimer = null;
+let lastSpiderwebSyncedCount = null;
+
+function renderSpiderwebStreamProgress(sp) {
+  const wrap = document.getElementById("spiderwebStreamProgressWrap");
+  const pill = document.getElementById("spiderwebStreamProgressPill");
+  const track = document.getElementById("spiderwebStreamProgressTrack");
+  const bar = document.getElementById("spiderwebStreamProgressBar");
+  const btn = document.getElementById("btnResumeStreamSync");
+  if (!wrap || !pill || !bar) return;
+
+  if (!sp || !sp.total_eligible) {
+    wrap.style.display = "none";
+    return;
+  }
+
+  wrap.style.display = "flex";
+  const total = Number(sp.total_eligible || 0);
+  const synced = Number(sp.synced_count || 0);
+  const remaining = Number(sp.remaining_count || 0);
+  const pct = Math.min(100, Math.max(0, Number(sp.pct_complete || 0)));
+
+  bar.style.width = `${pct.toFixed(0)}%`;
+  if (track) track.style.display = total > 0 ? "block" : "none";
+
+  if (remaining <= 0) {
+    pill.textContent = `⚡ 1-Hz Power Streams: ${synced}/${total} rides (100% Exact)`;
+    pill.style.background = "rgba(0, 200, 150, 0.1)";
+    pill.style.color = "#00C896";
+    pill.style.borderColor = "rgba(0, 200, 150, 0.3)";
+    if (btn) btn.style.display = "none";
+  } else if (sp.in_progress) {
+    pill.textContent = `⚡ 1-Hz Power Streams: ${synced}/${total} rides (${pct.toFixed(0)}%) • Syncing...`;
+    pill.style.background = "rgba(0, 82, 255, 0.08)";
+    pill.style.color = "var(--accent-cyan)";
+    pill.style.borderColor = "rgba(0, 82, 255, 0.25)";
+    if (btn) btn.style.display = "none";
+  } else if (sp.rate_limited || (sp.cooldown_remaining_sec || 0) > 0) {
+    const mins = Math.max(1, Math.ceil((sp.cooldown_remaining_sec || 900) / 60));
+    pill.textContent = `⏳ 1-Hz Streams: ${synced}/${total} (${pct.toFixed(0)}%) • Strava rate-limit pause (~${mins}m)`;
+    pill.style.background = "rgba(245, 158, 11, 0.12)";
+    pill.style.color = "#F59E0B";
+    pill.style.borderColor = "rgba(245, 158, 11, 0.35)";
+    if (btn) btn.style.display = "none";
+  } else {
+    pill.textContent = `⚡ 1-Hz Streams: ${synced}/${total} rides (${pct.toFixed(0)}%)`;
+    pill.style.background = "rgba(0, 82, 255, 0.08)";
+    pill.style.color = "var(--accent-cyan)";
+    pill.style.borderColor = "rgba(0, 82, 255, 0.22)";
+    if (btn && sp.strava_connected) {
+      btn.style.display = "inline-flex";
+      btn.disabled = false;
+      btn.textContent = `▶ Sync More (${remaining} left)`;
+    } else if (btn) {
+      btn.style.display = "none";
+    }
+  }
+
+  if (btn && !btn.dataset.wired) {
+    btn.dataset.wired = "1";
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      btn.disabled = true;
+      btn.textContent = "⏳ Starting...";
+      try {
+        const res = await fetch("/api/power/spiderweb/streams/sync", { method: "POST" });
+        const nextSp = await res.json();
+        renderSpiderwebStreamProgress(nextSp);
+        scheduleSpiderwebStreamPoll(nextSp);
+      } catch (err) {
+        console.warn("Failed to start stream sync:", err);
+        btn.disabled = false;
+      }
+    });
+  }
+
+  scheduleSpiderwebStreamPoll(sp);
+}
+
+function scheduleSpiderwebStreamPoll(sp) {
+  if (spiderwebStreamPollTimer) {
+    clearTimeout(spiderwebStreamPollTimer);
+    spiderwebStreamPollTimer = null;
+  }
+  if (!sp || !sp.in_progress) return;
+  spiderwebStreamPollTimer = setTimeout(async () => {
+    try {
+      const res = await fetch("/api/power/spiderweb/streams/status");
+      if (!res.ok) return;
+      const nextSp = await res.json();
+      const prevSynced = lastSpiderwebSyncedCount;
+      lastSpiderwebSyncedCount = Number(nextSp.synced_count || 0);
+      renderSpiderwebStreamProgress(nextSp);
+      // Refresh Spiderweb chart whenever new rides were synced or batch finished
+      if ((prevSynced !== null && lastSpiderwebSyncedCount > prevSynced) || !nextSp.in_progress) {
+        loadPowerSpiderweb(currentSpiderwebTimeframe || "30d");
+      }
+    } catch (err) {
+      console.warn("Stream status poll error:", err);
+    }
+  }, 4000);
+}
 
 async function loadPowerSpiderweb(timeframe = "30d") {
   currentSpiderwebTimeframe = timeframe;
@@ -7934,6 +8036,10 @@ function setupPowerSpiderwebTabs() {
 function renderPowerSpiderweb(data) {
   if (!data || !data.axes) return;
   currentSpiderwebData = data;
+  if (data.stream_progress) {
+    lastSpiderwebSyncedCount = Number(data.stream_progress.synced_count || 0);
+    renderSpiderwebStreamProgress(data.stream_progress);
+  }
 
   // Legend labels
   const curLbl = document.getElementById("spiderwebLegendCurrentLabel");

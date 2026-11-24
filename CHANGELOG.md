@@ -3,6 +3,15 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.26.0] - 2026-11-24
+### Added
+- **Exact 1-Hz Strava Stream MMP Peaks & Rate-Limit-Safe Background Sync for Power Spiderweb**:
+  - Added user-isolated `strava_activity_mmp_peaks` SQLite cache table in [`database.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) storing exact 1-Hz Mean Maximal Power (`5s`, `30s`, `1m`, `5m`, `20m`, `60m`) per activity.
+  - Added [`compute_mmp_peaks_from_streams()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strava_service.py), [`sync_missing_power_streams()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strava_service.py), [`trigger_power_stream_backfill_async()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strava_service.py), and [`get_strava_stream_backfill_status()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strava_service.py) in [`strava_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strava_service.py) to compute exact 1-Hz MMP peaks (zero-padding pauses) from local cached streams first and fetch missing `/activities/{id}/streams` in the background while honoring Strava `X-ReadRateLimit-Usage` headers and HTTP `429` cooldowns.
+  - Wired cached MMP peaks into [`calculate_activity_peak_powers()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) and [`get_power_spiderweb_profile()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) so the Power Spiderweb upgrades from modeled estimates to exact stream-computed peaks as rides sync.
+  - Added `GET /api/power/spiderweb/streams/status` and `POST /api/power/spiderweb/streams/sync` in [`power.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/power.py), plus a live progress pill, progress bar, rate-limit cooldown indicator, and auto-refresh polling on `#cardPowerSpiderweb` in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) and [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=166`).
+  - Added unit and isolation tests in [`test_stream_mmp_spiderweb.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_stream_mmp_spiderweb.py).
+
 ## [2.25.2] - 2026-11-24
 ### Fixed
 - **Structured ERG-Mode Detection on Indoor Interval Workouts (VI > 1.05)**:

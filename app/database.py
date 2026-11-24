@@ -627,6 +627,23 @@ def init_db():
     );
     """)
 
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS strava_activity_mmp_peaks (
+        user_id TEXT NOT NULL DEFAULT 'usr_default',
+        activity_id TEXT NOT NULL,
+        has_power_stream INTEGER NOT NULL DEFAULT 0,
+        peak_5s INTEGER NOT NULL DEFAULT 0,
+        peak_30s INTEGER NOT NULL DEFAULT 0,
+        peak_1m INTEGER NOT NULL DEFAULT 0,
+        peak_5m INTEGER NOT NULL DEFAULT 0,
+        peak_20m INTEGER NOT NULL DEFAULT 0,
+        peak_60m INTEGER NOT NULL DEFAULT 0,
+        sample_count INTEGER NOT NULL DEFAULT 0,
+        computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, activity_id)
+    );
+    """)
+
     # Ensure default user exists so legacy single-user data is preserved
     cursor.execute("""
         INSERT OR IGNORE INTO users (id, email, name, picture)

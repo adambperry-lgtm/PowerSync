@@ -1423,6 +1423,17 @@
             <div class="card-subtitle collapsible-tile-subtitle" id="spiderwebSubtitle">
               Multi-duration power signature &amp; progress over time (Strava &amp; Xert model)
             </div>
+            <div id="spiderwebStreamProgressWrap" style="display:none;align-items:center;gap:0.5rem;margin-top:0.35rem;flex-wrap:wrap;" onclick="event.stopPropagation();">
+              <span id="spiderwebStreamProgressPill" class="tag" style="font-size:0.72rem;padding:0.18rem 0.55rem;border-radius:999px;background:rgba(0,82,255,0.08);color:var(--accent-cyan);border:1px solid rgba(0,82,255,0.22);font-weight:600;">
+                ⚡ 1-Hz Power Streams: --
+              </span>
+              <div id="spiderwebStreamProgressTrack" style="width:90px;height:6px;background:rgba(148,163,184,0.22);border-radius:999px;overflow:hidden;">
+                <div id="spiderwebStreamProgressBar" style="width:0%;height:100%;background:linear-gradient(90deg,#0052FF,#00C896);transition:width 0.35s ease;"></div>
+              </div>
+              <button id="btnResumeStreamSync" type="button" class="btn btn-secondary" style="display:none;font-size:0.7rem;padding:0.15rem 0.5rem;">
+                ▶ Sync More
+              </button>
+            </div>
             <!-- Collapsed Summary Chips (Visible when collapsed) -->
             <div class="collapsible-tile-summary" id="spiderwebCollapsedSummary" style="display:none;margin-top:0.25rem;">
               <span class="tag tag-focus" id="collapsedSpiderweb5s">5s: --W</span>
@@ -3676,6 +3687,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=165"></script>
+  <script src="/static/js/app.js?v=166"></script>
 </body>
 </html>

@@ -258,18 +258,47 @@ def calculate_activity_peak_powers(
     act: Dict[str, Any],
     ftp: int = 250,
     w_prime_kj: float = 20.0,
-    peak_power_watts: int = 1050
+    peak_power_watts: int = 1050,
+    mmp_peaks: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, int]:
     """
     Computes realistic peak power profile (5s, 30s, 1m, 5m, 20m, 60m) for an activity.
-    Uses power meter telemetry (device_watts, max_watts), interval laps and segments,
-    and applies physiological duration gating with Morton CP / W' intensity attenuation.
+    Prefers exact 1-Hz Strava stream Mean Maximal Power (MMP) peaks when cached;
+    otherwise falls back to power meter telemetry (device_watts, max_watts), laps/segments,
+    and Morton CP / W' intensity attenuation.
     Guarantees non-cycling activities (runs, swims, gym) never produce cycling power data.
     """
     sport = act.get("sport_type") or act.get("type", "")
     act_name = act.get("name", "")
     if not is_cycling_sport(sport, act_name, activity=act):
         return {"5s": 0, "30s": 0, "1m": 0, "5m": 0, "20m": 0, "60m": 0}
+
+    if isinstance(mmp_peaks, dict) and mmp_peaks.get("has_power_stream"):
+        p_5s = int(mmp_peaks.get("5s") or 0)
+        p_30s = int(mmp_peaks.get("30s") or 0)
+        p_1m = int(mmp_peaks.get("1m") or 0)
+        p_5m = int(mmp_peaks.get("5m") or 0)
+        p_20m = int(mmp_peaks.get("20m") or 0)
+        p_60m = int(mmp_peaks.get("60m") or 0)
+        if p_5s > 0 or p_1m > 0 or p_5m > 0 or p_20m > 0 or p_60m > 0:
+            if p_20m > 0 and p_60m > p_20m:
+                p_20m = p_60m
+            if p_5m > 0 and p_20m > p_5m:
+                p_5m = p_20m
+            if p_1m > 0 and p_5m > p_1m:
+                p_1m = p_5m
+            if p_30s > 0 and p_1m > p_30s:
+                p_30s = p_1m
+            if p_5s > 0 and p_30s > p_5s:
+                p_5s = p_30s
+            return {
+                "5s": p_5s,
+                "30s": p_30s,
+                "1m": p_1m,
+                "5m": p_5m,
+                "20m": p_20m,
+                "60m": p_60m,
+            }
 
     moving_sec = int(act.get("moving_time_sec") or 0)
     avg_w = float(act.get("average_watts") or 0.0)
@@ -430,6 +459,22 @@ def get_power_spiderweb_profile(
             except Exception:
                 pass
 
+    mmp_map: Dict[str, Dict[str, Any]] = {}
+    stream_progress: Dict[str, Any] = {}
+    try:
+        from app.services.strava_service import (
+            get_cached_mmp_peaks_map,
+            get_strava_stream_backfill_status,
+            trigger_power_stream_backfill_async,
+        )
+        mmp_map = get_cached_mmp_peaks_map(user_id=uid)
+        if strava_tokens:
+            stream_progress = trigger_power_stream_backfill_async(user_id=uid)
+        else:
+            stream_progress = get_strava_stream_backfill_status(user_id=uid)
+    except Exception:
+        pass
+
     conn = get_db_connection()
     c = conn.cursor()
     c.execute("""
@@ -509,9 +554,12 @@ def get_power_spiderweb_profile(
         act_copy["is_cycling"] = is_cycling
 
         if is_cycling:
-            act_copy["peaks"] = calculate_activity_peak_powers(act_copy, ftp, w_prime_kj, peak_power)
+            act_mmp = mmp_map.get(str(act.get("id") or ""))
+            act_copy["peaks"] = calculate_activity_peak_powers(act_copy, ftp, w_prime_kj, peak_power, mmp_peaks=act_mmp)
+            act_copy["peak_source"] = "stream" if (act_mmp and act_mmp.get("has_power_stream")) else "estimated"
         else:
             act_copy["peaks"] = {"5s": 0, "30s": 0, "1m": 0, "5m": 0, "20m": 0, "60m": 0}
+            act_copy["peak_source"] = "none"
 
         all_acts.append(act_copy)
         if act_d >= cur_start:
@@ -856,6 +904,7 @@ def get_power_spiderweb_profile(
         },
         "has_active_goal": bool(active_goal),
         "active_goal": active_goal,
+        "stream_progress": stream_progress,
         "axes": axes_data,
         "summary_deltas": {
             "sprint_5s": next((a for a in axes_data if a["key"] == "5s"), {}),
