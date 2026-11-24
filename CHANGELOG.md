@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.25.1] - 2026-11-24
+### Fixed
+- **Strava Training Load (7 Days) Zeroed-Out Display Bug on Cached Debrief Loads**:
+  - Fixed a regression from v2.25.0 where sticky cache hits in [`generate_ai_review_and_outlook()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) attached a partial `strava` object (`{"recent_activities": [...]}` without `weekly_stats`), causing `loadDebrief()` to overwrite the live dashboard's 7-day Strava Training Load card with zeros (`0 hrs`, `0` TSS, `0.0 mi`, `0 ft`) while leaving the status badges intact.
+  - Added [`_build_cached_strava_payload()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) so cached debrief responses include complete, user-scoped `weekly_stats` (with XSS mirrored) and `strain_systems` computed locally from SQLite with zero external API calls.
+  - Hardened [`renderStrava()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) and [`loadDebrief()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=165`) to guard against partial `strava` payloads and merge updates without clobbering existing `weekly_stats` or `strain_systems`.
+  - Added regression coverage in [`test_sticky_ride_debrief.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_sticky_ride_debrief.py) verifying full Strava `weekly_stats` preservation and multi-user isolation across debrief cache hits.
+
 ## [2.25.0] - 2026-11-23
 ### Added
 - **Non-Circular 4-Pillar Ride Debrief & Long-Term Goal Tracking**:

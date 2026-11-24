@@ -2076,6 +2076,48 @@ def _build_debrief_activity_signature(today_iso: str, day_acts: List[Dict[str, A
     return f"{today_iso}|{latest_id}|{','.join(act_ids)}"
 
 
+def _build_cached_strava_payload(uid: str, recent_activities: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Builds a complete user-scoped Strava payload (weekly_stats, strain_systems, recent_activities) from SQLite without external API calls."""
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        "SELECT * FROM strava_activities WHERE user_id = ? ORDER BY start_date DESC LIMIT 30",
+        (uid,),
+    )
+    rows = c.fetchall()
+    conn.close()
+
+    activities = [dict(r) for r in rows] if rows else get_mock_strava_activities()
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid) or 250)
+    weekly_stats = get_strava_trailing_stats(activities=activities, days=7, user_id=uid)
+
+    from app.services.strain_model_service import calculate_trailing_strain_systems
+    strain_systems = calculate_trailing_strain_systems(activities=activities, days=7, ftp=ftp)
+
+    weekly_stats["total_xss"] = int(
+        strain_systems.get("total_xss")
+        or strain_systems.get("trailing_7d", {}).get("total_xss", 0.0)
+    )
+    weekly_stats["low_xss"] = int(
+        strain_systems.get("low_xss")
+        or strain_systems.get("trailing_7d", {}).get("low_xss", 0.0)
+    )
+    weekly_stats["high_xss"] = int(
+        strain_systems.get("high_xss")
+        or strain_systems.get("trailing_7d", {}).get("high_xss", 0.0)
+    )
+    weekly_stats["peak_xss"] = int(
+        strain_systems.get("peak_xss")
+        or strain_systems.get("trailing_7d", {}).get("peak_xss", 0.0)
+    )
+
+    return {
+        "weekly_stats": weekly_stats,
+        "strain_systems": strain_systems,
+        "recent_activities": recent_activities,
+    }
+
+
 def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool = False) -> Dict[str, Any]:
     """
     Main entry point: pulls live Whoop and Strava telemetry,
@@ -2106,8 +2148,9 @@ def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool 
             and isinstance(cached.get("review"), dict)
         ):
             cached_out = dict(cached["review"])
-            if "strava" not in cached_out:
-                cached_out["strava"] = {"recent_activities": act_info.get("all_recent", [])}
+            existing_strava = cached_out.get("strava")
+            if not isinstance(existing_strava, dict) or not existing_strava.get("weekly_stats"):
+                cached_out["strava"] = _build_cached_strava_payload(uid, act_info.get("all_recent", []))
             return cached_out
 
     from app.routers.dashboard import get_dashboard_data

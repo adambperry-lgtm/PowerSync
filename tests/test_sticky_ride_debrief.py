@@ -133,6 +133,47 @@ class TestStickyRideDebrief(unittest.TestCase):
             res_next_day = generate_ai_review_and_outlook()
             self.assertFalse(res_next_day["today_assessment"]["is_today"])
 
+    def test_cached_debrief_preserves_full_strava_weekly_stats_and_user_isolation(self):
+        set_setting("strava_tokens", {"access_token": "tok_a"}, user_id=self.user_a)
+        set_setting("strava_tokens", {"access_token": "tok_b"}, user_id=self.user_b)
+        today = get_athlete_date(self.user_a)
+        yesterday_iso = (today - datetime.timedelta(days=1)).isoformat()
+        three_days_ago_iso = (today - datetime.timedelta(days=3)).isoformat()
+
+        # User A has two trailing rides in the last 7 days
+        self._insert_activity(self.user_a, 4001, "Yesterday Sweet Spot", f"{yesterday_iso}T07:30:00", moving_sec=3600, watts=230)
+        self._insert_activity(self.user_a, 4002, "Midweek Endurance", f"{three_days_ago_iso}T08:00:00", moving_sec=5400, watts=195)
+        # User B has a single shorter ride yesterday
+        self._insert_activity(self.user_b, 5001, "User B Spin", f"{yesterday_iso}T09:00:00", moving_sec=1800, watts=160)
+
+        set_current_user_context(self.user_a)
+        with patch("app.services.strava_service.fetch_recent_strava_activities", return_value=[]):
+            res1 = generate_ai_review_and_outlook()
+            res2 = generate_ai_review_and_outlook()  # sticky cache hit
+
+        ws1 = res1.get("strava", {}).get("weekly_stats", {})
+        ws2 = res2.get("strava", {}).get("weekly_stats", {})
+        self.assertGreater(ws1.get("total_hours", 0), 0)
+        self.assertEqual(ws2.get("total_hours"), ws1.get("total_hours"))
+        self.assertEqual(ws2.get("total_tss"), ws1.get("total_tss"))
+        self.assertEqual(ws2.get("acute_weighted_tss"), ws1.get("acute_weighted_tss"))
+        self.assertEqual(ws2.get("yesterday_tss"), ws1.get("yesterday_tss"))
+        self.assertEqual(ws2.get("total_distance_miles"), ws1.get("total_distance_miles"))
+        self.assertEqual(ws2.get("total_elevation_ft"), ws1.get("total_elevation_ft"))
+        self.assertGreater(ws2.get("total_xss", 0), 0)
+        self.assertEqual(ws2.get("total_xss"), ws1.get("total_xss"))
+        self.assertIn("strain_systems", res2.get("strava", {}))
+        self.assertIn("recent_activities", res2.get("strava", {}))
+
+        # Verify User B's cached debrief returns User B's own smaller Strava stats
+        set_current_user_context(self.user_b)
+        with patch("app.services.strava_service.fetch_recent_strava_activities", return_value=[]):
+            res_b1 = generate_ai_review_and_outlook()
+            res_b2 = generate_ai_review_and_outlook()
+        ws_b2 = res_b2.get("strava", {}).get("weekly_stats", {})
+        self.assertEqual(ws_b2.get("total_hours"), 0.5)
+        self.assertNotEqual(ws_b2.get("total_hours"), ws2.get("total_hours"))
+
 
 if __name__ == "__main__":
     unittest.main()

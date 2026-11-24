@@ -435,8 +435,8 @@ function renderWhoop(whoop) {
 
 // Render Strava Workload
 function renderStrava(strava) {
-  if (!strava) return;
-  const ws = strava.weekly_stats || {};
+  if (!strava || !strava.weekly_stats || Object.keys(strava.weekly_stats).length === 0) return;
+  const ws = strava.weekly_stats;
   valWeeklyHours.textContent = `${ws.total_hours || 0} hrs`;
   const totalMi = ws.total_distance_miles || (ws.total_distance_km ? (ws.total_distance_km * 0.621371).toFixed(1) : "0.0");
   valWeeklyDist.textContent = `${totalMi} mi`;
@@ -4514,8 +4514,14 @@ async function loadDebrief() {
     renderDebrief(data);
     renderAiCoachTodayCard(data, state.currentWorkout);
     if (data.strava && typeof renderStrava === "function") {
-      state.strava = data.strava;
-      renderStrava(data.strava);
+      if (data.strava.weekly_stats && Object.keys(data.strava.weekly_stats).length > 0) {
+        state.strava = Object.assign({}, state.strava || {}, data.strava);
+        renderStrava(state.strava);
+      } else if (Array.isArray(data.strava.recent_activities) && state.strava) {
+        state.strava = Object.assign({}, state.strava, {
+          recent_activities: data.strava.recent_activities
+        });
+      }
     }
   } catch (err) {
     console.error("Failed to load daily debrief:", err);

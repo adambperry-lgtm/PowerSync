@@ -147,9 +147,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.25.0",
-        "release_name": "Non-Circular 4-Pillar Ride Debrief & Goal Progress",
-        "build_date": "2026-11-23",
+        "version": "2.25.1",
+        "release_name": "Strava Training Load Display Fix on Cached Debrief Loads",
+        "build_date": "2026-11-24",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.25.1",
+                "date": "2026-11-24",
+                "title": "Strava Training Load Display Fix on Cached Debrief Loads",
+                "items": [
+                    "Fixed Strava 7-Day Load Display Glitch: Resolved a v2.25.0 regression where cached daily debrief loads returned a partial strava payload (without weekly_stats) and overwrote the Strava Training Load (7 Days) card with zeros on page reload.",
+                    "Complete Cached Strava Payload: Sticky debrief cache hits now populate full user-scoped weekly_stats (including XSS) and strain_systems directly from local SQLite without extra API calls.",
+                    "Frontend State Guard: Hardened renderStrava() and loadDebrief() so partial strava responses can never clear live 7-day training load metrics."
+                ]
+            },
             {
                 "version": "v2.25.0",
                 "date": "2026-11-23",
