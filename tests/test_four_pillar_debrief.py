@@ -356,6 +356,80 @@ class TestFourPillarDebrief(unittest.TestCase):
             self.assertIn(elem_id, html_src)
             self.assertIn(elem_id, js_src)
 
+    def test_structured_erg_intervals_with_vi_above_105_detected_as_erg_locked(self):
+        """
+        A structured Zwift ERG interval workout (e.g. 3 work blocks + recoveries) naturally
+        produces whole-ride VI > 1.05 (such as 1.08). Stream steadiness within blocks must
+        detect ERG-mode lock so it is never mislabeled as a non-ERG stochastic ride or power fade.
+        """
+        today = get_athlete_date(self.user_a)
+        today_iso = today.isoformat()
+
+        # Build a 45-min (2700s) structured ERG stream:
+        # 5m warmup @ 140W, then 3x (6m work @ 240W/235W/229W + 3m recovery @ 125W), 5m cooldown @ 120W
+        def _erg_seg(watts_target: float, secs: int) -> list[float]:
+            # Realistic smart-trainer +/- 3W micro-oscillation
+            return [watts_target + ((i % 5) - 2) * 1.5 for i in range(secs)]
+
+        watts = (
+            _erg_seg(140.0, 300)
+            + _erg_seg(240.0, 360) + _erg_seg(125.0, 180)
+            + _erg_seg(235.0, 360) + _erg_seg(125.0, 180)
+            + _erg_seg(229.0, 360) + _erg_seg(125.0, 180)
+            + _erg_seg(120.0, 600)
+        )
+        n = len(watts)
+        hr = [125.0 + (22.0 * (i / n)) for i in range(n)]
+        cadence = [90.0 - (4.0 * (i / n)) for i in range(n)]
+
+        act = {
+            "id": "erg_structured_108",
+            "name": "Zwift - Structured Base Intervals",
+            "sport_type": "VirtualRide",
+            "start_date": f"{today_iso}T08:00:00",
+            "moving_time_sec": n,
+            "average_watts": 186.0,
+            "weighted_average_watts": 201.0,  # VI = 201 / 186 = 1.08
+            "average_heartrate": 141.0,
+            "max_heartrate": 162.0,
+            "suffer_score": 65,
+            "streams": {"time": list(range(n)), "watts": watts, "heartrate": hr, "cadence": cadence},
+        }
+
+        review = build_daily_review_and_outlook_local(
+            whoop_data={"recovery_score": 91, "hrv_rmssd": 72.0, "day_strain": 13.6},
+            trailing_strava={"total_tss": 242, "acute_weighted_tss": 242},
+            today_acts=[act],
+            latest_act=act,
+            program={
+                "goal_title": "Base Fitness",
+                "phase": "Base Phase",
+                "current_week": 2,
+                "total_weeks": 8,
+                "target_ftp": 265,
+                "weekly_tss_target": 400,
+                "weekly_tss_actual": 242,
+            },
+            ftp=250,
+            max_hr=185,
+            day_acts=[act],
+        )
+
+        pillars = review["today_assessment"]["debrief_pillars"]
+        exec_p = pillars["execution_nuances"]
+        self.assertTrue(pillars["is_erg_like"])
+        self.assertTrue(exec_p["is_erg_like"])
+        self.assertEqual(exec_p["vi"], 1.08)
+        self.assertEqual(exec_p["status"], "ERG-Locked Structure")
+        self.assertIn("VI 1.08 (ERG Structured)", exec_p["chips"])
+        self.assertNotIn("faded", exec_p["summary"].lower())
+
+        # Conversely, a non-ERG Zwift free-ride with continuous surges within 20s windows
+        # must NOT be flagged as ERG-locked.
+        free_ride_watts = [185.0 + ((i * 17) % 90) - 45.0 for i in range(1800)]
+        free_metrics = compute_stream_analytics({"watts": free_ride_watts}, ftp=250)
+        self.assertFalse(free_metrics["erg_stream_detected"])
+
 
 if __name__ == "__main__":
     unittest.main()

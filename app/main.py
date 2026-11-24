@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.25.1",
-        "release_name": "Strava Training Load Display Fix on Cached Debrief Loads",
+        "version": "2.25.2",
+        "release_name": "Structured ERG-Mode Detection for Indoor Interval Workouts",
         "build_date": "2026-11-24",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.25.2",
+                "date": "2026-11-24",
+                "title": "Structured ERG-Mode Detection for Indoor Interval Workouts",
+                "items": [
+                    "Stream-Based ERG Detection: Added within-block 20-second power steadiness analysis (median CV <= 0.055) so structured Zwift/ERG interval workouts with whole-ride VI > 1.05 (e.g. 1.08) are accurately recognized as ERG-locked rather than non-ERG stochastic rides.",
+                    "Accurate ERG Fatigue Analysis: Prevented prescribed interval step-downs or block differences in ERG mode from being mislabeled as power fade; AI debriefs now focus on cadence stability, HR drift, and aerobic decoupling."
+                ]
+            },
             {
                 "version": "v2.25.1",
                 "date": "2026-11-24",

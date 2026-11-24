@@ -2382,7 +2382,13 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
         f"Instead, deliver real coaching value across all four pillars: (1) internal physiological cost (EF vs personal baseline, cardiac drift/decoupling, HR & WHOOP strain/reaction), "
         f"(2) whether the workout truly fit their independent physiological readiness & HRV, (3) execution nuances beyond average NP (VI, cadence/power/interval fade, duration, W' depletion), "
         f"and (4) how this ride moves them toward their long-term goal, weekly TSS pace, and phase target.\n"
-        f"Mandatory: All wattage figures above are Normalized Power (NP). Always refer to them as Normalized Power or NP (e.g. '195W NP'), NEVER as 'average power' or 'avg watts'.\n"
+        + (
+            "CRITICAL ERG-MODE RULE: ERG-locked=True means the smart trainer controlled wattage automatically (even if whole-ride VI > 1.05 due to structured interval steps). "
+            "Do NOT state or imply the athlete rode without ERG lock, and do NOT interpret prescribed block wattage differences as power slipping from fatigue—evaluate fatigue via cadence stability, HR drift, and aerobic decoupling.\n"
+            if bool(p_exec.get("is_erg_like"))
+            else ""
+        )
+        + f"Mandatory: Session and target wattage figures above are Normalized Power (NP) unless explicitly labeled 'avg'. Always refer to NP figures as Normalized Power or NP (e.g. '195W NP'), NEVER as 'average power' or 'avg watts'.\n"
         f"Mandatory: All advice and tomorrow guidance MUST strictly respect the athlete's workout and schedule preferences.\n"
         f"Format response as strict JSON: {{\"insights\": \"2 tight paragraphs synthesizing physiological response, readiness fit, execution nuances, and long-term goal progress, under 180 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\", \"pillar_notes\": {{\"physiological\": \"1 concise insight sentence (<28 words)\", \"readiness\": \"1 concise insight sentence (<28 words)\", \"execution\": \"1 concise insight sentence (<28 words)\", \"goal\": \"1 concise insight sentence (<28 words)\"}}}}"
     )

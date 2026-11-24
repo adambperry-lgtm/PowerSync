@@ -152,6 +152,45 @@ def _detect_work_intervals(
     }
 
 
+def _detect_erg_stream_steadiness(
+    watts: List[float],
+    dt_sec: float = 1.0,
+) -> Tuple[Optional[bool], Optional[float]]:
+    """
+    Detects whether a power stream exhibits ERG-mode steadiness within steady blocks.
+    Even when a structured ERG interval workout has whole-ride VI > 1.05 (e.g. 1.08–1.25),
+    within each 20-second active window the smart trainer holds wattage tightly (median CV <= 0.055),
+    whereas free rides/races fluctuate continuously (median CV > 0.06).
+    """
+    win = max(5, int(round(20.0 / max(0.5, dt_sec))))
+    if len(watts) < win * 6:
+        return None, None
+
+    cvs: List[float] = []
+    for i in range(0, len(watts) - win + 1, win):
+        seg = watts[i : i + win]
+        if any(w <= 50.0 for w in seg):
+            continue
+        mean_w = sum(seg) / len(seg)
+        if mean_w <= 50.0:
+            continue
+        var_w = sum((w - mean_w) ** 2 for w in seg) / len(seg)
+        cv = math.sqrt(var_w) / mean_w
+        cvs.append(cv)
+
+    if len(cvs) < 6:
+        return None, None
+
+    cvs.sort()
+    mid_idx = len(cvs) // 2
+    if len(cvs) % 2 == 1:
+        median_cv = cvs[mid_idx]
+    else:
+        median_cv = 0.5 * (cvs[mid_idx - 1] + cvs[mid_idx])
+
+    return bool(median_cv <= 0.055), round(median_cv, 4)
+
+
 def compute_stream_analytics(
     streams: Optional[Dict[str, List[float]]],
     ftp: int = 250,
@@ -162,6 +201,7 @@ def compute_stream_analytics(
       - 1st-half vs. 2nd-half NP fade, HR drift, and Cadence fade
       - Discrete work-interval fade (1st vs. last >=85% FTP block)
       - Coggan Power Time-in-Zone distribution (Z1..Z5+)
+      - Within-block ERG steadiness detection
     """
     if not isinstance(streams, dict):
         return None
@@ -268,6 +308,7 @@ def compute_stream_analytics(
         ftp=ftp,
         dt_sec=dt_sec,
     )
+    erg_stream_detected, erg_stream_cv = _detect_erg_stream_steadiness(watts, dt_sec=dt_sec)
 
     return {
         "has_streams": True,
@@ -285,6 +326,8 @@ def compute_stream_analytics(
         "cadence_fade_rpm": cadence_fade_rpm,
         "interval_fade": interval_fade,
         "time_in_zones": time_in_zones,
+        "erg_stream_detected": erg_stream_detected,
+        "erg_stream_cv": erg_stream_cv,
     }
 
 
@@ -793,7 +836,14 @@ def analyze_execution_nuances(
     sport_l = (primary_act.get("sport_type") or primary_act.get("type") or "").lower()
     name_l = (primary_act.get("name") or "").lower()
     is_indoor_platform = ("virtual" in sport_l) or any(k in name_l for k in ("zwift", "trainerroad", "rouvy", "wahoo", "erg"))
-    is_erg_like = bool(is_indoor_platform and vi is not None and vi <= 1.05)
+    erg_stream_detected = stream_metrics.get("erg_stream_detected") if stream_metrics else None
+    is_erg_like = bool(
+        is_indoor_platform
+        and (
+            (vi is not None and vi <= 1.05)
+            or (erg_stream_detected is True)
+        )
+    )
 
     duration_completion_pct = (
         round((act_min / planned_duration_min) * 100)
@@ -813,7 +863,7 @@ def analyze_execution_nuances(
     if duration_completion_pct is not None and duration_completion_pct < 80:
         status = "Cut Short"
         color = "amber"
-    elif interval_fade and interval_fade.get("interval_power_fade_pct") is not None and interval_fade["interval_power_fade_pct"] <= -6.0:
+    elif interval_fade and interval_fade.get("interval_power_fade_pct") is not None and interval_fade["interval_power_fade_pct"] <= -6.0 and not is_erg_like:
         status = "Late Interval Fade"
         color = "amber"
     elif cadence_fade_rpm is not None and cadence_fade_rpm <= -5.0:
@@ -834,13 +884,18 @@ def analyze_execution_nuances(
 
     chips: List[str] = []
     if vi is not None:
-        vi_lbl = "ERG Steady" if is_erg_like else ("Smooth" if vi <= 1.06 else "Stochastic")
+        if is_erg_like:
+            vi_lbl = "ERG Structured" if vi > 1.05 else "ERG Steady"
+        elif is_indoor_platform:
+            vi_lbl = "Smooth" if vi <= 1.06 else ("Structured" if vi <= 1.12 else "Stochastic")
+        else:
+            vi_lbl = "Smooth" if vi <= 1.06 else "Stochastic"
         chips.append(f"VI {vi:.2f} ({vi_lbl})")
     if duration_completion_pct is not None and planned_duration_min:
         chips.append(f"Duration {act_min}m / {planned_duration_min}m ({duration_completion_pct}%)")
     if interval_fade and interval_fade.get("interval_count"):
         f_pct = interval_fade.get("interval_power_fade_pct")
-        f_str = f" ({f_pct:+.1f}% last vs 1st)" if f_pct is not None else ""
+        f_str = f" ({f_pct:+.1f}% last vs 1st)" if (f_pct is not None and not is_erg_like) else ""
         chips.append(f"{interval_fade['interval_count']} Work Blocks{f_str}")
     elif power_fade_pct is not None:
         chips.append(f"2nd Half NP {power_fade_pct:+.1f}%")
@@ -854,14 +909,22 @@ def analyze_execution_nuances(
 
     parts: List[str] = []
     if is_erg_like:
-        parts.append(
-            f"Indoor ERG-style pacing locked wattage tightly (VI {vi:.2f}), so wattage compliance alone isn't the real story—focus on your cadence and heart-rate cost."
-        )
+        if vi is not None and vi > 1.05:
+            parts.append(
+                f"Indoor ERG-mode structured intervals (VI {vi:.2f}) held each block's target wattage automatically, so focus on your cadence stability and heart-rate cost rather than wattage compliance."
+            )
+        else:
+            parts.append(
+                f"Indoor ERG-style pacing locked wattage tightly (VI {vi:.2f}), so wattage compliance alone isn't the real story—focus on your cadence and heart-rate cost."
+            )
     elif vi is not None:
         if vi <= 1.05:
             parts.append(f"Very steady pacing throughout (VI {vi:.2f}), minimizing wasted anaerobic surges.")
         elif vi <= 1.12:
-            parts.append(f"Moderately variable power profile (VI {vi:.2f}), typical of rolling terrain or structured surges.")
+            if is_indoor_platform:
+                parts.append(f"Moderately variable indoor power profile (VI {vi:.2f}), reflecting structured intensity changes or terrain.")
+            else:
+                parts.append(f"Moderately variable power profile (VI {vi:.2f}), typical of rolling terrain or structured surges.")
         else:
             parts.append(f"Highly stochastic effort (VI {vi:.2f}) with repeated surges above average power.")
 
@@ -876,12 +939,15 @@ def analyze_execution_nuances(
         fp = interval_fade.get("interval_power_fade_pct")
         fh = interval_fade.get("interval_hr_drift_bpm")
         fc = interval_fade.get("interval_cadence_fade_rpm")
-        if fp is not None and fp <= -5.0:
+        if fp is not None and fp <= -5.0 and not is_erg_like:
             parts.append(f"Across {ic} work blocks, power faded {fp:.1f}% from block 1 ({interval_fade['first_block_watts']}W) to block {ic} ({interval_fade['last_block_watts']}W).")
         elif fp is not None:
             hr_s = f" while HR rose {fh:+.0f} bpm" if fh is not None and abs(fh) >= 3 else ""
             cad_s = f" and cadence shifted {fc:+.0f} rpm" if fc is not None and abs(fc) >= 3 else ""
-            parts.append(f"Held power cleanly across all {ic} work blocks ({interval_fade['first_block_watts']}W → {interval_fade['last_block_watts']}W){hr_s}{cad_s}.")
+            if is_erg_like:
+                parts.append(f"Across {ic} ERG work blocks ({interval_fade['first_block_watts']}W avg → {interval_fade['last_block_watts']}W avg){hr_s}{cad_s}.")
+            else:
+                parts.append(f"Held power cleanly across all {ic} work blocks ({interval_fade['first_block_watts']}W → {interval_fade['last_block_watts']}W){hr_s}{cad_s}.")
     elif cadence_fade_rpm is not None:
         if cadence_fade_rpm <= -5.0:
             parts.append(f"Cadence dropped {abs(cadence_fade_rpm):.0f} rpm in the second half (avg {cadence_avg} rpm), an early sign of muscular fatigue even while holding watts.")

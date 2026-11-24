@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.25.2] - 2026-11-24
+### Fixed
+- **Structured ERG-Mode Detection on Indoor Interval Workouts (VI > 1.05)**:
+  - Fixed a bug in [`analyze_execution_nuances()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/debrief_analytics.py) where indoor Zwift/ERG interval workouts with whole-ride Variability Index above `1.05` (e.g. `1.08` from warmup/work/recovery steps) were misclassified as `is_erg_like = False` and `"Stochastic"`, causing the AI debrief to claim the athlete rode *"without ERG lock"* and misattribute prescribed block wattage differences to power fade.
+  - Added [`_detect_erg_stream_steadiness()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/debrief_analytics.py) in [`compute_stream_analytics()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/debrief_analytics.py) to measure within-block 20-second power Coefficient of Variation (`median CV <= 0.055`), accurately distinguishing ERG-locked structured interval workouts from non-ERG free rides/races.
+  - Updated [`call_gemini_coach_review()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) with an explicit `CRITICAL ERG-MODE RULE` and `NP` vs. `avg` block wattage clarification so ERG-mode debriefs evaluate fatigue via cadence stability, HR drift, and aerobic decoupling rather than power compliance.
+  - Added regression coverage in [`test_four_pillar_debrief.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_four_pillar_debrief.py) for structured ERG workouts (`VI 1.08`) vs. non-ERG free rides.
+
 ## [2.25.1] - 2026-11-24
 ### Fixed
 - **Strava Training Load (7 Days) Zeroed-Out Display Bug on Cached Debrief Loads**:
