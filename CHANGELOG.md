@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.27.6] - 2026-11-25
+### Fixed
+- **Phenotype Goal Table Parity with Spiderweb Active Goal**:
+  - Fixed [`calculate_spiderweb_target_changes()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) so the active phenotype card in the table below the Spiderweb uses the exact `active_goal["target_envelope"]` (expanded to all 12 axes) instead of recomputing a lower target from current FTP, and computes non-active phenotype targets from the 5 Coggan ratio anchors + [`_fill_intermediate_peaks()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) so `✓ Met` / gap values always match the Spiderweb chart.
+
 ## [2.27.5] - 2026-11-25
 ### Fixed
 - **All 12 Spiderweb Axes Now Show Goal Targets (Conforming with Duration Breakdown)**:

@@ -1458,35 +1458,43 @@ def calculate_spiderweb_target_changes(
         reqs = pheno["requirements"]
         sig_axes = pheno.get("signature_axes", [])
 
-        # Build progressive target envelope
-        target_env = {}
-        for dur_meta in RADAR_DURATIONS:
-            dur_k = dur_meta["key"]
-            base_req = round(ftp * reqs.get(f"{dur_k}_ratio", 1.0))
-            curr_val = cur_envelope.get(dur_k, 0)
-            if dur_k in sig_axes:
-                # Hallmark signature duration for this archetype:
-                # If current power is near or exceeds archetype baseline, challenge with a +5% progressive stimulus
-                if curr_val >= round(base_req * 0.97):
-                    target_env[dur_k] = max(base_req, round(curr_val * 1.05))
-                else:
-                    target_env[dur_k] = base_req
-            else:
-                # Non-signature axes: maintain current power or archetype baseline
-                target_env[dur_k] = max(curr_val, base_req)
+        is_active_pheno_goal = bool(
+            active_goal
+            and active_goal.get("goal_type") == "phenotype"
+            and str(active_goal.get("target_key", "")).lower() == pheno["id"].lower()
+            and active_goal.get("target_envelope")
+        )
 
-        if "min_20m_wkg" in reqs:
-            wkg_tgt = round(weight_kg * reqs["min_20m_wkg"])
-            if cur_envelope.get("20m", 0) >= round(wkg_tgt * 0.97):
-                target_env["20m"] = max(target_env.get("20m", 0), round(cur_envelope.get("20m", 0) * 1.05))
-            else:
-                target_env["20m"] = max(target_env.get("20m", 0), wkg_tgt)
-        if "min_5m_wkg" in reqs:
-            wkg_tgt_5 = round(weight_kg * reqs["min_5m_wkg"])
-            if cur_envelope.get("5m", 0) >= round(wkg_tgt_5 * 0.97):
-                target_env["5m"] = max(target_env.get("5m", 0), round(cur_envelope.get("5m", 0) * 1.05))
-            else:
-                target_env["5m"] = max(target_env.get("5m", 0), wkg_tgt_5)
+        if is_active_pheno_goal:
+            target_env = _fill_intermediate_peaks(active_goal["target_envelope"])
+        else:
+            # Build progressive target envelope from the 5 Coggan ratio anchors, then interpolate all 12 axes
+            base_target_env = {}
+            for dur_k in ("5s", "1m", "5m", "20m", "60m"):
+                base_req = round(ftp * reqs.get(f"{dur_k}_ratio", 1.0))
+                curr_val = cur_envelope.get(dur_k, 0)
+                if dur_k in sig_axes:
+                    if curr_val >= round(base_req * 0.97):
+                        base_target_env[dur_k] = max(base_req, round(curr_val * 1.05))
+                    else:
+                        base_target_env[dur_k] = base_req
+                else:
+                    base_target_env[dur_k] = max(curr_val, base_req)
+
+            if "min_20m_wkg" in reqs:
+                wkg_tgt = round(weight_kg * reqs["min_20m_wkg"])
+                if cur_envelope.get("20m", 0) >= round(wkg_tgt * 0.97):
+                    base_target_env["20m"] = max(base_target_env.get("20m", 0), round(cur_envelope.get("20m", 0) * 1.05))
+                else:
+                    base_target_env["20m"] = max(base_target_env.get("20m", 0), wkg_tgt)
+            if "min_5m_wkg" in reqs:
+                wkg_tgt_5 = round(weight_kg * reqs["min_5m_wkg"])
+                if cur_envelope.get("5m", 0) >= round(wkg_tgt_5 * 0.97):
+                    base_target_env["5m"] = max(base_target_env.get("5m", 0), round(cur_envelope.get("5m", 0) * 1.05))
+                else:
+                    base_target_env["5m"] = max(base_target_env.get("5m", 0), wkg_tgt_5)
+
+            target_env = _fill_intermediate_peaks(base_target_env)
 
         axis_gaps = []
         total_delta = 0

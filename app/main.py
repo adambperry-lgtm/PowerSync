@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.27.5",
-        "release_name": "Full 12-Axis Goal Targets on Spiderweb",
+        "version": "2.27.6",
+        "release_name": "Spiderweb & Phenotype Goal Table Parity",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.27.6",
+                "date": "2026-11-25",
+                "title": "Spiderweb & Phenotype Goal Table Parity",
+                "items": [
+                    "Goal Table Parity: Synced the Phenotype Transformation table below the Spiderweb directly with your Active Goal target_envelope across all 12 durations so Met vs. gap watts never disagree with the Spiderweb."
+                ]
+            },
             {
                 "version": "v2.27.5",
                 "date": "2026-11-25",
