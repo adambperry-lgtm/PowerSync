@@ -8344,12 +8344,12 @@ function renderSpiderwebSvg(axes, activeGoal) {
         gapColor = "#EF4444";
       }
     } else if (isAllTime) {
-      if (ax.delta_watts >= 0) {
-        gapText = `(PR ✓)`;
+      if (ax.delta_watts > 0) {
+        gapText = `(+${ax.delta_watts}W vs 30d)`;
         gapColor = "#00C896";
       } else {
-        gapText = `(${ax.delta_watts}W vs PR)`;
-        gapColor = "#EF4444";
+        gapText = `(Current 30d)`;
+        gapColor = "#64748B";
       }
     }
 

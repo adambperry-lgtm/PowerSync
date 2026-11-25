@@ -554,8 +554,8 @@ def get_power_spiderweb_profile(
     elif timeframe == "all_time":
         cur_days = 30
         prev_days = 365
-        cur_label = "Current Month"
-        prev_label = "All-Time PRs"
+        cur_label = "All-Time PRs"
+        prev_label = "Last 30 Days"
     else: # default 30d
         cur_days = 30
         prev_days = 30
@@ -589,7 +589,7 @@ def get_power_spiderweb_profile(
             act_copy["peaks"] = calculate_activity_peak_powers(act_copy, ftp, w_prime_kj, peak_power, mmp_peaks=act_mmp)
             act_copy["peak_source"] = "stream" if (act_mmp and act_mmp.get("has_power_stream")) else "estimated"
         else:
-            act_copy["peaks"] = {"5s": 0, "30s": 0, "1m": 0, "5m": 0, "20m": 0, "60m": 0}
+            act_copy["peaks"] = {k: 0 for k in ALL_PEAK_KEYS}
             act_copy["peak_source"] = "none"
 
         all_acts.append(act_copy)
@@ -634,21 +634,22 @@ def get_power_spiderweb_profile(
     all_time_envelope = {}
 
     for k in dur_keys:
-        # Current period peak (strictly cycling activities)
-        cur_vals = [a["peaks"].get(k, 0) for a in cur_cycling if a["peaks"].get(k, 0) > 0]
-        cur_envelope[k] = max(cur_vals) if cur_vals else modeled_baseline[k]
-
-        # Previous period peak (strictly cycling activities)
-        if timeframe == "all_time":
-            all_vals = [a["peaks"].get(k, 0) for a in all_cycling if a["peaks"].get(k, 0) > 0]
-            prev_envelope[k] = max(all_vals) if all_vals else modeled_baseline[k]
-        else:
-            prev_vals = [a["peaks"].get(k, 0) for a in prev_cycling if a["peaks"].get(k, 0) > 0]
-            prev_envelope[k] = max(prev_vals) if prev_vals else int(modeled_baseline[k] * 0.95)
-
         # All-time PR peak (strictly cycling activities)
         all_vals = [a["peaks"].get(k, 0) for a in all_cycling if a["peaks"].get(k, 0) > 0]
         all_time_envelope[k] = max(all_vals) if all_vals else modeled_baseline[k]
+
+        if timeframe == "all_time":
+            # Primary polygon = All-Time PRs; reference baseline = Last 30 Days
+            cur_envelope[k] = all_time_envelope[k]
+            recent_vals = [a["peaks"].get(k, 0) for a in cur_cycling if a["peaks"].get(k, 0) > 0]
+            prev_envelope[k] = max(recent_vals) if recent_vals else modeled_baseline[k]
+        else:
+            # Current period peak (strictly cycling activities)
+            cur_vals = [a["peaks"].get(k, 0) for a in cur_cycling if a["peaks"].get(k, 0) > 0]
+            cur_envelope[k] = max(cur_vals) if cur_vals else modeled_baseline[k]
+
+            prev_vals = [a["peaks"].get(k, 0) for a in prev_cycling if a["peaks"].get(k, 0) > 0]
+            prev_envelope[k] = max(prev_vals) if prev_vals else int(modeled_baseline[k] * 0.95)
 
     # Benchmark caps for radar scale normalization (100% outer ring)
     # Calibrated against Coggan Category 1 / Elite W/kg physiological standards,

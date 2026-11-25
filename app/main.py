@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.27.2",
-        "release_name": "Intuitive Spiderweb Color Scheme & Gap Labels",
+        "version": "2.27.3",
+        "release_name": "All-Time PRs vs. Goal Spiderweb Comparison",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.27.3",
+                "date": "2026-11-25",
+                "title": "All-Time PRs vs. Goal Spiderweb Comparison",
+                "items": [
+                    "All-Time PRs Primary Polygon: Selecting All-Time PRs now plots your All-Time PRs as the primary Spiderweb polygon, evaluates Active Goal gaps against your All-Time PRs, and shows Last 30 Days as the reference baseline."
+                ]
+            },
             {
                 "version": "v2.27.2",
                 "date": "2026-11-25",

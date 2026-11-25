@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.27.3] - 2026-11-25
+### Fixed
+- **All-Time PRs Spiderweb View Now Compares All-Time PRs vs. Goal**:
+  - Updated [`get_power_spiderweb_profile()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) so selecting `All-Time PRs` (`timeframe="all_time"`) plots your **All-Time PRs** as the primary polygon (`cur_envelope`), computes goal gaps and progress directly against your All-Time PRs, and uses **Last 30 Days** as the reference baseline.
+  - Updated [`renderSpiderwebSvg()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=169`) so `All-Time PRs` displays All-Time PR wattage on line 1 and the gap to your Active Goal (or `(+XW vs 30d)` when no goal is set) on line 2.
+
 ## [2.27.2] - 2026-11-25
 ### Changed
 - **Intuitive Spiderweb Color Scheme & Consistent `Absolute W + (Gap)` Labels**:
