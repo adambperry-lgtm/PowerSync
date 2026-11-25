@@ -6718,8 +6718,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .spiderweb-legend-dot.previous {
-  background: #FF5E00 !important;
-  border-color: #FF5E00 !important;
+  background: #64748B !important;
+  border-color: #64748B !important;
 }
 
 .spiderweb-legend-dot.goal {

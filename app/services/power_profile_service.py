@@ -16,18 +16,18 @@ from app.database import (
 from app.services.strain_model_service import get_athlete_fitness_signature, is_cycling_sport
 
 RADAR_DURATIONS = [
-    {"key": "15s", "label": "15s", "sec": 15, "name": "Sprint (15s)", "icon": "⚡", "energy": "Neuromuscular", "zone_group": "anaerobic", "zone_color": "#0066FF", "zone_label": "Anaerobic"},
-    {"key": "30s", "label": "30s", "sec": 30, "name": "Burst (30s)", "icon": "⚡", "energy": "Anaerobic Alactic", "zone_group": "anaerobic", "zone_color": "#0066FF", "zone_label": "Anaerobic"},
-    {"key": "1m", "label": "1m", "sec": 60, "name": "Anaerobic (1m)", "icon": "💥", "energy": "Glycolytic", "zone_group": "anaerobic", "zone_color": "#0066FF", "zone_label": "Anaerobic"},
-    {"key": "2m", "label": "2m", "sec": 120, "name": "VO2 Short (2m)", "icon": "🔥", "energy": "Glycolytic / VO2", "zone_group": "vo2", "zone_color": "#10B981", "zone_label": "VO2 Max"},
-    {"key": "3m", "label": "3m", "sec": 180, "name": "VO2 Power (3m)", "icon": "🫁", "energy": "Maximal Aerobic", "zone_group": "vo2", "zone_color": "#10B981", "zone_label": "VO2 Max"},
-    {"key": "5m", "label": "5m", "sec": 300, "name": "VO2 Max (5m)", "icon": "🫁", "energy": "Aerobic Ceiling", "zone_group": "vo2", "zone_color": "#10B981", "zone_label": "VO2 Max"},
-    {"key": "10m", "label": "10m", "sec": 600, "name": "Sustained VO2 (10m)", "icon": "🫁", "energy": "High Aerobic", "zone_group": "vo2", "zone_color": "#10B981", "zone_label": "VO2 Max"},
-    {"key": "15m", "label": "15m", "sec": 900, "name": "Sub-Threshold (15m)", "icon": "⏱️", "energy": "Threshold", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
-    {"key": "20m", "label": "20m", "sec": 1200, "name": "Threshold (20m)", "icon": "⏱️", "energy": "Lactate Equilibrium", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
-    {"key": "30m", "label": "30m", "sec": 1800, "name": "Tempo / TT (30m)", "icon": "🚴", "energy": "Lactate Clearance", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
-    {"key": "45m", "label": "45m", "sec": 2700, "name": "Endurance (45m)", "icon": "🚴", "energy": "Aerobic Stamina", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
-    {"key": "60m", "label": "60m", "sec": 3600, "name": "Stamina (60m)", "icon": "🚴", "energy": "Aerobic Endurance", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
+    {"key": "15s", "label": "15s", "sec": 15, "name": "Sprint (15s)", "icon": "⚡", "energy": "Neuromuscular", "zone_group": "anaerobic", "zone_color": "#4F46E5", "zone_label": "Anaerobic"},
+    {"key": "30s", "label": "30s", "sec": 30, "name": "Burst (30s)", "icon": "⚡", "energy": "Anaerobic Alactic", "zone_group": "anaerobic", "zone_color": "#4F46E5", "zone_label": "Anaerobic"},
+    {"key": "1m", "label": "1m", "sec": 60, "name": "Anaerobic (1m)", "icon": "💥", "energy": "Glycolytic", "zone_group": "anaerobic", "zone_color": "#4F46E5", "zone_label": "Anaerobic"},
+    {"key": "2m", "label": "2m", "sec": 120, "name": "VO2 Short (2m)", "icon": "🔥", "energy": "Glycolytic / VO2", "zone_group": "vo2", "zone_color": "#0D9488", "zone_label": "VO2 Max"},
+    {"key": "3m", "label": "3m", "sec": 180, "name": "VO2 Power (3m)", "icon": "🫁", "energy": "Maximal Aerobic", "zone_group": "vo2", "zone_color": "#0D9488", "zone_label": "VO2 Max"},
+    {"key": "5m", "label": "5m", "sec": 300, "name": "VO2 Max (5m)", "icon": "🫁", "energy": "Aerobic Ceiling", "zone_group": "vo2", "zone_color": "#0D9488", "zone_label": "VO2 Max"},
+    {"key": "10m", "label": "10m", "sec": 600, "name": "Sustained VO2 (10m)", "icon": "🫁", "energy": "High Aerobic", "zone_group": "vo2", "zone_color": "#0D9488", "zone_label": "VO2 Max"},
+    {"key": "15m", "label": "15m", "sec": 900, "name": "Sub-Threshold (15m)", "icon": "⏱️", "energy": "Threshold", "zone_group": "threshold", "zone_color": "#D97706", "zone_label": "Threshold"},
+    {"key": "20m", "label": "20m", "sec": 1200, "name": "Threshold (20m)", "icon": "⏱️", "energy": "Lactate Equilibrium", "zone_group": "threshold", "zone_color": "#D97706", "zone_label": "Threshold"},
+    {"key": "30m", "label": "30m", "sec": 1800, "name": "Tempo / TT (30m)", "icon": "🚴", "energy": "Lactate Clearance", "zone_group": "threshold", "zone_color": "#D97706", "zone_label": "Threshold"},
+    {"key": "45m", "label": "45m", "sec": 2700, "name": "Endurance (45m)", "icon": "🚴", "energy": "Aerobic Stamina", "zone_group": "threshold", "zone_color": "#D97706", "zone_label": "Threshold"},
+    {"key": "60m", "label": "60m", "sec": 3600, "name": "Stamina (60m)", "icon": "🚴", "energy": "Aerobic Endurance", "zone_group": "threshold", "zone_color": "#D97706", "zone_label": "Threshold"},
 ]
 
 ALL_PEAK_KEYS = ["5s", "15s", "30s", "1m", "2m", "3m", "5m", "10m", "15m", "20m", "30m", "45m", "60m"]

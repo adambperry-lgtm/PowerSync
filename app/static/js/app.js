@@ -8182,8 +8182,8 @@ function renderSpiderwebSvg(axes, activeGoal) {
         <stop offset="100%" stop-color="#0052FF" stop-opacity="0.12" />
       </radialGradient>
       <radialGradient id="radarPreviousGradient" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stop-color="#FF5E00" stop-opacity="0.22" />
-        <stop offset="100%" stop-color="#FF5E00" stop-opacity="0.06" />
+        <stop offset="0%" stop-color="#64748B" stop-opacity="0.20" />
+        <stop offset="100%" stop-color="#64748B" stop-opacity="0.05" />
       </radialGradient>
       <radialGradient id="radarGoalGradient" cx="50%" cy="50%" r="50%">
         <stop offset="0%" stop-color="#00C896" stop-opacity="0.26" />
@@ -8238,7 +8238,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
     const groups = [];
     axes.forEach((ax, idx) => {
       const gKey = ax.zone_group || "threshold";
-      const gCol = ax.zone_color || "#F97316";
+      const gCol = ax.zone_color || "#D97706";
       if (!groups.length || groups[groups.length - 1].key !== gKey) {
         groups.push({ key: gKey, color: gCol, startIdx: idx, endIdx: idx });
       } else {
@@ -8269,7 +8269,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
     }
   }
 
-  // Baseline polygon
+  // Baseline polygon (Slate dashed)
   const prevPts = [];
   const prevCircles = [];
   for (let i = 0; i < n; i++) {
@@ -8280,9 +8280,9 @@ function renderSpiderwebSvg(axes, activeGoal) {
     prevPts.push(`${px.toFixed(1)},${py.toFixed(1)}`);
     prevCircles.push({ x: px, y: py, axis: axes[i] });
   }
-  content += `<polygon points="${prevPts.join(" ")}" fill="url(#radarPreviousGradient)" stroke="#FF5E00" stroke-width="2" stroke-dasharray="4 3" opacity="0.92" />`;
+  content += `<polygon points="${prevPts.join(" ")}" fill="url(#radarPreviousGradient)" stroke="#64748B" stroke-width="2" stroke-dasharray="4 3" opacity="0.88" />`;
   prevCircles.forEach(pt => {
-    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${isDetailed ? 3.5 : 4.5}" fill="#FF5E00" stroke="#FFFFFF" stroke-width="1.3"><title>Baseline (${escapeSpiderwebHtml(pt.axis.label)}): ${pt.axis.previous_watts || '--'}W</title></circle>`;
+    content += `<circle cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${isDetailed ? 3.5 : 4.5}" fill="#64748B" stroke="#FFFFFF" stroke-width="1.3"><title>Baseline (${escapeSpiderwebHtml(pt.axis.label)}): ${pt.axis.previous_watts || '--'}W</title></circle>`;
   });
 
   // Active Goal Polygon (if active goal set)
@@ -8324,12 +8324,34 @@ function renderSpiderwebSvg(axes, activeGoal) {
     content += `<circle class="spiderweb-svg-vertex-hit" data-axis-key="${escapeSpiderwebHtml(pt.axis.key)}" cx="${pt.x.toFixed(1)}" cy="${pt.y.toFixed(1)}" r="${isDetailed ? 4.8 : 6}" fill="#0052FF" stroke="#FFFFFF" stroke-width="1.8" style="cursor:pointer;"><title>${escapeSpiderwebHtml(pt.axis.name)}: ${pt.axis.current_watts}W (${pt.axis.current_w_kg} W/kg) — Click for details</title></circle>`;
   });
 
-  // Outer axis labels
+  // Outer axis labels: consistent 2-part format -> Absolute W + (Tested Gap to Relevant Metric)
+  const isAllTime = (typeof currentSpiderwebTimeframe !== "undefined" && currentSpiderwebTimeframe === "all_time");
   for (let i = 0; i < n; i++) {
     const ax = axes[i];
     const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
     const deltaSign = ax.delta_watts > 0 ? "+" : "";
-    const deltaColor = ax.delta_watts > 0 ? "#00C896" : ax.delta_watts < 0 ? "#EF4444" : "#64748B";
+
+    let gapText = `(${deltaSign}${ax.delta_watts}W)`;
+    let gapColor = ax.delta_watts > 0 ? "#00C896" : ax.delta_watts < 0 ? "#EF4444" : "#64748B";
+
+    if (hasGoal && ax.target_watts) {
+      if (ax.goal_met) {
+        const surplus = Math.max(0, (ax.current_watts || 0) - ax.target_watts);
+        gapText = surplus > 0 ? `(✓ +${surplus}W)` : `(✓ Goal)`;
+        gapColor = "#00C896";
+      } else {
+        gapText = `(-${ax.goal_remaining_watts}W to goal)`;
+        gapColor = "#EF4444";
+      }
+    } else if (isAllTime) {
+      if (ax.delta_watts >= 0) {
+        gapText = `(PR ✓)`;
+        gapColor = "#00C896";
+      } else {
+        gapText = `(${ax.delta_watts}W vs PR)`;
+        gapColor = "#EF4444";
+      }
+    }
 
     if (isDetailed) {
       const labelDist = r + 40;
@@ -8348,7 +8370,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
         ly += 2;
       }
 
-      const hitW = 76;
+      const hitW = 86;
       const hitX = textAnchor === "start" ? lx - 4 : textAnchor === "end" ? lx - hitW + 4 : lx - hitW / 2;
       content += `
         <g class="spiderweb-svg-axis-label" data-axis-key="${escapeSpiderwebHtml(ax.key)}" role="button" tabindex="0" aria-label="Inspect ${escapeSpiderwebHtml(ax.name || ax.label)} details" style="pointer-events:all;cursor:pointer;">
@@ -8356,8 +8378,8 @@ function renderSpiderwebSvg(axes, activeGoal) {
           <text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="${textAnchor}" fill="#111625" font-size="13.5" font-weight="800" font-family="Outfit, Inter, sans-serif">
             ${ax.current_watts} W
           </text>
-          <text x="${lx.toFixed(1)}" y="${(ly + 13).toFixed(1)}" text-anchor="${textAnchor}" fill="${deltaColor}" font-size="10.5" font-weight="700" font-family="Inter, sans-serif">
-            ${deltaSign}${ax.delta_watts}W · ${ax.current_w_kg ? ax.current_w_kg.toFixed(1) : '--'}
+          <text x="${lx.toFixed(1)}" y="${(ly + 13).toFixed(1)}" text-anchor="${textAnchor}" fill="${gapColor}" font-size="10.5" font-weight="700" font-family="Inter, sans-serif">
+            ${escapeSpiderwebHtml(gapText)}
           </text>
         </g>
       `;

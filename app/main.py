@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.27.1",
-        "release_name": "Daily Training Card Spacing Polish",
+        "version": "2.27.2",
+        "release_name": "Intuitive Spiderweb Color Scheme & Gap Labels",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.27.2",
+                "date": "2026-11-25",
+                "title": "Intuitive Spiderweb Color Scheme & Gap Labels",
+                "items": [
+                    "Consistent Absolute + (Gap) Labels: Every Spiderweb spoke now shows your absolute tested wattage on line 1 and your parenthetical gap to the relevant metric on line 2 (prior period, All-Time PR, or Active Goal).",
+                    "De-Conflicted Color Scheme: Switched the Baseline polygon to Slate (#64748B) and the outer energy-zone arc ring to Indigo (Anaerobic), Teal (VO2 Max), and Amber (Threshold) with an inline zone key."
+                ]
+            },
             {
                 "version": "v2.27.1",
                 "date": "2026-11-25",

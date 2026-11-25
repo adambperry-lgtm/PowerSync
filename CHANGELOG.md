@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.27.2] - 2026-11-25
+### Changed
+- **Intuitive Spiderweb Color Scheme & Consistent `Absolute W + (Gap)` Labels**:
+  - Replaced the mixed `delta · w/kg` perimeter labels in [`renderSpiderwebSvg()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=168`) with a consistent 2-line format on all 12 axes: **absolute tested wattage** (`534 W`) and a **parenthetical gap** to the relevant metric (`(+18W)` vs. prior period, `(-14W vs PR)` / `(PR ✓)` on All-Time PRs, or `(-15W to goal)` / `(✓ +5W)` when an Active Goal is set).
+  - De-conflicted polygon vs. zone colors: changed the Baseline polygon and legend dot ([`style.css`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/css/style.css) `v=74`) to **Slate (`#64748B`)**, updated the outer zone arc ring in [`RADAR_DURATIONS`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) to **Indigo** (`Anaerobic 15s–1m`), **Teal** (`VO2 Max 2m–10m`), and **Amber** (`Threshold 15m–60m`), and added an inline `#spiderwebZoneKey` legend in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html).
+
 ## [2.27.1] - 2026-11-25
 ### Fixed
 - **Missing Vertical Gap Between Today's Training and AI Coach Daily Debrief Cards**:
