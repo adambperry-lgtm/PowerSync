@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.27.4",
-        "release_name": "Spiderweb Timeframe Pills & vs Prior / vs Goal Toggle",
+        "version": "2.27.5",
+        "release_name": "Full 12-Axis Goal Targets on Spiderweb",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.27.5",
+                "date": "2026-11-25",
+                "title": "Full 12-Axis Goal Targets on Spiderweb",
+                "items": [
+                    "12-Axis Goal Parity: Expanded saved and new Active Goal target_envelopes across all 12 Power Skills durations (15s through 60m) so every spoke displays its exact goal gap instead of (No goal)."
+                ]
+            },
             {
                 "version": "v2.27.4",
                 "date": "2026-11-25",

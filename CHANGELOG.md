@@ -3,6 +3,11 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.27.5] - 2026-11-25
+### Fixed
+- **All 12 Spiderweb Axes Now Show Goal Targets (Conforming with Duration Breakdown)**:
+  - Updated [`get_power_spiderweb_profile()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py), [`set_active_spiderweb_goal()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py), and [`sync_spiderweb_goal_from_program()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) to expand `target_envelope` across all 13 durations via [`_fill_intermediate_peaks()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) so previously saved 5-axis goals immediately populate goal targets and gaps on `15s`, `30s`, `2m`, `3m`, `10m`, `15m`, `30m`, and `45m` instead of showing `(No goal)`.
+
 ## [2.27.4] - 2026-11-25
 ### Changed
 - **Spiderweb Timeframe Pills (`30D` / `60D` / `90D` / `All-Time`) & `vs Prior | vs Goal` Delta Toggle**:

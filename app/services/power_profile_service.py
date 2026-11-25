@@ -682,7 +682,8 @@ def get_power_spiderweb_profile(
 
     # Retrieve athlete's active training goal if configured
     active_goal = get_active_spiderweb_goal(user_id=uid)
-    goal_envelope = active_goal.get("target_envelope", {}) if active_goal else {}
+    raw_goal_env = active_goal.get("target_envelope", {}) if active_goal else {}
+    goal_envelope = _fill_intermediate_peaks(raw_goal_env) if (active_goal and raw_goal_env) else {}
 
     # Build axis points and deltas
     axes_data = []
@@ -712,7 +713,7 @@ def get_power_spiderweb_profile(
         goal_remaining_w = 0
         goal_met = False
 
-        if active_goal and k in goal_envelope:
+        if active_goal and goal_envelope.get(k, 0) > 0:
             target_w = int(goal_envelope[k])
             target_w_kg = round(target_w / max(40.0, weight_kg), 2)
             target_radar_pct = round(min(100.0, max(20.0, (target_w / bm) * 100.0)), 1)
@@ -1155,6 +1156,8 @@ def set_active_spiderweb_goal(payload: Dict[str, Any], user_id: Optional[str] = 
         set_setting("program_start_date", today.isoformat(), user_id=uid)
         set_setting("program_target_date", (today + datetime.timedelta(days=max(14, block_weeks * 7))).isoformat(), user_id=uid)
 
+    target_envelope = _fill_intermediate_peaks(target_envelope)
+
     goal_obj = {
         "id": f"spiderweb_goal_{int(datetime.datetime.now().timestamp())}",
         "goal_type": goal_type,
@@ -1243,6 +1246,7 @@ def sync_spiderweb_goal_from_program(
                 env["20m"] = max(cur_envelope.get("20m", 240), round(p_target_ftp * reqs["20m_ratio"]))
                 env["60m"] = max(cur_envelope.get("60m", 210), round(p_target_ftp * reqs["60m_ratio"]))
 
+        env = _fill_intermediate_peaks(env)
         existing["target_envelope"] = env
         existing["synced_program_goal"] = p_goal
         existing["synced_target_ftp"] = p_target_ftp
