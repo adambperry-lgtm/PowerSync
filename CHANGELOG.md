@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.26.1] - 2026-11-25
+### Fixed
+- **Fueling Plan Packing Checklist Consistency & Mobile Readiness Pill Overflow**:
+  - Fixed [`generate_fueling_plan()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/fueling_service.py) so the Jersey Pocket & Bike Packing Checklist is derived 1:1 from the exact Hour-by-Hour Feeding Protocol and fluid/sodium totals instead of independent heuristic fractions. Eliminated phantom gels and excess drink mix on single-bottle/low-carb rides (e.g., a 60-minute `35g` carb ride now packs strictly `1x 750ml Cycling Water Bottle` + `Carb Drink Mix (35g carbs)` with no extra `25g` gel), omitted carb mix on `<45m` `0g` hydration-only rides, reconciled window carb rounding, and computed bottle counts from exact ml targets (`total_fluid_ml / 750`).
+  - Fixed a mobile UI overflow glitch on `#fuelingRecoveryPills` (and `#modalReplaceRecoveryPills`) in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) and [`style.css`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/css/style.css) (`v=73`) where the `Yesterday: XX TSS` readiness pill spilled past the right border of the Optimal Glycogen Readiness card on narrow viewports.
+  - Added regression coverage in [`test_fueling_service.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_fueling_service.py) verifying exact carb-sum parity across `target_rates`, `hourly_timeline`, and `packing_checklist` across durations, intensities, and recovery states.
+
 ## [2.26.0] - 2026-11-24
 ### Added
 - **Exact 1-Hz Strava Stream MMP Peaks & Rate-Limit-Safe Background Sync for Power Spiderweb**:

@@ -3084,6 +3084,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-bottom: 0.85rem;
 }
 
+.recovery-load-impact-bar {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#fuelingRecoveryPills,
+#modalReplaceRecoveryPills {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+#fuelingRecoveryPills .badge-status,
+#modalReplaceRecoveryPills .badge-status {
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 /* ==========================================================================
    iPhone & Mobile Responsive Optimization
    ========================================================================== */

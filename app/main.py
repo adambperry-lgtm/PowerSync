@@ -147,9 +147,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.26.0",
-        "release_name": "Exact 1-Hz Strava Power Stream Spiderweb & Live Sync Progress",
-        "build_date": "2026-11-24",
+        "version": "2.26.1",
+        "release_name": "Fueling Packing List Precision & Mobile Readiness Bar Fix",
+        "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.26.1",
+                "date": "2026-11-25",
+                "title": "Fueling Packing List Precision & Mobile Readiness Bar Fix",
+                "items": [
+                    "Exact Packing List Sync: Derived the Jersey Pocket & Bike Packing Checklist 1:1 from the Hour-by-Hour Feeding Protocol so packed drink mix, gels, and solids always sum to the exact recommended carb target (removing phantom gels on 35g bottle-only rides and carb mix on 0g rides).",
+                    "Mobile Readiness Pill Wrapping: Fixed the Optimal Glycogen Readiness card pill row (#fuelingRecoveryPills and #modalReplaceRecoveryPills) so the Yesterday TSS badge wraps cleanly inside the card border on mobile screens."
+                ]
+            },
             {
                 "version": "v2.26.0",
                 "date": "2026-11-24",

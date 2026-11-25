@@ -54,6 +54,101 @@ class TestFuelingService(unittest.TestCase):
         november_ride = generate_fueling_plan(duration_min=90, temp_f=48, humidity_pct=55, is_outdoor=True)
         self.assertFalse(any("Salt Capsules" in c["item"] for c in november_ride["packing_checklist"]))
 
+    def test_60_min_35g_ride_packing_list_matches_bottle_only_protocol(self):
+        plan = generate_fueling_plan(
+            duration_min=60,
+            avg_power_watts=170,
+            ftp=250,
+            intensity_type="Endurance",
+            is_outdoor=False,
+            recovery_score=92,
+            trailing_strain_avg=10.0,
+            yesterday_tss=37,
+        )
+        self.assertEqual(plan["target_rates"]["carbs_per_hour_g"], 35)
+        self.assertEqual(plan["target_rates"]["total_carbs_g"], 35)
+        self.assertEqual(plan["target_rates"]["fluid_ml_per_hour"], 747)
+
+        checklist = plan["packing_checklist"]
+        items = [c["item"] for c in checklist]
+        # 1 bottle + 35g carb drink mix only; no extra gel or solid that would exceed 35g
+        self.assertTrue(any("1x 750ml Cycling Water Bottle" == it for it in items))
+        self.assertTrue(any("Carb Drink Mix (35g carbs)" == it for it in items))
+        self.assertFalse(any("Gel" in it for it in items))
+        self.assertFalse(any("Solid" in it for it in items))
+        self.assertEqual(sum(c["carbs_g"] for c in checklist), 35)
+
+    def test_short_ride_zero_carbs_omits_carb_mix_and_gels(self):
+        plan = generate_fueling_plan(
+            duration_min=30,
+            avg_power_watts=160,
+            ftp=250,
+            is_outdoor=False,
+            recovery_score=80,
+        )
+        self.assertEqual(plan["target_rates"]["total_carbs_g"], 0)
+        checklist = plan["packing_checklist"]
+        self.assertEqual(len(checklist), 1)
+        self.assertEqual(checklist[0]["item"], "1x 750ml Cycling Water Bottle")
+        self.assertIn("0g carbs", checklist[0]["detail"])
+        self.assertEqual(sum(c["carbs_g"] for c in checklist), 0)
+
+    def test_packing_checklist_always_matches_hourly_timeline_and_total_carbs(self):
+        durations = [30, 45, 60, 63, 75, 90, 105, 120, 150, 180, 210, 240]
+        intensities = ["Recovery", "Endurance", "Tempo", "Hard"]
+        recoveries = [30, 85]
+
+        for dur in durations:
+            for intensity in intensities:
+                for rec in recoveries:
+                    plan = generate_fueling_plan(
+                        duration_min=dur,
+                        ftp=250,
+                        intensity_type=intensity,
+                        is_outdoor=True,
+                        temp_f=70,
+                        humidity_pct=50,
+                        recovery_score=rec,
+                    )
+                    total_target = plan["target_rates"]["total_carbs_g"]
+                    timeline_sum = sum(h["carbs_g"] for h in plan["hourly_timeline"])
+                    items_sum = sum(
+                        it["carbs"]
+                        for h in plan["hourly_timeline"]
+                        for it in h["fuel_items"]
+                    )
+                    checklist_sum = sum(c["carbs_g"] for c in plan["packing_checklist"])
+
+                    self.assertEqual(
+                        timeline_sum,
+                        total_target,
+                        f"Timeline sum mismatch for dur={dur}, intensity={intensity}, rec={rec}",
+                    )
+                    self.assertEqual(
+                        items_sum,
+                        total_target,
+                        f"Fuel items sum mismatch for dur={dur}, intensity={intensity}, rec={rec}",
+                    )
+                    self.assertEqual(
+                        checklist_sum,
+                        total_target,
+                        f"Packing checklist sum mismatch for dur={dur}, intensity={intensity}, rec={rec}",
+                    )
+
+                    # Verify gels only appear in checklist when scheduled in hourly_timeline
+                    scheduled_gels = sum(
+                        1
+                        for h in plan["hourly_timeline"]
+                        for it in h["fuel_items"]
+                        if "Gel" in it["item"]
+                    )
+                    has_gel_in_checklist = any("Gel" in c["item"] for c in plan["packing_checklist"])
+                    self.assertEqual(
+                        has_gel_in_checklist,
+                        scheduled_gels > 0,
+                        f"Gel mismatch for dur={dur}, intensity={intensity}, rec={rec}",
+                    )
+
 
 if __name__ == "__main__":
     unittest.main()

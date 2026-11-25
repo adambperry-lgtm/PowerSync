@@ -15,7 +15,7 @@
     document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.setAttribute("data-theme-mode", "light");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=72">
+  <link rel="stylesheet" href="/static/css/style.css?v=73">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -777,10 +777,10 @@
           </div>
 
           <!-- Physiological Recovery & Trailing Stress Impact Bar -->
-          <div class="recovery-load-impact-bar" id="fuelingRecoveryImpactBar" style="margin-top:0.6rem;background:rgba(0,82,255,0.06);border:1px solid rgba(0,82,255,0.2);border-radius:6px;padding:0.6rem 0.85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
-            <div style="display:flex;align-items:center;gap:0.5rem;">
-              <span style="font-size:1.15rem;" id="fuelingRecoveryIcon">🧬</span>
-              <div>
+          <div class="recovery-load-impact-bar" id="fuelingRecoveryImpactBar" style="margin-top:0.6rem;background:rgba(0,82,255,0.06);border:1px solid rgba(0,82,255,0.2);border-radius:6px;padding:0.6rem 0.85rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;max-width:100%;box-sizing:border-box;">
+            <div style="display:flex;align-items:center;gap:0.5rem;min-width:0;flex:1 1 200px;">
+              <span style="font-size:1.15rem;flex-shrink:0;" id="fuelingRecoveryIcon">🧬</span>
+              <div style="min-width:0;">
                 <div style="font-size:0.78rem;font-weight:700;color:#0052FF;" id="fuelingRecoveryTitle">
                   Physiological Recovery &amp; Load Adaptation
                 </div>
@@ -789,7 +789,7 @@
                 </div>
               </div>
             </div>
-            <div style="display:flex;align-items:center;gap:0.4rem;" id="fuelingRecoveryPills">
+            <div style="display:flex;align-items:center;flex-wrap:wrap;gap:0.4rem;max-width:100%;" id="fuelingRecoveryPills">
               <span class="badge-status" id="fuelingBadgeRecScore" style="font-size:0.7rem;">Whoop: --%</span>
               <span class="badge-status" id="fuelingBadgeStrain" style="font-size:0.7rem;">7D Strain: --</span>
               <span class="badge-status" id="fuelingBadgeYesterdayTss" style="font-size:0.7rem;">Yesterday: -- TSS</span>
@@ -3407,7 +3407,7 @@
             <div style="font-size:0.78rem;font-weight:700;color:#0052FF;display:flex;align-items:center;gap:0.35rem;">
               <span>🧬</span> Physiological Readiness &amp; Trailing Load
             </div>
-            <div style="display:flex;gap:0.35rem;" id="modalReplaceRecoveryPills">
+            <div style="display:flex;flex-wrap:wrap;gap:0.35rem;max-width:100%;" id="modalReplaceRecoveryPills">
               <span class="badge-status" id="modalReplaceBadgeWhoop" style="font-size:0.7rem;">Whoop: Loading...</span>
               <span class="badge-status" id="modalReplaceBadgeStrain" style="font-size:0.7rem;">7D Strain: --</span>
               <span class="badge-status" id="modalReplaceBadgeTss" style="font-size:0.7rem;">Yesterday: -- TSS</span>
