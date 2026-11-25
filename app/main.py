@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.27.3",
-        "release_name": "All-Time PRs vs. Goal Spiderweb Comparison",
+        "version": "2.27.4",
+        "release_name": "Spiderweb Timeframe Pills & vs Prior / vs Goal Toggle",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.27.4",
+                "date": "2026-11-25",
+                "title": "Spiderweb Timeframe Pills & vs Prior / vs Goal Toggle",
+                "items": [
+                    "Clean Timeframe Pills: Simplified Spiderweb timeframe tabs to 30D, 60D, 90D, and All-Time.",
+                    "vs Prior | vs Goal Delta Toggle: Added a dedicated toggle to switch parenthetical gaps between Prior Period (for 30D/60D/90D) and Active Goal (automatically locked to vs Goal on All-Time)."
+                ]
+            },
             {
                 "version": "v2.27.3",
                 "date": "2026-11-25",

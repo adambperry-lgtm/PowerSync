@@ -1449,16 +1449,24 @@
           </button>
           <div class="mode-tabs" id="spiderwebTimeframeGroup" style="padding:0.2rem;">
             <button class="mode-tab active" data-timeframe="30d" id="tabSpiderweb30d" type="button">
-              30D vs Prior
+              30D
             </button>
             <button class="mode-tab" data-timeframe="60d" id="tabSpiderweb60d" type="button">
-              60D vs Prior
+              60D
             </button>
             <button class="mode-tab" data-timeframe="90d" id="tabSpiderweb90d" type="button">
-              90D vs Season
+              90D
             </button>
             <button class="mode-tab" data-timeframe="all_time" id="tabSpiderwebAllTime" type="button">
-              All-Time PRs
+              All-Time
+            </button>
+          </div>
+          <div class="mode-tabs" id="spiderwebDeltaGroup" style="padding:0.2rem;" title="Choose whether parenthetical gaps compare against Prior Period or Active Goal">
+            <button class="mode-tab active" data-delta="prior" id="tabSpiderwebDeltaPrior" type="button">
+              vs Prior
+            </button>
+            <button class="mode-tab" data-delta="goal" id="tabSpiderwebDeltaGoal" type="button">
+              vs Goal
             </button>
           </div>
           <button class="btn btn-secondary btn-stage-collapse" id="btnTogglePowerSpiderweb" type="button" aria-label="Collapse or expand power spiderweb tracker">
@@ -3692,6 +3700,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=169"></script>
+  <script src="/static/js/app.js?v=170"></script>
 </body>
 </html>

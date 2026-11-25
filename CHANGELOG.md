@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.27.4] - 2026-11-25
+### Changed
+- **Spiderweb Timeframe Pills (`30D` / `60D` / `90D` / `All-Time`) & `vs Prior | vs Goal` Delta Toggle**:
+  - Simplified `#spiderwebTimeframeGroup` labels in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) to `30D`, `60D`, `90D`, and `All-Time`.
+  - Added `#spiderwebDeltaGroup` (`vs Prior` | `vs Goal`) in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html) and wired [`syncSpiderwebDeltaToggleUI()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) + [`renderSpiderwebSvg()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=170`) so `30D`/`60D`/`90D` can toggle parenthetical gaps between `vs Prior` and `vs Goal`, while `All-Time` automatically locks to `vs Goal`.
+
 ## [2.27.3] - 2026-11-25
 ### Fixed
 - **All-Time PRs Spiderweb View Now Compares All-Time PRs vs. Goal**:

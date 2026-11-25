@@ -7899,6 +7899,7 @@ function escapeSpiderwebHtml(str) {
 }
 
 let currentSpiderwebTimeframe = "30d";
+let currentSpiderwebDeltaMode = "prior";
 let currentSpiderwebData = null;
 let spiderwebStreamPollTimer = null;
 let lastSpiderwebSyncedCount = null;
@@ -8016,6 +8017,27 @@ async function loadPowerSpiderweb(timeframe = "30d") {
   }
 }
 
+function syncSpiderwebDeltaToggleUI(timeframe) {
+  const deltaGroup = document.getElementById("spiderwebDeltaGroup");
+  if (!deltaGroup) return;
+  const btnPrior = document.getElementById("tabSpiderwebDeltaPrior");
+  const btnGoal = document.getElementById("tabSpiderwebDeltaGoal");
+  const isAllTime = timeframe === "all_time";
+
+  if (btnPrior) {
+    btnPrior.disabled = isAllTime;
+    btnPrior.style.opacity = isAllTime ? "0.45" : "1";
+    btnPrior.style.cursor = isAllTime ? "not-allowed" : "pointer";
+  }
+  if (isAllTime && currentSpiderwebDeltaMode === "prior") {
+    currentSpiderwebDeltaMode = "goal";
+  }
+  if (btnPrior && btnGoal) {
+    btnPrior.classList.toggle("active", currentSpiderwebDeltaMode === "prior");
+    btnGoal.classList.toggle("active", currentSpiderwebDeltaMode === "goal");
+  }
+}
+
 function setupPowerSpiderwebTabs() {
   const group = document.getElementById("spiderwebTimeframeGroup");
   if (!group) return;
@@ -8026,10 +8048,29 @@ function setupPowerSpiderwebTabs() {
       tabs.forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
       const tf = tab.getAttribute("data-timeframe") || "30d";
+      syncSpiderwebDeltaToggleUI(tf);
       loadPowerSpiderweb(tf);
     });
   });
 
+  const deltaGroup = document.getElementById("spiderwebDeltaGroup");
+  if (deltaGroup) {
+    const dTabs = deltaGroup.querySelectorAll(".mode-tab");
+    dTabs.forEach(tab => {
+      tab.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (tab.disabled) return;
+        const mode = tab.getAttribute("data-delta") || "prior";
+        currentSpiderwebDeltaMode = mode;
+        syncSpiderwebDeltaToggleUI(currentSpiderwebTimeframe);
+        if (currentSpiderwebData) {
+          renderPowerSpiderweb(currentSpiderwebData);
+        }
+      });
+    });
+  }
+
+  syncSpiderwebDeltaToggleUI(currentSpiderwebTimeframe);
   setupSpiderwebPlannerNav();
 }
 
@@ -8326,6 +8367,7 @@ function renderSpiderwebSvg(axes, activeGoal) {
 
   // Outer axis labels: consistent 2-part format -> Absolute W + (Tested Gap to Relevant Metric)
   const isAllTime = (typeof currentSpiderwebTimeframe !== "undefined" && currentSpiderwebTimeframe === "all_time");
+  const useGoalGap = (typeof currentSpiderwebDeltaMode !== "undefined" && currentSpiderwebDeltaMode === "goal") || isAllTime;
   for (let i = 0; i < n; i++) {
     const ax = axes[i];
     const angle = -Math.PI / 2 + (i * 2 * Math.PI / n);
@@ -8334,21 +8376,26 @@ function renderSpiderwebSvg(axes, activeGoal) {
     let gapText = `(${deltaSign}${ax.delta_watts}W)`;
     let gapColor = ax.delta_watts > 0 ? "#00C896" : ax.delta_watts < 0 ? "#EF4444" : "#64748B";
 
-    if (hasGoal && ax.target_watts) {
-      if (ax.goal_met) {
-        const surplus = Math.max(0, (ax.current_watts || 0) - ax.target_watts);
-        gapText = surplus > 0 ? `(✓ +${surplus}W)` : `(✓ Goal)`;
-        gapColor = "#00C896";
+    if (useGoalGap) {
+      if (hasGoal && ax.target_watts) {
+        if (ax.goal_met) {
+          const surplus = Math.max(0, (ax.current_watts || 0) - ax.target_watts);
+          gapText = surplus > 0 ? `(✓ +${surplus}W)` : `(✓ Goal)`;
+          gapColor = "#00C896";
+        } else {
+          gapText = `(-${ax.goal_remaining_watts}W to goal)`;
+          gapColor = "#EF4444";
+        }
+      } else if (isAllTime) {
+        if (ax.delta_watts > 0) {
+          gapText = `(+${ax.delta_watts}W vs 30d)`;
+          gapColor = "#00C896";
+        } else {
+          gapText = `(Current 30d)`;
+          gapColor = "#64748B";
+        }
       } else {
-        gapText = `(-${ax.goal_remaining_watts}W to goal)`;
-        gapColor = "#EF4444";
-      }
-    } else if (isAllTime) {
-      if (ax.delta_watts > 0) {
-        gapText = `(+${ax.delta_watts}W vs 30d)`;
-        gapColor = "#00C896";
-      } else {
-        gapText = `(Current 30d)`;
+        gapText = `(No goal)`;
         gapColor = "#64748B";
       }
     }
