@@ -3,6 +3,14 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.27.0] - 2026-11-25
+### Added
+- **12-Axis Strava Power Skills Spiderweb (`15s` – `60m`)**:
+  - Expanded [`strava_activity_mmp_peaks`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) and [`MMP_WINDOWS`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/strava_service.py) to compute and cache all 12 Strava Power Skills durations (`15s`, `30s`, `1m`, `2m`, `3m`, `5m`, `10m`, `15m`, `20m`, `30m`, `45m`, `60m`) plus `5s`, with automatic local recomputation from cached streams.
+  - Expanded [`RADAR_DURATIONS`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) and [`get_power_spiderweb_profile()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) to a 12-axis model grouped into **Anaerobic** (`15s–1m`), **VO2 Max** (`2m–10m`), and **Threshold** (`15m–60m`), with log-time interpolation fallback for non-streamed rides.
+  - Upgraded [`renderSpiderwebSvg()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=167`) to render the 12-spoke radar chart with the color-coded outer zone arc ring (Blue / Green / Orange), duration pills, and non-overlapping perimeter wattage readouts.
+  - Added 12-axis Spiderweb verification in [`test_stream_mmp_spiderweb.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_stream_mmp_spiderweb.py).
+
 ## [2.26.1] - 2026-11-25
 ### Fixed
 - **Fueling Plan Packing Checklist Consistency & Mobile Readiness Pill Overflow**:

@@ -16,12 +16,21 @@ from app.database import (
 from app.services.strain_model_service import get_athlete_fitness_signature, is_cycling_sport
 
 RADAR_DURATIONS = [
-    {"key": "5s", "label": "5s Sprint", "sec": 5, "name": "Sprint (5s)", "icon": "⚡", "energy": "Neuromuscular"},
-    {"key": "1m", "label": "1m Anaerobic", "sec": 60, "name": "Anaerobic (1m)", "icon": "💥", "energy": "Glycolytic"},
-    {"key": "5m", "label": "5m VO2 Max", "sec": 300, "name": "VO2 Max (5m)", "icon": "🫁", "energy": "Aerobic Ceiling"},
-    {"key": "20m", "label": "20m Threshold", "sec": 1200, "name": "Threshold (20m)", "icon": "⏱️", "energy": "Lactate Equilibrium"},
-    {"key": "60m", "label": "60m Stamina", "sec": 3600, "name": "Stamina (60m)", "icon": "🚴", "energy": "Aerobic Endurance"},
+    {"key": "15s", "label": "15s", "sec": 15, "name": "Sprint (15s)", "icon": "⚡", "energy": "Neuromuscular", "zone_group": "anaerobic", "zone_color": "#0066FF", "zone_label": "Anaerobic"},
+    {"key": "30s", "label": "30s", "sec": 30, "name": "Burst (30s)", "icon": "⚡", "energy": "Anaerobic Alactic", "zone_group": "anaerobic", "zone_color": "#0066FF", "zone_label": "Anaerobic"},
+    {"key": "1m", "label": "1m", "sec": 60, "name": "Anaerobic (1m)", "icon": "💥", "energy": "Glycolytic", "zone_group": "anaerobic", "zone_color": "#0066FF", "zone_label": "Anaerobic"},
+    {"key": "2m", "label": "2m", "sec": 120, "name": "VO2 Short (2m)", "icon": "🔥", "energy": "Glycolytic / VO2", "zone_group": "vo2", "zone_color": "#10B981", "zone_label": "VO2 Max"},
+    {"key": "3m", "label": "3m", "sec": 180, "name": "VO2 Power (3m)", "icon": "🫁", "energy": "Maximal Aerobic", "zone_group": "vo2", "zone_color": "#10B981", "zone_label": "VO2 Max"},
+    {"key": "5m", "label": "5m", "sec": 300, "name": "VO2 Max (5m)", "icon": "🫁", "energy": "Aerobic Ceiling", "zone_group": "vo2", "zone_color": "#10B981", "zone_label": "VO2 Max"},
+    {"key": "10m", "label": "10m", "sec": 600, "name": "Sustained VO2 (10m)", "icon": "🫁", "energy": "High Aerobic", "zone_group": "vo2", "zone_color": "#10B981", "zone_label": "VO2 Max"},
+    {"key": "15m", "label": "15m", "sec": 900, "name": "Sub-Threshold (15m)", "icon": "⏱️", "energy": "Threshold", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
+    {"key": "20m", "label": "20m", "sec": 1200, "name": "Threshold (20m)", "icon": "⏱️", "energy": "Lactate Equilibrium", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
+    {"key": "30m", "label": "30m", "sec": 1800, "name": "Tempo / TT (30m)", "icon": "🚴", "energy": "Lactate Clearance", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
+    {"key": "45m", "label": "45m", "sec": 2700, "name": "Endurance (45m)", "icon": "🚴", "energy": "Aerobic Stamina", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
+    {"key": "60m", "label": "60m", "sec": 3600, "name": "Stamina (60m)", "icon": "🚴", "energy": "Aerobic Endurance", "zone_group": "threshold", "zone_color": "#F97316", "zone_label": "Threshold"},
 ]
+
+ALL_PEAK_KEYS = ["5s", "15s", "30s", "1m", "2m", "3m", "5m", "10m", "15m", "20m", "30m", "45m", "60m"]
 
 # --- Rider Phenotype Definitions (Coggan Power Profiling Model) ---
 
@@ -271,34 +280,15 @@ def calculate_activity_peak_powers(
     sport = act.get("sport_type") or act.get("type", "")
     act_name = act.get("name", "")
     if not is_cycling_sport(sport, act_name, activity=act):
-        return {"5s": 0, "30s": 0, "1m": 0, "5m": 0, "20m": 0, "60m": 0}
+        return {k: 0 for k in ALL_PEAK_KEYS}
 
     if isinstance(mmp_peaks, dict) and mmp_peaks.get("has_power_stream"):
-        p_5s = int(mmp_peaks.get("5s") or 0)
-        p_30s = int(mmp_peaks.get("30s") or 0)
-        p_1m = int(mmp_peaks.get("1m") or 0)
-        p_5m = int(mmp_peaks.get("5m") or 0)
-        p_20m = int(mmp_peaks.get("20m") or 0)
-        p_60m = int(mmp_peaks.get("60m") or 0)
-        if p_5s > 0 or p_1m > 0 or p_5m > 0 or p_20m > 0 or p_60m > 0:
-            if p_20m > 0 and p_60m > p_20m:
-                p_20m = p_60m
-            if p_5m > 0 and p_20m > p_5m:
-                p_5m = p_20m
-            if p_1m > 0 and p_5m > p_1m:
-                p_1m = p_5m
-            if p_30s > 0 and p_1m > p_30s:
-                p_30s = p_1m
-            if p_5s > 0 and p_30s > p_5s:
-                p_5s = p_30s
-            return {
-                "5s": p_5s,
-                "30s": p_30s,
-                "1m": p_1m,
-                "5m": p_5m,
-                "20m": p_20m,
-                "60m": p_60m,
-            }
+        out_peaks = {k: int(mmp_peaks.get(k) or 0) for k in ALL_PEAK_KEYS}
+        if any(v > 0 for v in out_peaks.values()):
+            # Fill any intermediate durations if an older 6-key cache row hasn't been recomputed yet
+            moving_sec_hint = int(act.get("moving_time_sec") or 0)
+            out_peaks = _fill_intermediate_peaks(out_peaks, moving_sec_hint)
+            return out_peaks
 
     moving_sec = int(act.get("moving_time_sec") or 0)
     avg_w = float(act.get("average_watts") or 0.0)
@@ -419,14 +409,55 @@ def calculate_activity_peak_powers(
     if p_5s > 0 and p_30s > p_5s:
         p_5s = p_30s
 
-    return {
+    base_peaks = {
         "5s": p_5s,
         "30s": p_30s,
         "1m": p_1m,
         "5m": p_5m,
         "20m": p_20m,
-        "60m": p_60m
+        "60m": p_60m,
     }
+    return _fill_intermediate_peaks(base_peaks, moving_sec)
+
+
+_KEY_SECONDS = {
+    "5s": 5, "15s": 15, "30s": 30, "1m": 60, "2m": 120, "3m": 180,
+    "5m": 300, "10m": 600, "15m": 900, "20m": 1200, "30m": 1800, "45m": 2700, "60m": 3600,
+}
+
+
+def _fill_intermediate_peaks(peaks: Dict[str, int], moving_sec: int = 0) -> Dict[str, int]:
+    """
+    Ensures all 13 duration keys are populated (using log-time interpolation for any missing
+    intermediate keys) and enforces physiological monotonicity P(short) >= P(long).
+    """
+    out = {k: int(peaks.get(k) or 0) for k in ALL_PEAK_KEYS}
+    anchors = [( _KEY_SECONDS[k], out[k] ) for k in ALL_PEAK_KEYS if out[k] > 0]
+    if anchors:
+        for k in ALL_PEAK_KEYS:
+            sec = _KEY_SECONDS[k]
+            if out[k] > 0:
+                continue
+            if moving_sec > 0 and moving_sec < sec and not (k == "60m" and moving_sec >= 3000) and not (k == "20m" and moving_sec >= 900):
+                continue
+            # Interpolate in log(time) between nearest lower and upper anchors
+            lower = [a for a in anchors if a[0] < sec]
+            upper = [a for a in anchors if a[0] > sec]
+            if lower and upper:
+                t1, p1 = lower[-1]
+                t2, p2 = upper[0]
+                frac = (math.log(sec) - math.log(t1)) / max(1e-6, math.log(t2) - math.log(t1))
+                out[k] = max(1, round(p1 + (p2 - p1) * frac))
+            elif lower and sec <= max(moving_sec, lower[-1][0]):
+                t1, p1 = lower[-1]
+                out[k] = max(1, round(p1 * (t1 / float(sec)) ** 0.08))
+
+    for idx in range(len(ALL_PEAK_KEYS) - 2, -1, -1):
+        sk = ALL_PEAK_KEYS[idx]
+        lk = ALL_PEAK_KEYS[idx + 1]
+        if out[sk] > 0 and out[lk] > out[sk]:
+            out[sk] = out[lk]
+    return out
 
 def get_power_spiderweb_profile(
     user_id: Optional[str] = None,
@@ -578,16 +609,24 @@ def get_power_spiderweb_profile(
     elif not prev_cycling and all_cycling:
         prev_cycling = []
 
-    # Calculate peak power envelope for each duration
-    dur_keys = ["5s", "1m", "5m", "20m", "60m"]
+    # Calculate peak power envelope for each duration (5s + all 12 Power Skills axes)
+    dur_keys = list(ALL_PEAK_KEYS)
 
     # Fallback baseline powers based on athlete's FTP and fitness signature
     modeled_baseline = {
         "5s": round(max(peak_power * 0.72, ftp * 2.7)),
+        "15s": round(max(peak_power * 0.62, ftp * 2.25)),
+        "30s": round(max(peak_power * 0.52, ftp * 1.90)),
         "1m": round(ftp * 1.55),
+        "2m": round(ftp * 1.32),
+        "3m": round(ftp * 1.22),
         "5m": round(ftp * 1.15),
+        "10m": round(ftp * 1.04),
+        "15m": round(ftp * 1.00),
         "20m": round(ftp * 0.98),
-        "60m": round(ftp * 0.88)
+        "30m": round(ftp * 0.94),
+        "45m": round(ftp * 0.90),
+        "60m": round(ftp * 0.88),
     }
 
     cur_envelope = {}
@@ -617,9 +656,17 @@ def get_power_spiderweb_profile(
     safe_weight = max(40.0, float(weight_kg))
     coggan_elite_benchmarks = {
         "5s": max(1200, round(safe_weight * 20.5), round(max(peak_power, ftp * 3.8) * 1.15)),
+        "15s": max(980, round(safe_weight * 16.5), round(max(peak_power * 0.88, ftp * 3.1) * 1.12)),
+        "30s": max(760, round(safe_weight * 12.8), round(ftp * 2.65)),
         "1m": max(580, round(safe_weight * 9.6), round(ftp * 2.2)),
+        "2m": max(460, round(safe_weight * 7.5), round(ftp * 1.75)),
+        "3m": max(420, round(safe_weight * 6.7), round(ftp * 1.58)),
         "5m": max(380, round(safe_weight * 6.1), round(ftp * 1.45)),
+        "10m": max(345, round(safe_weight * 5.4), round(ftp * 1.30)),
+        "15m": max(330, round(safe_weight * 5.15), round(ftp * 1.25)),
         "20m": max(320, round(safe_weight * 5.0), round(ftp * 1.22)),
+        "30m": max(308, round(safe_weight * 4.8), round(ftp * 1.17)),
+        "45m": max(298, round(safe_weight * 4.7), round(ftp * 1.14)),
         "60m": max(290, round(safe_weight * 4.6), round(ftp * 1.12)),
     }
 
@@ -681,6 +728,9 @@ def get_power_spiderweb_profile(
             "name": meta["name"],
             "icon": meta["icon"],
             "energy_system": meta["energy"],
+            "zone_group": meta.get("zone_group", "threshold"),
+            "zone_color": meta.get("zone_color", "#F97316"),
+            "zone_label": meta.get("zone_label", "Threshold"),
             "current_watts": cur_w,
             "current_w_kg": cur_w_kg,
             "previous_watts": prev_w,
@@ -788,11 +838,7 @@ def get_power_spiderweb_profile(
                 "cycling_sec": 0,
                 "total_tss": 0,
                 "cycling_tss": 0,
-                "peak_5s": 0,
-                "peak_1m": 0,
-                "peak_5m": 0,
-                "peak_20m": 0,
-                "peak_60m": 0
+                **{f"peak_{d}": 0 for d in dur_keys},
             }
         b = bucket_map[b_key]
         moving_sec = int(act.get("moving_time_sec") or 0)
@@ -907,7 +953,14 @@ def get_power_spiderweb_profile(
         "stream_progress": stream_progress,
         "axes": axes_data,
         "summary_deltas": {
-            "sprint_5s": next((a for a in axes_data if a["key"] == "5s"), {}),
+            "sprint_5s": next((a for a in axes_data if a["key"] == "5s"), {
+                "key": "5s",
+                "label": "5s Sprint",
+                "current_watts": cur_envelope.get("5s", 0),
+                "previous_watts": prev_envelope.get("5s", 0),
+                "delta_watts": cur_envelope.get("5s", 0) - prev_envelope.get("5s", 0),
+            }),
+            "sprint_15s": next((a for a in axes_data if a["key"] == "15s"), {}),
             "anaerobic_1m": next((a for a in axes_data if a["key"] == "1m"), {}),
             "vo2_5m": next((a for a in axes_data if a["key"] == "5m"), {}),
             "threshold_20m": next((a for a in axes_data if a["key"] == "20m"), {}),

@@ -633,16 +633,29 @@ def init_db():
         activity_id TEXT NOT NULL,
         has_power_stream INTEGER NOT NULL DEFAULT 0,
         peak_5s INTEGER NOT NULL DEFAULT 0,
+        peak_15s INTEGER NOT NULL DEFAULT 0,
         peak_30s INTEGER NOT NULL DEFAULT 0,
         peak_1m INTEGER NOT NULL DEFAULT 0,
+        peak_2m INTEGER NOT NULL DEFAULT 0,
+        peak_3m INTEGER NOT NULL DEFAULT 0,
         peak_5m INTEGER NOT NULL DEFAULT 0,
+        peak_10m INTEGER NOT NULL DEFAULT 0,
+        peak_15m INTEGER NOT NULL DEFAULT 0,
         peak_20m INTEGER NOT NULL DEFAULT 0,
+        peak_30m INTEGER NOT NULL DEFAULT 0,
+        peak_45m INTEGER NOT NULL DEFAULT 0,
         peak_60m INTEGER NOT NULL DEFAULT 0,
         sample_count INTEGER NOT NULL DEFAULT 0,
         computed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (user_id, activity_id)
     );
     """)
+
+    for col_name in ("peak_15s", "peak_2m", "peak_3m", "peak_10m", "peak_15m", "peak_30m", "peak_45m"):
+        try:
+            cursor.execute(f"ALTER TABLE strava_activity_mmp_peaks ADD COLUMN {col_name} INTEGER NOT NULL DEFAULT 0;")
+        except Exception:
+            pass
 
     # Ensure default user exists so legacy single-user data is preserved
     cursor.execute("""

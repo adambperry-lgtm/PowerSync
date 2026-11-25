@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.26.1",
-        "release_name": "Fueling Packing List Precision & Mobile Readiness Bar Fix",
+        "version": "2.27.0",
+        "release_name": "12-Axis Strava Power Skills Spiderweb",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.27.0",
+                "date": "2026-11-25",
+                "title": "12-Axis Strava Power Skills Spiderweb",
+                "items": [
+                    "12-Axis Power Skills Radar: Upgraded the Power Spiderweb from 5 axes to all 12 Strava Power Skills durations (15s, 30s, 1m, 2m, 3m, 5m, 10m, 15m, 20m, 30m, 45m, 60m) computed from 1-Hz Strava power streams.",
+                    "Color-Coded Zone Arc Ring: Added Blue (Anaerobic 15s–1m), Green (VO2 Max 2m–10m), and Orange (Threshold 15m–60m) outer arc bands with clean perimeter wattage and W/kg readouts.",
+                    "Automatic Local Backfill: Existing cached Strava streams automatically populate all 12 durations locally with zero extra Strava API calls."
+                ]
+            },
             {
                 "version": "v2.26.1",
                 "date": "2026-11-25",

@@ -631,17 +631,25 @@ def get_or_fetch_activity_streams(
 
 MMP_WINDOWS = (
     ("5s", 5),
+    ("15s", 15),
     ("30s", 30),
     ("1m", 60),
+    ("2m", 120),
+    ("3m", 180),
     ("5m", 300),
+    ("10m", 600),
+    ("15m", 900),
     ("20m", 1200),
+    ("30m", 1800),
+    ("45m", 2700),
     ("60m", 3600),
 )
 
 
 def compute_mmp_peaks_from_streams(raw_streams: Any) -> Optional[Dict[str, int]]:
     """
-    Computes exact Mean Maximal Power (MMP) peaks (5s, 30s, 1m, 5m, 20m, 60m)
+    Computes exact Mean Maximal Power (MMP) peaks across all 13 durations
+    (5s, 15s, 30s, 1m, 2m, 3m, 5m, 10m, 15m, 20m, 30m, 45m, 60m)
     from a Strava activity stream payload on a 1-Hz timeline (zero-padding pauses).
     Returns None if no valid watts stream is present.
     """
@@ -711,17 +719,13 @@ def compute_mmp_peaks_from_streams(raw_streams: Any) -> Optional[Dict[str, int]]
                 best = avg
         peaks[key] = int(round(best))
 
-    # Monotonicity guarantee across durations
-    if peaks["20m"] > 0 and peaks["60m"] > peaks["20m"]:
-        peaks["20m"] = peaks["60m"]
-    if peaks["5m"] > 0 and peaks["20m"] > peaks["5m"]:
-        peaks["5m"] = peaks["20m"]
-    if peaks["1m"] > 0 and peaks["5m"] > peaks["1m"]:
-        peaks["1m"] = peaks["5m"]
-    if peaks["30s"] > 0 and peaks["1m"] > peaks["30s"]:
-        peaks["30s"] = peaks["1m"]
-    if peaks["5s"] > 0 and peaks["30s"] > peaks["5s"]:
-        peaks["5s"] = peaks["30s"]
+    # Monotonicity guarantee across all durations (shorter >= longer)
+    ordered_keys = [k for k, _ in MMP_WINDOWS]
+    for idx in range(len(ordered_keys) - 2, -1, -1):
+        short_k = ordered_keys[idx]
+        long_k = ordered_keys[idx + 1]
+        if peaks[short_k] > 0 and peaks[long_k] > peaks[short_k]:
+            peaks[short_k] = peaks[long_k]
 
     return peaks
 
@@ -737,16 +741,24 @@ def save_activity_mmp_peaks(user_id: str, activity_id: str, peaks: Optional[Dict
         """
         INSERT INTO strava_activity_mmp_peaks (
             user_id, activity_id, has_power_stream,
-            peak_5s, peak_30s, peak_1m, peak_5m, peak_20m, peak_60m,
+            peak_5s, peak_15s, peak_30s, peak_1m, peak_2m, peak_3m,
+            peak_5m, peak_10m, peak_15m, peak_20m, peak_30m, peak_45m, peak_60m,
             sample_count, computed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
         ON CONFLICT(user_id, activity_id) DO UPDATE SET
             has_power_stream = excluded.has_power_stream,
             peak_5s = excluded.peak_5s,
+            peak_15s = excluded.peak_15s,
             peak_30s = excluded.peak_30s,
             peak_1m = excluded.peak_1m,
+            peak_2m = excluded.peak_2m,
+            peak_3m = excluded.peak_3m,
             peak_5m = excluded.peak_5m,
+            peak_10m = excluded.peak_10m,
+            peak_15m = excluded.peak_15m,
             peak_20m = excluded.peak_20m,
+            peak_30m = excluded.peak_30m,
+            peak_45m = excluded.peak_45m,
             peak_60m = excluded.peak_60m,
             sample_count = excluded.sample_count,
             computed_at = CURRENT_TIMESTAMP
@@ -756,10 +768,17 @@ def save_activity_mmp_peaks(user_id: str, activity_id: str, peaks: Optional[Dict
             str(activity_id),
             has_stream,
             int((peaks or {}).get("5s", 0)),
+            int((peaks or {}).get("15s", 0)),
             int((peaks or {}).get("30s", 0)),
             int((peaks or {}).get("1m", 0)),
+            int((peaks or {}).get("2m", 0)),
+            int((peaks or {}).get("3m", 0)),
             int((peaks or {}).get("5m", 0)),
+            int((peaks or {}).get("10m", 0)),
+            int((peaks or {}).get("15m", 0)),
             int((peaks or {}).get("20m", 0)),
+            int((peaks or {}).get("30m", 0)),
+            int((peaks or {}).get("45m", 0)),
             int((peaks or {}).get("60m", 0)),
             int((peaks or {}).get("sample_count", 0)),
         ),
@@ -775,7 +794,10 @@ def get_cached_mmp_peaks_map(user_id: Optional[str] = None) -> Dict[str, Dict[st
     c = conn.cursor()
     c.execute(
         """
-        SELECT activity_id, has_power_stream, peak_5s, peak_30s, peak_1m, peak_5m, peak_20m, peak_60m, sample_count
+        SELECT activity_id, has_power_stream,
+               peak_5s, peak_15s, peak_30s, peak_1m, peak_2m, peak_3m,
+               peak_5m, peak_10m, peak_15m, peak_20m, peak_30m, peak_45m, peak_60m,
+               sample_count
         FROM strava_activity_mmp_peaks
         WHERE user_id = ?
         """,
@@ -788,10 +810,17 @@ def get_cached_mmp_peaks_map(user_id: Optional[str] = None) -> Dict[str, Dict[st
         out[str(r["activity_id"])] = {
             "has_power_stream": bool(r["has_power_stream"]),
             "5s": int(r["peak_5s"] or 0),
+            "15s": int(r["peak_15s"] or 0),
             "30s": int(r["peak_30s"] or 0),
             "1m": int(r["peak_1m"] or 0),
+            "2m": int(r["peak_2m"] or 0),
+            "3m": int(r["peak_3m"] or 0),
             "5m": int(r["peak_5m"] or 0),
+            "10m": int(r["peak_10m"] or 0),
+            "15m": int(r["peak_15m"] or 0),
             "20m": int(r["peak_20m"] or 0),
+            "30m": int(r["peak_30m"] or 0),
+            "45m": int(r["peak_45m"] or 0),
             "60m": int(r["peak_60m"] or 0),
             "sample_count": int(r["sample_count"] or 0),
         }
@@ -956,7 +985,10 @@ def sync_missing_power_streams(user_id: Optional[str] = None, max_per_run: int =
             LEFT JOIN strava_activity_streams s
                    ON s.user_id = a.user_id AND s.activity_id = a.id
             WHERE a.user_id = ?
-              AND m.activity_id IS NULL
+              AND (
+                  m.activity_id IS NULL
+                  OR (m.has_power_stream = 1 AND m.peak_15s = 0 AND s.streams_json IS NOT NULL)
+              )
             ORDER BY a.start_date DESC
             """,
             (uid,),

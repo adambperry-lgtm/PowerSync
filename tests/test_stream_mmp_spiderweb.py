@@ -152,3 +152,36 @@ def test_spiderweb_streams_status_endpoint_isolated():
         data = get_spiderweb_streams_status_endpoint(mock_req)
     assert data["total_eligible"] >= 1
     assert data["synced_count"] >= 1
+
+
+def test_12_axis_power_skills_spiderweb_profile():
+    from app.services.power_profile_service import get_power_spiderweb_profile, RADAR_DURATIONS
+
+    # 3600s ride with a 15s sprint at 700W, 2m effort at 380W, and steady 240W
+    watts_arr = [700] * 15 + [380] * 120 + [240] * 3465
+    peaks = compute_mmp_peaks_from_streams({"time": {"data": list(range(3600))}, "watts": {"data": watts_arr}})
+    assert peaks is not None
+    assert peaks["15s"] == 700
+    assert peaks["2m"] >= 380
+    assert peaks["30m"] >= 240
+    assert peaks["60m"] >= 240
+
+    uid = "usr_test_mmp_12ax"
+    _ensure_user(uid)
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute("DELETE FROM strava_activities WHERE user_id = ?", (uid,))
+    c.execute("DELETE FROM strava_activity_mmp_peaks WHERE user_id = ?", (uid,))
+    conn.commit()
+    conn.close()
+
+    _insert_activity(uid, "88801", "2026-11-24T10:00:00Z", avg_w=245.0)
+    save_activity_mmp_peaks(uid, "88801", peaks)
+
+    profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
+    axes = profile["axes"]
+    assert len(axes) == 12
+    assert [a["key"] for a in axes] == [d["key"] for d in RADAR_DURATIONS]
+    assert axes[0]["key"] == "15s" and axes[0]["zone_group"] == "anaerobic" and axes[0]["current_watts"] == 700
+    assert axes[3]["key"] == "2m" and axes[3]["zone_group"] == "vo2"
+    assert axes[8]["key"] == "20m" and axes[8]["zone_group"] == "threshold"
