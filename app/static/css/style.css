@@ -492,6 +492,7 @@ h1, h2, h3, h4,
   gap: 1rem;
   align-items: stretch;
   width: 100%;
+  margin-bottom: 1.5rem;
 }
 
 .telemetry-grid > .card {
@@ -1048,6 +1049,7 @@ h1, h2, h3, h4,
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   padding: 1.75rem 2rem;
+  margin-bottom: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
@@ -3251,6 +3253,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   /* Workout Stage Tile & Selector on Mobile */
   .workout-stage {
     padding: 0.85rem 0.75rem !important;
+    margin-bottom: 0.85rem !important;
     gap: 0.85rem !important;
     border-radius: 12px !important;
     width: 100% !important;
@@ -3531,6 +3534,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   .telemetry-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.65rem;
+    margin-bottom: 0;
   }
 
   .telemetry-grid > .card {
@@ -6389,9 +6393,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* Tab Panes */
 .main-view-pane {
-  display: flex;
-  flex-direction: column;
-  gap: 2rem;
+  display: block;
   width: 100%;
   animation: fadeInMainView 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }

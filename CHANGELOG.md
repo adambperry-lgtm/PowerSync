@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.27.1] - 2026-11-25
+### Fixed
+- **Missing Vertical Gap Between Today's Training and AI Coach Daily Debrief Cards**:
+  - Added matching `margin-bottom: 0.85rem` on mobile (`<= 768px`) and `margin-bottom: 1.5rem` on desktop (`> 768px`) to `.workout-stage` (`#workoutStageSection`) in [`style.css`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/css/style.css) (`v=74`) so **Today's Training** and **AI Coach Daily Debrief & Forward Outlook** have the same clean vertical separation as adjacent `.card` tiles in both expanded and collapsed states.
+  - Added `margin-bottom: 1.5rem` to `.telemetry-grid` on desktop (with `margin-bottom: 0` on mobile so it does not double-stack with `.card`'s `0.85rem` bottom margin) and aligned `.main-view-pane` with the JS tab switcher's `display: block` layout to prevent flex-gap collapse/layout jumps.
+
 ## [2.27.0] - 2026-11-25
 ### Added
 - **12-Axis Strava Power Skills Spiderweb (`15s` – `60m`)**:

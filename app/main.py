@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.27.0",
-        "release_name": "12-Axis Strava Power Skills Spiderweb",
+        "version": "2.27.1",
+        "release_name": "Daily Training Card Spacing Polish",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.27.1",
+                "date": "2026-11-25",
+                "title": "Daily Training Card Spacing Polish",
+                "items": [
+                    "Consistent Daily Card Spacing: Added matching bottom margin to Today's Training (.workout-stage) on mobile (0.85rem) and desktop (1.5rem) so it no longer sits flush against AI Coach Daily Debrief & Forward Outlook.",
+                    "Unified Daily Pane Spacing: Added desktop bottom spacing to the top telemetry grid, prevented double margins on mobile, aligned .main-view-pane display mode with the tab switcher, and bumped style.css?v=74."
+                ]
+            },
             {
                 "version": "v2.27.0",
                 "date": "2026-11-25",
