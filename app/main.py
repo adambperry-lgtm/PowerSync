@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.27.6",
-        "release_name": "Spiderweb & Phenotype Goal Table Parity",
+        "version": "2.27.7",
+        "release_name": "Accurate 12-Axis Goal Progress Percentage",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.27.7",
+                "date": "2026-11-25",
+                "title": "Accurate 12-Axis Goal Progress Percentage",
+                "items": [
+                    "Realistic Goal Progress Bar: Fixed inflated goal progress percentages by scoring all 12 axes directly against your Active Goal target watts (with an 80%-of-target floor) instead of a 1.0x FTP fallback."
+                ]
+            },
             {
                 "version": "v2.27.6",
                 "date": "2026-11-25",

@@ -3,6 +3,12 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.27.7] - 2026-11-25
+### Fixed
+- **Spiderweb Goal Progress Bar Percentage Accuracy**:
+  - Fixed [`get_power_spiderweb_profile()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) and [`calculate_spiderweb_target_changes()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) where `progress_pct` was inflated (e.g. `97.7%` despite `214W` remaining and only `4 of 12` goals met) because 8 of the 12 axes compared current watts against a `1.0 * FTP` fallback instead of `goal_envelope[k]`.
+  - Both the Goal Progress bar and the Phenotype table's `% Readiness` now measure attainment directly against each axis's `target_watts` in `goal_envelope` using a realistic `80%`-of-target floor (`0%` at `0.80 * target`, `100%` when all 12 axes are met).
+
 ## [2.27.6] - 2026-11-25
 ### Fixed
 - **Phenotype Goal Table Parity with Spiderweb Active Goal**:
