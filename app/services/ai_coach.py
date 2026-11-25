@@ -45,6 +45,54 @@ def enrich_workout_strain(workout: Dict[str, Any], ftp: int = 250) -> Dict[str, 
         workout["battery_depleted_pct"] = 0.0
     return workout
 
+
+def _get_goal_aligned_training_focus(uid: Optional[str]) -> Optional[Dict[str, Any]]:
+    """
+    Inspects the athlete's 1-Hz Spiderweb power profile relative to their Active Goal
+    and returns the highest-priority unmet limiter and best matching catalog zone
+    ('vo2_max' for 15s-10m gaps, 'sweet_spot' for 15m-60m threshold/stamina gaps).
+    """
+    if not uid or uid == "usr_guest":
+        return None
+    try:
+        from app.services.power_profile_service import get_power_spiderweb_profile
+        profile = get_power_spiderweb_profile(user_id=uid, timeframe="30d")
+        active_goal = profile.get("active_goal")
+        axes = profile.get("axes") or []
+        if not active_goal or not axes:
+            return None
+
+        unmet = [
+            ax for ax in axes
+            if (ax.get("target_watts") or 0) > 0 and (ax.get("goal_remaining_watts") or 0) > 0
+        ]
+        if not unmet:
+            return None
+
+        goal_key = str(active_goal.get("target_key") or "").lower()
+
+        def _priority_score(ax: Dict[str, Any]) -> float:
+            rel_gap = float(ax["goal_remaining_watts"]) / max(1.0, float(ax["target_watts"]))
+            if ax.get("key") == goal_key:
+                rel_gap *= 1.35
+            return rel_gap
+
+        top = max(unmet, key=_priority_score)
+        z_grp = top.get("zone_group", "vo2")
+        zone = "sweet_spot" if z_grp == "threshold" else "vo2_max"
+        return {
+            "zone": zone,
+            "limiter_key": top.get("key"),
+            "limiter_name": top.get("name") or top.get("label"),
+            "limiter_cur_w": int(top.get("current_watts") or 0),
+            "limiter_target_w": int(top.get("target_watts") or 0),
+            "limiter_gap_w": int(top.get("goal_remaining_watts") or 0),
+            "goal_title": active_goal.get("target_title", "Active Goal"),
+        }
+    except Exception:
+        return None
+
+
 def build_adaptive_workout_local(
     recovery_score: int,
     hrv_rmssd: float,
@@ -769,15 +817,25 @@ def build_adaptive_workout_local(
         else:
             uid = get_current_user_id()
             plan_note = f"T-{days_until} Event Prep" if (active_plan and days_until is not None) else None
-            selected = select_diverse_archetype("vo2_max", duration, ftp=ftp, plan_ctx=plan_note, user_id=uid)
+            goal_focus = _get_goal_aligned_training_focus(uid)
+            target_zone = goal_focus["zone"] if goal_focus else "vo2_max"
+            selected = select_diverse_archetype(target_zone, duration, ftp=ftp, plan_ctx=plan_note, user_id=uid)
             title = selected["title"]
             focus_area = selected["focus_area"]
             strain_note = f" with well-managed acute load ({recent_weighted_strain:.1f} weighted strain)" if recent_weighted_strain > 0 else ""
-            ai_rationale = (
-                f"Exceptional Whoop readiness today ({recovery_score}% Recovery, {sleep_score}% Sleep){strain_note}. "
-                f"Low acute fatigue makes this the ideal window for high-intensity work. "
-                f"Today's session ({title}) targets {selected['focus_area']}: {selected['ai_rationale']}"
-            )
+            if goal_focus:
+                ai_rationale = (
+                    f"Exceptional Whoop readiness today ({recovery_score}% Recovery, {sleep_score}% Sleep){strain_note}. "
+                    f"Based on your 1-Hz power history, your largest gap to goal is {goal_focus['limiter_name']} "
+                    f"({goal_focus['limiter_cur_w']}W → {goal_focus['limiter_target_w']}W, -{goal_focus['limiter_gap_w']}W). "
+                    f"Today's session ({title}) directly targets {selected['focus_area']}: {selected['ai_rationale']}"
+                )
+            else:
+                ai_rationale = (
+                    f"Exceptional Whoop readiness today ({recovery_score}% Recovery, {sleep_score}% Sleep){strain_note}. "
+                    f"Low acute fatigue makes this the ideal window for high-intensity work. "
+                    f"Today's session ({title}) targets {selected['focus_area']}: {selected['ai_rationale']}"
+                )
             intervals = selected["intervals"]
             estimated_tss = selected["estimated_tss"]
 
@@ -799,7 +857,8 @@ def build_adaptive_workout_local(
                 goal_title = spiderweb_goal.get("target_title", "Spiderweb Target")
                 focus_sys = spiderweb_goal.get("focus_energy_system", "Target Energy System")
                 badge_text = f"🎯 {spiderweb_goal.get('target_badge', 'Spiderweb Goal')}"
-                ai_rationale = f"Aligned with your active spiderweb goal ({goal_title}): Today's high-readiness session ({title}) delivers key adaptations for {focus_sys}. {ai_rationale}"
+                if "Based on your 1-Hz power history" not in ai_rationale:
+                    ai_rationale = f"Aligned with your active spiderweb goal ({goal_title}): Today's high-readiness session ({title}) delivers key adaptations for {focus_sys}. {ai_rationale}"
         except Exception:
             pass
 

@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.27.7",
-        "release_name": "Accurate 12-Axis Goal Progress Percentage",
+        "version": "2.28.0",
+        "release_name": "1-Hz eFTP Breakthroughs & Goal-Gap-Driven Daily Workouts",
         "build_date": "2026-11-25",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.28.0",
+                "date": "2026-11-25",
+                "title": "1-Hz eFTP Breakthroughs & Goal-Gap-Driven Daily Workouts",
+                "items": [
+                    "1-Hz eFTP Breakthrough Detection: Wired cached 1-Hz 20m and 60m Strava power stream peaks into eFTP estimation so hard intervals inside longer rides trigger accurate FTP test readiness.",
+                    "Goal-Gap-Driven Daily Workouts: Green-recovery daily workout suggestions now target your largest unmet 1-Hz Spiderweb gap relative to your Active Goal (Threshold/Stamina vs. Anaerobic/VO2 Max)."
+                ]
+            },
             {
                 "version": "v2.27.7",
                 "date": "2026-11-25",

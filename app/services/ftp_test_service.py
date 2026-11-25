@@ -137,14 +137,30 @@ def _infer_last_ftp_test_date(uid: str, activities: List[Dict[str, Any]]) -> Opt
     return best_date
 
 
-def _estimate_breakthrough_eftp(activities: List[Dict[str, Any]], current_ftp: int, today: datetime.date) -> Dict[str, Any]:
+def _estimate_breakthrough_eftp(
+    activities: List[Dict[str, Any]],
+    current_ftp: int,
+    today: datetime.date,
+    user_id: Optional[str] = None,
+    mmp_map: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
     """
     Scans recent cycling activities (last 30 days) for sustained high-power performances
     that suggest the athlete's current FTP setting may be underestimating true threshold.
+    Prefers cached 1-Hz Strava stream MMP peaks (20m * 0.95 and 60m * 1.00) when available,
+    falling back to ride-level NP / average watts when streams are not cached.
     """
     cutoff = (today - datetime.timedelta(days=30)).isoformat()
     best_eftp = current_ftp
     breakthrough_ride = None
+
+    if mmp_map is None and user_id:
+        try:
+            from app.services.strava_service import get_cached_mmp_peaks_map
+            mmp_map = get_cached_mmp_peaks_map(user_id=user_id)
+        except Exception:
+            mmp_map = {}
+    mmp_map = mmp_map or {}
 
     for act in activities or []:
         d = str(act.get("start_date") or "")[:10]
@@ -153,19 +169,45 @@ def _estimate_breakthrough_eftp(activities: List[Dict[str, Any]], current_ftp: i
         moving_sec = int(act.get("moving_time_sec") or act.get("moving_time") or 0)
         if moving_sec < 1200:  # need at least 20 minutes
             continue
-        np_w = float(act.get("weighted_average_watts") or 0.0)
-        avg_w = float(act.get("average_watts") or 0.0)
-        ref_w = np_w if np_w > 0 else avg_w
-        if ref_w <= 0:
-            continue
 
-        # For 20–35 min hard efforts, 95% of NP/avg approximates FTP; for longer rides >= 45m, NP itself is a conservative floor
-        if moving_sec <= 2400:
-            est = round(ref_w * 0.95)
-        elif moving_sec <= 3600:
-            est = round(ref_w * 0.97)
-        else:
-            est = round(ref_w)
+        act_id = str(act.get("id") or "")
+        act_mmp = mmp_map.get(act_id) if act_id else None
+
+        est = 0
+        ref_w = 0.0
+        eff_dur_min = moving_sec // 60
+        source = "summary"
+
+        if isinstance(act_mmp, dict) and act_mmp.get("has_power_stream"):
+            p_20m = int(act_mmp.get("20m") or 0)
+            p_60m = int(act_mmp.get("60m") or 0)
+            est_20 = round(p_20m * 0.95) if p_20m > 0 else 0
+            est_60 = p_60m if p_60m > 0 else 0
+            if est_20 >= est_60 and est_20 > 0:
+                est = est_20
+                ref_w = float(p_20m)
+                eff_dur_min = 20
+                source = "1hz_20m_stream"
+            elif est_60 > 0:
+                est = est_60
+                ref_w = float(p_60m)
+                eff_dur_min = 60
+                source = "1hz_60m_stream"
+
+        if est <= 0:
+            np_w = float(act.get("weighted_average_watts") or 0.0)
+            avg_w = float(act.get("average_watts") or 0.0)
+            ref_w = np_w if np_w > 0 else avg_w
+            if ref_w <= 0:
+                continue
+
+            # For 20–35 min hard efforts, 95% of NP/avg approximates FTP; for longer rides >= 45m, NP itself is a conservative floor
+            if moving_sec <= 2400:
+                est = round(ref_w * 0.95)
+            elif moving_sec <= 3600:
+                est = round(ref_w * 0.97)
+            else:
+                est = round(ref_w)
 
         if est > best_eftp:
             best_eftp = est
@@ -173,8 +215,9 @@ def _estimate_breakthrough_eftp(activities: List[Dict[str, Any]], current_ftp: i
                 "name": act.get("name") or "Recent Ride",
                 "date": d,
                 "watts": round(ref_w),
-                "duration_min": moving_sec // 60,
+                "duration_min": eff_dur_min,
                 "estimated_ftp": est,
+                "source": source,
             }
 
     delta_w = best_eftp - current_ftp
@@ -294,7 +337,7 @@ def evaluate_ftp_test_readiness(
         except Exception:
             days_since_last_test = None
 
-    eftp_info = _estimate_breakthrough_eftp(activities, ftp, today)
+    eftp_info = _estimate_breakthrough_eftp(activities, ftp, today, user_id=uid)
 
     # 6. Score the 4 Pillars (Total 0-100)
     # Pillar A: Block Timing & Staleness (0-30)

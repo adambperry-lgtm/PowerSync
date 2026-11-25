@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.28.0] - 2026-11-25
+### Added
+- **1-Hz Stream eFTP Breakthrough Detection & Goal-Gap-Driven Daily Workouts**:
+  - Wired cached 1-Hz `20m` (`× 0.95`) and `60m` (`× 1.00`) Mean Maximal Power peaks from `strava_activity_mmp_peaks` into [`_estimate_breakthrough_eftp()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/ftp_test_service.py) and [`evaluate_ftp_test_readiness()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/ftp_test_service.py), so hard 20-minute or 60-minute efforts embedded inside longer rides accurately trigger eFTP breakthroughs.
+  - Added [`_get_goal_aligned_training_focus()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/ai_coach.py) in [`ai_coach.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/ai_coach.py) so Green-recovery daily workout suggestions inspect your 1-Hz Spiderweb gaps relative to your Active Goal and prescribe `sweet_spot` (for `15m–60m` Threshold/Stamina limiters) or `vo2_max` (for `15s–10m` Anaerobic/VO2 limiters) with explicit gap-to-goal rationale.
+  - Added unit tests for 1-Hz eFTP breakthroughs and goal-aligned workout selection in [`test_stream_mmp_spiderweb.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/tests/test_stream_mmp_spiderweb.py).
+
 ## [2.27.7] - 2026-11-25
 ### Fixed
 - **Spiderweb Goal Progress Bar Percentage Accuracy**:

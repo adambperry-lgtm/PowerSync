@@ -185,3 +185,39 @@ def test_12_axis_power_skills_spiderweb_profile():
     assert axes[0]["key"] == "15s" and axes[0]["zone_group"] == "anaerobic" and axes[0]["current_watts"] == 700
     assert axes[3]["key"] == "2m" and axes[3]["zone_group"] == "vo2"
     assert axes[8]["key"] == "20m" and axes[8]["zone_group"] == "threshold"
+
+
+def test_1hz_eftp_breakthrough_and_goal_aligned_workout_focus():
+    import datetime
+    from app.services.ftp_test_service import _estimate_breakthrough_eftp
+    from app.services.ai_coach import _get_goal_aligned_training_focus
+
+    # A 90-min ride with low ride-wide NP (185W) but a 20m 1-Hz MMP peak of 285W -> eFTP 271W
+    today = datetime.date.today()
+    acts = [{
+        "id": "77701",
+        "name": "Z2 + 20m Test Block",
+        "start_date": today.isoformat() + "T10:00:00Z",
+        "moving_time_sec": 5400,
+        "average_watts": 175.0,
+        "weighted_average_watts": 185.0,
+    }]
+    mmp_map = {"77701": {"has_power_stream": True, "20m": 285, "60m": 220}}
+    res = _estimate_breakthrough_eftp(acts, current_ftp=250, today=today, mmp_map=mmp_map)
+    assert res["estimated_ftp"] == round(285 * 0.95)
+    assert res["has_breakthrough"] is True
+    assert res["breakthrough_ride"]["source"] == "1hz_20m_stream"
+
+    # Goal-aligned workout focus: threshold limiter -> sweet_spot
+    uid = "usr_test_mmp_12ax"
+    set_setting("spiderweb_goal", {
+        "goal_type": "duration",
+        "target_key": "20m",
+        "target_watts": 310,
+        "target_title": "20m @ 310W",
+        "target_envelope": {"5s": 700, "1m": 380, "5m": 300, "20m": 310, "60m": 290},
+    }, user_id=uid)
+    focus = _get_goal_aligned_training_focus(uid)
+    assert focus is not None
+    assert focus["zone"] == "sweet_spot"
+    assert focus["limiter_key"] == "20m"
