@@ -948,11 +948,11 @@ def detect_session_spiderweb_prs(
     primary_streams: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
-    Compares the evaluated session's peak power outputs across all 12 Power Spiderweb axes
-    (15s, 30s, 1m, 2m, 3m, 5m, 10m, 15m, 20m, 30m, 45m, 60m) against the athlete's strictly
-    prior cycling history (user-isolated) to detect:
-      - All-Time Spiderweb PRs (beat every prior cycling activity in history)
-      - 30-Day Spiderweb Bests (expanded the current 30-day Spiderweb polygon)
+    Compares the evaluated session's peak power outputs across 5s Sprint + all 12 Power
+    Spiderweb axes (15s, 30s, 1m, 2m, 3m, 5m, 10m, 15m, 20m, 30m, 45m, 60m) against the
+    athlete's strictly prior cycling history (user-isolated) to detect:
+      - All-Time Power PRs (beat, set first mark, or matched prior All-Time cycling record)
+      - 30-Day Spiderweb Bests (expanded the current 30-day Spiderweb polygon, with gap to All-Time PR)
       - Newly achieved Active Spiderweb Goal axes
     Prefers exact 1-Hz Strava stream MMP peaks when available.
     """
@@ -1070,6 +1070,7 @@ def detect_session_spiderweb_prs(
     conn.close()
 
     prior_all_time: Dict[str, int] = {k: 0 for k in ALL_PEAK_KEYS}
+    prior_all_time_date: Dict[str, str] = {}
     prior_30d: Dict[str, int] = {k: 0 for k in ALL_PEAK_KEYS}
     prior_cycling_count = 0
     prior_30d_count = 0
@@ -1090,8 +1091,13 @@ def detect_session_spiderweb_prs(
         if rd > ref_d:
             continue
 
-        prior_cycling_count += 1
         r_mmp = mmp_map.get(rid) if rid else None
+        # When comparing stream-backed power-meter sessions, skip historical rides explicitly
+        # verified as having no power stream so Strava estimated watts never block real All-Time PRs.
+        if used_stream and isinstance(r_mmp, dict) and not r_mmp.get("has_power_stream"):
+            continue
+
+        prior_cycling_count += 1
         r_peaks = calculate_activity_peak_powers(
             row,
             ftp=ftp,
@@ -1103,39 +1109,79 @@ def detect_session_spiderweb_prs(
         if in_30d:
             prior_30d_count += 1
 
+        rd_iso = rd.isoformat()
         for k in ALL_PEAK_KEYS:
             v = int(r_peaks.get(k) or 0)
             if v > prior_all_time[k]:
                 prior_all_time[k] = v
+                prior_all_time_date[k] = rd_iso
             if in_30d and v > prior_30d[k]:
                 prior_30d[k] = v
 
     if prior_cycling_count == 0:
         return {**empty, "peak_source": "stream" if used_stream else "estimated"}
 
-    # 3. Cross-reference Active Spiderweb Goal envelope
+    # 3. Cross-reference Active Spiderweb Goal envelope across 5s + all 12 Spiderweb axes
     active_goal = get_active_spiderweb_goal(user_id=uid)
     raw_goal_env = (active_goal.get("target_envelope") or {}) if isinstance(active_goal, dict) else {}
     goal_envelope = _fill_intermediate_peaks(raw_goal_env) if raw_goal_env else {}
+
+    pr_durations = [
+        {
+            "key": "5s",
+            "label": "5s",
+            "sec": 5,
+            "name": "Sprint (5s)",
+            "icon": "⚡",
+            "energy": "Neuromuscular",
+            "zone_group": "anaerobic",
+            "zone_color": "#4F46E5",
+            "zone_label": "Anaerobic",
+        },
+        *RADAR_DURATIONS,
+    ]
 
     all_time_prs: List[Dict[str, Any]] = []
     recent_30d_bests: List[Dict[str, Any]] = []
     goal_axes_achieved: List[Dict[str, Any]] = []
 
-    for meta in RADAR_DURATIONS:
+    for meta in pr_durations:
         k = meta["key"]
         sess_w = int(session_peaks.get(k) or 0)
         if sess_w <= 0:
             continue
 
         prev_all = int(prior_all_time.get(k) or 0)
+        prev_all_d = prior_all_time_date.get(k)
         prev_30 = int(prior_30d.get(k) or 0)
         tgt_w = int(goal_envelope.get(k) or 0) or None
 
-        if prev_all > 0 and sess_w > prev_all:
-            delta = sess_w - prev_all
-            delta_pct = round((delta / prev_all) * 100.0, 1)
+        # Check All-Time PR: beat prior all-time record, set first-ever recorded mark for duration,
+        # or matched an All-Time PR from an earlier block while beating the 30d best.
+        is_beat_all = prev_all > 0 and sess_w > prev_all
+        is_first_mark = prev_all == 0 and prior_cycling_count >= 2 and k != "5s"
+        is_tied_all = (
+            prev_all > 0
+            and sess_w == prev_all
+            and (
+                (prior_30d_count >= 1 and prev_30 > 0 and sess_w > prev_30)
+                or (prev_all_d is not None and prev_all_d <= (ref_d - datetime.timedelta(days=14)).isoformat())
+            )
+        )
+
+        if is_beat_all or is_first_mark or is_tied_all:
+            delta = (sess_w - prev_all) if prev_all > 0 else sess_w
+            delta_pct = round((delta / prev_all) * 100.0, 1) if prev_all > 0 else 100.0
             newly_met = bool(tgt_w and sess_w >= tgt_w and prev_all < tgt_w)
+            if is_beat_all:
+                badge = f"{meta['label']} {sess_w}W (+{delta}W All-Time PR)"
+                scope_label = "All-Time PR"
+            elif is_tied_all:
+                badge = f"{meta['label']} {sess_w}W (Tied All-Time PR)"
+                scope_label = "Tied All-Time PR"
+            else:
+                badge = f"{meta['label']} {sess_w}W (New All-Time PR)"
+                scope_label = "New All-Time PR"
             pr_item = {
                 "key": k,
                 "label": meta["label"],
@@ -1145,24 +1191,30 @@ def detect_session_spiderweb_prs(
                 "zone_label": meta["zone_label"],
                 "zone_color": meta["zone_color"],
                 "scope": "all_time",
-                "scope_label": "All-Time PR",
+                "scope_label": scope_label,
+                "is_first_mark": is_first_mark,
+                "is_tie": is_tied_all,
                 "watts": sess_w,
                 "w_kg": round(sess_w / weight_kg, 2),
                 "previous_watts": prev_all,
-                "delta_watts": delta,
-                "delta_pct": delta_pct,
+                "previous_date": prev_all_d,
+                "all_time_pr_watts": sess_w,
+                "gap_to_all_time_watts": 0,
+                "delta_watts": 0 if is_tied_all else delta,
+                "delta_pct": 0.0 if is_tied_all else delta_pct,
                 "target_watts": tgt_w,
                 "goal_met": bool(tgt_w and sess_w >= tgt_w),
                 "goal_newly_achieved": newly_met,
-                "badge": f"{meta['label']} {sess_w}W (+{delta}W PR)",
+                "badge": badge,
             }
             all_time_prs.append(pr_item)
             if newly_met:
                 goal_axes_achieved.append(pr_item)
-        elif prior_30d_count >= 1 and prev_30 > 0 and sess_w >= prev_30 + 2:
+        elif k != "5s" and prior_30d_count >= 1 and prev_30 > 0 and sess_w >= prev_30 + 2:
             delta = sess_w - prev_30
             delta_pct = round((delta / prev_30) * 100.0, 1)
             newly_met = bool(tgt_w and sess_w >= tgt_w and prev_30 < tgt_w)
+            gap_to_all = max(0, prev_all - sess_w) if prev_all > 0 else None
             best_item = {
                 "key": k,
                 "label": meta["label"],
@@ -1176,12 +1228,15 @@ def detect_session_spiderweb_prs(
                 "watts": sess_w,
                 "w_kg": round(sess_w / weight_kg, 2),
                 "previous_watts": prev_30,
+                "all_time_pr_watts": prev_all if prev_all > 0 else None,
+                "all_time_pr_date": prev_all_d,
+                "gap_to_all_time_watts": gap_to_all,
                 "delta_watts": delta,
                 "delta_pct": delta_pct,
                 "target_watts": tgt_w,
                 "goal_met": bool(tgt_w and sess_w >= tgt_w),
                 "goal_newly_achieved": newly_met,
-                "badge": f"{meta['label']} {sess_w}W (+{delta}W 30d)",
+                "badge": f"{meta['label']} {sess_w}W (+{delta}W 30d Best)",
             }
             recent_30d_bests.append(best_item)
             if newly_met:
@@ -1200,13 +1255,13 @@ def detect_session_spiderweb_prs(
                 break
             zone_cands = [p for p in pool if p["zone_group"] == zg and p["key"] not in seen_keys]
             if zone_cands:
-                top_z = max(zone_cands, key=lambda x: (x["delta_pct"], x["delta_watts"]))
+                top_z = max(zone_cands, key=lambda x: (not x.get("is_tie", False), x["delta_pct"], x["delta_watts"]))
                 highlights.append(top_z)
                 seen_keys.add(top_z["key"])
         # Second pass: fill remaining slots by highest % gain
         remaining = sorted(
             [p for p in pool if p["key"] not in seen_keys],
-            key=lambda x: (x["delta_pct"], x["delta_watts"]),
+            key=lambda x: (not x.get("is_tie", False), x["delta_pct"], x["delta_watts"]),
             reverse=True,
         )
         for cand in remaining:
@@ -1219,15 +1274,21 @@ def detect_session_spiderweb_prs(
     if len(highlights) < 4:
         _pick_top_from_pool(recent_30d_bests, 4)
 
-    # Keep highlights ordered chronologically by duration (15s -> 60m) for intuitive reading
-    dur_order = {meta["key"]: idx for idx, meta in enumerate(RADAR_DURATIONS)}
+    # Keep highlights ordered chronologically by duration (5s -> 60m) for intuitive reading
+    dur_order = {meta["key"]: idx for idx, meta in enumerate(pr_durations)}
     highlights.sort(key=lambda x: dur_order.get(x["key"], 99))
 
-    # 5. Build clean human-readable summary sentence
+    # 5. Build clean human-readable summary sentence clearly calling out All-Time PRs
     summary_parts: List[str] = []
     if all_time_prs:
         hl_all = [h for h in highlights if h["scope"] == "all_time"]
-        fmt_list = ", ".join(f"{h['label']} {h['watts']}W (+{h['delta_watts']}W)" for h in hl_all)
+        def _fmt_at(h: Dict[str, Any]) -> str:
+            if h.get("is_tie"):
+                return f"{h['label']} {h['watts']}W (tied All-Time PR)"
+            if h.get("is_first_mark"):
+                return f"{h['label']} {h['watts']}W (first All-Time mark)"
+            return f"{h['label']} {h['watts']}W (+{h['delta_watts']}W All-Time PR)"
+        fmt_list = ", ".join(_fmt_at(h) for h in hl_all)
         if len(all_time_prs) == 1:
             summary_parts.append(f"Set a new All-Time Spiderweb Power PR: {fmt_list}.")
         elif len(all_time_prs) <= len(hl_all):
@@ -1242,8 +1303,16 @@ def detect_session_spiderweb_prs(
         if all_time_prs:
             summary_parts.append(f"Also set {len(recent_30d_bests)} new 30-day Spiderweb best{'s' if len(recent_30d_bests) > 1 else ''} ({fmt_30}).")
         else:
+            near_at = [
+                b for b in recent_30d_bests
+                if b.get("gap_to_all_time_watts") is not None and 0 < b["gap_to_all_time_watts"] <= 12
+            ]
+            near_note = ""
+            if near_at:
+                closest = min(near_at, key=lambda x: x["gap_to_all_time_watts"])
+                near_note = f" (within {closest['gap_to_all_time_watts']}W of your {closest['all_time_pr_watts']}W All-Time {closest['label']} PR)"
             summary_parts.append(
-                f"Expanded your 30-day Spiderweb envelope across {len(recent_30d_bests)} axis{'es' if len(recent_30d_bests) > 1 else ''}: {fmt_30}."
+                f"Expanded your 30-day Spiderweb envelope across {len(recent_30d_bests)} axis{'es' if len(recent_30d_bests) > 1 else ''}: {fmt_30}{near_note}."
             )
     if goal_axes_achieved:
         g_labels = ", ".join(f"{g['label']} ({g['watts']}W ≥ {g['target_watts']}W)" for g in goal_axes_achieved[:3])

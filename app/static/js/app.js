@@ -4704,8 +4704,8 @@ function renderDebrief(data) {
       }
       if (countEl) {
         const partsCount = [];
-        if (allTimeList.length > 0) partsCount.push(`${allTimeList.length} All-Time`);
-        if (recent30List.length > 0) partsCount.push(`${recent30List.length} 30d Best`);
+        if (allTimeList.length > 0) partsCount.push(`🏆 ${allTimeList.length} All-Time PR${allTimeList.length > 1 ? "s" : ""}`);
+        if (recent30List.length > 0) partsCount.push(`📈 ${recent30List.length} 30d Best${recent30List.length > 1 ? "s" : ""}`);
         countEl.textContent = partsCount.join(" • ");
       }
       if (chipsEl) {
@@ -4716,8 +4716,22 @@ function renderDebrief(data) {
           const isAllTime = pr.scope === "all_time";
           pill.className = `debrief-pr-pill ${isAllTime ? "pr-all-time" : "pr-30d"}`;
           const goalTag = pr.goal_newly_achieved ? " • 🎯 Goal Met" : "";
-          const scopeTag = isAllTime ? "PR" : "30d";
-          pill.textContent = `${pr.icon || "⚡"} ${pr.label}: ${pr.watts}W (+${pr.delta_watts}W ${scopeTag})${goalTag}`;
+          if (isAllTime) {
+            let detailTag;
+            if (pr.is_tie) {
+              detailTag = "Tied All-Time PR";
+            } else if (pr.is_first_mark) {
+              detailTag = "New All-Time PR";
+            } else {
+              detailTag = `+${pr.delta_watts}W All-Time PR`;
+            }
+            pill.textContent = `🏆 ${pr.label}: ${pr.watts}W (${detailTag})${goalTag}`;
+          } else {
+            const nearAt = (pr.gap_to_all_time_watts !== null && pr.gap_to_all_time_watts !== undefined && pr.gap_to_all_time_watts > 0 && pr.gap_to_all_time_watts <= 12)
+              ? ` • ${pr.gap_to_all_time_watts}W off All-Time`
+              : "";
+            pill.textContent = `📈 ${pr.label}: ${pr.watts}W (+${pr.delta_watts}W 30d Best${nearAt})${goalTag}`;
+          }
           chipsEl.appendChild(pill);
         });
       }

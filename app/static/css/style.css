@@ -7971,9 +7971,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .debrief-pr-pill.pr-all-time {
-  background: rgba(16, 185, 129, 0.14);
-  color: #065F46;
-  border: 1px solid rgba(16, 185, 129, 0.38);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.18) 0%, rgba(16, 185, 129, 0.16) 100%);
+  color: #92400E;
+  border: 1px solid rgba(245, 158, 11, 0.48);
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.14);
 }
 
 .debrief-pr-pill.pr-30d {

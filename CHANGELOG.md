@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.29.1] - 2026-11-26
+### Enhanced
+- **Explicit All-Time Power PR Callouts & Coverage in Daily Debrief**:
+  - Upgraded [`detect_session_spiderweb_prs()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) to track **All-Time Power PRs** across `5s` Sprint plus all 12 Spiderweb axes (`15s`–`60m`), including first-ever recorded duration marks and tied All-Time PRs, while excluding confirmed power-meterless rides (`has_power_stream = 0`) from blocking real stream-backed All-Time PRs.
+  - Added `previous_date` on beaten All-Time PRs and `all_time_pr_watts` / `gap_to_all_time_watts` on 30-Day Bests so the debrief also highlights how close near-miss 30-day bests came to All-Time PRs.
+  - Updated PR pills, Pillar 4 status/chips, takeaway badge, and [`call_gemini_coach_review()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) (`DEBRIEF_CACHE_VERSION = 5`) to explicitly label every All-Time PR as **`All-Time PR`** with distinct gold-amber styling in [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=172`) and [`style.css`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/css/style.css) (`v=76`).
+
 ## [2.29.0] - 2026-11-26
 ### Added
 - **Spiderweb Power PRs in Daily Debrief**:

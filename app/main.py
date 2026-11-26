@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.29.0",
-        "release_name": "Accurate Non-ERG Self-Paced Analysis & Spiderweb Power PR Debriefs",
+        "version": "2.29.1",
+        "release_name": "Explicit All-Time Power PR Debrief Callouts",
         "build_date": "2026-11-26",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,15 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.29.1",
+                "date": "2026-11-26",
+                "title": "Explicit All-Time Power PR Debrief Callouts",
+                "items": [
+                    "All-Time PR Coverage & Accuracy: Expanded session PR detection across 5s Sprint and all 12 Spiderweb axes (including first-ever duration marks and tied All-Time PRs) while preventing confirmed power-meterless Strava estimates from blocking real stream-backed All-Time PRs.",
+                    "Unmistakable All-Time PR Callouts: Explicitly labels every All-Time PR in the debrief PR banner (gold-amber pills), Pillar 4 status & chips, takeaway badge, and AI Coach insights, and shows proximity to All-Time PR on 30-day bests."
+                ]
+            },
             {
                 "version": "v2.29.0",
                 "date": "2026-11-26",

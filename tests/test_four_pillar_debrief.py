@@ -679,14 +679,14 @@ class TestFourPillarDebrief(unittest.TestCase):
         goal_hit_keys = {g["key"] for g in sess_prs["goal_axes_achieved"]}
         self.assertIn("5m", goal_hit_keys)
 
-        # 3. Reflected in Pillar 4, assessment text, and takeaway badge
-        self.assertIn("Spiderweb PR", goal_p["status"])
-        self.assertTrue(any("🏆" in ch for ch in goal_p["chips"]))
-        self.assertIn("Spiderweb Power PR", goal_p["summary"])
-        self.assertIn("Spiderweb Power PR", assessment["assessment_text"])
-        self.assertIn("Spiderweb PR", pillars["takeaway_badge"])
+        # 3. Reflected in Pillar 4, assessment text, and takeaway badge with explicit All-Time PR labels
+        self.assertIn("All-Time PR", goal_p["status"])
+        self.assertTrue(any("All-Time PR" in ch for ch in goal_p["chips"]))
+        self.assertIn("All-Time Spiderweb Power PR", goal_p["summary"])
+        self.assertIn("All-Time Spiderweb Power PR", assessment["assessment_text"])
+        self.assertIn("All-Time Power PR", pillars["takeaway_badge"])
 
-        # 4. Verify Gemini prompt receives BOTH the Non-ERG rule AND the exact Power PRs
+        # 4. Verify Gemini prompt receives BOTH the Non-ERG rule AND explicit ALL-TIME POWER PRs
         captured_prompts = []
 
         def fake_post(url, json=None, timeout=20):
@@ -694,7 +694,7 @@ class TestFourPillarDebrief(unittest.TestCase):
             resp = MagicMock()
             resp.status_code = 200
             resp.json.return_value = {
-                "candidates": [{"content": {"parts": [{"text": '{"insights": "Great self-paced session with new Spiderweb Power PRs across 15s, 1m, 5m, and 20m.", "tomorrow_guidance": "Spin easy Zone 2 tomorrow."}'}]}}]
+                "candidates": [{"content": {"parts": [{"text": '{"insights": "Great self-paced session with new All-Time PRs across 15s, 1m, 5m, and 20m.", "tomorrow_guidance": "Spin easy Zone 2 tomorrow."}'}]}}]
             }
             return resp
 
@@ -705,7 +705,7 @@ class TestFourPillarDebrief(unittest.TestCase):
         prompt = captured_prompts[0]
         self.assertIn("CRITICAL SELF-PACED (NON-ERG) RULE", prompt)
         self.assertNotIn("CRITICAL ERG-MODE RULE", prompt)
-        self.assertIn("SPIDERWEB POWER PRs ACHIEVED IN THIS SESSION", prompt)
+        self.assertIn("ALL-TIME POWER PRs", prompt)
         self.assertIn("CRITICAL POWER PR RULE", prompt)
         self.assertIn("5m:", prompt)
 
@@ -718,6 +718,119 @@ class TestFourPillarDebrief(unittest.TestCase):
         for elem_id in ("debriefPowerPrsBanner", "debriefPowerPrsChips", "btnDebriefViewSpiderweb"):
             self.assertIn(elem_id, html_src)
             self.assertIn(elem_id, js_src)
+
+    def test_all_time_pr_skips_no_stream_estimates_and_detects_ties_and_5s(self):
+        """
+        Verifies:
+          1. Historical rides explicitly verified as having no power stream (has_power_stream=0)
+             never block real stream-backed All-Time PRs.
+          2. All-Time 5s Sprint PRs and tied All-Time PRs from an earlier block are noted.
+          3. 30-day Bests below All-Time PR carry gap_to_all_time_watts.
+        """
+        from app.services.power_profile_service import detect_session_spiderweb_prs
+        from app.services.strava_service import save_activity_mmp_peaks
+
+        today = get_athlete_date(self.user_a)
+        today_iso = today.isoformat()
+        old_d = (today - datetime.timedelta(days=45)).isoformat()
+        recent_d = (today - datetime.timedelta(days=7)).isoformat()
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        # Confirmed power-meterless outdoor ride with wildly inflated Strava estimate
+        c.execute(
+            """
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec,
+                average_watts, weighted_average_watts, average_heartrate, max_heartrate
+            ) VALUES (?, 'est_only_ride', 'Outdoor Estimated Ride', 'Ride', ?, 3600, 340, 360, 150, 175)
+            """,
+            (self.user_a, f"{old_d}T09:00:00"),
+        )
+        # Real older ride setting All-Time PR baseline (45d ago)
+        c.execute(
+            """
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec,
+                average_watts, weighted_average_watts, average_heartrate, max_heartrate
+            ) VALUES (?, 'real_old_ride', 'Old Hard Ride', 'VirtualRide', ?, 3600, 210, 220, 150, 175)
+            """,
+            (self.user_a, f"{old_d}T11:00:00"),
+        )
+        # Recent 30d ride with lower peaks
+        c.execute(
+            """
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec,
+                average_watts, weighted_average_watts, average_heartrate, max_heartrate
+            ) VALUES (?, 'real_recent_ride', 'Recent Ride', 'VirtualRide', ?, 3600, 195, 205, 145, 168)
+            """,
+            (self.user_a, f"{recent_d}T08:00:00"),
+        )
+        conn.commit()
+        conn.close()
+
+        save_activity_mmp_peaks(self.user_a, "est_only_ride", None)  # has_power_stream = 0
+        save_activity_mmp_peaks(
+            self.user_a,
+            "real_old_ride",
+            {
+                "5s": 700, "15s": 550, "30s": 460, "1m": 380,
+                "2m": 320, "3m": 300, "5m": 290, "10m": 270,
+                "15m": 260, "20m": 255, "30m": 240, "45m": 225, "60m": 215,
+                "sample_count": 3600,
+            },
+        )
+        save_activity_mmp_peaks(
+            self.user_a,
+            "real_recent_ride",
+            {
+                "5s": 600, "15s": 500, "30s": 420, "1m": 340,
+                "2m": 290, "3m": 275, "5m": 265, "10m": 250,
+                "15m": 240, "20m": 235, "30m": 220, "45m": 210, "60m": 200,
+                "sample_count": 3600,
+            },
+        )
+
+        # Today's ride beats 5s (750W > 700W All-Time PR), ties 1m (380W == 380W All-Time PR from 45d ago),
+        # and sets a 30d Best on 5m (284W > 265W 30d, 6W shy of 290W All-Time PR)
+        save_activity_mmp_peaks(
+            self.user_a,
+            "today_all_time_501",
+            {
+                "5s": 750, "15s": 540, "30s": 440, "1m": 380,
+                "2m": 300, "3m": 288, "5m": 284, "10m": 255,
+                "15m": 245, "20m": 240, "30m": 225, "45m": 0, "60m": 0,
+                "sample_count": 1800,
+            },
+        )
+        today_act = {
+            "id": "today_all_time_501",
+            "name": "Zwift - Sprint & Threshold Free Ride",
+            "sport_type": "VirtualRide",
+            "start_date": f"{today_iso}T08:00:00",
+            "moving_time_sec": 1800,
+            "average_watts": 230.0,
+            "weighted_average_watts": 248.0,
+        }
+
+        prs = detect_session_spiderweb_prs([today_act], today_iso, user_id=self.user_a, primary_act=today_act)
+        self.assertTrue(prs["has_all_time_prs"])
+        at_map = {p["key"]: p for p in prs["all_time_prs"]}
+        r30_map = {p["key"]: p for p in prs["recent_30d_bests"]}
+
+        self.assertIn("5s", at_map)
+        self.assertEqual(at_map["5s"]["watts"], 750)
+        self.assertEqual(at_map["5s"]["delta_watts"], 50)
+        self.assertIn("All-Time PR", at_map["5s"]["badge"])
+
+        self.assertIn("1m", at_map)
+        self.assertTrue(at_map["1m"]["is_tie"])
+        self.assertIn("Tied All-Time PR", at_map["1m"]["badge"])
+
+        self.assertIn("5m", r30_map)
+        self.assertEqual(r30_map["5m"]["all_time_pr_watts"], 290)
+        self.assertEqual(r30_map["5m"]["gap_to_all_time_watts"], 6)
 
 
 if __name__ == "__main__":

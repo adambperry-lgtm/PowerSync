@@ -2073,7 +2073,7 @@ def build_daily_review_and_outlook_local(
         }
     }
 
-DEBRIEF_CACHE_VERSION = 4
+DEBRIEF_CACHE_VERSION = 5
 
 
 def _build_debrief_activity_signature(
@@ -2271,9 +2271,21 @@ def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool 
                         "execution": "execution_nuances",
                         "goal": "goal_progress",
                     }
+                    sess_prs_for_note = pillars.get("session_power_prs") or {}
                     for short_k, full_k in key_map.items():
                         note_val = str(p_notes.get(short_k) or "").strip()
                         if len(note_val) > 15 and not note_val.startswith("{") and isinstance(pillars.get(full_k), dict):
+                            if (
+                                short_k == "goal"
+                                and isinstance(sess_prs_for_note, dict)
+                                and sess_prs_for_note.get("has_all_time_prs")
+                                and "all-time" not in note_val.lower()
+                                and "all time" not in note_val.lower()
+                            ):
+                                at_hl = [h for h in (sess_prs_for_note.get("highlights") or []) if h.get("scope") == "all_time"]
+                                if at_hl:
+                                    at_str = ", ".join(f"{h['label']} {h['watts']}W" for h in at_hl[:3])
+                                    note_val = f"All-Time PRs set ({at_str}). {note_val}"
                             pillars[full_k]["ai_note"] = note_val
             if enhanced_assessment and enhanced_assessment.get("tomorrow_guidance"):
                 clean_guidance = str(enhanced_assessment["tomorrow_guidance"]).strip()
@@ -2389,21 +2401,29 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
     pacing_mode_label = p_exec.get("pacing_mode_label") or ("ERG-Locked" if is_erg_locked else "Self-Paced (Non-ERG)")
 
     pr_lines: List[str] = []
+    has_all_time_prs = False
     if isinstance(sess_prs, dict) and sess_prs.get("has_prs"):
         all_t = sess_prs.get("all_time_prs") or []
         rec_30 = sess_prs.get("recent_30d_bests") or []
         goal_hit = sess_prs.get("goal_axes_achieved") or []
         if all_t:
-            all_fmt = ", ".join(
-                f"{p['label']}: {p['watts']}W ({p['w_kg']} W/kg, +{p['delta_watts']}W / +{p['delta_pct']}% vs prior {p['previous_watts']}W)"
-                for p in all_t
-            )
-            pr_lines.append(f"  - All-Time Spiderweb PRs ({len(all_t)}): {all_fmt}")
+            has_all_time_prs = True
+            def _fmt_at_prompt(p: Dict[str, Any]) -> str:
+                prev_dt = f" on {p['previous_date']}" if p.get("previous_date") else ""
+                if p.get("is_tie"):
+                    return f"{p['label']}: {p['watts']}W ({p['w_kg']} W/kg, TIED All-Time PR from{prev_dt or ' earlier'})"
+                if p.get("is_first_mark"):
+                    return f"{p['label']}: {p['watts']}W ({p['w_kg']} W/kg, NEW All-Time PR — first recorded mark)"
+                return f"{p['label']}: {p['watts']}W ({p['w_kg']} W/kg, +{p['delta_watts']}W / +{p['delta_pct']}% vs prior All-Time PR {p['previous_watts']}W{prev_dt})"
+            all_fmt = ", ".join(_fmt_at_prompt(p) for p in all_t)
+            pr_lines.append(f"  - ALL-TIME POWER PRs ({len(all_t)}): {all_fmt}")
         if rec_30:
-            r30_fmt = ", ".join(
-                f"{p['label']}: {p['watts']}W (+{p['delta_watts']}W vs prior 30d best {p['previous_watts']}W)"
-                for p in rec_30
-            )
+            def _fmt_30_prompt(p: Dict[str, Any]) -> str:
+                at_ref = ""
+                if p.get("all_time_pr_watts") and p.get("gap_to_all_time_watts") is not None:
+                    at_ref = f"; {p['gap_to_all_time_watts']}W shy of {p['all_time_pr_watts']}W All-Time PR"
+                return f"{p['label']}: {p['watts']}W (+{p['delta_watts']}W vs prior 30d best {p['previous_watts']}W{at_ref})"
+            r30_fmt = ", ".join(_fmt_30_prompt(p) for p in rec_30)
             pr_lines.append(f"  - 30-Day Spiderweb Bests ({len(rec_30)}): {r30_fmt}")
         if goal_hit:
             gh_fmt = ", ".join(f"{g['label']} ({g['watts']}W >= {g['target_watts']}W target)" for g in goal_hit)
@@ -2453,12 +2473,19 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
             "Analyze execution accordingly: evaluate their manual pacing discipline (VI, even vs. negative/positive 2nd-half split, power fade or build across work blocks, anaerobic surges/W' usage, and cadence management).\n"
         )
 
-    pr_rule = (
-        "CRITICAL POWER PR RULE: The athlete set new Power Spiderweb PRs in this session (listed above). "
-        "You MUST explicitly highlight and celebrate these specific Power PR durations and wattages in BOTH your main `insights` narrative AND `pillar_notes.goal`, explaining which energy systems expanded and how they advance the athlete's long-term goal.\n"
-        if pr_lines
-        else ""
-    )
+    if has_all_time_prs:
+        pr_rule = (
+            "CRITICAL POWER PR RULE: The athlete set ALL-TIME POWER PRs in this session (listed above). "
+            "You MUST explicitly name and celebrate these All-Time PRs as 'All-Time PRs' (with exact durations, wattages, and +W gains over prior all-time records) in BOTH your main `insights` narrative AND `pillar_notes.goal`, "
+            "clearly distinguishing All-Time PRs from any additional 30-day bests and explaining how they advance the athlete's long-term goal.\n"
+        )
+    elif pr_lines:
+        pr_rule = (
+            "CRITICAL POWER PR RULE: The athlete set new 30-Day Spiderweb Power Bests in this session (listed above). "
+            "You MUST explicitly highlight these specific durations and wattages in BOTH your main `insights` narrative AND `pillar_notes.goal`, noting how they expand the 30-day profile and how close they sit to All-Time PRs.\n"
+        )
+    else:
+        pr_rule = ""
 
     prompt = (
         f"You are PowerSync's elite cycling sports-science coach. Provide a concise, deeply analytical, NON-CIRCULAR debrief for the athlete.\n"

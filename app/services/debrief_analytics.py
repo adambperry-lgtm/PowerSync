@@ -1281,7 +1281,7 @@ def analyze_long_term_goal_progress(
 
     if has_all_time_prs and not is_deload:
         all_cnt = int(prs.get("all_time_count") or 0)
-        pace_status = f"New Spiderweb PR{'s' if all_cnt > 1 else ''}"
+        pace_status = f"{all_cnt} All-Time PR{'s' if all_cnt > 1 else ''}"
         color = "emerald"
     elif is_deload:
         pace_status = "Recovery / Deload Week"
@@ -1582,7 +1582,7 @@ def build_four_pillar_debrief(
         takeaway_color = "amber"
     elif session_power_prs.get("has_all_time_prs"):
         pr_n = int(session_power_prs.get("all_time_count") or 1)
-        takeaway_badge = f"🏆 {pr_n} New Spiderweb PR{'s' if pr_n > 1 else ''}"
+        takeaway_badge = f"🏆 {pr_n} All-Time Power PR{'s' if pr_n > 1 else ''}"
         takeaway_color = "emerald"
     elif p1_phys["color"] == "emerald" and p2_readiness["color"] == "emerald":
         takeaway_badge = f"✅ {p1_phys['status']}"
