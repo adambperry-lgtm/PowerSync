@@ -3,6 +3,21 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.29.0] - 2026-11-26
+### Added
+- **Spiderweb Power PRs in Daily Debrief**:
+  - Added [`detect_session_spiderweb_prs()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) to compare the evaluated session's 1-Hz MMP peaks across all 12 Spiderweb axes (`15s`–`60m`) against strictly prior user-isolated cycling history, identifying **All-Time Spiderweb PRs**, **30-Day Spiderweb Bests**, and newly unlocked Active Spiderweb Goal targets.
+  - Wired session Power PRs into Pillar 4 (`Long-Term Goal Progress`), the debrief takeaway badge, local fallback narrative, and [`call_gemini_coach_review()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) with a dedicated `CRITICAL POWER PR RULE`.
+  - Added the `#debriefPowerPrsBanner` UI banner in [`index.html`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/index.html), [`app.js`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) (`v=171`), and [`style.css`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/css/style.css) (`v=75`) displaying newly unlocked PR pills and a quick **View Spiderweb →** jump button.
+  - Expanded Spiderweb `recent_breakthroughs` in [`get_power_spiderweb_profile()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/power_profile_service.py) from 3 durations (`5s`, `5m`, `20m`) to all 12 Spiderweb axes plus `5s` Sprint.
+
+### Fixed
+- **Accurate Non-ERG vs. ERG-Mode Detection & Tailored Self-Paced Analysis**:
+  - Upgraded [`_detect_erg_stream_steadiness()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/debrief_analytics.py) to combine tightened within-block CV (`<= 0.038`), adjacent-window plateau flatness, and **power-cadence coupling** (vetoing SIM/resistance rides where power rises and falls with cadence, `r >= 0.50`).
+  - Fixed [`analyze_execution_nuances()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/debrief_analytics.py) so 1-Hz stream telemetry and explicit non-ERG metadata/titles/notes (`_has_explicit_non_erg_signal()`) always take precedence over whole-ride `VI <= 1.05`, eliminating false ERG-mode labels on steady Zwift free rides, climbs, races, and SIM-mode efforts.
+  - Added tailored self-paced indoor (non-ERG) execution analysis—evaluating manual pacing discipline, 2nd-half negative/positive splits, work-block power progression/fade, peak 5s bursts, and `>120% FTP` surges—along with an explicit `CRITICAL SELF-PACED (NON-ERG) RULE` in [`call_gemini_coach_review()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py).
+  - Bumped `DEBRIEF_CACHE_VERSION` to `4` in [`review_coach.py`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) so stale cached debriefs automatically regenerate on load.
+
 ## [2.28.1] - 2026-11-26
 ### Fixed
 - **Unified Cross-Device DS Coach Scheduled Workouts**:

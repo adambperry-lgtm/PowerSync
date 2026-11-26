@@ -15,7 +15,7 @@
     document.documentElement.setAttribute("data-theme", "light");
     document.documentElement.setAttribute("data-theme-mode", "light");
   </script>
-  <link rel="stylesheet" href="/static/css/style.css?v=74">
+  <link rel="stylesheet" href="/static/css/style.css?v=75">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <link rel="icon" type="image/jpeg" href="/static/img/logo.jpg?v=25">
   <link rel="apple-touch-icon" href="/static/img/logo.jpg?v=25">
@@ -1256,6 +1256,19 @@
             <span class="debrief-metric-val" id="debriefMetricTss" style="color:var(--accent-orange);">-- TSS</span>
             <span class="debrief-metric-sub" id="debriefMetricHr">-- bpm avg</span>
           </div>
+        </div>
+
+        <!-- New Spiderweb Power PRs Banner (populated when session breaks PRs) -->
+        <div class="debrief-prs-banner" id="debriefPowerPrsBanner" style="display:none;">
+          <div class="debrief-prs-header">
+            <div class="debrief-prs-title-group">
+              <span class="debrief-prs-title" id="debriefPowerPrsTitle">🏆 New Spiderweb Power PRs Unlocked</span>
+              <span class="debrief-prs-count" id="debriefPowerPrsCount"></span>
+            </div>
+            <button type="button" class="debrief-prs-jump-btn" id="btnDebriefViewSpiderweb">View Spiderweb →</button>
+          </div>
+          <div class="debrief-prs-chips" id="debriefPowerPrsChips"></div>
+          <p class="debrief-prs-summary" id="debriefPowerPrsSummary"></p>
         </div>
 
         <!-- 4-Pillar Deep Physiological & Strategic Debrief -->
@@ -3700,6 +3713,6 @@
 
   <!-- Leaflet Interactive Map -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="/static/js/app.js?v=170"></script>
+  <script src="/static/js/app.js?v=171"></script>
 </body>
 </html>

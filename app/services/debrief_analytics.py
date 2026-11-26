@@ -152,22 +152,56 @@ def _detect_work_intervals(
     }
 
 
+def _pearson_corr(xs: List[float], ys: List[float]) -> Optional[float]:
+    """Computes Pearson correlation coefficient between two equal-length numeric series."""
+    n = len(xs)
+    if n < 5 or n != len(ys):
+        return None
+    mx = sum(xs) / n
+    my = sum(ys) / n
+    dx = [x - mx for x in xs]
+    dy = [y - my for y in ys]
+    vx = sum(a * a for a in dx)
+    vy = sum(b * b for b in dy)
+    if vx <= 1e-9 or vy <= 1e-9:
+        return None
+    return sum(a * b for a, b in zip(dx, dy)) / math.sqrt(vx * vy)
+
+
+def _median_val(vals: List[float]) -> Optional[float]:
+    if not vals:
+        return None
+    s = sorted(vals)
+    mid = len(s) // 2
+    if len(s) % 2 == 1:
+        return s[mid]
+    return 0.5 * (s[mid - 1] + s[mid])
+
+
 def _detect_erg_stream_steadiness(
     watts: List[float],
     dt_sec: float = 1.0,
-) -> Tuple[Optional[bool], Optional[float]]:
+    cadence: Optional[List[float]] = None,
+) -> Tuple[Optional[bool], Optional[float], Dict[str, Any]]:
     """
-    Detects whether a power stream exhibits ERG-mode steadiness within steady blocks.
-    Even when a structured ERG interval workout has whole-ride VI > 1.05 (e.g. 1.08–1.25),
-    within each 20-second active window the smart trainer holds wattage tightly (median CV <= 0.055),
-    whereas free rides/races fluctuate continuously (median CV > 0.06).
+    Distinguishes true smart-trainer ERG-mode lock from human self-paced SIM / Free-Ride /
+    Slope / Resistance riding using three orthogonal physical signals across 20s active windows:
+      1. Tight within-window CV: ERG holds wattage tightly (median CV <= 0.038, >=55% windows <= 0.038).
+      2. Plateau step flatness: adjacent active windows inside ERG blocks stay flat (<=2.5% jump on >=40% pairs),
+         whereas SIM/free-ride power drifts continuously with gradient, drafting, and effort.
+      3. Power-cadence decoupling: in SIM/resistance mode, rising cadence increases power (median r >= 0.50);
+         in ERG mode, the trainer inversely adjusts torque to keep watts flat regardless of cadence.
     """
     win = max(5, int(round(20.0 / max(0.5, dt_sec))))
     if len(watts) < win * 6:
-        return None, None
+        return None, None, {}
 
+    has_cad = bool(cadence and len(cadence) == len(watts))
     cvs: List[float] = []
-    for i in range(0, len(watts) - win + 1, win):
+    window_means: List[Tuple[int, float]] = []
+    pw_cad_rs: List[float] = []
+
+    for w_idx, i in enumerate(range(0, len(watts) - win + 1, win)):
         seg = watts[i : i + win]
         if any(w <= 50.0 for w in seg):
             continue
@@ -175,20 +209,133 @@ def _detect_erg_stream_steadiness(
         if mean_w <= 50.0:
             continue
         var_w = sum((w - mean_w) ** 2 for w in seg) / len(seg)
-        cv = math.sqrt(var_w) / mean_w
+        std_w = math.sqrt(var_w)
+        cv = std_w / mean_w
         cvs.append(cv)
+        window_means.append((w_idx, mean_w))
+
+        if has_cad and std_w >= 2.0:
+            c_seg = [float(cadence[k] or 0.0) for k in range(i, i + win)]  # type: ignore[index]
+            if all(c > 30.0 for c in c_seg):
+                c_mean = sum(c_seg) / len(c_seg)
+                c_std = math.sqrt(sum((c - c_mean) ** 2 for c in c_seg) / len(c_seg))
+                if c_std >= 1.5:
+                    r_val = _pearson_corr(seg, c_seg)
+                    if r_val is not None:
+                        pw_cad_rs.append(r_val)
 
     if len(cvs) < 6:
-        return None, None
+        return None, None, {}
 
-    cvs.sort()
-    mid_idx = len(cvs) // 2
-    if len(cvs) % 2 == 1:
-        median_cv = cvs[mid_idx]
-    else:
-        median_cv = 0.5 * (cvs[mid_idx - 1] + cvs[mid_idx])
+    median_cv = _median_val(cvs)
+    assert median_cv is not None
+    tight_frac = sum(1 for c in cvs if c <= 0.038) / len(cvs)
 
-    return bool(median_cv <= 0.055), round(median_cv, 4)
+    # Check consecutive active window pairs for horizontal ERG plateaus vs. drifting SIM/free-ride power
+    adj_diffs: List[float] = []
+    for idx in range(1, len(window_means)):
+        prev_wi, prev_m = window_means[idx - 1]
+        cur_wi, cur_m = window_means[idx]
+        if cur_wi == prev_wi + 1:
+            denom = max(prev_m, cur_m, 1.0)
+            adj_diffs.append(abs(cur_m - prev_m) / denom)
+    flat_step_frac = (
+        sum(1 for d in adj_diffs if d <= 0.025) / len(adj_diffs)
+        if adj_diffs
+        else 1.0
+    )
+
+    median_pw_cad_r = _median_val(pw_cad_rs) if len(pw_cad_rs) >= 4 else None
+
+    steadiness_pass = (median_cv <= 0.038) and (tight_frac >= 0.55) and (flat_step_frac >= 0.40)
+    cadence_coupled_sim = bool(
+        median_pw_cad_r is not None
+        and median_pw_cad_r >= 0.50
+        and median_cv > 0.015
+    )
+    erg_detected = bool(steadiness_pass and not cadence_coupled_sim)
+
+    diagnostics = {
+        "median_cv": round(median_cv, 4),
+        "tight_window_frac": round(tight_frac, 3),
+        "flat_step_frac": round(flat_step_frac, 3),
+        "median_pw_cad_r": round(median_pw_cad_r, 3) if median_pw_cad_r is not None else None,
+        "cadence_coupled_sim": cadence_coupled_sim,
+    }
+    return erg_detected, round(median_cv, 4), diagnostics
+
+
+def _has_explicit_non_erg_signal(
+    primary_act: Optional[Dict[str, Any]],
+    custom_prompt: str = "",
+) -> bool:
+    """
+    Checks Strava activity metadata, title/description, and athlete debrief notes for
+    unambiguous non-ERG ride indicators (races, group/pacer rides, free rides, SIM mode, etc.).
+    """
+    import json
+    import re
+
+    act = primary_act or {}
+    name_l = str(act.get("name") or "").lower()
+    desc_l = ""
+
+    raw_json = act.get("raw_json")
+    if raw_json:
+        try:
+            parsed = json.loads(raw_json) if isinstance(raw_json, str) else raw_json
+            if isinstance(parsed, dict):
+                # Strava API cycling workout_type == 11 indicates a Race
+                if parsed.get("workout_type") == 11:
+                    return True
+                desc_l = str(parsed.get("description") or "").lower()
+        except Exception:
+            pass
+
+    combined_meta = f"{name_l} {desc_l}"
+    non_erg_patterns = (
+        r"\bno[\s-]*erg\b",
+        r"\bnon[\s-]*erg\b",
+        r"\berg[\s-]*off\b",
+        r"\bwithout[\s-]*erg\b",
+        r"\bsim[\s-]*mode\b",
+        r"\bfree[\s-]*ride\b",
+        r"\bfreeride\b",
+        r"\brace\b",
+        r"\bracing\b",
+        r"\bzrl\b",
+        r"\bttt\b",
+        r"\btime[\s-]*trial\b",
+        r"\bgroup[\s-]*ride\b",
+        r"\bpacer\b",
+        r"\brobopacer\b",
+        r"\bpace[\s-]*partner\b",
+        r"\bfondo\b",
+        r"\bclimb[\s-]*portal\b",
+        r"\bcrit\b",
+        r"\bzwift[\s-]*games\b",
+        r"\btour[\s-]*(of|de)\b",
+    )
+    if any(re.search(pat, combined_meta) for pat in non_erg_patterns):
+        return True
+
+    if custom_prompt and custom_prompt.strip():
+        note_l = custom_prompt.lower()
+        note_non_erg_patterns = (
+            r"\bnot[\s-]*erg\b",
+            r"\bwasn'?t[\s-]*erg\b",
+            r"\bwas[\s-]+not[\s-]+erg\b",
+            r"\bno[\s-]*erg\b",
+            r"\bnon[\s-]*erg\b",
+            r"\berg[\s-]*off\b",
+            r"\bwithout[\s-]*erg\b",
+            r"\bsim[\s-]*mode\b",
+            r"\bfree[\s-]*ride\b",
+        )
+        if any(re.search(pat, note_l) for pat in note_non_erg_patterns):
+            return True
+
+    return False
 
 
 def compute_stream_analytics(
@@ -201,7 +348,8 @@ def compute_stream_analytics(
       - 1st-half vs. 2nd-half NP fade, HR drift, and Cadence fade
       - Discrete work-interval fade (1st vs. last >=85% FTP block)
       - Coggan Power Time-in-Zone distribution (Z1..Z5+)
-      - Within-block ERG steadiness detection
+      - Multi-signal ERG vs. Self-Paced SIM/Free-Ride detection (CV + plateaus + power-cadence coupling)
+      - Peak 5s burst power & high-intensity surge count (>=120% FTP)
     """
     if not isinstance(streams, dict):
         return None
@@ -308,7 +456,44 @@ def compute_stream_analytics(
         ftp=ftp,
         dt_sec=dt_sec,
     )
-    erg_stream_detected, erg_stream_cv = _detect_erg_stream_steadiness(watts, dt_sec=dt_sec)
+    erg_stream_detected, erg_stream_cv, erg_diagnostics = _detect_erg_stream_steadiness(
+        watts,
+        dt_sec=dt_sec,
+        cadence=raw_cad if len(raw_cad) == n else None,
+    )
+
+    # Peak 5s burst power & discrete surge count (>= 120% FTP for >= 5s)
+    win_5s = max(1, int(round(5.0 / max(0.5, dt_sec))))
+    max_5s_watts = None
+    if n >= win_5s:
+        s5 = sum(watts[:win_5s])
+        best_5s = s5 / win_5s
+        for i in range(win_5s, n):
+            s5 += watts[i] - watts[i - win_5s]
+            avg5 = s5 / win_5s
+            if avg5 > best_5s:
+                best_5s = avg5
+        max_5s_watts = round(best_5s)
+
+    surge_thresh = f * 1.20
+    surge_reset = f * 0.95
+    surge_min_samples = max(2, int(round(5.0 / max(0.5, dt_sec))))
+    surge_count = 0
+    above_run = 0
+    in_surge = False
+    for w in watts:
+        if not in_surge:
+            if w >= surge_thresh:
+                above_run += 1
+                if above_run >= surge_min_samples:
+                    surge_count += 1
+                    in_surge = True
+            else:
+                above_run = 0
+        else:
+            if w < surge_reset:
+                in_surge = False
+                above_run = 0
 
     return {
         "has_streams": True,
@@ -328,6 +513,9 @@ def compute_stream_analytics(
         "time_in_zones": time_in_zones,
         "erg_stream_detected": erg_stream_detected,
         "erg_stream_cv": erg_stream_cv,
+        "erg_diagnostics": erg_diagnostics,
+        "max_5s_watts": max_5s_watts,
+        "surge_count": surge_count,
     }
 
 
@@ -810,10 +998,13 @@ def analyze_execution_nuances(
     total_xss: float,
     battery_depleted_pct: float,
     stream_metrics: Optional[Dict[str, Any]],
+    ftp: int = 250,
+    custom_prompt: str = "",
 ) -> Dict[str, Any]:
     """
     Pillar 3: Looks past whole-ride NP compliance to evaluate how the ride actually unfolded:
-    VI / ERG detection, duration completion, power/cadence/interval fade, and energy-system mix.
+    accurate ERG vs. self-paced detection, VI, duration completion, power/cadence/interval fade,
+    peak surges, and energy-system mix.
     """
     if not has_cycling:
         return {
@@ -821,6 +1012,8 @@ def analyze_execution_nuances(
             "color": "cyan",
             "vi": None,
             "is_erg_like": False,
+            "pacing_mode": "cross_training",
+            "pacing_mode_label": "Cross-Training",
             "duration_completion_pct": None,
             "power_fade_pct": None,
             "cadence_avg": None,
@@ -837,13 +1030,29 @@ def analyze_execution_nuances(
     name_l = (primary_act.get("name") or "").lower()
     is_indoor_platform = ("virtual" in sport_l) or any(k in name_l for k in ("zwift", "trainerroad", "rouvy", "wahoo", "erg"))
     erg_stream_detected = stream_metrics.get("erg_stream_detected") if stream_metrics else None
-    is_erg_like = bool(
-        is_indoor_platform
-        and (
-            (vi is not None and vi <= 1.05)
-            or (erg_stream_detected is True)
-        )
-    )
+    explicit_non_erg = _has_explicit_non_erg_signal(primary_act, custom_prompt=custom_prompt)
+
+    # Accurate ERG detection hierarchy:
+    # 1. Explicit non-ERG metadata/title/note always rules out ERG.
+    # 2. Non-indoor platforms (outdoor rides) are never ERG.
+    # 3. When 1-Hz power stream telemetry exists, trust stream ERG detection (NEVER override with VI!).
+    # 4. Only when streams are unavailable on an indoor ride, use a tight VI <= 1.03 fallback.
+    if explicit_non_erg or not is_indoor_platform:
+        is_erg_like = False
+    elif erg_stream_detected is not None:
+        is_erg_like = bool(erg_stream_detected)
+    else:
+        is_erg_like = bool(vi is not None and vi <= 1.03)
+
+    if is_erg_like:
+        pacing_mode = "erg"
+        pacing_mode_label = "ERG-Locked"
+    elif is_indoor_platform:
+        pacing_mode = "self_paced_indoor"
+        pacing_mode_label = "Self-Paced Indoor (Non-ERG)"
+    else:
+        pacing_mode = "outdoor"
+        pacing_mode_label = "Outdoor Self-Paced"
 
     duration_completion_pct = (
         round((act_min / planned_duration_min) * 100)
@@ -856,9 +1065,11 @@ def analyze_execution_nuances(
     cadence_fade_rpm = stream_metrics.get("cadence_fade_rpm") if stream_metrics else None
     interval_fade = stream_metrics.get("interval_fade") if stream_metrics else None
     time_in_zones = stream_metrics.get("time_in_zones") if stream_metrics else None
+    max_5s_watts = stream_metrics.get("max_5s_watts") if stream_metrics else None
+    surge_count = int(stream_metrics.get("surge_count") or 0) if stream_metrics else 0
 
     # Determine status
-    status = "Controlled Pacing"
+    status = "Disciplined Self-Pacing" if pacing_mode == "self_paced_indoor" else "Controlled Pacing"
     color = "emerald"
     if duration_completion_pct is not None and duration_completion_pct < 80:
         status = "Cut Short"
@@ -883,13 +1094,15 @@ def analyze_execution_nuances(
         color = "cyan"
 
     chips: List[str] = []
+    if pacing_mode == "self_paced_indoor":
+        chips.append("Self-Paced (Non-ERG)")
     if vi is not None:
         if is_erg_like:
             vi_lbl = "ERG Structured" if vi > 1.05 else "ERG Steady"
-        elif is_indoor_platform:
-            vi_lbl = "Smooth" if vi <= 1.06 else ("Structured" if vi <= 1.12 else "Stochastic")
+        elif pacing_mode == "self_paced_indoor":
+            vi_lbl = "Self-Paced Steady" if vi <= 1.06 else ("Self-Paced Variable" if vi <= 1.12 else "Stochastic")
         else:
-            vi_lbl = "Smooth" if vi <= 1.06 else "Stochastic"
+            vi_lbl = "Smooth" if vi <= 1.06 else ("Rolling" if vi <= 1.12 else "Stochastic")
         chips.append(f"VI {vi:.2f} ({vi_lbl})")
     if duration_completion_pct is not None and planned_duration_min:
         chips.append(f"Duration {act_min}m / {planned_duration_min}m ({duration_completion_pct}%)")
@@ -899,6 +1112,8 @@ def analyze_execution_nuances(
         chips.append(f"{interval_fade['interval_count']} Work Blocks{f_str}")
     elif power_fade_pct is not None:
         chips.append(f"2nd Half NP {power_fade_pct:+.1f}%")
+    if not is_erg_like and surge_count >= 3:
+        chips.append(f"{surge_count} Surges (>120% FTP)")
     if cadence_avg is not None:
         cad_str = f"Cadence {cadence_avg} rpm"
         if cadence_fade_rpm is not None and abs(cadence_fade_rpm) >= 2.0:
@@ -917,16 +1132,42 @@ def analyze_execution_nuances(
             parts.append(
                 f"Indoor ERG-style pacing locked wattage tightly (VI {vi:.2f}), so wattage compliance alone isn't the real story—focus on your cadence and heart-rate cost."
             )
+    elif pacing_mode == "self_paced_indoor":
+        if vi is not None and vi <= 1.06:
+            parts.append(
+                f"Self-paced indoor ride (non-ERG)—holding a tight VI of {vi:.2f} manually without trainer lock reflects strong shifting and pacing discipline."
+            )
+        elif vi is not None and vi <= 1.12:
+            parts.append(
+                f"Self-paced indoor ride (non-ERG, VI {vi:.2f}) where you modulated power manually across virtual terrain, pacing shifts, or hard efforts."
+            )
+        elif vi is not None:
+            parts.append(
+                f"Self-paced indoor ride (non-ERG) with a punchy, stochastic power profile (VI {vi:.2f}) driven by manual surges and terrain."
+            )
+        else:
+            parts.append("Self-paced indoor session (non-ERG) with manual power control.")
     elif vi is not None:
         if vi <= 1.05:
-            parts.append(f"Very steady pacing throughout (VI {vi:.2f}), minimizing wasted anaerobic surges.")
+            parts.append(f"Very steady self-paced effort outdoors (VI {vi:.2f}), minimizing wasted anaerobic surges.")
         elif vi <= 1.12:
-            if is_indoor_platform:
-                parts.append(f"Moderately variable indoor power profile (VI {vi:.2f}), reflecting structured intensity changes or terrain.")
-            else:
-                parts.append(f"Moderately variable power profile (VI {vi:.2f}), typical of rolling terrain or structured surges.")
+            parts.append(f"Moderately variable outdoor power profile (VI {vi:.2f}), typical of rolling terrain or structured surges.")
         else:
-            parts.append(f"Highly stochastic effort (VI {vi:.2f}) with repeated surges above average power.")
+            parts.append(f"Highly stochastic outdoor effort (VI {vi:.2f}) with repeated surges above average power.")
+
+    if not is_erg_like and power_fade_pct is not None and not (interval_fade and interval_fade.get("interval_count", 0) >= 2):
+        if power_fade_pct >= 4.0:
+            parts.append(
+                f"Executed a strong negative split ({power_fade_pct:+.1f}% NP in the 2nd half: {stream_metrics.get('first_half_np')}W → {stream_metrics.get('second_half_np')}W), finishing stronger than you started."
+            )
+        elif power_fade_pct <= -6.0:
+            parts.append(
+                f"Second-half NP faded {power_fade_pct:.1f}% ({stream_metrics.get('first_half_np')}W → {stream_metrics.get('second_half_np')}W), suggesting an aggressive opening pace or late fatigue."
+            )
+        else:
+            parts.append(
+                f"Even manual split across both halves ({power_fade_pct:+.1f}% NP shift: {stream_metrics.get('first_half_np')}W → {stream_metrics.get('second_half_np')}W)."
+            )
 
     if duration_completion_pct is not None and planned_duration_min:
         if duration_completion_pct < 80:
@@ -940,19 +1181,29 @@ def analyze_execution_nuances(
         fh = interval_fade.get("interval_hr_drift_bpm")
         fc = interval_fade.get("interval_cadence_fade_rpm")
         if fp is not None and fp <= -5.0 and not is_erg_like:
-            parts.append(f"Across {ic} work blocks, power faded {fp:.1f}% from block 1 ({interval_fade['first_block_watts']}W) to block {ic} ({interval_fade['last_block_watts']}W).")
+            parts.append(f"Across {ic} self-paced work blocks, power faded {fp:.1f}% from block 1 ({interval_fade['first_block_watts']}W) to block {ic} ({interval_fade['last_block_watts']}W).")
+        elif fp is not None and fp >= 4.0 and not is_erg_like:
+            hr_s = f" with HR {fh:+.0f} bpm" if fh is not None and abs(fh) >= 3 else ""
+            parts.append(f"Built power across {ic} self-paced work blocks (+{fp:.1f}% from {interval_fade['first_block_watts']}W to {interval_fade['last_block_watts']}W){hr_s}.")
         elif fp is not None:
             hr_s = f" while HR rose {fh:+.0f} bpm" if fh is not None and abs(fh) >= 3 else ""
             cad_s = f" and cadence shifted {fc:+.0f} rpm" if fc is not None and abs(fc) >= 3 else ""
             if is_erg_like:
                 parts.append(f"Across {ic} ERG work blocks ({interval_fade['first_block_watts']}W avg → {interval_fade['last_block_watts']}W avg){hr_s}{cad_s}.")
             else:
-                parts.append(f"Held power cleanly across all {ic} work blocks ({interval_fade['first_block_watts']}W → {interval_fade['last_block_watts']}W){hr_s}{cad_s}.")
+                parts.append(f"Held power cleanly across all {ic} self-paced work blocks ({interval_fade['first_block_watts']}W → {interval_fade['last_block_watts']}W){hr_s}{cad_s}.")
     elif cadence_fade_rpm is not None:
         if cadence_fade_rpm <= -5.0:
             parts.append(f"Cadence dropped {abs(cadence_fade_rpm):.0f} rpm in the second half (avg {cadence_avg} rpm), an early sign of muscular fatigue even while holding watts.")
         elif cadence_avg:
             parts.append(f"Cadence stayed consistent around {cadence_avg} rpm ({cadence_fade_rpm:+.0f} rpm late).")
+
+    if not is_erg_like and (surge_count >= 3 or (max_5s_watts and max_5s_watts >= max(350, int(ftp * 1.65)))):
+        burst_note = f"Peak 5s burst hit {max_5s_watts}W" if max_5s_watts else "Multiple anaerobic surges"
+        if surge_count >= 3:
+            parts.append(f"{burst_note} across {surge_count} discrete surges above 120% FTP.")
+        else:
+            parts.append(f"{burst_note}, taxing neuromuscular power.")
 
     if total_xss > 0:
         high_share = round(((high_xss + peak_xss) / total_xss) * 100)
@@ -966,6 +1217,8 @@ def analyze_execution_nuances(
         "color": color,
         "vi": vi,
         "is_erg_like": is_erg_like,
+        "pacing_mode": pacing_mode,
+        "pacing_mode_label": pacing_mode_label,
         "planned_duration_min": planned_duration_min,
         "actual_duration_min": act_min,
         "duration_completion_pct": duration_completion_pct,
@@ -974,6 +1227,8 @@ def analyze_execution_nuances(
         "cadence_fade_rpm": cadence_fade_rpm,
         "interval_fade": interval_fade,
         "time_in_zones": time_in_zones,
+        "max_5s_watts": max_5s_watts,
+        "surge_count": surge_count,
         "chips": chips,
         "summary": " ".join(parts),
     }
@@ -992,10 +1247,12 @@ def analyze_long_term_goal_progress(
     acute_tss: int,
     today: datetime.date,
     user_id: str,
+    session_power_prs: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Pillar 4: Connects today's session directly to the athlete's long-term macrocycle goal,
-    weekly pace, FTP progression gap, phase energy-system target, and 42-day power profile.
+    weekly pace, FTP progression gap, phase energy-system target, Spiderweb Power PRs set
+    in this session, and 30-day power profile trends.
     """
     prog = program or {}
     goal_title = prog.get("goal_title") or prog.get("title") or "Threshold & FTP Progression"
@@ -1018,7 +1275,15 @@ def analyze_long_term_goal_progress(
     expected_pct = round((day_of_week_num / 7.0) * 100)
     is_deload = "deload" in phase.lower() or "recovery" in phase.lower()
 
-    if is_deload:
+    prs = session_power_prs if isinstance(session_power_prs, dict) else {}
+    has_session_prs = bool(prs.get("has_prs"))
+    has_all_time_prs = bool(prs.get("has_all_time_prs"))
+
+    if has_all_time_prs and not is_deload:
+        all_cnt = int(prs.get("all_time_count") or 0)
+        pace_status = f"New Spiderweb PR{'s' if all_cnt > 1 else ''}"
+        color = "emerald"
+    elif is_deload:
         pace_status = "Recovery / Deload Week"
         color = "cyan"
     elif weekly_tss_pct >= expected_pct + 15:
@@ -1051,14 +1316,14 @@ def analyze_long_term_goal_progress(
     else:
         phase_alignment = f"Supports {phase} freshness and load management."
 
-    # Pull lightweight 42-day power spiderweb progress (strictly user-isolated)
+    # Pull lightweight 30-day power spiderweb progress (strictly user-isolated)
     trend_20m_w = None
     trend_5m_w = None
     growth_focus = None
     recent_pr_badge = None
     try:
         from app.services.power_profile_service import get_power_spiderweb_profile
-        profile = get_power_spiderweb_profile(timeframe="42d", user_id=user_id)
+        profile = get_power_spiderweb_profile(timeframe="30d", user_id=user_id)
         if isinstance(profile, dict):
             s_deltas = profile.get("summary_deltas") or {}
             t20 = s_deltas.get("threshold_20m") or {}
@@ -1079,21 +1344,34 @@ def analyze_long_term_goal_progress(
     event_title = active_plan.get("title") if has_event else prog.get("event_title")
     event_days = int(active_plan["days_until"]) if has_event else None
 
-    chips: List[str] = [
+    chips: List[str] = []
+    if has_session_prs:
+        highlights = prs.get("highlights") or []
+        for hl in highlights[:3]:
+            icon_p = "🏆" if hl.get("scope") == "all_time" else "📈"
+            chips.append(f"{icon_p} {hl.get('badge')}")
+        extra_cnt = int(prs.get("total_pr_count") or 0) - min(3, len(highlights))
+        if extra_cnt > 0:
+            chips.append(f"+{extra_cnt} more PR{'s' if extra_cnt > 1 else ''}")
+
+    chips.extend([
         f"{phase} • Wk {current_week}/{total_weeks}",
         f"Weekly {weekly_tss_actual}/{weekly_tss_target} TSS ({weekly_tss_pct}%)",
         f"FTP {ftp}W → {target_ftp}W" if ftp_gap > 0 else f"FTP Target {target_ftp}W Met",
-    ]
+    ])
     if has_event and event_days is not None:
         chips.append(f"{event_title}: {event_days}d out")
     elif trend_20m_w is not None and trend_20m_w != 0:
-        chips.append(f"42d 20m Power {trend_20m_w:+d}W")
-    if recent_pr_badge:
+        chips.append(f"30d 20m Power {trend_20m_w:+d}W")
+    if recent_pr_badge and not has_session_prs:
         chips.append(f"Recent: {recent_pr_badge}")
 
-    parts = [
+    parts: List[str] = []
+    if has_session_prs and prs.get("summary_text"):
+        parts.append(str(prs["summary_text"]))
+    parts.append(
         f"Toward '{goal_title}' ({phase}, Week {current_week} of {total_weeks}), you're at {weekly_tss_actual}/{weekly_tss_target} TSS ({weekly_tss_pct}% vs. ~{expected_pct}% mid-week pace)."
-    ]
+    )
     if calculated_tss > 0:
         parts.append(f"This session contributed +{ride_share_pct}% of your weekly target. {phase_alignment}")
     else:
@@ -1102,9 +1380,9 @@ def analyze_long_term_goal_progress(
     if ftp_gap > 0:
         trend_note = ""
         if trend_20m_w is not None and trend_20m_w > 0:
-            trend_note = f" (42d 20m power trending +{trend_20m_w}W)"
+            trend_note = f" (30d 20m power trending +{trend_20m_w}W)"
         elif trend_20m_w is not None and trend_20m_w < 0:
-            trend_note = f" (42d 20m power {trend_20m_w}W vs. prior block)"
+            trend_note = f" (30d 20m power {trend_20m_w}W vs. prior block)"
         parts.append(f"You remain {ftp_gap}W shy of your {target_ftp}W FTP goal{trend_note}.")
     if has_event and event_days is not None:
         parts.append(f"{event_days} days until {event_title}.")
@@ -1130,6 +1408,7 @@ def analyze_long_term_goal_progress(
         "trend_5m_w": trend_5m_w,
         "growth_focus": growth_focus,
         "recent_pr_badge": recent_pr_badge,
+        "session_power_prs": prs if has_session_prs else None,
         "event_title": event_title,
         "event_days_until": event_days,
         "phase_alignment": phase_alignment,
@@ -1172,6 +1451,8 @@ def build_four_pillar_debrief(
     ftp: int,
     user_id: Optional[str] = None,
     streams: Optional[Dict[str, List[float]]] = None,
+    evaluated_acts: Optional[List[Dict[str, Any]]] = None,
+    custom_prompt: str = "",
 ) -> Dict[str, Any]:
     """Orchestrates all 4 non-circular debrief pillars into a single structured payload."""
     uid = user_id or get_current_user_id()
@@ -1182,6 +1463,34 @@ def build_four_pillar_debrief(
     avg_watts = float((primary_act or {}).get("average_watts") or 0.0)
     vi = round(primary_watts / avg_watts, 2) if (has_cycling and primary_watts > 0 and avg_watts > 20) else None
     planned_dur = prescribed_info.get("planned_duration_min")
+
+    # Detect Spiderweb Power PRs set during this evaluated session (strictly user-isolated)
+    session_power_prs: Dict[str, Any] = {
+        "has_prs": False,
+        "has_all_time_prs": False,
+        "all_time_prs": [],
+        "recent_30d_bests": [],
+        "highlights": [],
+        "goal_axes_achieved": [],
+        "all_time_count": 0,
+        "recent_30d_count": 0,
+        "total_pr_count": 0,
+        "peak_source": "none",
+        "summary_text": "",
+    }
+    if has_cycling:
+        sess_acts = evaluated_acts if evaluated_acts else ([primary_act] if primary_act else [])
+        try:
+            from app.services.power_profile_service import detect_session_spiderweb_prs
+            session_power_prs = detect_session_spiderweb_prs(
+                evaluated_acts=sess_acts,
+                act_date_str=act_date_str,
+                user_id=uid,
+                primary_act=primary_act,
+                primary_streams=streams,
+            )
+        except Exception:
+            pass
 
     p1_phys = analyze_physiological_response(
         has_cycling=has_cycling,
@@ -1235,6 +1544,8 @@ def build_four_pillar_debrief(
         total_xss=total_xss,
         battery_depleted_pct=battery_depleted_pct,
         stream_metrics=stream_metrics,
+        ftp=ftp,
+        custom_prompt=custom_prompt,
     )
 
     p4_goal = analyze_long_term_goal_progress(
@@ -1249,9 +1560,11 @@ def build_four_pillar_debrief(
         acute_tss=acute_tss,
         today=today,
         user_id=uid,
+        session_power_prs=session_power_prs,
     )
 
-    # Synthesize a non-circular headline takeaway badge prioritizing real physiology & readiness
+    # Synthesize a non-circular headline takeaway badge prioritizing safety/readiness warnings,
+    # then celebrating new Spiderweb Power PR breakthroughs when recovery/physiology are healthy.
     if p2_readiness["color"] == "rose":
         takeaway_badge = f"⚠️ {p2_readiness['status']}"
         takeaway_color = "rose"
@@ -1267,6 +1580,10 @@ def build_four_pillar_debrief(
     elif p3_execution["color"] == "amber":
         takeaway_badge = f"⚙️ {p3_execution['status']}"
         takeaway_color = "amber"
+    elif session_power_prs.get("has_all_time_prs"):
+        pr_n = int(session_power_prs.get("all_time_count") or 1)
+        takeaway_badge = f"🏆 {pr_n} New Spiderweb PR{'s' if pr_n > 1 else ''}"
+        takeaway_color = "emerald"
     elif p1_phys["color"] == "emerald" and p2_readiness["color"] == "emerald":
         takeaway_badge = f"✅ {p1_phys['status']}"
         takeaway_color = "emerald"
@@ -1279,8 +1596,11 @@ def build_four_pillar_debrief(
         "readiness_fit": p2_readiness,
         "execution_nuances": p3_execution,
         "goal_progress": p4_goal,
+        "session_power_prs": session_power_prs,
         "has_stream_telemetry": bool(stream_metrics and stream_metrics.get("has_streams")),
         "is_erg_like": bool(p3_execution.get("is_erg_like")),
+        "pacing_mode": p3_execution.get("pacing_mode", "outdoor"),
+        "pacing_mode_label": p3_execution.get("pacing_mode_label", "Self-Paced"),
         "takeaway_badge": takeaway_badge,
         "takeaway_color": takeaway_color,
     }

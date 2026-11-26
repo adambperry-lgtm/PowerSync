@@ -49,6 +49,7 @@ class TestFourPillarDebrief(unittest.TestCase):
         for table in (
             "strava_activities",
             "strava_activity_streams",
+            "strava_activity_mmp_peaks",
             "whoop_metrics",
             "workouts",
             "settings",
@@ -429,6 +430,294 @@ class TestFourPillarDebrief(unittest.TestCase):
         free_ride_watts = [185.0 + ((i * 17) % 90) - 45.0 for i in range(1800)]
         free_metrics = compute_stream_analytics({"watts": free_ride_watts}, ftp=250)
         self.assertFalse(free_metrics["erg_stream_detected"])
+
+    def test_non_erg_indoor_steady_ride_with_low_vi_not_mislabeled_as_erg(self):
+        """
+        A self-paced indoor Zwift free ride / SIM-mode climb can easily have VI <= 1.05
+        (e.g. 1.03), yet 1-Hz power naturally fluctuates with cadence and virtual terrain.
+        Stream telemetry must override VI so it is analyzed as Self-Paced (Non-ERG),
+        never as ERG-Locked.
+        """
+        import math
+
+        today = get_athlete_date(self.user_a)
+        today_iso = today.isoformat()
+
+        # 40-min (2400s) steady SIM-mode indoor ride:
+        # Cadence varies naturally 84..94 rpm and power tracks cadence + terrain undulations (~4.8% CV),
+        # with a negative split (stronger second half) while whole-ride VI stays 1.03.
+        n = 2400
+        cadence = [89.0 + 4.5 * math.sin(i / 6.0) + 1.5 * math.cos(i / 17.0) for i in range(n)]
+        watts = [
+            (205.0 if i < n // 2 else 222.0)
+            + 2.4 * (cadence[i] - 89.0)
+            + 6.0 * math.sin(i / 35.0)
+            for i in range(n)
+        ]
+        hr = [142.0 + (12.0 * (i / n)) for i in range(n)]
+
+        act = {
+            "id": "sim_steady_low_vi_301",
+            "name": "Zwift - Tempus Fugit Tempo",
+            "sport_type": "VirtualRide",
+            "start_date": f"{today_iso}T07:45:00",
+            "moving_time_sec": n,
+            "average_watts": 214.0,
+            "weighted_average_watts": 220.0,  # VI = 1.03 (previously falsely tripped VI <= 1.05!)
+            "average_heartrate": 148.0,
+            "max_heartrate": 166.0,
+            "suffer_score": 68,
+            "streams": {"time": list(range(n)), "watts": watts, "heartrate": hr, "cadence": cadence},
+        }
+
+        review = build_daily_review_and_outlook_local(
+            whoop_data={"recovery_score": 82, "hrv_rmssd": 64.0, "day_strain": 13.2},
+            trailing_strava={"total_tss": 210, "acute_weighted_tss": 210},
+            today_acts=[act],
+            latest_act=act,
+            program={
+                "goal_title": "FTP Booster",
+                "phase": "Build Phase",
+                "current_week": 3,
+                "total_weeks": 8,
+                "target_ftp": 265,
+                "weekly_tss_target": 360,
+                "weekly_tss_actual": 210,
+            },
+            ftp=250,
+            max_hr=185,
+            day_acts=[act],
+        )
+
+        pillars = review["today_assessment"]["debrief_pillars"]
+        exec_p = pillars["execution_nuances"]
+        self.assertFalse(pillars["is_erg_like"])
+        self.assertFalse(exec_p["is_erg_like"])
+        self.assertEqual(exec_p["pacing_mode"], "self_paced_indoor")
+        self.assertEqual(exec_p["status"], "Strong Negative Split")
+        self.assertIn("Self-Paced (Non-ERG)", exec_p["chips"])
+        self.assertIn("non-erg", exec_p["summary"].lower())
+        self.assertIn("negative split", exec_p["summary"].lower())
+        self.assertNotIn("erg-locked", exec_p["status"].lower())
+
+        # Even tighter CV (~0.030) where power is strongly coupled to cadence (SIM/resistance physics)
+        # must also be vetoed as non-ERG.
+        sim_cad = [88.0 + 3.0 * math.sin(i / 4.0) for i in range(1800)]
+        sim_watts = [220.0 + 2.8 * (sim_cad[i] - 88.0) for i in range(1800)]
+        sim_metrics = compute_stream_analytics({"watts": sim_watts, "cadence": sim_cad}, ftp=250)
+        self.assertFalse(sim_metrics["erg_stream_detected"])
+        self.assertTrue(sim_metrics["erg_diagnostics"]["cadence_coupled_sim"])
+
+        # Explicit non-ERG signals (Race workout_type=11, RoboPacer title, or athlete note)
+        # must force is_erg_like=False even without streams and VI=1.01.
+        race_act = {
+            "id": "zwift_race_302",
+            "name": "Zwift - Watopia Flat",
+            "sport_type": "VirtualRide",
+            "start_date": f"{today_iso}T08:00:00",
+            "moving_time_sec": 2400,
+            "average_watts": 240.0,
+            "weighted_average_watts": 242.0,
+            "average_heartrate": 168.0,
+            "raw_json": json.dumps({"workout_type": 11}),
+        }
+        race_review = build_daily_review_and_outlook_local(
+            whoop_data={"recovery_score": 80, "hrv_rmssd": 62.0, "day_strain": 14.0},
+            trailing_strava={"total_tss": 200, "acute_weighted_tss": 200},
+            today_acts=[race_act],
+            latest_act=race_act,
+            program={"goal_title": "FTP Booster", "phase": "Build Phase", "weekly_tss_target": 360},
+            ftp=250,
+            max_hr=185,
+            day_acts=[race_act],
+        )
+        self.assertFalse(race_review["today_assessment"]["debrief_pillars"]["is_erg_like"])
+
+    def test_session_spiderweb_power_prs_reflected_in_debrief_and_gemini_prompt(self):
+        """
+        When today's non-ERG ride sets new Spiderweb Power PRs (e.g. 15s, 1m, 5m, 20m),
+        the debrief must detect them strictly per user_id, reflect them in Pillar 4,
+        session_power_prs, takeaway badge, assessment text, and pass both PRs and
+        the Non-ERG coaching rule into the Gemini prompt.
+        """
+        import math
+        from app.services.strava_service import save_activity_mmp_peaks
+
+        today = get_athlete_date(self.user_a)
+        today_iso = today.isoformat()
+        prior_d1 = (today - datetime.timedelta(days=10)).isoformat()
+        prior_d2 = (today - datetime.timedelta(days=20)).isoformat()
+
+        conn = get_db_connection()
+        c = conn.cursor()
+        # Seed prior cycling history for user_a with lower peaks
+        for aid, d_iso, avg_w, np_w in (
+            ("hist_pr_a1", f"{prior_d1}T08:00:00", 200.0, 210.0),
+            ("hist_pr_a2", f"{prior_d2}T08:00:00", 195.0, 205.0),
+        ):
+            c.execute(
+                """
+                INSERT INTO strava_activities (
+                    user_id, id, name, sport_type, start_date, moving_time_sec,
+                    average_watts, weighted_average_watts, average_heartrate, max_heartrate
+                ) VALUES (?, ?, 'Prior Ride', 'VirtualRide', ?, 3600, ?, ?, 145, 168)
+                """,
+                (self.user_a, aid, d_iso, avg_w, np_w),
+            )
+
+        # Seed MUCH higher peaks for user_b to ensure strict multi-user isolation
+        c.execute(
+            """
+            INSERT INTO strava_activities (
+                user_id, id, name, sport_type, start_date, moving_time_sec,
+                average_watts, weighted_average_watts, average_heartrate, max_heartrate
+            ) VALUES (?, 'hist_pr_b1', 'Pro Ride B', 'Ride', ?, 3600, 340, 360, 150, 180)
+            """,
+            (self.user_b, f"{prior_d1}T08:00:00"),
+        )
+        conn.commit()
+        conn.close()
+
+        for aid in ("hist_pr_a1", "hist_pr_a2"):
+            save_activity_mmp_peaks(
+                self.user_a,
+                aid,
+                {
+                    "5s": 620, "15s": 500, "30s": 430, "1m": 340,
+                    "2m": 300, "3m": 285, "5m": 270, "10m": 250,
+                    "15m": 240, "20m": 235, "30m": 225, "45m": 215, "60m": 205,
+                    "sample_count": 3600,
+                },
+            )
+        save_activity_mmp_peaks(
+            self.user_b,
+            "hist_pr_b1",
+            {
+                "5s": 1300, "15s": 1100, "30s": 900, "1m": 700,
+                "2m": 550, "3m": 500, "5m": 460, "10m": 420,
+                "15m": 400, "20m": 390, "30m": 370, "45m": 355, "60m": 340,
+                "sample_count": 3600,
+            },
+        )
+
+        # Active Spiderweb goal for user_a: 5m target 290W (today's ride will beat it!)
+        set_setting(
+            "spiderweb_goal",
+            {
+                "goal_type": "duration",
+                "target_key": "5m",
+                "target_watts": 290,
+                "target_title": "5m VO2 Max @ 290W",
+                "target_envelope": {"15s": 550, "1m": 380, "5m": 290, "20m": 260, "60m": 230},
+            },
+            user_id=self.user_a,
+        )
+
+        # Today's non-ERG Zwift ride: 30-min (1800s) progressive negative-split PR finish:
+        # 3m warmup -> 15m steady 252W -> 5m PR @ 305W -> 1m PR @ 405W -> 15s PR @ 610W -> cooldown
+        watts = (
+            [175.0 + 18.0 * math.sin(i / 5.0) for i in range(180)]          # 3m warmup
+            + [252.0 + 16.0 * math.sin(i / 9.0) for i in range(900)]        # 15m sustained threshold build
+            + [305.0 + 18.0 * math.sin(i / 7.0) for i in range(300)]        # 5m PR (unlocks 290W goal!)
+            + [405.0 + 20.0 * math.sin(i / 4.0) for i in range(60)]         # 1m PR!
+            + [610.0 + 15.0 * math.sin(i) for i in range(15)]               # 15s PR!
+            + [150.0 + 12.0 * math.sin(i / 6.0) for i in range(345)]        # cooldown
+        )
+        n = len(watts)
+        cadence = [88.0 + 5.0 * math.sin(i / 7.0) for i in range(n)]
+        hr = [148.0 + (10.0 * (i / n)) for i in range(n)]
+
+        act = {
+            "id": "today_pr_non_erg_401",
+            "name": "Zwift - Watopia Hard Free Ride",
+            "sport_type": "VirtualRide",
+            "start_date": f"{today_iso}T08:30:00",
+            "moving_time_sec": n,
+            "average_watts": 248.0,
+            "weighted_average_watts": 268.0,
+            "average_heartrate": 153.0,
+            "max_heartrate": 176.0,
+            "suffer_score": 78,
+            "distance_meters": 22500.0,
+            "streams": {"time": list(range(n)), "watts": watts, "heartrate": hr, "cadence": cadence},
+        }
+
+        review = build_daily_review_and_outlook_local(
+            whoop_data={"recovery_score": 84, "hrv_rmssd": 68.0, "day_strain": 14.1},
+            trailing_strava={"total_tss": 240, "acute_weighted_tss": 240},
+            today_acts=[act],
+            latest_act=act,
+            program={
+                "goal_title": "VO2 Max Expansion",
+                "phase": "Build Phase",
+                "current_week": 4,
+                "total_weeks": 8,
+                "target_ftp": 265,
+                "weekly_tss_target": 360,
+                "weekly_tss_actual": 240,
+            },
+            ftp=250,
+            max_hr=185,
+            day_acts=[act],
+        )
+
+        assessment = review["today_assessment"]
+        pillars = assessment["debrief_pillars"]
+        exec_p = pillars["execution_nuances"]
+        goal_p = pillars["goal_progress"]
+        sess_prs = pillars["session_power_prs"]
+
+        # 1. Correctly detected as Non-ERG self-paced indoor ride
+        self.assertFalse(pillars["is_erg_like"])
+        self.assertEqual(exec_p["pacing_mode"], "self_paced_indoor")
+
+        # 2. Spiderweb Power PRs detected accurately across multiple axes (isolated from user_b)
+        self.assertTrue(sess_prs["has_prs"])
+        self.assertTrue(sess_prs["has_all_time_prs"])
+        all_keys = {p["key"] for p in sess_prs["all_time_prs"]}
+        self.assertTrue({"15s", "1m", "5m", "20m"}.issubset(all_keys))
+        goal_hit_keys = {g["key"] for g in sess_prs["goal_axes_achieved"]}
+        self.assertIn("5m", goal_hit_keys)
+
+        # 3. Reflected in Pillar 4, assessment text, and takeaway badge
+        self.assertIn("Spiderweb PR", goal_p["status"])
+        self.assertTrue(any("🏆" in ch for ch in goal_p["chips"]))
+        self.assertIn("Spiderweb Power PR", goal_p["summary"])
+        self.assertIn("Spiderweb Power PR", assessment["assessment_text"])
+        self.assertIn("Spiderweb PR", pillars["takeaway_badge"])
+
+        # 4. Verify Gemini prompt receives BOTH the Non-ERG rule AND the exact Power PRs
+        captured_prompts = []
+
+        def fake_post(url, json=None, timeout=20):
+            captured_prompts.append(json["contents"][0]["parts"][0]["text"])
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.json.return_value = {
+                "candidates": [{"content": {"parts": [{"text": '{"insights": "Great self-paced session with new Spiderweb Power PRs across 15s, 1m, 5m, and 20m.", "tomorrow_guidance": "Spin easy Zone 2 tomorrow."}'}]}}]
+            }
+            return resp
+
+        with patch("requests.post", side_effect=fake_post):
+            call_gemini_coach_review("fake-key", review, {"recovery_score": 84})
+
+        self.assertEqual(len(captured_prompts), 1)
+        prompt = captured_prompts[0]
+        self.assertIn("CRITICAL SELF-PACED (NON-ERG) RULE", prompt)
+        self.assertNotIn("CRITICAL ERG-MODE RULE", prompt)
+        self.assertIn("SPIDERWEB POWER PRs ACHIEVED IN THIS SESSION", prompt)
+        self.assertIn("CRITICAL POWER PR RULE", prompt)
+        self.assertIn("5m:", prompt)
+
+        # 5. Verify frontend Power PR banner UI hooks exist
+        repo_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(repo_root, "app", "static", "index.html"), "r", encoding="utf-8") as f:
+            html_src = f.read()
+        with open(os.path.join(repo_root, "app", "static", "js", "app.js"), "r", encoding="utf-8") as f:
+            js_src = f.read()
+        for elem_id in ("debriefPowerPrsBanner", "debriefPowerPrsChips", "btnDebriefViewSpiderweb"):
+            self.assertIn(elem_id, html_src)
+            self.assertIn(elem_id, js_src)
 
 
 if __name__ == "__main__":

@@ -834,65 +834,59 @@ def get_power_spiderweb_profile(
         b["cycling_hours"] = round(b.get("cycling_sec", 0) / 3600.0, 1) if b.get("cycling_sec", 0) > 0 else b["total_hours"]
         timeline_buckets.append(b)
 
-    # Highlight PR breakthroughs across history (strictly cycling activities)
+    # Highlight PR breakthroughs across history across all 12 Spiderweb axes + 5s sprint (strictly cycling activities)
     breakthroughs = []
-    best_5s_so_far = 0
-    best_5m_so_far = 0
-    best_20m_so_far = 0
+    bt_thresholds = {
+        "5s": (15, "5s Sprint", "Sprint PR", "anaerobic"),
+        "15s": (10, "15s Sprint", "15s Sprint PR", "anaerobic"),
+        "30s": (8, "30s Burst", "30s Burst PR", "anaerobic"),
+        "1m": (6, "1m Anaerobic", "1m PR", "anaerobic"),
+        "2m": (5, "2m VO2", "2m VO2 PR", "vo2"),
+        "3m": (5, "3m VO2", "3m VO2 PR", "vo2"),
+        "5m": (4, "5m VO2 Max", "5m VO2 PR", "vo2"),
+        "10m": (4, "10m VO2", "10m PR", "vo2"),
+        "15m": (3, "15m Threshold", "15m PR", "threshold"),
+        "20m": (3, "20m Threshold", "20m Threshold PR", "threshold"),
+        "30m": (3, "30m Tempo/TT", "30m PR", "threshold"),
+        "45m": (3, "45m Endurance", "45m PR", "threshold"),
+        "60m": (3, "60m Stamina", "60m PR", "threshold"),
+    }
+    best_so_far: Dict[str, int] = {k: 0 for k in bt_thresholds}
 
     # Chronological scan of cycling activities ONLY
     chronological_cycling = sorted([a for a in all_acts if a.get("is_cycling", False)], key=lambda a: a["act_date_str"])
     for act in chronological_cycling:
-        p_5 = act["peaks"].get("5s", 0)
-        p_5m = act["peaks"].get("5m", 0)
-        p_20 = act["peaks"].get("20m", 0)
         d_str = act["act_date_str"]
         a_name = act.get("name", "Ride")
-
-        if p_5 > best_5s_so_far and best_5s_so_far > 0 and (p_5 - best_5s_so_far) >= 15:
-            delta = p_5 - best_5s_so_far
-            breakthroughs.append({
-                "date": d_str,
-                "activity_name": a_name,
-                "duration": "5s Sprint",
-                "watts": p_5,
-                "delta_watts": delta,
-                "badge": f"+{delta}W Sprint PR"
-            })
-            best_5s_so_far = p_5
-        elif p_5 > best_5s_so_far:
-            best_5s_so_far = p_5
-
-        if p_5m > best_5m_so_far and best_5m_so_far > 0 and (p_5m - best_5m_so_far) >= 6:
-            delta = p_5m - best_5m_so_far
-            breakthroughs.append({
-                "date": d_str,
-                "activity_name": a_name,
-                "duration": "5m VO2 Max",
-                "watts": p_5m,
-                "delta_watts": delta,
-                "badge": f"+{delta}W VO2 PR"
-            })
-            best_5m_so_far = p_5m
-        elif p_5m > best_5m_so_far:
-            best_5m_so_far = p_5m
-
-        if p_20 > best_20m_so_far and best_20m_so_far > 0 and (p_20 - best_20m_so_far) >= 4:
-            delta = p_20 - best_20m_so_far
-            breakthroughs.append({
-                "date": d_str,
-                "activity_name": a_name,
-                "duration": "20m Threshold",
-                "watts": p_20,
-                "delta_watts": delta,
-                "badge": f"+{delta}W Threshold PR"
-            })
-            best_20m_so_far = p_20
-        elif p_20 > best_20m_so_far:
-            best_20m_so_far = p_20
+        # Track strongest breakthrough per energy zone for this activity so one ride doesn't crowd the list
+        act_zone_best: Dict[str, Dict[str, Any]] = {}
+        for dur_k, (min_delta, dur_label, badge_suffix, z_group) in bt_thresholds.items():
+            val = int(act["peaks"].get(dur_k, 0) or 0)
+            prev_best = best_so_far[dur_k]
+            if val > prev_best:
+                if prev_best > 0 and (val - prev_best) >= min_delta:
+                    delta = val - prev_best
+                    rel_gain = delta / max(1.0, float(prev_best))
+                    cand = {
+                        "date": d_str,
+                        "activity_name": a_name,
+                        "key": dur_k,
+                        "duration": dur_label,
+                        "watts": val,
+                        "delta_watts": delta,
+                        "badge": f"+{delta}W {badge_suffix}",
+                        "_score": rel_gain,
+                    }
+                    prev_cand = act_zone_best.get(z_group)
+                    if not prev_cand or cand["_score"] > prev_cand["_score"]:
+                        act_zone_best[z_group] = cand
+                best_so_far[dur_k] = val
+        for cand in act_zone_best.values():
+            cand.pop("_score", None)
+            breakthroughs.append(cand)
 
     # Sort breakthroughs reverse chronological
-    breakthroughs = sorted(breakthroughs, key=lambda b: b["date"], reverse=True)[:5]
+    breakthroughs = sorted(breakthroughs, key=lambda b: b["date"], reverse=True)[:6]
 
     return {
         "timeframe": timeframe,
@@ -943,6 +937,331 @@ def get_power_spiderweb_profile(
             "total_cross_training": len([a for a in all_acts if not a.get("is_cycling", False)]),
             "total_analyzed": len(all_acts)
         }
+    }
+
+
+def detect_session_spiderweb_prs(
+    evaluated_acts: Optional[List[Dict[str, Any]]],
+    act_date_str: str,
+    user_id: Optional[str] = None,
+    primary_act: Optional[Dict[str, Any]] = None,
+    primary_streams: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Compares the evaluated session's peak power outputs across all 12 Power Spiderweb axes
+    (15s, 30s, 1m, 2m, 3m, 5m, 10m, 15m, 20m, 30m, 45m, 60m) against the athlete's strictly
+    prior cycling history (user-isolated) to detect:
+      - All-Time Spiderweb PRs (beat every prior cycling activity in history)
+      - 30-Day Spiderweb Bests (expanded the current 30-day Spiderweb polygon)
+      - Newly achieved Active Spiderweb Goal axes
+    Prefers exact 1-Hz Strava stream MMP peaks when available.
+    """
+    empty = {
+        "has_prs": False,
+        "has_all_time_prs": False,
+        "all_time_prs": [],
+        "recent_30d_bests": [],
+        "highlights": [],
+        "goal_axes_achieved": [],
+        "all_time_count": 0,
+        "recent_30d_count": 0,
+        "total_pr_count": 0,
+        "peak_source": "none",
+        "summary_text": "",
+    }
+    if not evaluated_acts:
+        return empty
+
+    uid = user_id or get_current_user_id()
+    cycling_sess = [
+        a for a in evaluated_acts
+        if isinstance(a, dict)
+        and is_cycling_sport(a.get("sport_type") or a.get("type", ""), a.get("name", ""), activity=a)
+    ]
+    if not cycling_sess:
+        return empty
+
+    ftp = int(get_setting("athlete_ftp", 250, user_id=uid) or 250)
+    w_prime_kj = float(get_setting("athlete_w_prime_kj", 20.0, user_id=uid) or 20.0)
+    peak_power = int(get_setting("athlete_peak_power_watts", 1050, user_id=uid) or 1050)
+    weight_kg = max(40.0, float(get_athlete_weight_kg(user_id=uid) or 75.0))
+
+    mmp_map: Dict[str, Dict[str, Any]] = {}
+    try:
+        from app.services.strava_service import (
+            compute_mmp_peaks_from_streams,
+            get_cached_mmp_peaks_map,
+            save_activity_mmp_peaks,
+        )
+        mmp_map = get_cached_mmp_peaks_map(user_id=uid)
+    except Exception:
+        compute_mmp_peaks_from_streams = None  # type: ignore
+        save_activity_mmp_peaks = None  # type: ignore
+
+    # 1. Compute session peak power envelope across all cycling activities in the evaluated day
+    evaluated_ids = set()
+    session_peaks: Dict[str, int] = {k: 0 for k in ALL_PEAK_KEYS}
+    used_stream = False
+    primary_id = str((primary_act or {}).get("id") or "")
+
+    for a in cycling_sess:
+        aid = str(a.get("id") or "")
+        if aid:
+            evaluated_ids.add(aid)
+
+        act_mmp = mmp_map.get(aid) if aid else None
+        if not (act_mmp and act_mmp.get("has_power_stream")):
+            cand_streams = None
+            if a.get("streams"):
+                cand_streams = a.get("streams")
+            elif primary_streams and (a is primary_act or (aid and aid == primary_id) or len(cycling_sess) == 1):
+                cand_streams = primary_streams
+            if cand_streams and compute_mmp_peaks_from_streams is not None:
+                try:
+                    computed = compute_mmp_peaks_from_streams(cand_streams)
+                    if computed:
+                        act_mmp = {"has_power_stream": True, **computed}
+                        if aid and save_activity_mmp_peaks is not None:
+                            try:
+                                save_activity_mmp_peaks(uid, aid, computed)
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+
+        if act_mmp and act_mmp.get("has_power_stream"):
+            used_stream = True
+
+        peaks = calculate_activity_peak_powers(
+            a,
+            ftp=ftp,
+            w_prime_kj=w_prime_kj,
+            peak_power_watts=peak_power,
+            mmp_peaks=act_mmp,
+        )
+        for k in ALL_PEAK_KEYS:
+            v = int(peaks.get(k) or 0)
+            if v > session_peaks[k]:
+                session_peaks[k] = v
+
+    if not any(v > 0 for v in session_peaks.values()):
+        return empty
+
+    # 2. Load strictly prior cycling history for this user (exclude evaluated session & future rides)
+    try:
+        ref_d = datetime.date.fromisoformat(str(act_date_str)[:10])
+    except Exception:
+        ref_d = get_athlete_date(uid)
+    cutoff_30d = ref_d - datetime.timedelta(days=30)
+
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute(
+        """
+        SELECT id, name, sport_type, start_date, moving_time_sec, distance_meters,
+               average_watts, weighted_average_watts, average_heartrate, suffer_score, raw_json
+        FROM strava_activities
+        WHERE user_id = ?
+        ORDER BY start_date DESC
+        """,
+        (uid,),
+    )
+    rows = [dict(r) for r in c.fetchall()]
+    conn.close()
+
+    prior_all_time: Dict[str, int] = {k: 0 for k in ALL_PEAK_KEYS}
+    prior_30d: Dict[str, int] = {k: 0 for k in ALL_PEAK_KEYS}
+    prior_cycling_count = 0
+    prior_30d_count = 0
+
+    for row in rows:
+        rid = str(row.get("id") or "")
+        if rid and rid in evaluated_ids:
+            continue
+        sport = row.get("sport_type") or row.get("type", "")
+        if not is_cycling_sport(sport, row.get("name", ""), activity=row):
+            continue
+
+        local_s = resolve_strava_local_start(row, user_id=uid) or row.get("start_date") or ""
+        try:
+            rd = datetime.date.fromisoformat(str(local_s)[:10])
+        except Exception:
+            continue
+        if rd > ref_d:
+            continue
+
+        prior_cycling_count += 1
+        r_mmp = mmp_map.get(rid) if rid else None
+        r_peaks = calculate_activity_peak_powers(
+            row,
+            ftp=ftp,
+            w_prime_kj=w_prime_kj,
+            peak_power_watts=peak_power,
+            mmp_peaks=r_mmp,
+        )
+        in_30d = rd >= cutoff_30d
+        if in_30d:
+            prior_30d_count += 1
+
+        for k in ALL_PEAK_KEYS:
+            v = int(r_peaks.get(k) or 0)
+            if v > prior_all_time[k]:
+                prior_all_time[k] = v
+            if in_30d and v > prior_30d[k]:
+                prior_30d[k] = v
+
+    if prior_cycling_count == 0:
+        return {**empty, "peak_source": "stream" if used_stream else "estimated"}
+
+    # 3. Cross-reference Active Spiderweb Goal envelope
+    active_goal = get_active_spiderweb_goal(user_id=uid)
+    raw_goal_env = (active_goal.get("target_envelope") or {}) if isinstance(active_goal, dict) else {}
+    goal_envelope = _fill_intermediate_peaks(raw_goal_env) if raw_goal_env else {}
+
+    all_time_prs: List[Dict[str, Any]] = []
+    recent_30d_bests: List[Dict[str, Any]] = []
+    goal_axes_achieved: List[Dict[str, Any]] = []
+
+    for meta in RADAR_DURATIONS:
+        k = meta["key"]
+        sess_w = int(session_peaks.get(k) or 0)
+        if sess_w <= 0:
+            continue
+
+        prev_all = int(prior_all_time.get(k) or 0)
+        prev_30 = int(prior_30d.get(k) or 0)
+        tgt_w = int(goal_envelope.get(k) or 0) or None
+
+        if prev_all > 0 and sess_w > prev_all:
+            delta = sess_w - prev_all
+            delta_pct = round((delta / prev_all) * 100.0, 1)
+            newly_met = bool(tgt_w and sess_w >= tgt_w and prev_all < tgt_w)
+            pr_item = {
+                "key": k,
+                "label": meta["label"],
+                "name": meta["name"],
+                "icon": meta["icon"],
+                "zone_group": meta["zone_group"],
+                "zone_label": meta["zone_label"],
+                "zone_color": meta["zone_color"],
+                "scope": "all_time",
+                "scope_label": "All-Time PR",
+                "watts": sess_w,
+                "w_kg": round(sess_w / weight_kg, 2),
+                "previous_watts": prev_all,
+                "delta_watts": delta,
+                "delta_pct": delta_pct,
+                "target_watts": tgt_w,
+                "goal_met": bool(tgt_w and sess_w >= tgt_w),
+                "goal_newly_achieved": newly_met,
+                "badge": f"{meta['label']} {sess_w}W (+{delta}W PR)",
+            }
+            all_time_prs.append(pr_item)
+            if newly_met:
+                goal_axes_achieved.append(pr_item)
+        elif prior_30d_count >= 1 and prev_30 > 0 and sess_w >= prev_30 + 2:
+            delta = sess_w - prev_30
+            delta_pct = round((delta / prev_30) * 100.0, 1)
+            newly_met = bool(tgt_w and sess_w >= tgt_w and prev_30 < tgt_w)
+            best_item = {
+                "key": k,
+                "label": meta["label"],
+                "name": meta["name"],
+                "icon": meta["icon"],
+                "zone_group": meta["zone_group"],
+                "zone_label": meta["zone_label"],
+                "zone_color": meta["zone_color"],
+                "scope": "30d",
+                "scope_label": "30d Best",
+                "watts": sess_w,
+                "w_kg": round(sess_w / weight_kg, 2),
+                "previous_watts": prev_30,
+                "delta_watts": delta,
+                "delta_pct": delta_pct,
+                "target_watts": tgt_w,
+                "goal_met": bool(tgt_w and sess_w >= tgt_w),
+                "goal_newly_achieved": newly_met,
+                "badge": f"{meta['label']} {sess_w}W (+{delta}W 30d)",
+            }
+            recent_30d_bests.append(best_item)
+            if newly_met:
+                goal_axes_achieved.append(best_item)
+
+    # 4. Select up to 4 most representative highlights (spanning energy zones, prioritizing All-Time PRs)
+    highlights: List[Dict[str, Any]] = []
+    seen_keys = set()
+
+    def _pick_top_from_pool(pool: List[Dict[str, Any]], max_items: int) -> None:
+        if not pool or len(highlights) >= max_items:
+            return
+        # First pass: pick highest % gain from each distinct energy zone group
+        for zg in ("threshold", "vo2", "anaerobic"):
+            if len(highlights) >= max_items:
+                break
+            zone_cands = [p for p in pool if p["zone_group"] == zg and p["key"] not in seen_keys]
+            if zone_cands:
+                top_z = max(zone_cands, key=lambda x: (x["delta_pct"], x["delta_watts"]))
+                highlights.append(top_z)
+                seen_keys.add(top_z["key"])
+        # Second pass: fill remaining slots by highest % gain
+        remaining = sorted(
+            [p for p in pool if p["key"] not in seen_keys],
+            key=lambda x: (x["delta_pct"], x["delta_watts"]),
+            reverse=True,
+        )
+        for cand in remaining:
+            if len(highlights) >= max_items:
+                break
+            highlights.append(cand)
+            seen_keys.add(cand["key"])
+
+    _pick_top_from_pool(all_time_prs, 4)
+    if len(highlights) < 4:
+        _pick_top_from_pool(recent_30d_bests, 4)
+
+    # Keep highlights ordered chronologically by duration (15s -> 60m) for intuitive reading
+    dur_order = {meta["key"]: idx for idx, meta in enumerate(RADAR_DURATIONS)}
+    highlights.sort(key=lambda x: dur_order.get(x["key"], 99))
+
+    # 5. Build clean human-readable summary sentence
+    summary_parts: List[str] = []
+    if all_time_prs:
+        hl_all = [h for h in highlights if h["scope"] == "all_time"]
+        fmt_list = ", ".join(f"{h['label']} {h['watts']}W (+{h['delta_watts']}W)" for h in hl_all)
+        if len(all_time_prs) == 1:
+            summary_parts.append(f"Set a new All-Time Spiderweb Power PR: {fmt_list}.")
+        elif len(all_time_prs) <= len(hl_all):
+            summary_parts.append(f"Set {len(all_time_prs)} new All-Time Spiderweb Power PRs: {fmt_list}.")
+        else:
+            summary_parts.append(f"Set {len(all_time_prs)} new All-Time Spiderweb Power PRs, highlighted by {fmt_list}.")
+    if recent_30d_bests:
+        hl_30 = [h for h in highlights if h["scope"] == "30d"]
+        if not hl_30:
+            hl_30 = sorted(recent_30d_bests, key=lambda x: x["delta_pct"], reverse=True)[:3]
+        fmt_30 = ", ".join(f"{h['label']} {h['watts']}W (+{h['delta_watts']}W)" for h in hl_30)
+        if all_time_prs:
+            summary_parts.append(f"Also set {len(recent_30d_bests)} new 30-day Spiderweb best{'s' if len(recent_30d_bests) > 1 else ''} ({fmt_30}).")
+        else:
+            summary_parts.append(
+                f"Expanded your 30-day Spiderweb envelope across {len(recent_30d_bests)} axis{'es' if len(recent_30d_bests) > 1 else ''}: {fmt_30}."
+            )
+    if goal_axes_achieved:
+        g_labels = ", ".join(f"{g['label']} ({g['watts']}W ≥ {g['target_watts']}W)" for g in goal_axes_achieved[:3])
+        summary_parts.append(f"Unlocked active Spiderweb Goal target{'s' if len(goal_axes_achieved) > 1 else ''}: {g_labels}!")
+
+    total_cnt = len(all_time_prs) + len(recent_30d_bests)
+    return {
+        "has_prs": total_cnt > 0,
+        "has_all_time_prs": len(all_time_prs) > 0,
+        "all_time_prs": all_time_prs,
+        "recent_30d_bests": recent_30d_bests,
+        "highlights": highlights,
+        "goal_axes_achieved": goal_axes_achieved,
+        "all_time_count": len(all_time_prs),
+        "recent_30d_count": len(recent_30d_bests),
+        "total_pr_count": total_cnt,
+        "peak_source": "stream" if used_stream else "estimated",
+        "summary_text": " ".join(summary_parts),
     }
 
 

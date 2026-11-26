@@ -4654,9 +4654,13 @@ function renderDebrief(data) {
 
   if (debriefMetricScore) debriefMetricScore.textContent = `${assessment.compliance_score || 95}%`;
   if (debriefMetricVerdict) {
-    debriefMetricVerdict.textContent = (pillars && pillars.is_erg_like)
-      ? "ERG-Locked NP"
-      : (assessment.verdict || "Target Fidelity");
+    if (pillars && pillars.is_erg_like) {
+      debriefMetricVerdict.textContent = "ERG-Locked NP";
+    } else if (pillars && pillars.pacing_mode === "self_paced_indoor") {
+      debriefMetricVerdict.textContent = "Self-Paced (Non-ERG)";
+    } else {
+      debriefMetricVerdict.textContent = assessment.verdict || "Target Fidelity";
+    }
   }
   
   if (debriefMetricWatts) {
@@ -4672,6 +4676,75 @@ function renderDebrief(data) {
   if (debriefMetricTss) debriefMetricTss.textContent = `${cardLoadTss} TSS`;
   if (debriefMetricHr) {
     debriefMetricHr.textContent = (assessment.avg_hr && assessment.avg_hr > 0) ? `${assessment.avg_hr} bpm avg` : "-- bpm avg";
+  }
+
+  // Render New Spiderweb Power PRs Banner when session broke Spiderweb PRs
+  const debriefPowerPrsBanner = document.getElementById("debriefPowerPrsBanner");
+  if (debriefPowerPrsBanner) {
+    const sessPrs = (pillars && pillars.session_power_prs) || assessment.session_power_prs || null;
+    if (sessPrs && sessPrs.has_prs) {
+      debriefPowerPrsBanner.style.display = "flex";
+      const titleEl = document.getElementById("debriefPowerPrsTitle");
+      const countEl = document.getElementById("debriefPowerPrsCount");
+      const chipsEl = document.getElementById("debriefPowerPrsChips");
+      const sumEl = document.getElementById("debriefPowerPrsSummary");
+      const allTimeList = Array.isArray(sessPrs.all_time_prs) ? sessPrs.all_time_prs : [];
+      const recent30List = Array.isArray(sessPrs.recent_30d_bests) ? sessPrs.recent_30d_bests : [];
+
+      if (titleEl) {
+        if (allTimeList.length > 0) {
+          titleEl.textContent = allTimeList.length === 1
+            ? "🏆 New All-Time Spiderweb Power PR"
+            : "🏆 New All-Time Spiderweb Power PRs";
+        } else {
+          titleEl.textContent = recent30List.length === 1
+            ? "📈 New 30-Day Spiderweb Power Best"
+            : "📈 New 30-Day Spiderweb Power Bests";
+        }
+      }
+      if (countEl) {
+        const partsCount = [];
+        if (allTimeList.length > 0) partsCount.push(`${allTimeList.length} All-Time`);
+        if (recent30List.length > 0) partsCount.push(`${recent30List.length} 30d Best`);
+        countEl.textContent = partsCount.join(" • ");
+      }
+      if (chipsEl) {
+        chipsEl.innerHTML = "";
+        const combinedPrs = [...allTimeList, ...recent30List];
+        combinedPrs.forEach((pr) => {
+          const pill = document.createElement("span");
+          const isAllTime = pr.scope === "all_time";
+          pill.className = `debrief-pr-pill ${isAllTime ? "pr-all-time" : "pr-30d"}`;
+          const goalTag = pr.goal_newly_achieved ? " • 🎯 Goal Met" : "";
+          const scopeTag = isAllTime ? "PR" : "30d";
+          pill.textContent = `${pr.icon || "⚡"} ${pr.label}: ${pr.watts}W (+${pr.delta_watts}W ${scopeTag})${goalTag}`;
+          chipsEl.appendChild(pill);
+        });
+      }
+      if (sumEl) {
+        sumEl.textContent = sessPrs.summary_text || "";
+      }
+
+      const jumpBtn = document.getElementById("btnDebriefViewSpiderweb");
+      if (jumpBtn && !jumpBtn.dataset.bound) {
+        jumpBtn.dataset.bound = "1";
+        jumpBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (typeof switchMainDashboardView === "function" && currentActiveMainView !== "analysis") {
+            switchMainDashboardView("analysis", true);
+          }
+          if (powerSpiderwebCollapsible && typeof powerSpiderwebCollapsible.expand === "function") {
+            powerSpiderwebCollapsible.expand();
+          }
+          const card = document.getElementById("cardPowerSpiderweb") || document.getElementById("powerSpiderwebHeader");
+          if (card) {
+            setTimeout(() => card.scrollIntoView({ behavior: "smooth", block: "start" }), 80);
+          }
+        });
+      }
+    } else {
+      debriefPowerPrsBanner.style.display = "none";
+    }
   }
 
   // Render 4-Pillar Deep Physiological & Strategic Debrief Grid

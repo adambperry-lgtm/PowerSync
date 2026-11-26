@@ -1697,13 +1697,18 @@ def build_daily_review_and_outlook_local(
             ftp=ftp,
             user_id=uid,
             streams=primary_streams,
+            evaluated_acts=evaluated_acts,
+            custom_prompt=custom_prompt,
         )
 
-        # Enrich local fallback assessment_text with non-circular physiological & goal highlights
+        # Enrich local fallback assessment_text with non-circular physiological, PR & goal highlights
         phys_p = four_pillars["physiological_response"]
         read_p = four_pillars["readiness_fit"]
         goal_p = four_pillars["goal_progress"]
+        sess_prs = four_pillars.get("session_power_prs") or {}
         extra_bits = []
+        if sess_prs.get("has_prs") and sess_prs.get("summary_text"):
+            extra_bits.append(str(sess_prs["summary_text"]))
         if has_cycling and phys_p.get("ef") is not None:
             if phys_p.get("ef_delta_pct") is not None:
                 extra_bits.append(f"Efficiency Factor was {phys_p['ef']:.2f} ({phys_p['ef_delta_pct']:+.1f}% vs. baseline).")
@@ -1763,6 +1768,7 @@ def build_daily_review_and_outlook_local(
             "focus_duration": act_strain.get("focus_duration", "Endurance / Century (>1h Focus)"),
             "strain_data": act_strain,
             "debrief_pillars": four_pillars,
+            "session_power_prs": sess_prs,
             "sessions": sessions_list,
             "sessions_count": len(evaluated_acts)
         }
@@ -2067,7 +2073,7 @@ def build_daily_review_and_outlook_local(
         }
     }
 
-DEBRIEF_CACHE_VERSION = 3
+DEBRIEF_CACHE_VERSION = 4
 
 
 def _build_debrief_activity_signature(
@@ -2376,7 +2382,38 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
     p_read = pillars.get("readiness_fit") or {}
     p_exec = pillars.get("execution_nuances") or {}
     p_goal = pillars.get("goal_progress") or {}
+    sess_prs = pillars.get("session_power_prs") or sess.get("session_power_prs") or {}
     macro = review_data.get("macrocycle_context") or {}
+
+    is_erg_locked = bool(p_exec.get("is_erg_like"))
+    pacing_mode_label = p_exec.get("pacing_mode_label") or ("ERG-Locked" if is_erg_locked else "Self-Paced (Non-ERG)")
+
+    pr_lines: List[str] = []
+    if isinstance(sess_prs, dict) and sess_prs.get("has_prs"):
+        all_t = sess_prs.get("all_time_prs") or []
+        rec_30 = sess_prs.get("recent_30d_bests") or []
+        goal_hit = sess_prs.get("goal_axes_achieved") or []
+        if all_t:
+            all_fmt = ", ".join(
+                f"{p['label']}: {p['watts']}W ({p['w_kg']} W/kg, +{p['delta_watts']}W / +{p['delta_pct']}% vs prior {p['previous_watts']}W)"
+                for p in all_t
+            )
+            pr_lines.append(f"  - All-Time Spiderweb PRs ({len(all_t)}): {all_fmt}")
+        if rec_30:
+            r30_fmt = ", ".join(
+                f"{p['label']}: {p['watts']}W (+{p['delta_watts']}W vs prior 30d best {p['previous_watts']}W)"
+                for p in rec_30
+            )
+            pr_lines.append(f"  - 30-Day Spiderweb Bests ({len(rec_30)}): {r30_fmt}")
+        if goal_hit:
+            gh_fmt = ", ".join(f"{g['label']} ({g['watts']}W >= {g['target_watts']}W target)" for g in goal_hit)
+            pr_lines.append(f"  - Active Spiderweb Goal Targets Newly Unlocked: {gh_fmt}")
+
+    pr_block = (
+        "SPIDERWEB POWER PRs ACHIEVED IN THIS SESSION:\n" + "\n".join(pr_lines) + "\n"
+        if pr_lines
+        else ""
+    )
 
     pillar_block = (
         f"4-PILLAR TELEMETRY (USE THESE FOR DEEP NON-CIRCULAR ANALYSIS):\n"
@@ -2385,10 +2422,42 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
         f"2. Independent Readiness & Strategic Fit [{p_read.get('status', 'N/A')}]: {p_read.get('summary', 'Evaluated against WHOOP recovery.')} "
         f"(Chips: {', '.join(p_read.get('chips') or [])})\n"
         f"3. Execution Nuances [{p_exec.get('status', 'N/A')}]: {p_exec.get('summary', 'Standard pacing profile.')} "
-        f"(ERG-locked={bool(p_exec.get('is_erg_like'))}; Chips: {', '.join(p_exec.get('chips') or [])})\n"
+        f"(Pacing Mode: {pacing_mode_label}; ERG-locked={is_erg_locked}; Chips: {', '.join(p_exec.get('chips') or [])})\n"
         f"4. Long-Term Goal Progress [{p_goal.get('status', 'N/A')}]: {p_goal.get('summary', '')} "
         f"(Goal: '{p_goal.get('goal_title', macro.get('goal_title', 'FTP Build'))}', Phase: {p_goal.get('phase', macro.get('phase', 'Build'))}, "
-        f"FTP {macro.get('current_ftp', 250)}W -> {macro.get('target_ftp', 265)}W, Weekly TSS {p_goal.get('weekly_tss_actual', macro.get('weekly_tss_actual', 0))}/{p_goal.get('weekly_tss_target', macro.get('weekly_tss_target', 360))})\n"
+        f"FTP {macro.get('current_ftp', 250)}W -> {macro.get('target_ftp', 265)}W, Weekly TSS {p_goal.get('weekly_tss_actual', macro.get('weekly_tss_actual', 0))}/{p_goal.get('weekly_tss_target', macro.get('weekly_tss_target', 360))}; "
+        f"Chips: {', '.join(p_goal.get('chips') or [])})\n"
+    )
+
+    if is_erg_locked:
+        anti_circ_rule = (
+            "CRITICAL ANTI-CIRCULARITY RULE: Do NOT waste words congratulating the athlete for matching ERG-mode power to a workout file they themselves selected or edited. "
+            "Instead, deliver real coaching value across all four pillars: (1) internal physiological cost (EF vs personal baseline, cardiac drift/decoupling, HR & WHOOP strain/reaction), "
+            "(2) whether the workout truly fit their independent physiological readiness & HRV, (3) execution nuances beyond average NP (VI, cadence stability, duration, W' depletion), "
+            "and (4) how this ride moves them toward their long-term goal, weekly TSS pace, Power Spiderweb PRs, and phase target.\n"
+        )
+        pacing_mode_rule = (
+            "CRITICAL ERG-MODE RULE: ERG-locked=True means the smart trainer controlled wattage automatically (even if whole-ride VI > 1.05 due to structured interval steps). "
+            "Do NOT state or imply the athlete rode without ERG lock, and do NOT interpret prescribed block wattage differences as power slipping from fatigue—evaluate fatigue via cadence stability, HR drift, and aerobic decoupling.\n"
+        )
+    else:
+        anti_circ_rule = (
+            "CRITICAL ANTI-CIRCULARITY RULE: Go beyond rubber-stamping simple target NP compliance. "
+            "Deliver deep sports-science coaching across all four pillars: (1) internal physiological cost (EF vs personal baseline, cardiac drift/decoupling, HR & WHOOP strain/reaction), "
+            "(2) whether the workout truly fit their independent physiological readiness & HRV, (3) self-paced execution nuances (manual pacing discipline, VI, negative vs. positive split, work-block fade/progression, surge intensity, cadence stability, W' depletion), "
+            "and (4) how this ride moves them toward their long-term goal, Power Spiderweb PRs, weekly TSS pace, and phase target.\n"
+        )
+        pacing_mode_rule = (
+            f"CRITICAL SELF-PACED (NON-ERG) RULE: ERG-locked=False ({pacing_mode_label}). The athlete did NOT ride in ERG mode—they controlled power manually through shifting, cadence, and effort. "
+            "NEVER state, assume, or imply this workout was in ERG mode or ERG-locked. "
+            "Analyze execution accordingly: evaluate their manual pacing discipline (VI, even vs. negative/positive 2nd-half split, power fade or build across work blocks, anaerobic surges/W' usage, and cadence management).\n"
+        )
+
+    pr_rule = (
+        "CRITICAL POWER PR RULE: The athlete set new Power Spiderweb PRs in this session (listed above). "
+        "You MUST explicitly highlight and celebrate these specific Power PR durations and wattages in BOTH your main `insights` narrative AND `pillar_notes.goal`, explaining which energy systems expanded and how they advance the athlete's long-term goal.\n"
+        if pr_lines
+        else ""
     )
 
     prompt = (
@@ -2399,21 +2468,15 @@ def call_gemini_coach_review(api_key: str, review_data: Dict[str, Any], whoop_da
         f"{sessions_breakdown}\n"
         f"Physiological Strain Breakdown: {sess.get('total_xss', 0)} Total XSS ({sess.get('low_strain_xss', 0)} Low / {sess.get('high_strain_xss', 0)} High / {sess.get('peak_strain_xss', 0)} Peak), W' Anaerobic Battery Depleted: {sess.get('battery_depleted_pct', 0)}%, Focus Duration: {sess.get('focus_duration', 'Endurance')}.\n"
         f"Scheduled / Prescribed Reference: {sess.get('target_zone')} ({sess.get('target_watts', 0)}W NP, {sess.get('target_pct_ftp', 0)}% FTP). Prescribed session: '{sess.get('prescribed_workout_title', sess.get('target_zone'))}'. Plan Compliance: {sess.get('verdict')} ({sess.get('compliance_score', 95)}% score).\n"
+        f"{pr_block}"
         f"{pillar_block}"
         f"Tomorrow outlook: {review_data['outlook_days'][0]['title']} (est. {review_data['outlook_days'][0].get('estimated_xss', 50)} XSS, Focus: {review_data['outlook_days'][0].get('focus_duration', 'Sweet Spot')}, {review_data['outlook_days'][0]['focus']}).\n"
-        f"CRITICAL ANTI-CIRCULARITY RULE: Do NOT waste words congratulating the athlete for matching ERG-mode power to a workout file they themselves selected or edited. "
-        f"Instead, deliver real coaching value across all four pillars: (1) internal physiological cost (EF vs personal baseline, cardiac drift/decoupling, HR & WHOOP strain/reaction), "
-        f"(2) whether the workout truly fit their independent physiological readiness & HRV, (3) execution nuances beyond average NP (VI, cadence/power/interval fade, duration, W' depletion), "
-        f"and (4) how this ride moves them toward their long-term goal, weekly TSS pace, and phase target.\n"
-        + (
-            "CRITICAL ERG-MODE RULE: ERG-locked=True means the smart trainer controlled wattage automatically (even if whole-ride VI > 1.05 due to structured interval steps). "
-            "Do NOT state or imply the athlete rode without ERG lock, and do NOT interpret prescribed block wattage differences as power slipping from fatigue—evaluate fatigue via cadence stability, HR drift, and aerobic decoupling.\n"
-            if bool(p_exec.get("is_erg_like"))
-            else ""
-        )
-        + f"Mandatory: Session and target wattage figures above are Normalized Power (NP) unless explicitly labeled 'avg'. Always refer to NP figures as Normalized Power or NP (e.g. '195W NP'), NEVER as 'average power' or 'avg watts'.\n"
+        f"{anti_circ_rule}"
+        f"{pacing_mode_rule}"
+        f"{pr_rule}"
+        f"Mandatory: Session and target wattage figures above are Normalized Power (NP) unless explicitly labeled 'avg'. Always refer to NP figures as Normalized Power or NP (e.g. '195W NP'), NEVER as 'average power' or 'avg watts'.\n"
         f"Mandatory: All advice and tomorrow guidance MUST strictly respect the athlete's workout and schedule preferences.\n"
-        f"Format response as strict JSON: {{\"insights\": \"2 tight paragraphs synthesizing physiological response, readiness fit, execution nuances, and long-term goal progress, under 180 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\", \"pillar_notes\": {{\"physiological\": \"1 concise insight sentence (<28 words)\", \"readiness\": \"1 concise insight sentence (<28 words)\", \"execution\": \"1 concise insight sentence (<28 words)\", \"goal\": \"1 concise insight sentence (<28 words)\"}}}}"
+        f"Format response as strict JSON: {{\"insights\": \"2 tight paragraphs synthesizing physiological response, readiness fit, execution nuances, and long-term goal progress (plus any new Power PRs), under 190 words\", \"tomorrow_guidance\": \"short 1-2 sentence guidance for tomorrow, under 40 words\", \"pillar_notes\": {{\"physiological\": \"1 concise insight sentence (<28 words)\", \"readiness\": \"1 concise insight sentence (<28 words)\", \"execution\": \"1 concise insight sentence (<28 words)\", \"goal\": \"1 concise insight sentence (<28 words)\"}}}}"
     )
     if custom_prompt:
         prompt += f"\nAthlete note: '{custom_prompt}'"

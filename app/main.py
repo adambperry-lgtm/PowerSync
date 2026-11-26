@@ -147,8 +147,8 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.28.1",
-        "release_name": "Unified Cross-Device DS Coach Scheduled Workouts",
+        "version": "2.29.0",
+        "release_name": "Accurate Non-ERG Self-Paced Analysis & Spiderweb Power PR Debriefs",
         "build_date": "2026-11-26",
         "services": {
             "whoop": "v2 REST API",
@@ -160,6 +160,16 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.29.0",
+                "date": "2026-11-26",
+                "title": "Accurate Non-ERG Self-Paced Analysis & Spiderweb Power PR Debriefs",
+                "items": [
+                    "Multi-Signal ERG vs. Self-Paced Detection: Upgraded 1-Hz stream analysis with tightened CV, plateau flatness, power-cadence coupling veto, and race/free-ride/note signals so steady non-ERG indoor rides are never mislabeled as ERG-locked.",
+                    "Tailored Non-ERG Execution Analysis: Self-paced rides are now analyzed on manual pacing discipline, negative vs. positive splits, work-block fade/progression, peak 5s bursts, and >120% FTP surges—both locally and in Gemini AI coaching.",
+                    "Spiderweb Power PRs in Daily Debrief: Automatically detects All-Time Spiderweb PRs, 30-Day Spiderweb Bests, and newly unlocked Spiderweb Goal targets across all 12 axes (15s–60m), surfacing them in a dedicated debrief PR banner, Pillar 4, and AI Coach insights."
+                ]
+            },
             {
                 "version": "v2.28.1",
                 "date": "2026-11-26",
