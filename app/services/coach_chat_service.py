@@ -22,6 +22,62 @@ def extract_gemini_key_from_text(text: str) -> Optional[str]:
         return match.group(1)
     return None
 
+def _persist_coach_scheduled_workout(
+    proposed_action: Dict[str, Any],
+    target_date: str,
+    user_id: str,
+    ftp: int = 250,
+) -> None:
+    """Persists a DS Coach scheduled workout/plan to both athlete_planned_sessions and the workouts SQLite table."""
+    from app.services.forecast_service import save_athlete_planned_session
+    save_athlete_planned_session(target_date, proposed_action, user_id=user_id)
+    if proposed_action.get("action_type") == "schedule_workout":
+        try:
+            from app.database import save_scheduled_workout
+            from app.services.zwift_service import generate_zwo_xml, generate_intervals_icu_text, reconcile_workout_intervals
+            from app.services.ai_coach import enrich_workout_strain
+
+            today_str = get_athlete_date(user_id).isoformat()
+            is_for_today = (str(target_date)[:10] == today_str)
+            title = proposed_action.get("title") or "Scheduled Workout"
+            duration = int(proposed_action.get("duration_minutes") or 45)
+            focus = proposed_action.get("focus_area") or proposed_action.get("intensity_type") or "Adaptive Training"
+            tss = int(proposed_action.get("estimated_tss") or round(duration * 0.75))
+            raw_intervals = proposed_action.get("intervals") or [
+                {"type": "Warmup", "duration_sec": 300, "power_low_pct": 50, "power_high_pct": 65, "cadence": 88, "name": "Warmup"},
+                {"type": "SteadyState", "duration_sec": max(300, (duration * 60) - 600), "power_pct": 75, "cadence": 90, "name": "Main Set"},
+                {"type": "Cooldown", "duration_sec": 300, "power_low_pct": 55, "power_high_pct": 40, "cadence": 80, "name": "Cooldown"},
+            ]
+            intervals = reconcile_workout_intervals(raw_intervals, duration, ftp=ftp)
+            workout_obj = {
+                "id": "workout_primary" if is_for_today else f"workout_scheduled_{str(target_date)[:10].replace('-', '')}",
+                "option_type": "coach_chat" if is_for_today else "coach_scheduled",
+                "badge": "⭐ Coach's Choice" if is_for_today else "📅 Scheduled",
+                "badge_color": "emerald" if is_for_today else "blue",
+                "title": title,
+                "target_date": str(target_date)[:10],
+                "description": proposed_action.get("description") or f"Scheduled {focus} session for {str(target_date)[:10]} ({duration}m, ~{tss} TSS).",
+                "focus_area": focus,
+                "duration_minutes": duration,
+                "estimated_tss": tss,
+                "distance_miles": 0.0,
+                "elevation_gain_ft": 0.0,
+                "ai_rationale": proposed_action.get("ai_rationale") or f"Prescribed via AI Coach chat. Calibrated to your {ftp}W FTP.",
+                "intervals": intervals,
+                "coach_prescribed": True,
+                "status": "scheduled",
+            }
+            workout_obj["zwo_content"] = generate_zwo_xml(workout_obj, ftp)
+            workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj, ftp=ftp)
+            workout_obj = enrich_workout_strain(workout_obj, ftp)
+            save_scheduled_workout(workout_obj, str(target_date)[:10], user_id=user_id)
+        except Exception as e:
+            print(f"Error persisting coach scheduled workout to SQLite: {e}")
+    try:
+        set_setting("cached_daily_debrief", None, user_id=user_id)
+    except Exception:
+        pass
+
 def get_gemini_api_key() -> str:
     """Retrieves Gemini API key from database settings or environment variables."""
     key = get_setting("gemini_api_key", "").strip()
@@ -1358,9 +1414,13 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
             if proposed_action:
                 act_type = proposed_action.get("action_type")
                 t_date = proposed_action.get("target_date")
-                from app.services.forecast_service import save_athlete_planned_session
                 if act_type in ("schedule_workout", "schedule_upcoming_plan") and t_date:
-                    save_athlete_planned_session(t_date, proposed_action, user_id=uid)
+                    _persist_coach_scheduled_workout(
+                        proposed_action,
+                        t_date,
+                        user_id=uid,
+                        ftp=int(snapshot["athlete"].get("ftp_watts") or 250),
+                    )
                 elif act_type == "clear_upcoming_plan":
                     from app.services.plan_service import execute_clear_plan
                     is_rec_wk = bool(proposed_action.get("is_recovery_week", True))
@@ -1465,9 +1525,13 @@ def handle_coach_chat(user_message: str, history: List[Dict[str, str]] = None) -
     if proposed_action:
         act_type = proposed_action.get("action_type")
         t_date = proposed_action.get("target_date")
-        from app.services.forecast_service import save_athlete_planned_session
         if act_type in ("schedule_workout", "schedule_upcoming_plan") and t_date:
-            save_athlete_planned_session(t_date, proposed_action, user_id=uid)
+            _persist_coach_scheduled_workout(
+                proposed_action,
+                t_date,
+                user_id=uid,
+                ftp=int(snapshot["athlete"].get("ftp_watts") or 250),
+            )
         elif act_type == "clear_upcoming_plan":
             from app.services.plan_service import execute_clear_plan
             is_rec_wk = bool(proposed_action.get("is_recovery_week", True))

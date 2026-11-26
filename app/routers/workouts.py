@@ -395,7 +395,7 @@ def generate_workout(req: WorkoutGenerateRequest):
     from app.database import get_scheduled_workout_for_date, save_scheduled_workout
     from app.services.workout_catalog import rebuild_workout_for_duration
     from app.services.ai_coach import enrich_workout_strain
-    scheduled_target = get_scheduled_workout_for_date(target_iso)
+    scheduled_target = get_scheduled_workout_for_date(target_iso, user_id=uid)
 
     # If user explicitly adjusted duration while a scheduled workout exists (without a conflicting text note),
     # scale the scheduled workout to match the requested duration and persist it.
@@ -611,7 +611,7 @@ def get_current_workout():
         }
     today_iso = get_athlete_date().isoformat()
     from app.database import get_scheduled_workout_for_date
-    scheduled = get_scheduled_workout_for_date(today_iso)
+    scheduled = get_scheduled_workout_for_date(today_iso, user_id=uid)
     workout_cache = get_current_workout_cache()
     options_cache = get_current_options_cache()
     if scheduled and (not workout_cache or workout_cache.get("id") != scheduled.get("id")):
@@ -652,8 +652,8 @@ def get_scheduled_workouts_endpoint():
             "scheduled_workouts": []
         }
     from app.database import get_upcoming_scheduled_workouts
-    today_iso = get_athlete_date().isoformat()
-    workouts = get_upcoming_scheduled_workouts(today_iso)
+    today_iso = get_athlete_date(uid).isoformat()
+    workouts = get_upcoming_scheduled_workouts(today_iso, user_id=uid)
     return {
         "success": True,
         "scheduled_workouts": workouts
@@ -1055,7 +1055,7 @@ def generate_outdoor_recommendation(req: OutdoorRecommendRequest):
             inherited_from_workout = True
         else:
             from app.database import get_scheduled_workout_for_date
-            sched_w = get_scheduled_workout_for_date(today_iso)
+            sched_w = get_scheduled_workout_for_date(today_iso, user_id=uid)
             if sched_w and int(sched_w.get("duration_minutes") or 0) >= 20:
                 effective_dur = int(sched_w["duration_minutes"])
                 inherited_from_workout = True

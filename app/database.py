@@ -2008,6 +2008,62 @@ def clear_coach_chat_messages(user_id: Optional[str] = None) -> int:
     conn.close()
     return deleted
 
+def mark_coach_chat_action_applied(
+    action_type: str,
+    target_date: Optional[str] = None,
+    title: Optional[str] = None,
+    synced_to_zwift: bool = False,
+    message_id: Optional[int] = None,
+    user_id: Optional[str] = None,
+) -> bool:
+    """Marks the matching persisted coach_chat_messages proposed_action as already_applied=True."""
+    uid = user_id or get_current_user_id()
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if message_id:
+        cursor.execute(
+            "SELECT id, proposed_action_json FROM coach_chat_messages WHERE user_id = ? AND id = ?",
+            (uid, int(message_id)),
+        )
+    else:
+        cursor.execute(
+            """
+            SELECT id, proposed_action_json
+            FROM coach_chat_messages
+            WHERE user_id = ? AND role = 'model' AND proposed_action_json IS NOT NULL
+            ORDER BY id DESC
+            LIMIT 25
+            """,
+            (uid,),
+        )
+    rows = cursor.fetchall()
+    updated = False
+    for row in rows:
+        try:
+            pa = json.loads(row["proposed_action_json"])
+        except Exception:
+            continue
+        if not isinstance(pa, dict):
+            continue
+        if pa.get("action_type") != action_type:
+            continue
+        if target_date and pa.get("target_date") and str(pa.get("target_date"))[:10] != str(target_date)[:10]:
+            continue
+        if title and pa.get("title") and str(pa.get("title")).strip().lower() != str(title).strip().lower():
+            continue
+        pa["already_applied"] = True
+        if synced_to_zwift:
+            pa["synced_to_zwift"] = True
+        cursor.execute(
+            "UPDATE coach_chat_messages SET proposed_action_json = ? WHERE id = ? AND user_id = ?",
+            (json.dumps(pa), row["id"], uid),
+        )
+        updated = True
+        break
+    conn.commit()
+    conn.close()
+    return updated
+
 def get_coach_conversation_memory(user_id: Optional[str] = None) -> Dict[str, Any]:
     """Retrieves distilled long-term conversation memory for the specified user."""
     uid = user_id or get_current_user_id()

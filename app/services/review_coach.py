@@ -1969,12 +1969,12 @@ def build_daily_review_and_outlook_local(
     from app.database import get_scheduled_workout_for_date
     for item in outlook_days:
         offset = item["day_offset"]
-        # If athlete explicitly requested rest or zone 2 for this day, or if day is directive rest, honor it
-        if item.get("is_athlete_adjusted") or item.get("is_directive_rest"):
+        # If athlete explicitly requested rest or zone 2 via debrief note, or if day is directive rest, honor it
+        if (item.get("is_athlete_adjusted") and not item.get("is_coach_scheduled")) or item.get("is_directive_rest"):
             continue
 
         target_iso = (today + datetime.timedelta(days=offset)).isoformat()
-        scheduled_w = get_scheduled_workout_for_date(target_iso)
+        scheduled_w = get_scheduled_workout_for_date(target_iso, user_id=uid)
         if scheduled_w:
             w_title = scheduled_w.get("title", "Scheduled Workout")
             w_dur = int(scheduled_w.get("duration_minutes") or 45)
@@ -2070,10 +2070,33 @@ def build_daily_review_and_outlook_local(
 DEBRIEF_CACHE_VERSION = 3
 
 
-def _build_debrief_activity_signature(today_iso: str, day_acts: List[Dict[str, Any]], latest_act: Optional[Dict[str, Any]]) -> str:
+def _build_debrief_activity_signature(
+    today_iso: str,
+    day_acts: List[Dict[str, Any]],
+    latest_act: Optional[Dict[str, Any]],
+    user_id: Optional[str] = None,
+) -> str:
     act_ids = sorted([str(a.get("id") or "") for a in (day_acts or []) if isinstance(a, dict) and a.get("id") is not None])
     latest_id = str(latest_act.get("id") or "") if isinstance(latest_act, dict) else ""
-    return f"{today_iso}|{latest_id}|{','.join(act_ids)}"
+    sched_sig = ""
+    try:
+        from app.database import get_upcoming_scheduled_workouts
+        from app.services.forecast_service import get_athlete_planned_sessions
+        uid = user_id or get_current_user_id()
+        upcoming = get_upcoming_scheduled_workouts(today_iso, user_id=uid)
+        sched_parts = sorted([
+            f"{str(w.get('date') or '')[:10]}:{w.get('id') or ''}:{w.get('title') or ''}:{w.get('duration_minutes') or ''}"
+            for w in (upcoming or [])
+        ])
+        planned = get_athlete_planned_sessions(user_id=uid) or {}
+        plan_parts = sorted([
+            f"{d}:{(v or {}).get('title') or ''}:{(v or {}).get('duration_min') or (v or {}).get('duration_minutes') or ''}"
+            for d, v in planned.items() if d >= today_iso
+        ])
+        sched_sig = f"|{'/'.join(sched_parts)}|{'/'.join(plan_parts)}"
+    except Exception:
+        sched_sig = ""
+    return f"{today_iso}|{latest_id}|{','.join(act_ids)}{sched_sig}"
 
 
 def _build_cached_strava_payload(uid: str, recent_activities: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -2136,7 +2159,7 @@ def generate_ai_review_and_outlook(custom_prompt: str = "", force_refresh: bool 
     day_acts = act_info.get("day_activities", today_acts)
     latest_act = act_info.get("latest_activity")
 
-    activity_signature = _build_debrief_activity_signature(today_iso, day_acts, latest_act)
+    activity_signature = _build_debrief_activity_signature(today_iso, day_acts, latest_act, user_id=uid)
     has_custom_note = bool(custom_prompt and custom_prompt.strip())
 
     if not force_refresh and not has_custom_note:

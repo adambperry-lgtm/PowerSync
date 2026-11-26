@@ -147,9 +147,9 @@ def reset_program_block_api(payload: Optional[dict] = None):
 @app.get("/api/version")
 def version_info():
     return {
-        "version": "2.28.0",
-        "release_name": "1-Hz eFTP Breakthroughs & Goal-Gap-Driven Daily Workouts",
-        "build_date": "2026-11-25",
+        "version": "2.28.1",
+        "release_name": "Unified Cross-Device DS Coach Scheduled Workouts",
+        "build_date": "2026-11-26",
         "services": {
             "whoop": "v2 REST API",
             "strava": "v3 REST API",
@@ -160,6 +160,14 @@ def version_info():
             "cloud": "Railway 24/7 + Persistent Volume"
         },
         "changelog": [
+            {
+                "version": "v2.28.1",
+                "date": "2026-11-26",
+                "title": "Unified Cross-Device DS Coach Scheduled Workouts",
+                "items": [
+                    "Cross-Device Scheduled Workout Sync: Workouts scheduled via DS Coach now persist immediately to the SQLite workouts table, update chat action cards as applied across browsers/devices, and invalidate stale 3-day outlook caches so your Mac and phone always stay in sync."
+                ]
+            },
             {
                 "version": "v2.28.0",
                 "date": "2026-11-25",

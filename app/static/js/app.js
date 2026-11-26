@@ -5473,6 +5473,24 @@ function renderForecastSteps(item) {
 // ============================================================================
 let activeTargetPlan = null;
 
+async function loadScheduledWorkouts() {
+  try {
+    const res = await fetch("/api/workouts/scheduled");
+    if (!res.ok) return [];
+    const data = await res.json();
+    if (data && data.success && Array.isArray(data.scheduled_workouts)) {
+      state.scheduledWorkouts = data.scheduled_workouts;
+      if (data.scheduled_workouts.length > 0) {
+        state.scheduledZwiftWorkout = data.scheduled_workouts[0];
+      }
+      return data.scheduled_workouts;
+    }
+  } catch (e) {
+    console.warn("Could not load scheduled workouts:", e);
+  }
+  return [];
+}
+
 async function loadUpcomingPlan() {
   try {
     const res = await fetch("/api/plans/active");
@@ -6788,7 +6806,8 @@ async function loadCoachChatHistory(force = false) {
           uiRole,
           msgText,
           msg.proposed_action || null,
-          msg.executed_tools || null
+          msg.executed_tools || null,
+          msg.id || null
         );
         coachChatHistory.push({
           role: msg.role === "user" ? "user" : "model",
@@ -6937,7 +6956,7 @@ function formatCoachMarkdown(text) {
   return html;
 }
 
-function appendCoachChatMessage(role, text, actionData = null, executedTools = null) {
+function appendCoachChatMessage(role, text, actionData = null, executedTools = null, messageId = null) {
   if (!coachChatMessages) return;
   const msgDiv = document.createElement("div");
   msgDiv.className = `chat-msg chat-msg-${role === "user" ? "user" : "coach"}`;
@@ -6985,11 +7004,13 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
     let btnLabel = "";
     if (isToday) {
       badgeLabel = "⚡ Proposed For Today";
-      btnLabel = "⚡ Apply as Today's Workout";
+      btnLabel = actionData.already_applied ? "✓ Active on Today's Dashboard! 🚀" : "⚡ Apply as Today's Workout";
     } else if (isScheduleWorkout) {
       const d = actionData.target_date || "Tomorrow";
       badgeLabel = `📅 Scheduled for ${d}`;
-      btnLabel = "🚀 Sync to Zwift Calendar";
+      btnLabel = actionData.already_applied
+        ? (actionData.synced_to_zwift ? "✓ Scheduled & Synced to Zwift! 🚀" : "✓ Scheduled! 📅")
+        : "🚀 Sync to Zwift Calendar";
     } else if (isClearTravelWeek) {
       badgeLabel = "🔄 Normal Training Restored";
       btnLabel = actionData.already_applied ? "✓ Travel Week Tag Cleared! 🔄" : "🔄 Clear Travel & Recovery Tag";
@@ -6998,7 +7019,7 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
       btnLabel = actionData.already_applied ? "✓ Plan Cleared! 🗑️" : "🗑️ Confirm Clear Plan";
     } else {
       badgeLabel = `🏆 Target Event (${actionData.target_date || 'Upcoming'})`;
-      btnLabel = "🏆 Set as Target Event & Activate Taper";
+      btnLabel = actionData.already_applied ? "✓ Scheduled in Training Plan! 📅" : "🏆 Set as Target Event & Activate Taper";
     }
 
     const isIndoor = actionData.is_indoor || !actionData.distance_miles || actionData.distance_miles === 0;
@@ -7027,7 +7048,7 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
     `;
 
     const applyBtn = actionCard.querySelector(".btn-chat-apply-action");
-    if (actionData.already_applied && (isClear || isClearTravelWeek)) {
+    if (actionData.already_applied) {
       applyBtn.classList.remove("btn-primary");
       applyBtn.classList.add("btn-applied");
       applyBtn.disabled = true;
@@ -7042,7 +7063,8 @@ function appendCoachChatMessage(role, text, actionData = null, executedTools = n
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             action_type: actionData.action_type,
-            action_data: actionData
+            action_data: actionData,
+            message_id: messageId
           })
         });
         const resData = await res.json();
@@ -10244,6 +10266,12 @@ async function bootApp() {
     }
   } catch (err) {
     console.warn("Failed to load settings in bootApp:", err);
+  }
+
+  try {
+    await loadScheduledWorkouts();
+  } catch (e) {
+    console.warn("Scheduled workouts load error in bootApp:", e);
   }
 
   try {

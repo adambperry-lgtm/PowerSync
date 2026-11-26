@@ -5,7 +5,8 @@ from typing import Optional, List, Dict, Any
 from app.database import (
     get_setting, set_setting, get_current_user_id, get_athlete_date, GUEST_USER_ID,
     get_coach_chat_messages, clear_coach_chat_messages,
-    get_coach_conversation_memory, clear_coach_conversation_memory
+    get_coach_conversation_memory, clear_coach_conversation_memory,
+    mark_coach_chat_action_applied, get_upcoming_scheduled_workouts
 )
 from app.routers.settings import require_authenticated_user
 from app.services.coach_chat_service import (
@@ -44,6 +45,30 @@ def get_chat_history_endpoint(limit: int = 50):
     uid = get_current_user_id()
     safe_limit = max(1, min(int(limit or 50), 200))
     messages = get_coach_chat_messages(limit=safe_limit, user_id=uid)
+    try:
+        today_iso = get_athlete_date(uid).isoformat()
+        scheduled = get_upcoming_scheduled_workouts(today_iso, user_id=uid)
+        sched_by_date = {}
+        for sw in scheduled:
+            d = str(sw.get("date") or "")[:10]
+            if d:
+                sched_by_date.setdefault(d, []).append(sw)
+        for msg in messages:
+            pa = msg.get("proposed_action")
+            if not isinstance(pa, dict):
+                continue
+            act_type = pa.get("action_type")
+            if act_type in ("schedule_workout", "apply_today_workout"):
+                t_date = str(pa.get("target_date") or (today_iso if act_type == "apply_today_workout" else ""))[:10]
+                if t_date and t_date in sched_by_date:
+                    pa_title = str(pa.get("title") or "").strip().lower()
+                    for sw in sched_by_date[t_date]:
+                        sw_title = str(sw.get("title") or "").strip().lower()
+                        if not pa_title or not sw_title or pa_title == sw_title or pa_title in sw_title or sw_title in pa_title:
+                            pa["already_applied"] = True
+                            break
+    except Exception:
+        pass
     memory = get_coach_conversation_memory(user_id=uid)
     return {
         "success": True,
@@ -193,6 +218,7 @@ def _clean_float(val: Any, default: float = 0.0) -> float:
 class ApplyChatActionPayload(BaseModel):
     action_type: str  # "apply_today_workout" | "schedule_upcoming_plan"
     action_data: Dict[str, Any]
+    message_id: Optional[int] = None
 
 @router.post("/apply-action")
 def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
@@ -246,7 +272,15 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj, ftp=ftp)
             workout_obj = enrich_workout_strain(workout_obj, ftp)
 
-            save_scheduled_workout(workout_obj, today_iso)
+            save_scheduled_workout(workout_obj, today_iso, user_id=uid)
+            mark_coach_chat_action_applied(
+                "apply_today_workout",
+                target_date=today_iso,
+                title=title,
+                message_id=payload.message_id,
+                user_id=uid,
+            )
+            set_setting("cached_daily_debrief", None, user_id=uid)
 
             workout_cache = get_current_workout_cache()
             options_cache = get_current_options_cache()
@@ -312,7 +346,7 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
                 target_date = (get_athlete_date() + datetime.timedelta(days=1)).isoformat()
             is_for_today = (target_date == today_str)
 
-            ftp = _clean_int(get_setting("athlete_ftp", 250), 250)
+            ftp = _clean_int(get_setting("athlete_ftp", 250, user_id=uid), 250)
             title = data.get("title") or "Scheduled Workout"
             duration = _clean_int(data.get("duration_minutes"), 45)
             focus = data.get("focus_area") or data.get("intensity_type") or "Adaptive Training"
@@ -345,8 +379,8 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             workout_obj["intervals_icu_text"] = generate_intervals_icu_text(workout_obj, ftp=ftp)
             workout_obj = enrich_workout_strain(workout_obj, ftp)
 
-            athlete_id = get_setting("intervals_athlete_id", "")
-            api_key = get_setting("intervals_icu_api_key", "")
+            athlete_id = get_setting("intervals_athlete_id", "", user_id=uid)
+            api_key = get_setting("intervals_icu_api_key", "", user_id=uid)
             sync_result = None
             if athlete_id and api_key and "•" not in api_key and "\u2022" not in api_key:
                 try:
@@ -364,6 +398,15 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             save_scheduled_workout(workout_obj, target_date, user_id=uid)
             from app.services.forecast_service import save_athlete_planned_session
             save_athlete_planned_session(target_date, workout_obj, user_id=uid)
+            mark_coach_chat_action_applied(
+                "schedule_workout",
+                target_date=target_date,
+                title=title,
+                synced_to_zwift=synced_zwift,
+                message_id=payload.message_id,
+                user_id=uid,
+            )
+            set_setting("cached_daily_debrief", None, user_id=uid)
 
             from app.services.review_coach import build_preference_aligned_outlook_days
             from app.services.forecast_service import save_coach_forecast_plan
@@ -437,6 +480,14 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             set_setting("travel_recovery_week_active", False, user_id=uid)
             from app.services.forecast_service import save_athlete_planned_session, save_coach_forecast_plan
             save_athlete_planned_session(plan_dict["target_date"], plan_dict, user_id=uid)
+            mark_coach_chat_action_applied(
+                "schedule_upcoming_plan",
+                target_date=plan_dict["target_date"],
+                title=plan_dict["title"],
+                message_id=payload.message_id,
+                user_id=uid,
+            )
+            set_setting("cached_daily_debrief", None, user_id=uid)
 
             from app.services.review_coach import build_preference_aligned_outlook_days
             try:
@@ -472,11 +523,15 @@ def apply_chat_action_endpoint(payload: ApplyChatActionPayload):
             from app.services.plan_service import execute_clear_plan
             is_rec_wk = bool(data.get("is_recovery_week", True))
             res = execute_clear_plan(user_id=uid, is_recovery_week=is_rec_wk, notes=str(data.get("description", "")))
+            mark_coach_chat_action_applied("clear_upcoming_plan", message_id=payload.message_id, user_id=uid)
+            set_setting("cached_daily_debrief", None, user_id=uid)
             return res
 
         elif action_type == "clear_travel_recovery_week":
             from app.services.plan_service import execute_clear_travel_recovery_week
             res = execute_clear_travel_recovery_week(user_id=uid)
+            mark_coach_chat_action_applied("clear_travel_recovery_week", message_id=payload.message_id, user_id=uid)
+            set_setting("cached_daily_debrief", None, user_id=uid)
             return res
 
         else:

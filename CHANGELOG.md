@@ -3,6 +3,13 @@
 All notable changes to the PowerSync Adaptive Cycling Coach & Zwift Sync platform are documented in this file.
 From version 2.2.0 forward, this changelog and the in-app version endpoint (`/api/version`) are automatically updated with every meaningful release.
 
+## [2.28.1] - 2026-11-26
+### Fixed
+- **Unified Cross-Device DS Coach Scheduled Workouts**:
+  - Updated [`_persist_coach_scheduled_workout()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/coach_chat_service.py) so workouts scheduled via DS Coach are immediately persisted to the SQLite `workouts` table (`status = 'scheduled'`) in addition to `athlete_planned_sessions`.
+  - Added [`mark_coach_chat_action_applied()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/database.py) and cross-checking in [`get_chat_history_endpoint()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/routers/chat.py) + [`appendCoachChatMessage()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) so applied DS Coach action cards (`schedule_workout`, `apply_today_workout`, `schedule_upcoming_plan`) show as scheduled across all browsers and devices.
+  - Updated [`_build_debrief_activity_signature()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/services/review_coach.py) and invalidated `cached_daily_debrief` on action apply so the 3-Day Forward Outlook immediately reflects scheduled workouts on every device, and added [`loadScheduledWorkouts()`](file:///home/antigravity/adambperry-lgtm/PowerSync/app/static/js/app.js) to hydrate `/api/workouts/scheduled` on app boot.
+
 ## [2.28.0] - 2026-11-25
 ### Added
 - **1-Hz Stream eFTP Breakthrough Detection & Goal-Gap-Driven Daily Workouts**:
